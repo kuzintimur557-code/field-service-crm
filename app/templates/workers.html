@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>Workers</title>
+</head>
+
+<body style="
+background:#f5f7fb;
+font-family:Arial;
+padding:20px;
+">
+
+<a href="/"
+style="
+background:#2d89ef;
+color:white;
+padding:10px 16px;
+border-radius:10px;
+text-decoration:none;
+">
+Назад
+</a>
+
+<br><br>
+
+<div style="
+background:white;
+padding:20px;
+border-radius:20px;
+max-width:700px;
+margin-bottom:20px;
+">
+
+<h1>Workers</h1>
+
+<form method="post" action="/add_worker">
+
+<input
+name="username"
+placeholder="Логин"
+style="
+width:100%;
+padding:12px;
+margin-bottom:10px;
+"
+>
+
+<input
+name="password"
+placeholder="Пароль"
+style="
+width:100%;
+padding:12px;
+margin-bottom:10px;
+"
+>
+
+<button style="
+width:100%;
+background:#27ae60;
+color:white;
+border:none;
+padding:12px;
+border-radius:10px;
+cursor:pointer;
+">
+Добавить worker
+</button>
+
+</form>
+
+</div>
+
+{% for worker in workers %}
+
+<div style="
+background:white;
+padding:20px;
+border-radius:20px;
+max-width:700px;
+margin-bottom:20px;
+">
+
+<h2>
+{{ worker["username"] }}
+</h2>
+
+👷 Worker account
+
+</div>
+
+{% endfor %}
+
+</body>
+</html>

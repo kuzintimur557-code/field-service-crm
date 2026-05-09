@@ -1,0 +1,16 @@
+{
+  "name": "Field Service CRM",
+  "short_name": "CRM",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#2d89ef",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2920/2920277.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
