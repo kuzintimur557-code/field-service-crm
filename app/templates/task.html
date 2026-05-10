@@ -30,69 +30,36 @@ padding:20px;
 background:white;
 padding:24px;
 border-radius:24px;
-margin-bottom:20px;
 box-shadow:0 4px 20px rgba(0,0,0,0.05);
-}
-
-.top{
-display:flex;
-justify-content:space-between;
-align-items:center;
-gap:20px;
-flex-wrap:wrap;
-}
-
-input,
-textarea,
-select{
-width:100%;
-padding:14px;
-margin-bottom:12px;
-border-radius:12px;
-border:1px solid #ddd;
-box-sizing:border-box;
-font-size:16px;
-}
-
-button{
-width:100%;
-background:#2d89ef;
-color:white;
-border:none;
-padding:16px;
-border-radius:14px;
-font-size:18px;
-cursor:pointer;
-}
-
-.map-btn{
-display:inline-block;
-background:#27ae60;
-color:white;
-padding:12px 18px;
-border-radius:12px;
-text-decoration:none;
-font-weight:bold;
-margin-top:10px;
 }
 
 .back{
 display:inline-block;
 margin-bottom:20px;
-text-decoration:none;
-font-weight:bold;
 font-size:18px;
+font-weight:bold;
+text-decoration:none;
 }
 
-img{
-width:100%;
-border-radius:20px;
-margin-top:20px;
+.row{
+margin-bottom:18px;
+}
+
+.label{
+font-size:14px;
+color:gray;
+margin-bottom:6px;
+}
+
+.value{
+font-size:20px;
+font-weight:bold;
 }
 
 .status{
-padding:10px 14px;
-border-radius:12px;
+display:inline-block;
+padding:12px 16px;
+border-radius:14px;
 color:white;
 font-weight:bold;
 }
@@ -109,32 +76,44 @@ background:#f39c12;
 background:#27ae60;
 }
 
-.price{
-font-size:32px;
+img{
+width:100%;
+border-radius:20px;
+margin-top:20px;
+}
+
+form{
+margin-top:30px;
+}
+
+select,
+button{
+width:100%;
+padding:14px;
+border-radius:14px;
+border:1px solid #ddd;
+margin-bottom:14px;
+font-size:16px;
+box-sizing:border-box;
+}
+
+button{
+background:#2d89ef;
+color:white;
+border:none;
+cursor:pointer;
+}
+
+.map{
+display:block;
+margin-top:20px;
+background:#2d89ef;
+color:white;
+padding:14px;
+text-align:center;
+border-radius:14px;
+text-decoration:none;
 font-weight:bold;
-color:#27ae60;
-}
-
-.grid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:20px;
-}
-
-@media(max-width:800px){
-
-.grid{
-grid-template-columns:1fr;
-}
-
-.container{
-padding:12px;
-}
-
-.card{
-padding:18px;
-}
-
 }
 
 </style>
@@ -151,33 +130,73 @@ padding:18px;
 
 <div class="card">
 
-<div class="top">
-
-<div>
-
-<h1>
+<div class="row">
+<div class="label">
+Клиент
+</div>
+<div class="value">
 {{ task["client"] }}
-</h1>
-
-<p>
-📞 {{ task["phone"] }}
-</p>
-
-<p>
-📍 {{ task["address"] }}
-</p>
-
-<p>
-📅 {{ task["task_date"] }}
-</p>
-
-<p>
-👷 {{ task["worker"] }}
-</p>
-
+</div>
 </div>
 
-<div>
+<div class="row">
+<div class="label">
+Телефон
+</div>
+<div class="value">
+{{ task["phone"] }}
+</div>
+</div>
+
+<div class="row">
+<div class="label">
+Адрес
+</div>
+<div class="value">
+{{ task["address"] }}
+</div>
+</div>
+
+<div class="row">
+<div class="label">
+Описание
+</div>
+<div class="value">
+{{ task["description"] }}
+</div>
+</div>
+
+<div class="row">
+<div class="label">
+Дата
+</div>
+<div class="value">
+{{ task["task_date"] }}
+</div>
+</div>
+
+<div class="row">
+<div class="label">
+Монтажник
+</div>
+<div class="value">
+{{ task["worker"] }}
+</div>
+</div>
+
+<div class="row">
+<div class="label">
+Стоимость
+</div>
+<div class="value">
+${{ task["price"] }}
+</div>
+</div>
+
+<div class="row">
+<div class="label">
+Статус
+</div>
 
 {% if task['status'] == 'Новая' %}
 
@@ -199,141 +218,44 @@ padding:18px;
 
 {% endif %}
 
-<br>
-
-<div class="price">
-${{ task["price"] }}
 </div>
-
-</div>
-
-</div>
-
-<hr style="margin:30px 0; border:none; border-top:1px solid #eee;">
-
-<h2>
-📝 Описание
-</h2>
-
-<p style="
-font-size:18px;
-line-height:1.6;
-">
-{{ task["description"] }}
-</p>
 
 <a
 href="{{ map_url }}"
 target="_blank"
-class="map-btn"
+class="map"
 >
-🗺 Открыть маршрут
+📍 Открыть Google Maps
 </a>
 
 {% if task["photo"] %}
 
-<img src="/{{ task['photo'] }}">
+<img
+src="/uploads/{{ task['photo'] }}"
+>
 
 {% endif %}
 
-</div>
-
-<div class="card">
-
-<h2>
-✏ Обновить заявку
-</h2>
-
-<form
-method="post"
-action="/task/{{ task['id'] }}/update"
-enctype="multipart/form-data"
->
-
-<div class="grid">
-
-<div>
-
-<label>
-Статус
-</label>
+<form method="post">
 
 <select name="status">
 
-<option
-value="Новая"
-{% if task['status'] == 'Новая' %}selected{% endif %}
->
+<option value="Новая">
 Новая
 </option>
 
-<option
-value="В работе"
-{% if task['status'] == 'В работе' %}selected{% endif %}
->
+<option value="В работе">
 В работе
 </option>
 
-<option
-value="Завершено"
-{% if task['status'] == 'Завершено' %}selected{% endif %}
->
+<option value="Завершено">
 Завершено
 </option>
 
 </select>
 
-</div>
-
-<div>
-
-<label>
-Монтажник
-</label>
-
-<select name="worker">
-
-{% for worker in workers %}
-
-<option
-value="{{ worker['username'] }}"
-{% if task['worker'] == worker['username'] %}selected{% endif %}
->
-
-{{ worker["username"] }}
-
-</option>
-
-{% endfor %}
-
-</select>
-
-</div>
-
-</div>
-
-<label>
-Описание
-</label>
-
-<textarea
-name="description"
-style="height:140px;"
->{{ task["description"] }}</textarea>
-
-<label>
-Фото / документ
-</label>
-
-<input
-type="file"
-name="photo"
->
-
-<br><br>
-
 <button>
-💾 Сохранить изменения
+💾 Обновить статус
 </button>
 
 </form>

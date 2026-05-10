@@ -696,3 +696,126 @@ async def create_task(
         status_code=302
     )
 
+
+
+@app.get("/task/{task_id}", response_class=HTMLResponse)
+def task_page(
+    request: Request,
+    task_id: int
+):
+
+    username = get_user(request)
+
+    if not username:
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
+
+    conn = connect()
+
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    conn.close()
+
+    if not task:
+
+        return RedirectResponse(
+            "/",
+            status_code=302
+        )
+
+    encoded = urllib.parse.quote(
+        task["address"]
+    )
+
+    map_url = f"https://maps.google.com/?q={encoded}"
+
+    return templates.TemplateResponse(
+        request,
+        "task.html",
+        {
+            "task": task,
+            "map_url": map_url
+        }
+    )
+
+
+@app.post("/task/{task_id}")
+async def update_task(
+    request: Request,
+    task_id: int
+):
+
+    username = get_user(request)
+
+    if not username:
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
+
+    form = await request.form()
+
+    status = form.get("status")
+
+    conn = connect()
+
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+
+        conn.close()
+
+        return RedirectResponse(
+            "/",
+            status_code=302
+        )
+
+    c.execute("""
+    UPDATE tasks
+    SET status=?
+    WHERE id=?
+    """, (
+        status,
+        task_id
+    ))
+
+    conn.commit()
+
+    conn.close()
+
+    try:
+
+        send_message(
+            f"""
+📦 Статус заявки обновлен
+
+👤 Клиент: {task['client']}
+
+👷 Монтажник: {task['worker']}
+
+📌 Новый статус: {status}
+"""
+        )
+
+    except:
+        pass
+
+    return RedirectResponse(
+        f"/task/{task_id}",
+        status_code=302
+    )
+
