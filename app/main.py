@@ -540,3 +540,159 @@ async def update_task(
         f"/task/{task_id}",
         status_code=302
     )
+
+
+@app.get("/create-task", response_class=HTMLResponse)
+def create_task_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
+
+    role = get_role(username)
+
+    if role != "boss":
+
+        return RedirectResponse(
+            "/",
+            status_code=302
+        )
+
+    conn = connect()
+
+    c = conn.cursor()
+
+    workers = c.execute("""
+    SELECT * FROM users
+    WHERE role='worker'
+    """).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "create_task.html",
+        {
+            "workers": workers
+        }
+    )
+
+
+@app.post("/create-task")
+async def create_task(
+    request: Request,
+    photo: UploadFile = File(None)
+):
+
+    username = get_user(request)
+
+    if not username:
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
+
+    role = get_role(username)
+
+    if role != "boss":
+
+        return RedirectResponse(
+            "/",
+            status_code=302
+        )
+
+    form = await request.form()
+
+    client = form.get("client")
+    phone = form.get("phone")
+    address = form.get("address")
+    description = form.get("description")
+    task_date = form.get("task_date")
+    worker = form.get("worker")
+    priority = form.get("priority")
+    price = form.get("price")
+
+    filename = ""
+
+    if photo and photo.filename:
+
+        os.makedirs("uploads", exist_ok=True)
+
+        filename = f"task_{photo.filename}"
+
+        filepath = f"uploads/{filename}"
+
+        with open(filepath, "wb") as buffer:
+
+            shutil.copyfileobj(
+                photo.file,
+                buffer
+            )
+
+    conn = connect()
+
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO tasks (
+        client,
+        phone,
+        address,
+        description,
+        task_date,
+        worker,
+        status,
+        priority,
+        photo,
+        price
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        client,
+        phone,
+        address,
+        description,
+        task_date,
+        worker,
+        "Новая",
+        priority,
+        filename,
+        price
+    ))
+
+    conn.commit()
+
+    conn.close()
+
+    try:
+
+        send_message(
+            f"""
+🚀 Новая заявка
+
+👤 Клиент: {client}
+
+📞 Телефон: {phone}
+
+📍 Адрес: {address}
+
+👷 Монтажник: {worker}
+
+💰 Цена: {price}
+"""
+        )
+
+    except:
+        pass
+
+    return RedirectResponse(
+        "/",
+        status_code=302
+    )
+
