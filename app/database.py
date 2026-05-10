@@ -1,11 +1,13 @@
 import sqlite3
+import os
 
-DB = "crm.db"
+
+DB_NAME = "crm.db"
 
 
 def connect():
 
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB_NAME)
 
     conn.row_factory = sqlite3.Row
 
@@ -20,41 +22,29 @@ def init_db():
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS users (
-
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT,
         password TEXT,
-        role TEXT
+        role TEXT,
+        last_seen TEXT
     )
     """)
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS tasks (
-
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         client TEXT,
         phone TEXT,
         address TEXT,
         description TEXT,
+        task_date TEXT,
         worker TEXT,
         status TEXT,
         priority TEXT,
-        task_date TEXT,
-        photo TEXT
+        photo TEXT,
+        price REAL
     )
     """)
-
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS comments (
-
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id INTEGER,
-        username TEXT,
-        text TEXT
-    )
-    """)
-
-    conn.commit()
 
     boss = c.execute("""
     SELECT * FROM users
@@ -67,15 +57,39 @@ def init_db():
         INSERT INTO users (
             username,
             password,
-            role
+            role,
+            last_seen
         )
-        VALUES (?, ?, ?)
+        VALUES (?, ?, ?, ?)
         """, (
             "boss",
-            "1234",
-            "boss"
+            "boss123",
+            "boss",
+            ""
         ))
 
-        conn.commit()
+    worker = c.execute("""
+    SELECT * FROM users
+    WHERE username='worker'
+    """).fetchone()
+
+    if not worker:
+
+        c.execute("""
+        INSERT INTO users (
+            username,
+            password,
+            role,
+            last_seen
+        )
+        VALUES (?, ?, ?, ?)
+        """, (
+            "worker",
+            "worker123",
+            "worker",
+            ""
+        ))
+
+    conn.commit()
 
     conn.close()
