@@ -1,5 +1,4 @@
 import sqlite3
-import os
 
 
 DB_NAME = "crm.db"
@@ -42,7 +41,9 @@ def init_db():
         status TEXT,
         priority TEXT,
         photo TEXT,
-        price REAL
+        price REAL,
+        report TEXT,
+        after_photo TEXT
     )
     """)
 
@@ -89,6 +90,27 @@ def init_db():
             "worker",
             ""
         ))
+
+    columns = [
+        row["name"]
+        for row in c.execute(
+            "PRAGMA table_info(tasks)"
+        ).fetchall()
+    ]
+
+    if "report" not in columns:
+
+        c.execute("""
+        ALTER TABLE tasks
+        ADD COLUMN report TEXT
+        """)
+
+    if "after_photo" not in columns:
+
+        c.execute("""
+        ALTER TABLE tasks
+        ADD COLUMN after_photo TEXT
+        """)
 
     conn.commit()
 
