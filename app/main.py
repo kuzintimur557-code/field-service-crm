@@ -400,7 +400,18 @@ async def create_task(
     ))
 
     conn.commit()
+send_message(
+    f"""
+🔥 Новая заявка
 
+👤 Клиент: {client}
+📞 Телефон: {phone}
+📍 Адрес: {address}
+🛠 Монтажник: {worker}
+📅 Дата: {task_date}
+💰 Сумма: {price}
+"""
+)
     conn.close()
 
     try:
