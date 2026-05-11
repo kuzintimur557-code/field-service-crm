@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -7,6 +7,7 @@ from app.database import connect, init_db
 from app.telegram_utils import send_message
 
 from datetime import datetime
+from reportlab.pdfgen import canvas
 
 import shutil
 import os
@@ -360,25 +361,6 @@ async def create_task(
 
     conn.close()
 
-    try:
-
-        send_message(
-            f"""
-🚀 Новая заявка
-
-👤 Клиент: {client}
-
-📍 Адрес: {address}
-
-👷 Монтажник: {worker}
-
-💰 Цена: {price}
-"""
-        )
-
-    except:
-        pass
-
     return RedirectResponse(
         "/",
         status_code=302
@@ -410,13 +392,6 @@ def task_page(
     """, (task_id,)).fetchone()
 
     conn.close()
-
-    if not task:
-
-        return RedirectResponse(
-            "/",
-            status_code=302
-        )
 
     encoded = urllib.parse.quote(
         task["address"]
@@ -466,15 +441,6 @@ async def update_task(
     WHERE id=?
     """, (task_id,)).fetchone()
 
-    if not task:
-
-        conn.close()
-
-        return RedirectResponse(
-            "/",
-            status_code=302
-        )
-
     after_filename = task["after_photo"]
 
     if after_photo and after_photo.filename:
@@ -517,25 +483,101 @@ async def update_task(
 
     conn.close()
 
-    try:
-
-        send_message(
-            f"""
-📦 Заявка обновлена
-
-👤 Клиент: {task['client']}
-
-📌 Статус: {status}
-
-📝 Отчет:
-{report}
-"""
-        )
-
-    except:
-        pass
-
     return RedirectResponse(
         f"/task/{task_id}",
         status_code=302
+    )
+
+
+@app.get("/task/{task_id}/pdf")
+def generate_pdf(
+    request: Request,
+    task_id: int
+):
+
+    username = get_user(request)
+
+    if not username:
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
+
+    conn = connect()
+
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    conn.close()
+
+    if not task:
+
+        return RedirectResponse(
+            "/",
+            status_code=302
+        )
+
+    os.makedirs(
+        "uploads/docs",
+        exist_ok=True
+    )
+
+    filename = (
+        f"uploads/docs/task_{task_id}.pdf"
+    )
+
+    pdf = canvas.Canvas(filename)
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        22
+    )
+
+    pdf.drawString(
+        50,
+        800,
+        "Field Service Report"
+    )
+
+    pdf.setFont(
+        "Helvetica",
+        14
+    )
+
+    y = 740
+
+    lines = [
+        f"Client: {task['client']}",
+        f"Phone: {task['phone']}",
+        f"Address: {task['address']}",
+        f"Worker: {task['worker']}",
+        f"Date: {task['task_date']}",
+        f"Status: {task['status']}",
+        f"Price: ${task['price']}",
+        "",
+        "Report:",
+        task["report"] or ""
+    ]
+
+    for line in lines:
+
+        pdf.drawString(
+            50,
+            y,
+            str(line)
+        )
+
+        y -= 30
+
+    pdf.save()
+
+    return FileResponse(
+        filename,
+        media_type='application/pdf',
+        filename=f"task_{task_id}.pdf"
     )

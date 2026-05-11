@@ -111,7 +111,8 @@ border:none;
 cursor:pointer;
 }
 
-.map{
+.map,
+.pdf{
 display:block;
 margin-top:20px;
 background:#2d89ef;
@@ -121,6 +122,10 @@ text-align:center;
 border-radius:14px;
 text-decoration:none;
 font-weight:bold;
+}
+
+.pdf{
+background:#27ae60;
 }
 
 .section{
@@ -212,6 +217,14 @@ target="_blank"
 class="map"
 >
 📍 Открыть Google Maps
+</a>
+
+<a
+href="/task/{{ task['id'] }}/pdf"
+target="_blank"
+class="pdf"
+>
+📄 Скачать PDF акт
 </a>
 
 {% if task["photo"] %}
