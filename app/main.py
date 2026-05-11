@@ -181,6 +181,47 @@ def home(request: Request):
         ORDER BY id DESC
         """, (username,)).fetchall()
 
+    workers = c.execute("""
+    SELECT * FROM users
+    WHERE role='worker'
+    """).fetchall()
+
+    worker_stats = []
+
+    for w in workers:
+
+        completed = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE worker=?
+        AND status='Завершено'
+        """, (w["username"],)).fetchone()[0]
+
+        active = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE worker=?
+        AND status='В работе'
+        """, (w["username"],)).fetchone()[0]
+
+        revenue_worker = c.execute("""
+        SELECT SUM(price)
+        FROM tasks
+        WHERE worker=?
+        AND status='Завершено'
+        """, (w["username"],)).fetchone()[0]
+
+        if revenue_worker is None:
+            revenue_worker = 0
+
+        worker_stats.append({
+            "username": w["username"],
+            "completed": completed,
+            "active": active,
+            "revenue": revenue_worker,
+            "last_seen": w["last_seen"]
+        })
+
     revenue = c.execute("""
     SELECT SUM(price)
     FROM tasks
@@ -226,7 +267,8 @@ def home(request: Request):
             "total_tasks": total_tasks,
             "new_tasks": new_tasks,
             "working_tasks": working_tasks,
-            "done_tasks": done_tasks
+            "done_tasks": done_tasks,
+            "worker_stats": worker_stats
         }
     )
 
@@ -361,6 +403,25 @@ async def create_task(
 
     conn.close()
 
+    try:
+
+        send_message(
+            f"""
+🚀 Новая заявка
+
+👤 Клиент: {client}
+
+📍 Адрес: {address}
+
+👷 Монтажник: {worker}
+
+💰 Цена: {price}
+"""
+        )
+
+    except:
+        pass
+
     return RedirectResponse(
         "/",
         status_code=302
@@ -392,6 +453,13 @@ def task_page(
     """, (task_id,)).fetchone()
 
     conn.close()
+
+    if not task:
+
+        return RedirectResponse(
+            "/",
+            status_code=302
+        )
 
     encoded = urllib.parse.quote(
         task["address"]
@@ -482,6 +550,24 @@ async def update_task(
     conn.commit()
 
     conn.close()
+
+    try:
+
+        send_message(
+            f"""
+📦 Заявка обновлена
+
+👤 Клиент: {task['client']}
+
+📌 Статус: {status}
+
+📝 Отчет:
+{report}
+"""
+        )
+
+    except:
+        pass
 
     return RedirectResponse(
         f"/task/{task_id}",

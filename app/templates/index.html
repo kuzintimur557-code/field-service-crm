@@ -83,6 +83,7 @@ margin-top:10px;
 .tasks{
 display:grid;
 gap:18px;
+margin-top:20px;
 }
 
 .task{
@@ -120,39 +121,35 @@ background:#f39c12;
 background:#27ae60;
 }
 
-.search{
-background:white;
-padding:20px;
-border-radius:20px;
+.section-title{
+font-size:28px;
+font-weight:bold;
+margin-top:40px;
 margin-bottom:20px;
+}
+
+.worker-grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+gap:20px;
+}
+
+.worker-card{
+background:white;
+padding:24px;
+border-radius:24px;
 box-shadow:0 4px 20px rgba(0,0,0,0.05);
 }
 
-input,
-select{
-width:100%;
-padding:14px;
-border-radius:12px;
-border:1px solid #ddd;
+.worker-name{
+font-size:24px;
+font-weight:bold;
+margin-bottom:20px;
+}
+
+.worker-stat{
 margin-bottom:12px;
-box-sizing:border-box;
-}
-
-.search-grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-gap:12px;
-}
-
-button{
-background:#2d89ef;
-color:white;
-border:none;
-padding:14px;
-border-radius:12px;
-font-size:16px;
-cursor:pointer;
-width:100%;
+font-size:18px;
 }
 
 @media(max-width:700px){
@@ -244,59 +241,52 @@ ${{ revenue }}
 
 </div>
 
-<div class="search">
+{% if role == 'boss' %}
 
-<form method="get">
-
-<div class="search-grid">
-
-<div>
-
-<input
-type="text"
-name="search"
-placeholder="Поиск клиента"
-value="{{ search }}"
->
-
+<div class="section-title">
+👷 Монтажники
 </div>
 
-<div>
+<div class="worker-grid">
 
-<select name="status">
+{% for worker in worker_stats %}
 
-<option value="">
-Все статусы
-</option>
+<div class="worker-card">
 
-<option value="Новая">
-Новая
-</option>
-
-<option value="В работе">
-В работе
-</option>
-
-<option value="Завершено">
-Завершено
-</option>
-
-</select>
-
+<div class="worker-name">
+{{ worker["username"] }}
 </div>
 
-<div>
+<div class="worker-stat">
+✅ Завершено:
+<b>{{ worker["completed"] }}</b>
+</div>
 
-<button>
-🔍 Фильтр
-</button>
+<div class="worker-stat">
+🚧 В работе:
+<b>{{ worker["active"] }}</b>
+</div>
 
+<div class="worker-stat">
+💰 Доход:
+<b>${{ worker["revenue"] }}</b>
+</div>
+
+<div class="worker-stat">
+🕒 Online:
+<b>{{ worker["last_seen"] }}</b>
 </div>
 
 </div>
 
-</form>
+{% endfor %}
 
+</div>
+
+{% endif %}
+
+<div class="section-title">
+📦 Заявки
 </div>
 
 <div class="tasks">
