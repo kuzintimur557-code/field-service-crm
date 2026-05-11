@@ -87,6 +87,8 @@ margin-top:30px;
 }
 
 select,
+textarea,
+input,
 button{
 width:100%;
 padding:14px;
@@ -95,6 +97,11 @@ border:1px solid #ddd;
 margin-bottom:14px;
 font-size:16px;
 box-sizing:border-box;
+}
+
+textarea{
+height:140px;
+resize:none;
 }
 
 button{
@@ -116,6 +123,12 @@ text-decoration:none;
 font-weight:bold;
 }
 
+.section{
+margin-top:40px;
+padding-top:30px;
+border-top:1px solid #eee;
+}
+
 </style>
 
 </head>
@@ -131,69 +144,42 @@ font-weight:bold;
 <div class="card">
 
 <div class="row">
-<div class="label">
-Клиент
-</div>
-<div class="value">
-{{ task["client"] }}
-</div>
+<div class="label">Клиент</div>
+<div class="value">{{ task["client"] }}</div>
 </div>
 
 <div class="row">
-<div class="label">
-Телефон
-</div>
-<div class="value">
-{{ task["phone"] }}
-</div>
+<div class="label">Телефон</div>
+<div class="value">{{ task["phone"] }}</div>
 </div>
 
 <div class="row">
-<div class="label">
-Адрес
-</div>
-<div class="value">
-{{ task["address"] }}
-</div>
+<div class="label">Адрес</div>
+<div class="value">{{ task["address"] }}</div>
 </div>
 
 <div class="row">
-<div class="label">
-Описание
-</div>
-<div class="value">
-{{ task["description"] }}
-</div>
+<div class="label">Описание</div>
+<div class="value">{{ task["description"] }}</div>
 </div>
 
 <div class="row">
-<div class="label">
-Дата
-</div>
-<div class="value">
-{{ task["task_date"] }}
-</div>
+<div class="label">Дата</div>
+<div class="value">{{ task["task_date"] }}</div>
 </div>
 
 <div class="row">
-<div class="label">
-Монтажник
-</div>
-<div class="value">
-{{ task["worker"] }}
-</div>
+<div class="label">Монтажник</div>
+<div class="value">{{ task["worker"] }}</div>
 </div>
 
 <div class="row">
-<div class="label">
-Стоимость
-</div>
-<div class="value">
-${{ task["price"] }}
-</div>
+<div class="label">Стоимость</div>
+<div class="value">${{ task["price"] }}</div>
 </div>
 
 <div class="row">
+
 <div class="label">
 Статус
 </div>
@@ -230,13 +216,30 @@ class="map"
 
 {% if task["photo"] %}
 
+<div class="section">
+
+<h2>
+📷 Фото до работы
+</h2>
+
 <img
 src="/uploads/{{ task['photo'] }}"
 >
 
+</div>
+
 {% endif %}
 
-<form method="post">
+<form
+method="post"
+enctype="multipart/form-data"
+>
+
+<div class="section">
+
+<h2>
+🚀 Обновление заявки
+</h2>
 
 <select name="status">
 
@@ -254,11 +257,63 @@ src="/uploads/{{ task['photo'] }}"
 
 </select>
 
+<label>
+Отчет монтажника
+</label>
+
+<textarea
+name="report"
+placeholder="Что было сделано..."
+>{{ task["report"] or "" }}</textarea>
+
+<label>
+Фото после работы
+</label>
+
+<input
+type="file"
+name="after_photo"
+>
+
 <button>
-💾 Обновить статус
+💾 Сохранить изменения
 </button>
 
+</div>
+
 </form>
+
+{% if task["after_photo"] %}
+
+<div class="section">
+
+<h2>
+✅ Фото после работы
+</h2>
+
+<img
+src="/uploads/{{ task['after_photo'] }}"
+>
+
+</div>
+
+{% endif %}
+
+{% if task["report"] %}
+
+<div class="section">
+
+<h2>
+📝 Отчет
+</h2>
+
+<p style="font-size:18px;line-height:1.6;">
+{{ task["report"] }}
+</p>
+
+</div>
+
+{% endif %}
 
 </div>
 
