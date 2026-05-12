@@ -1,16 +1,16 @@
 import os
 import requests
 
-BOT_TOKEN = str(os.getenv("8466880508:AAECt2BpqJB_KzWIJT1Tv27MaJNjGBjrUSc"))
-CHAT_ID = str(os.getenv("7739861626"))
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 
 def send_message(text):
 
-    url = f"https://api.telegram.org/bot{8466880508:AAECt2BpqJB_KzWIJT1Tv27MaJNjGBjrUSc}/sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     data = {
-        "chat_id": 7739861626,
+        "chat_id": CHAT_ID,
         "text": text
     }
 
@@ -22,7 +22,7 @@ def send_message(text):
 
 def send_photo(photo_path, caption=""):
 
-    url = f"https://api.telegram.org/bot{8466880508:AAECt2BpqJB_KzWIJT1Tv27MaJNjGBjrUSc}/sendDocument"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
 
     with open(photo_path, "rb") as photo:
 
@@ -31,7 +31,7 @@ def send_photo(photo_path, caption=""):
         }
 
         data = {
-            "chat_id": 7739861626,
+            "chat_id": CHAT_ID,
             "caption": caption
         }
 
