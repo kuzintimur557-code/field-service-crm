@@ -1,35 +1,42 @@
-import requests
 import os
+import requests
 
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+BOT_TOKEN = os.getenv("8466880508:AAECt2BpqJB_KzWIJT1Tv27MaJNjGBjrUSc")
+CHAT_ID = os.getenv("7739861626")
 
 
 def send_message(text):
 
-    if not BOT_TOKEN:
-        return
-
-    if not CHAT_ID:
-        return
-
-    url = (
-        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    )
+    url = f"https://api.telegram.org/bot{8466880508:AAECt2BpqJB_KzWIJT1Tv27MaJNjGBjrUSc}/sendMessage"
 
     data = {
-        "chat_id": CHAT_ID,
+        "chat_id": 7739861626,
         "text": text
     }
 
-    try:
+    requests.post(
+        url,
+        data=data
+    )
+
+
+def send_photo(photo_path, caption=""):
+
+    url = f"https://api.telegram.org/bot{8466880508:AAECt2BpqJB_KzWIJT1Tv27MaJNjGBjrUSc}/sendPhoto"
+
+    with open(photo_path, "rb") as photo:
+
+        files = {
+            "photo": photo
+        }
+
+        data = {
+            "chat_id": 7739861626,
+            "caption": caption
+        }
 
         requests.post(
             url,
             data=data,
-            timeout=10
+            files=files
         )
-
-    except:
-        pass

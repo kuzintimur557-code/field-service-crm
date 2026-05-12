@@ -1,18 +1,15 @@
-
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.database import connect, init_db
-from app.telegram_utils import send_message
+from app.telegram_utils import send_message, send_photo
 
 from datetime import datetime
-from reportlab.pdfgen import canvas
 
 import shutil
 import os
-import urllib.parse
 
 
 app = FastAPI()
@@ -39,45 +36,6 @@ templates = Jinja2Templates(
 def get_user(request: Request):
 
     return request.cookies.get("user")
-
-
-def update_last_seen(username):
-
-    conn = connect()
-
-    c = conn.cursor()
-
-    c.execute("""
-    UPDATE users
-    SET last_seen=?
-    WHERE username=?
-    """, (
-        str(datetime.now()),
-        username
-    ))
-
-    conn.commit()
-
-    conn.close()
-
-
-def get_role(username):
-
-    conn = connect()
-
-    c = conn.cursor()
-
-    user = c.execute("""
-    SELECT * FROM users
-    WHERE username=?
-    """, (username,)).fetchone()
-
-    conn.close()
-
-    if not user:
-        return None
-
-    return user["role"]
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -119,8 +77,6 @@ async def login(request: Request):
             status_code=302
         )
 
-    update_last_seen(username)
-
     response = RedirectResponse(
         "/",
         status_code=302
@@ -134,20 +90,7 @@ async def login(request: Request):
     return response
 
 
-@app.get("/logout")
-def logout():
-
-    response = RedirectResponse(
-        "/login",
-        status_code=302
-    )
-
-    response.delete_cookie("user")
-
-    return response
-
-
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 def home(request: Request):
 
     username = get_user(request)
@@ -159,101 +102,19 @@ def home(request: Request):
             status_code=302
         )
 
-    update_last_seen(username)
-
-    role = get_role(username)
-
     conn = connect()
 
     c = conn.cursor()
 
-    if role == "boss":
-
-        tasks = c.execute("""
-        SELECT * FROM tasks
-        ORDER BY id DESC
-        """).fetchall()
-
-    else:
-
-        tasks = c.execute("""
-        SELECT * FROM tasks
-        WHERE worker=?
-        ORDER BY id DESC
-        """, (username,)).fetchall()
+    tasks = c.execute("""
+    SELECT * FROM tasks
+    ORDER BY id DESC
+    """).fetchall()
 
     workers = c.execute("""
     SELECT * FROM users
     WHERE role='worker'
     """).fetchall()
-
-    worker_stats = []
-
-    for w in workers:
-
-        completed = c.execute("""
-        SELECT COUNT(*)
-        FROM tasks
-        WHERE worker=?
-        AND status='Завершено'
-        """, (w["username"],)).fetchone()[0]
-
-        active = c.execute("""
-        SELECT COUNT(*)
-        FROM tasks
-        WHERE worker=?
-        AND status='В работе'
-        """, (w["username"],)).fetchone()[0]
-
-        revenue_worker = c.execute("""
-        SELECT SUM(price)
-        FROM tasks
-        WHERE worker=?
-        AND status='Завершено'
-        """, (w["username"],)).fetchone()[0]
-
-        if revenue_worker is None:
-            revenue_worker = 0
-
-        worker_stats.append({
-            "username": w["username"],
-            "completed": completed,
-            "active": active,
-            "revenue": revenue_worker,
-            "last_seen": w["last_seen"]
-        })
-
-    revenue = c.execute("""
-    SELECT SUM(price)
-    FROM tasks
-    WHERE status='Завершено'
-    """).fetchone()[0]
-
-    if revenue is None:
-        revenue = 0
-
-    total_tasks = c.execute("""
-    SELECT COUNT(*)
-    FROM tasks
-    """).fetchone()[0]
-
-    new_tasks = c.execute("""
-    SELECT COUNT(*)
-    FROM tasks
-    WHERE status='Новая'
-    """).fetchone()[0]
-
-    working_tasks = c.execute("""
-    SELECT COUNT(*)
-    FROM tasks
-    WHERE status='В работе'
-    """).fetchone()[0]
-
-    done_tasks = c.execute("""
-    SELECT COUNT(*)
-    FROM tasks
-    WHERE status='Завершено'
-    """).fetchone()[0]
 
     conn.close()
 
@@ -262,14 +123,8 @@ def home(request: Request):
         "index.html",
         {
             "tasks": tasks,
-            "username": username,
-            "role": role,
-            "revenue": revenue,
-            "total_tasks": total_tasks,
-            "new_tasks": new_tasks,
-            "working_tasks": working_tasks,
-            "done_tasks": done_tasks,
-            "worker_stats": worker_stats
+            "workers": workers,
+            "username": username
         }
     )
 
@@ -283,15 +138,6 @@ def create_task_page(request: Request):
 
         return RedirectResponse(
             "/login",
-            status_code=302
-        )
-
-    role = get_role(username)
-
-    if role != "boss":
-
-        return RedirectResponse(
-            "/",
             status_code=302
         )
 
@@ -321,15 +167,6 @@ async def create_task(
     photo: UploadFile = File(None)
 ):
 
-    username = get_user(request)
-
-    if not username:
-
-        return RedirectResponse(
-            "/login",
-            status_code=302
-        )
-
     form = await request.form()
 
     client = form.get("client")
@@ -342,6 +179,7 @@ async def create_task(
     price = form.get("price")
 
     filename = ""
+    file_path = ""
 
     if photo and photo.filename:
 
@@ -351,14 +189,14 @@ async def create_task(
         )
 
         filename = (
-            f"task_{datetime.now().timestamp()}_{photo.filename}"
+            f"{datetime.now().timestamp()}_{photo.filename}"
         )
 
-        filepath = (
+        file_path = (
             f"uploads/{filename}"
         )
 
-        with open(filepath, "wb") as buffer:
+        with open(file_path, "wb") as buffer:
 
             shutil.copyfileobj(
                 photo.file,
@@ -398,8 +236,9 @@ async def create_task(
 
     conn.commit()
 
-    send_message(
-        f"""
+    conn.close()
+
+    message = f'''
 🔥 Новая заявка
 
 👤 Клиент: {client}
@@ -408,10 +247,18 @@ async def create_task(
 🛠 Монтажник: {worker}
 📅 Дата: {task_date}
 💰 Сумма: {price}
-"""
-    )
+'''
 
-    conn.close()
+    if filename:
+
+        send_photo(
+            file_path,
+            message
+        )
+
+    else:
+
+        send_message(message)
 
     return RedirectResponse(
         "/",
