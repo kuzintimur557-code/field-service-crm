@@ -1,4 +1,4 @@
-cat > app/main.py << 'EOF'
+
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -417,4 +417,3 @@ async def create_task(
         "/",
         status_code=302
     )
-EOF
