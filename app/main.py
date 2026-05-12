@@ -350,7 +350,7 @@ async def create_task(
         )
 
         filename = (
-            f"task_{photo.filename}"
+            f"task_{datetime.now().timestamp()}_{photo.filename}"
         )
 
         filepath = (
@@ -379,11 +379,9 @@ async def create_task(
         status,
         priority,
         photo,
-        price,
-        report,
-        after_photo
+        price
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         client,
         phone,
@@ -394,14 +392,13 @@ async def create_task(
         "Новая",
         priority,
         filename,
-        price,
-        "",
-        ""
+        price
     ))
 
     conn.commit()
-send_message(
-    f"""
+
+    send_message(
+        f"""
 🔥 Новая заявка
 
 👤 Клиент: {client}
@@ -411,270 +408,11 @@ send_message(
 📅 Дата: {task_date}
 💰 Сумма: {price}
 """
-)
+    )
+
     conn.close()
-
-    try:
-
-        send_message(
-            f"""
-🚀 Новая заявка
-
-👤 Клиент: {client}
-
-📍 Адрес: {address}
-
-👷 Монтажник: {worker}
-
-💰 Цена: {price}
-"""
-        )
-
-    except:
-        pass
 
     return RedirectResponse(
         "/",
         status_code=302
-    )
-
-
-@app.get("/task/{task_id}", response_class=HTMLResponse)
-def task_page(
-    request: Request,
-    task_id: int
-):
-
-    username = get_user(request)
-
-    if not username:
-
-        return RedirectResponse(
-            "/login",
-            status_code=302
-        )
-
-    conn = connect()
-
-    c = conn.cursor()
-
-    task = c.execute("""
-    SELECT * FROM tasks
-    WHERE id=?
-    """, (task_id,)).fetchone()
-
-    conn.close()
-
-    if not task:
-
-        return RedirectResponse(
-            "/",
-            status_code=302
-        )
-
-    encoded = urllib.parse.quote(
-        task["address"]
-    )
-
-    map_url = (
-        f"https://maps.google.com/?q={encoded}"
-    )
-
-    return templates.TemplateResponse(
-        request,
-        "task.html",
-        {
-            "task": task,
-            "map_url": map_url
-        }
-    )
-
-
-@app.post("/task/{task_id}")
-async def update_task(
-    request: Request,
-    task_id: int,
-    after_photo: UploadFile = File(None)
-):
-
-    username = get_user(request)
-
-    if not username:
-
-        return RedirectResponse(
-            "/login",
-            status_code=302
-        )
-
-    form = await request.form()
-
-    status = form.get("status")
-    report = form.get("report")
-
-    conn = connect()
-
-    c = conn.cursor()
-
-    task = c.execute("""
-    SELECT * FROM tasks
-    WHERE id=?
-    """, (task_id,)).fetchone()
-
-    after_filename = task["after_photo"]
-
-    if after_photo and after_photo.filename:
-
-        os.makedirs(
-            "uploads",
-            exist_ok=True
-        )
-
-        after_filename = (
-            f"after_{after_photo.filename}"
-        )
-
-        filepath = (
-            f"uploads/{after_filename}"
-        )
-
-        with open(filepath, "wb") as buffer:
-
-            shutil.copyfileobj(
-                after_photo.file,
-                buffer
-            )
-
-    c.execute("""
-    UPDATE tasks
-    SET
-        status=?,
-        report=?,
-        after_photo=?
-    WHERE id=?
-    """, (
-        status,
-        report,
-        after_filename,
-        task_id
-    ))
-
-    conn.commit()
-
-    conn.close()
-
-    try:
-
-        send_message(
-            f"""
-📦 Заявка обновлена
-
-👤 Клиент: {task['client']}
-
-📌 Статус: {status}
-
-📝 Отчет:
-{report}
-"""
-        )
-
-    except:
-        pass
-
-    return RedirectResponse(
-        f"/task/{task_id}",
-        status_code=302
-    )
-
-
-@app.get("/task/{task_id}/pdf")
-def generate_pdf(
-    request: Request,
-    task_id: int
-):
-
-    username = get_user(request)
-
-    if not username:
-
-        return RedirectResponse(
-            "/login",
-            status_code=302
-        )
-
-    conn = connect()
-
-    c = conn.cursor()
-
-    task = c.execute("""
-    SELECT * FROM tasks
-    WHERE id=?
-    """, (task_id,)).fetchone()
-
-    conn.close()
-
-    if not task:
-
-        return RedirectResponse(
-            "/",
-            status_code=302
-        )
-
-    os.makedirs(
-        "uploads/docs",
-        exist_ok=True
-    )
-
-    filename = (
-        f"uploads/docs/task_{task_id}.pdf"
-    )
-
-    pdf = canvas.Canvas(filename)
-
-    pdf.setFont(
-        "Helvetica-Bold",
-        22
-    )
-
-    pdf.drawString(
-        50,
-        800,
-        "Field Service Report"
-    )
-
-    pdf.setFont(
-        "Helvetica",
-        14
-    )
-
-    y = 740
-
-    lines = [
-        f"Client: {task['client']}",
-        f"Phone: {task['phone']}",
-        f"Address: {task['address']}",
-        f"Worker: {task['worker']}",
-        f"Date: {task['task_date']}",
-        f"Status: {task['status']}",
-        f"Price: ${task['price']}",
-        "",
-        "Report:",
-        task["report"] or ""
-    ]
-
-    for line in lines:
-
-        pdf.drawString(
-            50,
-            y,
-            str(line)
-        )
-
-        y -= 30
-
-    pdf.save()
-
-    return FileResponse(
-        filename,
-        media_type='application/pdf',
-        filename=f"task_{task_id}.pdf"
     )
