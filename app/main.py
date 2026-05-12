@@ -296,3 +296,47 @@ async def task_page(request: Request, task_id: int):
             "user": username
         }
     )
+@app.get("/task/{task_id}", response_class=HTMLResponse)
+async def task_detail(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    SELECT * FROM tasks
+    WHERE id=?
+    """, (task_id,))
+
+    task = c.fetchone()
+
+    conn.close()
+
+    if not task:
+        return HTMLResponse("Task not found", status_code=404)
+
+    return templates.TemplateResponse(
+        "task_detail.html",
+        {
+            "request": request,
+            "task": task,
+            "username": username
+        }
+    )
+
+
+@app.get("/logout")
+async def logout():
+
+    response = RedirectResponse(
+        "/login",
+        status_code=302
+    )
+
+    response.delete_cookie("user")
+
+    return response
