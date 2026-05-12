@@ -16,6 +16,8 @@ app = FastAPI()
 
 init_db()
 
+os.makedirs("uploads", exist_ok=True)
+
 app.mount(
     "/uploads",
     StaticFiles(directory="uploads"),
@@ -38,13 +40,44 @@ def get_user(request: Request):
     return request.cookies.get("user")
 
 
-@app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    SELECT * FROM tasks
+    ORDER BY id DESC
+    """)
+
+    tasks = c.fetchall()
+
+    conn.close()
 
     return templates.TemplateResponse(
-        request,
+        "index.html",
+        {
+            "request": request,
+            "tasks": tasks,
+            "username": username
+        }
+    )
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+
+    return templates.TemplateResponse(
         "login.html",
-        {}
+        {
+            "request": request
+        }
     )
 
 
@@ -57,21 +90,21 @@ async def login(request: Request):
     password = form.get("password")
 
     conn = connect()
-
     c = conn.cursor()
 
-    user = c.execute("""
+    c.execute("""
     SELECT * FROM users
     WHERE username=? AND password=?
     """, (
         username,
         password
-    )).fetchone()
+    ))
+
+    user = c.fetchone()
 
     conn.close()
 
     if not user:
-
         return RedirectResponse(
             "/login",
             status_code=302
@@ -90,73 +123,32 @@ async def login(request: Request):
     return response
 
 
-@app.get("/")
-def home(request: Request):
+@app.get("/logout")
+async def logout():
 
-    username = get_user(request)
-
-    if not username:
-
-        return RedirectResponse(
-            "/login",
-            status_code=302
-        )
-
-    conn = connect()
-
-    c = conn.cursor()
-
-    tasks = c.execute("""
-    SELECT * FROM tasks
-    ORDER BY id DESC
-    """).fetchall()
-
-    workers = c.execute("""
-    SELECT * FROM users
-    WHERE role='worker'
-    """).fetchall()
-
-    conn.close()
-
-    return templates.TemplateResponse(
-        request,
-        "index.html",
-        {
-            "tasks": tasks,
-            "workers": workers,
-            "username": username
-        }
+    response = RedirectResponse(
+        "/login",
+        status_code=302
     )
+
+    response.delete_cookie("user")
+
+    return response
 
 
 @app.get("/create-task", response_class=HTMLResponse)
-def create_task_page(request: Request):
+async def create_task_page(request: Request):
 
     username = get_user(request)
 
     if not username:
-
-        return RedirectResponse(
-            "/login",
-            status_code=302
-        )
-
-    conn = connect()
-
-    c = conn.cursor()
-
-    workers = c.execute("""
-    SELECT * FROM users
-    WHERE role='worker'
-    """).fetchall()
-
-    conn.close()
+        return RedirectResponse("/login", status_code=302)
 
     return templates.TemplateResponse(
-        request,
         "create_task.html",
         {
-            "workers": workers
+            "request": request,
+            "username": username
         }
     )
 
@@ -166,6 +158,11 @@ async def create_task(
     request: Request,
     photo: UploadFile = File(None)
 ):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
 
     form = await request.form()
 
@@ -179,32 +176,17 @@ async def create_task(
     price = form.get("price")
 
     filename = ""
-    file_path = ""
 
     if photo and photo.filename:
 
-        os.makedirs(
-            "uploads",
-            exist_ok=True
-        )
+        filename = f"{datetime.now().timestamp()}_{photo.filename}"
 
-        filename = (
-            f"{datetime.now().timestamp()}_{photo.filename}"
-        )
-
-        file_path = (
-            f"uploads/{filename}"
-        )
+        file_path = f"uploads/{filename}"
 
         with open(file_path, "wb") as buffer:
-
-            shutil.copyfileobj(
-                photo.file,
-                buffer
-            )
+            shutil.copyfileobj(photo.file, buffer)
 
     conn = connect()
-
     c = conn.cursor()
 
     c.execute("""
@@ -215,10 +197,10 @@ async def create_task(
         description,
         task_date,
         worker,
-        status,
         priority,
+        price,
         photo,
-        price
+        status
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
@@ -228,74 +210,49 @@ async def create_task(
         description,
         task_date,
         worker,
-        "Новая",
         priority,
+        price,
         filename,
-        price
+        "new"
     ))
 
     conn.commit()
 
+    task_id = c.lastrowid
+
     conn.close()
 
-    message = f'''
-🔥 Новая заявка
+    text = f"""
+Новая заявка #{task_id}
 
-👤 Клиент: {client}
-📞 Телефон: {phone}
-📍 Адрес: {address}
-🛠 Монтажник: {worker}
-📅 Дата: {task_date}
-💰 Сумма: {price}
-'''
+Клиент: {client}
+Телефон: {phone}
+Адрес: {address}
+
+Описание:
+{description}
+
+Дата: {task_date}
+Мастер: {worker}
+Приоритет: {priority}
+Цена: {price}
+"""
+
+    send_message(text)
 
     if filename:
 
         send_photo(
-            file_path,
-            message
+            f"uploads/{filename}",
+            f"Фото к заявке #{task_id}"
         )
-
-    else:
-
-        send_message(message)
 
     return RedirectResponse(
         "/",
         status_code=302
     )
-@app.get("/task/{task_id}", response_class=HTMLResponse)
-async def task_page(request: Request, task_id: int):
 
-    username = get_user(request)
 
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    conn = connect()
-    c = conn.cursor()
-
-    c.execute("""
-    SELECT *
-    FROM tasks
-    WHERE id=?
-    """, (task_id,))
-
-    task = c.fetchone()
-
-    conn.close()
-
-    if not task:
-        return HTMLResponse("Заявка не найдена", status_code=404)
-
-    return templates.TemplateResponse(
-        "task.html",
-        {
-            "request": request,
-            "task": task,
-            "user": username
-        }
-    )
 @app.get("/task/{task_id}", response_class=HTMLResponse)
 async def task_detail(request: Request, task_id: int):
 
@@ -317,7 +274,10 @@ async def task_detail(request: Request, task_id: int):
     conn.close()
 
     if not task:
-        return HTMLResponse("Task not found", status_code=404)
+        return HTMLResponse(
+            "Task not found",
+            status_code=404
+        )
 
     return templates.TemplateResponse(
         "task_detail.html",
@@ -327,16 +287,3 @@ async def task_detail(request: Request, task_id: int):
             "username": username
         }
     )
-
-
-@app.get("/logout")
-async def logout():
-
-    response = RedirectResponse(
-        "/login",
-        status_code=302
-    )
-
-    response.delete_cookie("user")
-
-    return response
