@@ -22,12 +22,12 @@ def send_message(text):
 
 def send_photo(photo_path, caption=""):
 
-    url = f"https://api.telegram.org/bot{8466880508:AAECt2BpqJB_KzWIJT1Tv27MaJNjGBjrUSc}/sendPhoto"
+    url = f"https://api.telegram.org/bot{8466880508:AAECt2BpqJB_KzWIJT1Tv27MaJNjGBjrUSc}/sendDocument"
 
     with open(photo_path, "rb") as photo:
 
         files = {
-            "photo": photo
+            "document": photo
         }
 
         data = {
