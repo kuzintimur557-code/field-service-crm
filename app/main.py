@@ -264,3 +264,35 @@ async def create_task(
         "/",
         status_code=302
     )
+@app.get("/task/{task_id}", response_class=HTMLResponse)
+async def task_page(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,))
+
+    task = c.fetchone()
+
+    conn.close()
+
+    if not task:
+        return HTMLResponse("Заявка не найдена", status_code=404)
+
+    return templates.TemplateResponse(
+        "task.html",
+        {
+            "request": request,
+            "task": task,
+            "user": username
+        }
+    )
