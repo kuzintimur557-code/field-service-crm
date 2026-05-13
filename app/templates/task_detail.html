@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Task</title>
+</head>
+<body>
+
+<h1>Task #{{ task[0] }}</h1>
+
+<p>Client: {{ task[1] }}</p>
+
+<p>Phone: {{ task[2] }}</p>
+
+<p>Address: {{ task[3] }}</p>
+
+<p>Description: {{ task[4] }}</p>
+
+<p>Date: {{ task[5] }}</p>
+
+<p>Worker: {{ task[6] }}</p>
+
+<p>Priority: {{ task[7] }}</p>
+
+<p>Price: {{ task[8] }}</p>
+
+{% if task[9] %}
+
+<img
+    src="/uploads/{{ task[9] }}"
+    width="300"
+>
+
+{% endif %}
+
+</body>
+</html>
