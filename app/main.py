@@ -52,7 +52,8 @@ async def home(request: Request):
     c = conn.cursor()
 
     c.execute("""
-    SELECT * FROM tasks
+    SELECT *
+    FROM tasks
     ORDER BY id DESC
     """)
 
@@ -61,9 +62,9 @@ async def home(request: Request):
     conn.close()
 
     return templates.TemplateResponse(
+        request,
         "index.html",
         {
-            "request": request,
             "tasks": tasks,
             "username": username
         }
@@ -74,10 +75,8 @@ async def home(request: Request):
 async def login_page(request: Request):
 
     return templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request
-        }
+        request,
+        "login.html"
     )
 
 
@@ -93,7 +92,8 @@ async def login(request: Request):
     c = conn.cursor()
 
     c.execute("""
-    SELECT * FROM users
+    SELECT *
+    FROM users
     WHERE username=? AND password=?
     """, (
         username,
@@ -105,6 +105,7 @@ async def login(request: Request):
     conn.close()
 
     if not user:
+
         return RedirectResponse(
             "/login",
             status_code=302
@@ -145,9 +146,9 @@ async def create_task_page(request: Request):
         return RedirectResponse("/login", status_code=302)
 
     return templates.TemplateResponse(
+        request,
         "create_task.html",
         {
-            "request": request,
             "username": username
         }
     )
@@ -265,7 +266,8 @@ async def task_detail(request: Request, task_id: int):
     c = conn.cursor()
 
     c.execute("""
-    SELECT * FROM tasks
+    SELECT *
+    FROM tasks
     WHERE id=?
     """, (task_id,))
 
@@ -274,15 +276,16 @@ async def task_detail(request: Request, task_id: int):
     conn.close()
 
     if not task:
+
         return HTMLResponse(
             "Task not found",
             status_code=404
         )
 
     return templates.TemplateResponse(
+        request,
         "task_detail.html",
         {
-            "request": request,
             "task": task,
             "username": username
         }
