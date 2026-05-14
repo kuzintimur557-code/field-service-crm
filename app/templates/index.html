@@ -1,90 +1,42 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-
-    <meta charset="UTF-8">
-
     <title>CRM</title>
 
-    <style>
-
-        body {
-            font-family: Arial;
-            background: #f4f4f4;
-            margin: 0;
-            padding: 30px;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: auto;
-        }
-
-        .topbar {
-            margin-bottom: 30px;
-        }
-
-        .button {
-            display: inline-block;
-            padding: 10px 16px;
-            background: black;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            margin-right: 10px;
-        }
-
-        .task {
-            background: white;
-            padding: 20px;
-            margin-bottom: 15px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-
-        .task a {
-            text-decoration: none;
-            color: black;
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-    </style>
-
+    <link
+        rel="stylesheet"
+        href="/static/style.css"
+    >
 </head>
 <body>
 
-<div class="container">
+<h1>Задачи</h1>
 
-    <h1>Задачи</h1>
+<div class="topbar">
 
-    <div class="topbar">
+    <a class="button" href="/create-task">
+        Создать заявку
+    </a>
 
-        <a class="button" href="/create-task">
-            Создать заявку
-        </a>
-
-        <a class="button" href="/logout">
-            Выйти
-        </a>
-
-    </div>
-
-    {% for task in tasks %}
-
-    <div class="task">
-
-        <a href="/task/{{ task[0] }}">
-
-            #{{ task[0] }} — {{ task[1] }}
-
-        </a>
-
-    </div>
-
-    {% endfor %}
+    <a class="button" href="/logout">
+        Выйти
+    </a>
 
 </div>
+
+{% for task in tasks %}
+
+<a href="/task/{{ task[0] }}">
+
+    <div class="task-card">
+
+        #{{ task[0] }} — {{ task[1] }}
+
+    </div>
+
+</a>
+
+{% endfor %}
 
 </body>
 </html>
