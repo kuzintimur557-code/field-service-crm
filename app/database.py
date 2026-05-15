@@ -33,6 +33,21 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS task_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER,
+        catalog_item_id INTEGER,
+        item_name TEXT,
+        item_type TEXT,
+        unit TEXT,
+        qty REAL DEFAULT 1,
+        price REAL DEFAULT 0,
+        cost REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        profit REAL DEFAULT 0,
+        created_at TEXT
+    )
+
     CREATE TABLE IF NOT EXISTS catalog_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item_type TEXT,

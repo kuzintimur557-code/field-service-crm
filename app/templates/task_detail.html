@@ -36,6 +36,11 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 .timeline-time{font-size:13px;color:#6b7280;font-weight:800}
 .timeline-action{font-size:16px;font-weight:900}
 .timeline-details{font-size:14px;color:#4b5563;margin-top:5px;white-space:pre-wrap}
+.estimate-item{display:grid;grid-template-columns:1.2fr .8fr .7fr .7fr .7fr;gap:12px;padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px}
+.estimate-name{font-size:16px;font-weight:900}
+.estimate-meta{font-size:13px;color:#6b7280;font-weight:700;margin-top:4px}
+.estimate-total{margin-top:18px;padding:18px;border-radius:18px;background:#eff6ff}
+@media(max-width:700px){.estimate-item{grid-template-columns:1fr}}
 @media(max-width:700px){.timeline-item{grid-template-columns:1fr;gap:6px}}
 @media(max-width:700px){.container{padding:16px}.grid,.photo-grid{grid-template-columns:1fr}h1{font-size:26px}.card{padding:22px}}
 </style>
@@ -122,6 +127,95 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 
 </div>
 </div>
+
+{% if role in ["boss", "manager"] %}
+<div class="card">
+
+<h2>💰 Смета заявки</h2>
+
+<form method="post" action="/task/{{ task[0] }}/items">
+
+<label>Позиция из каталога</label>
+<select name="catalog_item_id" required>
+<option value="">Выберите позицию</option>
+{% for item in catalog_items %}
+<option value="{{ item['id'] }}">
+{{ item["name"] }} —
+{% if item["item_type"] == "service" %}
+Услуга
+{% else %}
+Материал
+{% endif %}
+— ${{ item["price"] }}
+</option>
+{% endfor %}
+</select>
+
+<label>Количество</label>
+<input type="number" step="0.01" name="qty" value="1">
+
+<button type="submit">➕ Добавить в смету</button>
+
+</form>
+
+<div style="margin-top:18px">
+
+{% if task_items %}
+{% for item in task_items %}
+<div class="estimate-item">
+
+    <div>
+        <div class="estimate-name">{{ item["item_name"] }}</div>
+        <div class="estimate-meta">
+            {% if item["item_type"] == "service" %}
+            Услуга
+            {% else %}
+            Материал
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        <div class="estimate-meta">Кол-во</div>
+        <div class="estimate-name">{{ item["qty"] }} {{ item["unit"] }}</div>
+    </div>
+
+    <div>
+        <div class="estimate-meta">Цена</div>
+        <div class="estimate-name">${{ item["price"] }}</div>
+    </div>
+
+    <div>
+        <div class="estimate-meta">Сумма</div>
+        <div class="estimate-name">${{ item["total"] }}</div>
+    </div>
+
+    <div>
+        <div class="estimate-meta">Прибыль</div>
+        <div class="estimate-name">${{ item["profit"] }}</div>
+    </div>
+
+</div>
+{% endfor %}
+
+<div class="estimate-total">
+    <div style="font-size:20px;font-weight:900">
+        Итого: ${{ estimate_total }}
+    </div>
+
+    <div style="margin-top:8px;font-size:18px;color:#166534;font-weight:900">
+        Прибыль: ${{ estimate_profit }}
+    </div>
+</div>
+
+{% else %}
+<div class="empty-photo">Смета пока пустая</div>
+{% endif %}
+
+</div>
+
+</div>
+{% endif %}
 
 <div class="card">
 

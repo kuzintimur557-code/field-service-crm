@@ -1399,6 +1399,23 @@ async def task_detail(request: Request, task_id: int):
     ORDER BY id DESC
     """, (task_id,)).fetchall()
 
+    task_items = c.execute("""
+    SELECT *
+    FROM task_items
+    WHERE task_id=?
+    ORDER BY id DESC
+    """, (task_id,)).fetchall()
+
+    catalog_items = c.execute("""
+    SELECT *
+    FROM catalog_items
+    WHERE active=1
+    ORDER BY item_type, name
+    """).fetchall()
+
+    estimate_total = sum(item["total"] for item in task_items)
+    estimate_profit = sum(item["profit"] for item in task_items)
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -1410,9 +1427,111 @@ async def task_detail(request: Request, task_id: int):
             "role": role,
             "comments": comments,
             "activity": activity,
-            "linked_client": linked_client
+            "linked_client": linked_client,
+            "task_items": task_items,
+            "catalog_items": catalog_items,
+            "estimate_total": estimate_total,
+            "estimate_profit": estimate_profit
         }
     )
+
+
+@app.post("/task/{task_id}/items")
+async def add_task_item(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+
+    catalog_item_id = form.get("catalog_item_id")
+    qty = form.get("qty") or "1"
+
+    try:
+        qty = float(str(qty).replace(",", "."))
+    except Exception:
+        qty = 1
+
+    if qty <= 0:
+        qty = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    item = c.execute("""
+    SELECT *
+    FROM catalog_items
+    WHERE id=?
+    """, (catalog_item_id,)).fetchone()
+
+    if not item:
+        conn.close()
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    total = float(item["price"]) * qty
+    profit = (float(item["price"]) - float(item["cost"])) * qty
+
+    c.execute("""
+    INSERT INTO task_items (
+        task_id,
+        catalog_item_id,
+        item_name,
+        item_type,
+        unit,
+        qty,
+        price,
+        cost,
+        total,
+        profit,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        item["id"],
+        item["name"],
+        item["item_type"],
+        item["unit"],
+        qty,
+        item["price"],
+        item["cost"],
+        total,
+        profit,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Добавлена позиция в смету",
+            f"{item['name']} × {qty}"
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
 @app.post("/task/{task_id}/comment")
