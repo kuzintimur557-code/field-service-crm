@@ -66,9 +66,9 @@ async def home(request: Request):
     conn.close()
 
     return templates.TemplateResponse(
-        request,
-        "index.html",
-        {
+        name="index.html",
+        context={
+            "request": request,
             "tasks": tasks,
             "username": username
         }
@@ -79,8 +79,10 @@ async def home(request: Request):
 async def login_page(request: Request):
 
     return templates.TemplateResponse(
-        request,
-        "login.html"
+        name="login.html",
+        context={
+            "request": request
+        }
     )
 
 
@@ -154,9 +156,9 @@ async def create_task_page(request: Request):
         )
 
     return templates.TemplateResponse(
-        request,
-        "create_task.html",
-        {
+        name="create_task.html",
+        context={
+            "request": request,
             "username": username
         }
     )
@@ -303,9 +305,9 @@ async def task_detail(
         )
 
     return templates.TemplateResponse(
-        request,
-        "task_detail.html",
-        {
+        name="task_detail.html",
+        context={
+            "request": request,
             "task": task,
             "username": username
         }
