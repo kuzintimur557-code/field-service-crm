@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -17,6 +17,8 @@ from reportlab.pdfgen import canvas
 
 import shutil
 import os
+import csv
+import io
 
 
 app = FastAPI()
@@ -411,6 +413,94 @@ async def calendar_page(request: Request):
             "tasks": tasks,
             "username": username,
             "role": role
+        }
+    )
+
+
+@app.get("/finance/export")
+async def finance_export(request: Request, month: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0 AND task_date LIKE ?
+    ORDER BY task_date DESC
+    """, (f"{month}%",)).fetchall()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "ID",
+        "Дата",
+        "Клиент",
+        "Телефон",
+        "Адрес",
+        "Исполнитель",
+        "Статус заявки",
+        "Статус оплаты",
+        "Сумма",
+        "Прибыль"
+    ])
+
+    for task in tasks:
+        items = c.execute("""
+        SELECT *
+        FROM task_items
+        WHERE task_id=?
+        """, (task["id"],)).fetchall()
+
+        task_total = sum(item["total"] for item in items)
+        task_profit = sum(item["profit"] for item in items)
+
+        if not items:
+            try:
+                task_total = float(task["price"] or 0)
+            except Exception:
+                task_total = 0
+            task_profit = 0
+
+        payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
+
+        writer.writerow([
+            task["id"],
+            task["task_date"],
+            task["client"],
+            task["phone"],
+            task["address"],
+            task["worker"],
+            task["status"],
+            payment_status,
+            task_total,
+            task_profit
+        ])
+
+    conn.close()
+
+    content = output.getvalue()
+    output.close()
+
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=finance_{month}.csv"
         }
     )
 
