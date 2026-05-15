@@ -1,0 +1,26 @@
+:root{
+    --crm-blue:#2563eb;
+    --crm-dark:#111827;
+    --crm-green:#16a34a;
+    --crm-red:#991b1b;
+    --crm-bg:#f3f4f6;
+    --crm-text:#111827;
+    --crm-muted:#6b7280;
+    --crm-card:white;
+}
+
+a{
+    -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+select,
+textarea{
+    font-family: inherit;
+}
+
+.crm-mobile-safe{
+    max-width:100%;
+    overflow-x:hidden;
+}
