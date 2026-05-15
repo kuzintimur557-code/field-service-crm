@@ -523,6 +523,164 @@ async def reports_page(request: Request, month: str = ""):
     )
 
 
+@app.get("/catalog", response_class=HTMLResponse)
+async def catalog_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    items = c.execute("""
+    SELECT *
+    FROM catalog_items
+    ORDER BY active DESC, item_type, name
+    """).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        name="catalog.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "items": items
+        }
+    )
+
+
+@app.post("/catalog")
+async def create_catalog_item(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+
+    item_type = (form.get("item_type") or "service").strip()
+    name = (form.get("name") or "").strip()
+    unit = (form.get("unit") or "шт").strip()
+    price = form.get("price") or "0"
+    cost = form.get("cost") or "0"
+
+    if item_type not in ("service", "material"):
+        item_type = "service"
+
+    if not name:
+        return RedirectResponse("/catalog?error=empty", status_code=302)
+
+    try:
+        price = float(str(price).replace(",", "."))
+    except Exception:
+        price = 0
+
+    try:
+        cost = float(str(cost).replace(",", "."))
+    except Exception:
+        cost = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO catalog_items (
+        item_type,
+        name,
+        unit,
+        price,
+        cost,
+        active,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        item_type,
+        name,
+        unit,
+        price,
+        cost,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        send_message(
+            f"""
+📦 Добавлена позиция в каталог
+
+Тип: {"Услуга" if item_type == "service" else "Материал"}
+Название: {name}
+Цена: {price}
+Себестоимость: {cost}
+
+Создал: {username} ({get_role_title(role)})
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse("/catalog?created=1", status_code=302)
+
+
+@app.post("/catalog/{item_id}/toggle")
+async def toggle_catalog_item(request: Request, item_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    item = c.execute("""
+    SELECT *
+    FROM catalog_items
+    WHERE id=?
+    """, (item_id,)).fetchone()
+
+    if not item:
+        conn.close()
+        return RedirectResponse("/catalog", status_code=302)
+
+    new_active = 0 if item["active"] else 1
+
+    c.execute("""
+    UPDATE catalog_items
+    SET active=?
+    WHERE id=?
+    """, (new_active, item_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/catalog", status_code=302)
+
+
 @app.get("/clients", response_class=HTMLResponse)
 async def clients_page(request: Request):
 

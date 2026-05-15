@@ -33,6 +33,17 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS catalog_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_type TEXT,
+        name TEXT,
+        unit TEXT,
+        price REAL DEFAULT 0,
+        cost REAL DEFAULT 0,
+        active INTEGER DEFAULT 1,
+        created_at TEXT
+    )
+
     CREATE TABLE IF NOT EXISTS client_notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_id INTEGER,
