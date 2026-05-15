@@ -6,15 +6,21 @@
 <title>Заявка</title>
 
 <style>
-body{margin:0;font-family:Arial;background:#f3f4f6;color:#111827}
-.container{max-width:850px;margin:auto;padding:28px}
-.card{background:white;padding:28px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.08);margin-bottom:20px}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:900px;margin:auto;padding:28px}
 .back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:bold}
-.row{margin-bottom:14px}
-.label{font-size:13px;color:#6b7280;margin-bottom:4px}
+.card{background:white;padding:30px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:20px}
+h1{margin:0 0 24px;font-size:32px}
+.row{margin-bottom:16px}
+.label{font-size:13px;color:#6b7280;margin-bottom:5px}
 .value{font-size:18px;font-weight:bold}
-.status{display:inline-block;background:#dbeafe;color:#1d4ed8;padding:9px 14px;border-radius:999px;font-weight:bold}
-img{max-width:100%;border-radius:18px;margin-top:16px}
+.status{display:inline-block;padding:9px 15px;border-radius:999px;font-weight:bold;background:#dbeafe;color:#1d4ed8}
+img{max-width:100%;border-radius:18px;margin-top:18px}
+select,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:10px}
+select{border:1px solid #d1d5db;background:white}
+button{border:0;background:#2563eb;color:white;font-weight:bold;cursor:pointer}
+button:hover{background:#1d4ed8}
 </style>
 </head>
 
@@ -24,6 +30,7 @@ img{max-width:100%;border-radius:18px;margin-top:16px}
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
+
 <h1>Заявка #{{ task[0] }}</h1>
 
 <div class="row"><div class="label">Клиент</div><div class="value">{{ task[1] }}</div></div>
@@ -43,6 +50,25 @@ img{max-width:100%;border-radius:18px;margin-top:16px}
 {% if task[9] %}
 <img src="/uploads/{{ task[9] }}">
 {% endif %}
+
+</div>
+
+<div class="card">
+
+<h2>Изменить статус</h2>
+
+<form method="post" action="/task/{{ task[0] }}/status">
+
+<select name="status">
+<option value="Новая">Новая</option>
+<option value="В работе">В работе</option>
+<option value="Завершено">Завершено</option>
+<option value="Отменено">Отменено</option>
+</select>
+
+<button type="submit">💾 Сохранить статус</button>
+
+</form>
 
 </div>
 

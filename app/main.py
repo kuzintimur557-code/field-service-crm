@@ -7,7 +7,6 @@ from app.database import connect, init_db
 from app.telegram_utils import send_message, send_photo
 
 from datetime import datetime
-
 import shutil
 import os
 
@@ -183,7 +182,7 @@ async def create_task(
         priority,
         price,
         filename,
-        "new"
+        "Новая"
     ))
 
     conn.commit()
@@ -191,28 +190,27 @@ async def create_task(
     conn.close()
 
     text = f"""
-Новая заявка #{task_id}
+🚀 Новая заявка #{task_id}
 
-Клиент: {client}
-Телефон: {phone}
-Адрес: {address}
-
-Описание:
-{description}
-
-Дата: {task_date}
-Мастер: {worker}
-Приоритет: {priority}
-Цена: {price}
+👤 Клиент: {client}
+📞 Телефон: {phone}
+📍 Адрес: {address}
+📅 Дата: {task_date}
+👷 Монтажник: {worker}
+🔥 Приоритет: {priority}
+💰 Цена: {price}
 """
 
-    send_message(text)
+    try:
+        send_message(text)
 
-    if filename:
-        send_photo(
-            f"uploads/{filename}",
-            f"Фото к заявке #{task_id}"
-        )
+        if filename:
+            send_photo(
+                f"uploads/{filename}",
+                f"Фото к заявке #{task_id}"
+            )
+    except:
+        pass
 
     return RedirectResponse("/", status_code=302)
 
@@ -246,4 +244,59 @@ async def task_detail(request: Request, task_id: int):
             "task": task,
             "username": username
         }
+    )
+
+
+@app.post("/task/{task_id}/status")
+async def update_status(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    form = await request.form()
+    status = form.get("status")
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    c.execute("""
+    UPDATE tasks
+    SET status=?
+    WHERE id=?
+    """, (
+        status,
+        task_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        send_message(
+            f"""
+🔔 Статус заявки изменён
+
+Заявка #{task_id}
+Клиент: {task[1]}
+Новый статус: {status}
+"""
+        )
+    except:
+        pass
+
+    return RedirectResponse(
+        f"/task/{task_id}",
+        status_code=302
     )
