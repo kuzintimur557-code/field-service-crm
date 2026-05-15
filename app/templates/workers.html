@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Монтажники</title>
+<title>Исполнители</title>
 
 <style>
 *{box-sizing:border-box}
@@ -26,12 +26,12 @@ button{width:100%;margin-top:18px;padding:15px;border:0;border-radius:16px;backg
 <div class="container">
 
 <div class="header">
-<h1>👷 Монтажники</h1>
+<h1>👷 Исполнители</h1>
 <a href="/" class="btn">← Dashboard</a>
 </div>
 
 <div class="card">
-<h2>Добавить монтажника</h2>
+<h2>Добавить исполнителя</h2>
 
 <form method="post" action="/workers">
 
@@ -47,20 +47,20 @@ button{width:100%;margin-top:18px;padding:15px;border:0;border-radius:16px;backg
 </div>
 </div>
 
-<button type="submit">➕ Создать монтажника</button>
+<button type="submit">➕ Создать исполнителя</button>
 
 </form>
 </div>
 
 <div class="card">
-<h2>Список монтажников</h2>
+<h2>Список исполнителей</h2>
 
 {% for worker in workers %}
 <div class="worker">
 {{ worker["username"] }}
 </div>
 {% else %}
-<p>Монтажников пока нет.</p>
+<p>Исполнителей пока нет.</p>
 {% endfor %}
 
 </div>

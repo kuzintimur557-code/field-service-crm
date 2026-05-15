@@ -54,9 +54,9 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
     </div>
 
     <div class="actions">
-        {% if role == "boss" %}
+        {% if role in ["boss", "manager"] %}
         <a href="/reports" class="btn green">📊 Отчёты</a>
-        <a href="/workers" class="btn dark">👷 Монтажники</a>
+        <a href="/workers" class="btn dark">👷 Исполнители</a>
         <a href="/create-task" class="btn">➕ Новая заявка</a>
         {% endif %}
 
@@ -73,9 +73,9 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
     <div class="stat"><div class="label">Доход</div><div class="num">${{ revenue }}</div></div>
 </div>
 
-{% if role == "boss" %}
+{% if role in ["boss", "manager"] %}
 
-<div class="section-title">👷 Монтажники</div>
+<div class="section-title">👷 Исполнители</div>
 
 <div class="worker-grid">
 
@@ -91,7 +91,7 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
 
 {% else %}
 
-<div class="empty">Монтажников пока нет.</div>
+<div class="empty">Исполнителей пока нет.</div>
 
 {% endfor %}
 
@@ -114,9 +114,9 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
                 <option value="Отменено" {% if selected_status == "Отменено" %}selected{% endif %}>Отменено</option>
             </select>
 
-            {% if role == "boss" %}
+            {% if role in ["boss", "manager"] %}
             <select name="worker">
-                <option value="">Все монтажники</option>
+                <option value="">Все исполнительи</option>
                 {% for worker in workers %}
                 <option value="{{ worker[0] }}" {% if selected_worker == worker[0] %}selected{% endif %}>
                     {{ worker[0] }}

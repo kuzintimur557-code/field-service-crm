@@ -64,7 +64,7 @@ def can_access_task(username, role, task):
     if not task:
         return False
 
-    if role == "boss":
+    if role in ("boss", "manager"):
         return True
 
     return task["worker"] == username
@@ -230,7 +230,7 @@ async def home(
     query = "SELECT * FROM tasks WHERE 1=1"
     params = []
 
-    if role != "boss":
+    if role not in ("boss", "manager"):
         query += " AND worker=?"
         params.append(username)
 
@@ -238,7 +238,7 @@ async def home(
         query += " AND status=?"
         params.append(status)
 
-    if worker and role == "boss":
+    if worker and role in ("boss", "manager"):
         query += " AND worker=?"
         params.append(worker)
 
@@ -254,7 +254,7 @@ async def home(
 
     tasks = c.execute(query, params).fetchall()
 
-    if role == "boss":
+    if role in ("boss", "manager"):
         total_tasks = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
         new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Новая'").fetchone()[0]
         working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='В работе'").fetchone()[0]
@@ -285,7 +285,7 @@ async def home(
 
     worker_stats = []
 
-    if role == "boss":
+    if role in ("boss", "manager"):
         for w in workers:
             worker_name = w["username"]
 
@@ -353,7 +353,7 @@ async def calendar_page(request: Request):
     conn = connect()
     c = conn.cursor()
 
-    if role == "boss":
+    if role in ("boss", "manager"):
         tasks = c.execute("""
         SELECT * FROM tasks
         ORDER BY task_date ASC, id DESC
@@ -389,7 +389,7 @@ async def reports_page(request: Request, month: str = ""):
     update_last_seen(username)
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
     if not month:
@@ -497,7 +497,7 @@ async def workers_page(request: Request):
     update_last_seen(username)
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
     conn = connect()
@@ -531,7 +531,7 @@ async def create_worker(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
     form = await request.form()
@@ -624,7 +624,7 @@ async def create_task_page(request: Request):
     update_last_seen(username)
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
     conn = connect()
@@ -662,7 +662,7 @@ async def create_task(
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
     form = await request.form()
@@ -730,7 +730,7 @@ async def create_task(
 📞 Телефон: {phone}
 📍 Адрес: {address}
 📅 Дата: {task_date}
-👷 Монтажник: {worker}
+👷 Исполнитель: {worker}
 🔥 Приоритет: {priority}
 💰 Цена: {price}
 """
@@ -831,7 +831,7 @@ async def update_status(request: Request, task_id: int):
 
 Заявка #{task_id}
 Клиент: {task[1]}
-Монтажник: {task[6]}
+Исполнитель: {task[6]}
 Новый статус: {status}
 """
         )
@@ -953,7 +953,7 @@ async def update_report(
 📝 Отчёт по заявке #{task_id}
 
 Клиент: {task['client']}
-Монтажник: {task['worker']}
+Исполнитель: {task['worker']}
 
 Отчёт:
 {report}
@@ -1019,7 +1019,7 @@ async def task_pdf(request: Request, task_id: int):
         ("Телефон", task["phone"]),
         ("Адрес", task["address"]),
         ("Дата заявки", task["task_date"]),
-        ("Монтажник", task["worker"]),
+        ("Исполнитель", task["worker"]),
         ("Приоритет", task["priority"]),
         ("Стоимость", f"${task['price']}"),
         ("Статус", task["status"]),
@@ -1039,7 +1039,7 @@ async def task_pdf(request: Request, task_id: int):
 
     y -= 14
     pdf.setFont(font_name, 12)
-    pdf.drawString(40, y, "Отчёт монтажника")
+    pdf.drawString(40, y, "Отчёт исполнителя")
     y -= 20
     y = draw_text(pdf, task["report"] if "report" in task.keys() else "", 40, y, font_name, size=10)
 
@@ -1054,7 +1054,7 @@ async def task_pdf(request: Request, task_id: int):
     pdf.setFont(font_name, 11)
     pdf.drawString(40, y, "Подпись клиента: ______________________________")
     y -= 35
-    pdf.drawString(40, y, "Подпись монтажника: ___________________________")
+    pdf.drawString(40, y, "Подпись исполнителя: ___________________________")
 
     pdf.save()
 

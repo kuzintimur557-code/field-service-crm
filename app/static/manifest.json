@@ -1,7 +1,7 @@
 {
     "name": "Field Service CRM",
     "short_name": "CRM",
-    "description": "CRM для заявок, монтажников и выездных работ",
+    "description": "CRM для заявок, исполнителей и выездных работ",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",

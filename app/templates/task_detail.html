@@ -52,7 +52,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 </div>
 
 <div>
-<div class="row"><div class="label">Монтажник</div><div class="value">{{ task[6] }}</div></div>
+<div class="row"><div class="label">Исполнитель</div><div class="value">{{ task[6] }}</div></div>
 <div class="row"><div class="label">Приоритет</div><div class="value">{{ task[7] }}</div></div>
 <div class="row"><div class="label">Цена</div><div class="value">${{ task[8] }}</div></div>
 <div class="row"><div class="label">Статус</div><div class="status">{{ task[10] }}</div></div>
@@ -102,7 +102,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 {% else %}
 <div class="empty-photo">Фото после пока не загружено</div>
 {% endif %}
-<div class="small-note">Фото после загружается вместе с отчётом монтажника ниже.</div>
+<div class="small-note">Фото после загружается вместе с отчётом исполнителя ниже.</div>
 </div>
 
 </div>
@@ -129,7 +129,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 
 <div class="card">
 
-<h2>Отчёт монтажника</h2>
+<h2>Отчёт исполнителя</h2>
 
 <form method="post" action="/task/{{ task[0] }}/report" enctype="multipart/form-data">
 
