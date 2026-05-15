@@ -139,6 +139,78 @@ async def home(
     )
 
 
+@app.get("/workers", response_class=HTMLResponse)
+async def workers_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    workers = c.execute("""
+    SELECT * FROM users
+    WHERE role='worker'
+    ORDER BY username
+    """).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="workers.html",
+        context={
+            "workers": workers,
+            "username": username
+        }
+    )
+
+
+@app.post("/workers")
+async def create_worker(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    form = await request.form()
+
+    worker_username = form.get("username")
+    worker_password = form.get("password")
+
+    conn = connect()
+    c = conn.cursor()
+
+    existing = c.execute("""
+    SELECT * FROM users
+    WHERE username=?
+    """, (worker_username,)).fetchone()
+
+    if not existing:
+        c.execute("""
+        INSERT INTO users (
+            username,
+            password,
+            role,
+            last_seen
+        )
+        VALUES (?, ?, ?, ?)
+        """, (
+            worker_username,
+            worker_password,
+            "worker",
+            ""
+        ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/workers", status_code=302)
+
+
 @app.get("/calendar", response_class=HTMLResponse)
 async def calendar_page(request: Request):
 

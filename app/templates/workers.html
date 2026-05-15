@@ -1,97 +1,70 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Workers</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Монтажники</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:900px;margin:auto;padding:28px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:12px;flex-wrap:wrap}
+h1{font-size:32px;margin:0}
+.btn{display:inline-block;padding:14px 18px;background:#2563eb;color:white;border-radius:16px;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label{display:block;font-weight:800;margin:12px 0 6px}
+input{width:100%;padding:15px;border:1px solid #d1d5db;border-radius:14px;font-size:16px}
+button{width:100%;margin-top:18px;padding:15px;border:0;border-radius:16px;background:#111827;color:white;font-weight:900;font-size:16px;cursor:pointer}
+.worker{padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px;font-weight:900}
+@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}}
+</style>
 </head>
 
-<body style="
-background:#f5f7fb;
-font-family:Arial;
-padding:20px;
-">
+<body>
+<div class="container">
 
-<a href="/"
-style="
-background:#2d89ef;
-color:white;
-padding:10px 16px;
-border-radius:10px;
-text-decoration:none;
-">
-Назад
-</a>
+<div class="header">
+<h1>👷 Монтажники</h1>
+<a href="/" class="btn">← Dashboard</a>
+</div>
 
-<br><br>
+<div class="card">
+<h2>Добавить монтажника</h2>
 
-<div style="
-background:white;
-padding:20px;
-border-radius:20px;
-max-width:700px;
-margin-bottom:20px;
-">
+<form method="post" action="/workers">
 
-<h1>Workers</h1>
+<div class="grid">
+<div>
+<label>Логин</label>
+<input name="username" placeholder="например: ivan" required>
+</div>
 
-<form method="post" action="/add_worker">
+<div>
+<label>Пароль</label>
+<input name="password" placeholder="например: 12345" required>
+</div>
+</div>
 
-<input
-name="username"
-placeholder="Логин"
-style="
-width:100%;
-padding:12px;
-margin-bottom:10px;
-"
->
-
-<input
-name="password"
-placeholder="Пароль"
-style="
-width:100%;
-padding:12px;
-margin-bottom:10px;
-"
->
-
-<button style="
-width:100%;
-background:#27ae60;
-color:white;
-border:none;
-padding:12px;
-border-radius:10px;
-cursor:pointer;
-">
-Добавить worker
-</button>
+<button type="submit">➕ Создать монтажника</button>
 
 </form>
-
 </div>
+
+<div class="card">
+<h2>Список монтажников</h2>
 
 {% for worker in workers %}
-
-<div style="
-background:white;
-padding:20px;
-border-radius:20px;
-max-width:700px;
-margin-bottom:20px;
-">
-
-<h2>
+<div class="worker">
 {{ worker["username"] }}
-</h2>
-
-👷 Worker account
+</div>
+{% else %}
+<p>Монтажников пока нет.</p>
+{% endfor %}
 
 </div>
 
-{% endfor %}
-
+</div>
 </body>
 </html>
