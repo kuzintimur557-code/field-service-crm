@@ -95,6 +95,36 @@ async def home(
     SELECT username FROM users WHERE role='worker' ORDER BY username
     """).fetchall()
 
+    worker_stats = []
+
+    for w in workers:
+        worker_name = w[0]
+
+        completed = c.execute("""
+        SELECT COUNT(*) FROM tasks
+        WHERE worker=? AND status='Завершено'
+        """, (worker_name,)).fetchone()[0]
+
+        active = c.execute("""
+        SELECT COUNT(*) FROM tasks
+        WHERE worker=? AND status='В работе'
+        """, (worker_name,)).fetchone()[0]
+
+        worker_revenue = c.execute("""
+        SELECT SUM(price) FROM tasks
+        WHERE worker=? AND status='Завершено'
+        """, (worker_name,)).fetchone()[0]
+
+        if worker_revenue is None:
+            worker_revenue = 0
+
+        worker_stats.append({
+            "username": worker_name,
+            "completed": completed,
+            "active": active,
+            "revenue": worker_revenue
+        })
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -109,6 +139,7 @@ async def home(
             "done_tasks": done_tasks,
             "revenue": revenue,
             "workers": workers,
+            "worker_stats": worker_stats,
             "selected_status": status,
             "selected_worker": worker,
             "selected_date": task_date,
