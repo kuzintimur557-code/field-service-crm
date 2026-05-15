@@ -20,6 +20,14 @@ h2{margin:0 0 16px;font-size:22px}
 .btn{display:inline-block;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
 .empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
+.notice{margin-bottom:16px;padding:14px;border-radius:16px;font-weight:900}
+.notice.ok{background:#dcfce7;color:#166534}
+.notice.err{background:#fee2e2;color:#991b1b}
+label{display:block;margin-top:12px;font-weight:900;color:#374151}
+input,textarea,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
+input,textarea{border:1px solid #d1d5db;background:white}
+textarea{height:110px;resize:vertical}
+button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 @media(max-width:800px){.container{padding:16px}.grid,.task{grid-template-columns:1fr}h1{font-size:28px}.btn{display:block;text-align:center}}
 </style>
 </head>
@@ -31,6 +39,14 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="card">
 <h1>👤 {{ client["name"] }}</h1>
+
+{% if request.query_params.get("updated") == "1" %}
+<div class="notice ok">✅ Карточка клиента обновлена</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "empty" %}
+<div class="notice err">❌ Имя клиента обязательно</div>
+{% endif %}
 
 <div class="grid">
     <div>
@@ -60,6 +76,43 @@ h2{margin:0 0 16px;font-size:22px}
     <div class="value">{{ client["notes"] }}</div>
 </div>
 {% endif %}
+</div>
+
+<div class="card">
+<h2>Редактировать клиента</h2>
+
+<form method="post" action="/clients/{{ client['id'] }}/edit">
+
+<div class="grid">
+    <div>
+        <label>Имя / Компания</label>
+        <input type="text" name="name" value="{{ client['name'] }}" required>
+    </div>
+
+    <div>
+        <label>Телефон</label>
+        <input type="text" name="phone" value="{{ client['phone'] or '' }}">
+    </div>
+</div>
+
+<div class="grid">
+    <div>
+        <label>Email</label>
+        <input type="email" name="email" value="{{ client['email'] or '' }}">
+    </div>
+
+    <div>
+        <label>Адрес</label>
+        <input type="text" name="address" value="{{ client['address'] or '' }}">
+    </div>
+</div>
+
+<label>Заметки</label>
+<textarea name="notes">{{ client["notes"] or "" }}</textarea>
+
+<button type="submit">💾 Сохранить изменения</button>
+
+</form>
 </div>
 
 <div class="card">

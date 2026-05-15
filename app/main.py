@@ -605,6 +605,96 @@ async def client_detail(request: Request, client_id: int):
     )
 
 
+@app.post("/clients/{client_id}/edit")
+async def edit_client(request: Request, client_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    email = (form.get("email") or "").strip()
+    address = (form.get("address") or "").strip()
+    notes = (form.get("notes") or "").strip()
+
+    if not name:
+        return RedirectResponse(f"/clients/{client_id}?error=empty", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    client = c.execute("""
+    SELECT *
+    FROM clients
+    WHERE id=?
+    """, (client_id,)).fetchone()
+
+    if not client:
+        conn.close()
+        return RedirectResponse("/clients", status_code=302)
+
+    c.execute("""
+    UPDATE clients
+    SET name=?, phone=?, email=?, address=?, notes=?
+    WHERE id=?
+    """, (
+        name,
+        phone,
+        email,
+        address,
+        notes,
+        client_id
+    ))
+
+    linked_tasks = c.execute("""
+    SELECT id
+    FROM tasks
+    WHERE client_id=?
+    """, (client_id,)).fetchall()
+
+    conn.commit()
+    conn.close()
+
+    for task in linked_tasks:
+        try:
+            log_task_activity(
+                task["id"],
+                username,
+                role,
+                "Обновлена карточка клиента",
+                name
+            )
+        except Exception:
+            pass
+
+    try:
+        send_message(
+            f"""
+👤 Карточка клиента обновлена
+
+Клиент: {name}
+Телефон: {phone}
+Email: {email}
+Адрес: {address}
+
+Изменил: {username} ({get_role_title(role)})
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/clients/{client_id}?updated=1", status_code=302)
+
+
 @app.post("/clients")
 async def create_client(request: Request):
 
