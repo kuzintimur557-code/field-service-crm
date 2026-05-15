@@ -71,18 +71,9 @@ async def home(
     tasks = c.execute(query, params).fetchall()
 
     total_tasks = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
-
-    new_tasks = c.execute("""
-    SELECT COUNT(*) FROM tasks WHERE status='Новая'
-    """).fetchone()[0]
-
-    working_tasks = c.execute("""
-    SELECT COUNT(*) FROM tasks WHERE status='В работе'
-    """).fetchone()[0]
-
-    done_tasks = c.execute("""
-    SELECT COUNT(*) FROM tasks WHERE status='Завершено'
-    """).fetchone()[0]
+    new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Новая'").fetchone()[0]
+    working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='В работе'").fetchone()[0]
+    done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Завершено'").fetchone()[0]
 
     revenue = c.execute("""
     SELECT SUM(price) FROM tasks WHERE status='Завершено'
@@ -233,11 +224,21 @@ async def create_task_page(request: Request):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    conn = connect()
+    c = conn.cursor()
+
+    workers = c.execute("""
+    SELECT username FROM users WHERE role='worker' ORDER BY username
+    """).fetchall()
+
+    conn.close()
+
     return templates.TemplateResponse(
         request=request,
         name="create_task.html",
         context={
-            "username": username
+            "username": username,
+            "workers": workers
         }
     )
 
@@ -437,10 +438,8 @@ async def task_pdf(request: Request, task_id: int):
     pdf_path = f"uploads/docs/task_{task_id}.pdf"
 
     pdf = canvas.Canvas(pdf_path)
-
     pdf.setFont("Helvetica-Bold", 20)
     pdf.drawString(50, 800, f"Service Report #{task[0]}")
-
     pdf.setFont("Helvetica", 12)
 
     y = 750

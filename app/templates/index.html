@@ -13,6 +13,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .title{font-size:34px;font-weight:800}
 .actions{display:flex;gap:12px;flex-wrap:wrap}
 .btn{display:inline-block;padding:14px 20px;border-radius:16px;text-decoration:none;color:white;font-weight:800;background:#2563eb}
+.btn.dark{background:#111827}
 .logout{background:#ef4444}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:24px}
 .stat{background:white;padding:22px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
@@ -48,36 +49,18 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
     <div class="title">🚀 Field Service CRM</div>
 
     <div class="actions">
+        <a href="/calendar" class="btn dark">📅 Календарь</a>
         <a href="/create-task" class="btn">➕ Новая заявка</a>
         <a href="/logout" class="btn logout">Выйти</a>
     </div>
 </div>
 
 <div class="stats">
-    <div class="stat">
-        <div class="label">Всего заявок</div>
-        <div class="num">{{ total_tasks }}</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">Новые</div>
-        <div class="num">{{ new_tasks }}</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">В работе</div>
-        <div class="num">{{ working_tasks }}</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">Завершено</div>
-        <div class="num">{{ done_tasks }}</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">Доход</div>
-        <div class="num">${{ revenue }}</div>
-    </div>
+    <div class="stat"><div class="label">Всего заявок</div><div class="num">{{ total_tasks }}</div></div>
+    <div class="stat"><div class="label">Новые</div><div class="num">{{ new_tasks }}</div></div>
+    <div class="stat"><div class="label">В работе</div><div class="num">{{ working_tasks }}</div></div>
+    <div class="stat"><div class="label">Завершено</div><div class="num">{{ done_tasks }}</div></div>
+    <div class="stat"><div class="label">Доход</div><div class="num">${{ revenue }}</div></div>
 </div>
 
 <div class="section-title">👷 Монтажники</div>
@@ -105,42 +88,19 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
     <form method="get" action="/">
         <div class="filter-grid">
 
-            <input
-                type="text"
-                name="search"
-                placeholder="Поиск клиента"
-                value="{{ search }}"
-            >
-
-            <input
-                type="date"
-                name="task_date"
-                value="{{ selected_date }}"
-            >
+            <input type="text" name="search" placeholder="Поиск клиента" value="{{ search }}">
+            <input type="date" name="task_date" value="{{ selected_date }}">
 
             <select name="status">
                 <option value="">Все статусы</option>
-
-                <option value="Новая" {% if selected_status == "Новая" %}selected{% endif %}>
-                    Новая
-                </option>
-
-                <option value="В работе" {% if selected_status == "В работе" %}selected{% endif %}>
-                    В работе
-                </option>
-
-                <option value="Завершено" {% if selected_status == "Завершено" %}selected{% endif %}>
-                    Завершено
-                </option>
-
-                <option value="Отменено" {% if selected_status == "Отменено" %}selected{% endif %}>
-                    Отменено
-                </option>
+                <option value="Новая" {% if selected_status == "Новая" %}selected{% endif %}>Новая</option>
+                <option value="В работе" {% if selected_status == "В работе" %}selected{% endif %}>В работе</option>
+                <option value="Завершено" {% if selected_status == "Завершено" %}selected{% endif %}>Завершено</option>
+                <option value="Отменено" {% if selected_status == "Отменено" %}selected{% endif %}>Отменено</option>
             </select>
 
             <select name="worker">
                 <option value="">Все монтажники</option>
-
                 {% for worker in workers %}
                 <option value="{{ worker[0] }}" {% if selected_worker == worker[0] %}selected{% endif %}>
                     {{ worker[0] }}
@@ -162,11 +122,7 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
 
 <div class="card">
     <a href="/task/{{ task[0] }}">
-
-        <div class="task-title">
-            #{{ task[0] }} — {{ task[1] }}
-        </div>
-
+        <div class="task-title">#{{ task[0] }} — {{ task[1] }}</div>
         <div class="meta">📞 {{ task[2] }}</div>
         <div class="meta">📍 {{ task[3] }}</div>
         <div class="meta">📅 {{ task[5] }}</div>
@@ -183,15 +139,12 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
         {% else %}
             <div class="badge">{{ task[10] }}</div>
         {% endif %}
-
     </a>
 </div>
 
 {% else %}
 
-<div class="empty">
-    Заявок пока нет.
-</div>
+<div class="empty">Заявок пока нет.</div>
 
 {% endfor %}
 
