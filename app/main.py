@@ -139,6 +139,134 @@ async def home(
     )
 
 
+@app.get("/reports", response_class=HTMLResponse)
+async def reports_page(request: Request, month: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    conn = connect()
+    c = conn.cursor()
+
+    workers = c.execute("""
+    SELECT username FROM users
+    WHERE role='worker'
+    ORDER BY username
+    """).fetchall()
+
+    report_rows = []
+
+    total_completed = 0
+    total_active = 0
+    total_new = 0
+    total_cancelled = 0
+    total_revenue = 0
+
+    for w in workers:
+        worker_name = w[0]
+
+        completed = c.execute("""
+        SELECT COUNT(*) FROM tasks
+        WHERE worker=?
+        AND status='Завершено'
+        AND task_date LIKE ?
+        """, (
+            worker_name,
+            f"{month}%"
+        )).fetchone()[0]
+
+        active = c.execute("""
+        SELECT COUNT(*) FROM tasks
+        WHERE worker=?
+        AND status='В работе'
+        AND task_date LIKE ?
+        """, (
+            worker_name,
+            f"{month}%"
+        )).fetchone()[0]
+
+        new = c.execute("""
+        SELECT COUNT(*) FROM tasks
+        WHERE worker=?
+        AND status='Новая'
+        AND task_date LIKE ?
+        """, (
+            worker_name,
+            f"{month}%"
+        )).fetchone()[0]
+
+        cancelled = c.execute("""
+        SELECT COUNT(*) FROM tasks
+        WHERE worker=?
+        AND status='Отменено'
+        AND task_date LIKE ?
+        """, (
+            worker_name,
+            f"{month}%"
+        )).fetchone()[0]
+
+        revenue = c.execute("""
+        SELECT SUM(price) FROM tasks
+        WHERE worker=?
+        AND status='Завершено'
+        AND task_date LIKE ?
+        """, (
+            worker_name,
+            f"{month}%"
+        )).fetchone()[0]
+
+        if revenue is None:
+            revenue = 0
+
+        total_worker_tasks = completed + active + new + cancelled
+
+        report_rows.append({
+            "worker": worker_name,
+            "completed": completed,
+            "active": active,
+            "new": new,
+            "cancelled": cancelled,
+            "revenue": revenue,
+            "total": total_worker_tasks
+        })
+
+        total_completed += completed
+        total_active += active
+        total_new += new
+        total_cancelled += cancelled
+        total_revenue += revenue
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE task_date LIKE ?
+    ORDER BY task_date ASC, id DESC
+    """, (f"{month}%",)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="reports.html",
+        context={
+            "username": username,
+            "month": month,
+            "report_rows": report_rows,
+            "tasks": tasks,
+            "total_completed": total_completed,
+            "total_active": total_active,
+            "total_new": total_new,
+            "total_cancelled": total_cancelled,
+            "total_revenue": total_revenue
+        }
+    )
+
+
 @app.get("/workers", response_class=HTMLResponse)
 async def workers_page(request: Request):
 

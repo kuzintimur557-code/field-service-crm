@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Отчёты</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1200px;margin:auto;padding:28px}
+.header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+h1{font-size:32px;margin:0}
+.btn{display:inline-block;padding:14px 18px;background:#2563eb;color:white;border-radius:16px;text-decoration:none;font-weight:900}
+.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:22px}
+.stat{background:white;padding:22px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
+.label{color:#6b7280;font-weight:700;margin-bottom:8px}
+.num{font-size:30px;font-weight:900}
+input,button{padding:14px;border-radius:14px;border:1px solid #d1d5db;font-size:16px}
+button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{text-align:left;padding:14px;border-bottom:1px solid #e5e7eb}
+.table th{color:#6b7280}
+.badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800}
+.task{padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px}
+.task a{text-decoration:none;color:#111827;font-weight:900}
+.meta{color:#4b5563;margin-top:6px}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="header">
+<h1>📊 Отчёты за месяц</h1>
+<a href="/" class="btn">← Dashboard</a>
+</div>
+
+<div class="card">
+<form method="get" action="/reports">
+<label><b>Месяц</b></label><br><br>
+<input type="month" name="month" value="{{ month }}">
+<button type="submit">Показать</button>
+</form>
+</div>
+
+<div class="grid">
+<div class="stat"><div class="label">Новые</div><div class="num">{{ total_new }}</div></div>
+<div class="stat"><div class="label">В работе</div><div class="num">{{ total_active }}</div></div>
+<div class="stat"><div class="label">Завершено</div><div class="num">{{ total_completed }}</div></div>
+<div class="stat"><div class="label">Отменено</div><div class="num">{{ total_cancelled }}</div></div>
+<div class="stat"><div class="label">Доход</div><div class="num">${{ total_revenue }}</div></div>
+</div>
+
+<div class="card">
+<h2>👷 Монтажники</h2>
+
+<table class="table">
+<thead>
+<tr>
+<th>Монтажник</th>
+<th>Всего</th>
+<th>Новые</th>
+<th>В работе</th>
+<th>Завершено</th>
+<th>Отменено</th>
+<th>Доход</th>
+</tr>
+</thead>
+
+<tbody>
+{% for row in report_rows %}
+<tr>
+<td><b>{{ row.worker }}</b></td>
+<td>{{ row.total }}</td>
+<td>{{ row.new }}</td>
+<td>{{ row.active }}</td>
+<td>{{ row.completed }}</td>
+<td>{{ row.cancelled }}</td>
+<td><b>${{ row.revenue }}</b></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="card">
+<h2>📦 Заявки за {{ month }}</h2>
+
+{% for task in tasks %}
+
+<div class="task">
+<a href="/task/{{ task[0] }}">#{{ task[0] }} — {{ task[1] }}</a>
+<div class="meta">📅 {{ task[5] }} | 👷 {{ task[6] }} | 💰 ${{ task[8] }}</div>
+<div class="badge">{{ task[10] }}</div>
+</div>
+
+{% else %}
+
+<p>За этот месяц заявок нет.</p>
+
+{% endfor %}
+
+</div>
+
+</div>
+</body>
+</html>
