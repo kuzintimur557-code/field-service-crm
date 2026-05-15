@@ -81,6 +81,30 @@ def get_role_title(role):
     return titles.get(role, role)
 
 
+def get_company_settings():
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT OR IGNORE INTO company_settings (
+        id, company_name, phone, email, address, tax_number, bank_details, updated_at
+    )
+    VALUES (1, '', '', '', '', '', '', '')
+    """)
+
+    conn.commit()
+
+    settings = c.execute("""
+    SELECT *
+    FROM company_settings
+    WHERE id=1
+    """).fetchone()
+
+    conn.close()
+
+    return settings
+
+
 def log_task_activity(task_id, username, role, action, details=""):
     conn = connect()
     c = conn.cursor()
@@ -704,6 +728,96 @@ async def reports_page(request: Request, month: str = ""):
             "total_revenue": total_revenue
         }
     )
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    settings = get_company_settings()
+
+    return templates.TemplateResponse(
+        name="settings.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings
+        }
+    )
+
+
+@app.post("/settings")
+async def update_settings(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+
+    company_name = (form.get("company_name") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    email = (form.get("email") or "").strip()
+    address = (form.get("address") or "").strip()
+    tax_number = (form.get("tax_number") or "").strip()
+    bank_details = (form.get("bank_details") or "").strip()
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT OR IGNORE INTO company_settings (
+        id, company_name, phone, email, address, tax_number, bank_details, updated_at
+    )
+    VALUES (1, '', '', '', '', '', '', '')
+    """)
+
+    c.execute("""
+    UPDATE company_settings
+    SET company_name=?, phone=?, email=?, address=?, tax_number=?, bank_details=?, updated_at=?
+    WHERE id=1
+    """, (
+        company_name,
+        phone,
+        email,
+        address,
+        tax_number,
+        bank_details,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        send_message(
+            f"""
+⚙️ Настройки компании обновлены
+
+Компания: {company_name}
+Изменил: {username} ({get_role_title(role)})
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse("/settings?updated=1", status_code=302)
 
 
 @app.get("/catalog", response_class=HTMLResponse)
