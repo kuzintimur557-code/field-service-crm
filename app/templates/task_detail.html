@@ -12,19 +12,24 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:800}
 .card{background:white;padding:30px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:20px}
 h1{margin:0 0 24px;font-size:32px}
+h2{margin:0 0 16px;font-size:22px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
 .row{margin-bottom:16px}
 .label{font-size:13px;color:#6b7280;margin-bottom:5px;font-weight:700}
-.value{font-size:18px;font-weight:800}
+.value{font-size:18px;font-weight:800;word-break:break-word}
 .status{display:inline-block;padding:9px 15px;border-radius:999px;font-weight:800;background:#dbeafe;color:#1d4ed8}
-img{max-width:100%;border-radius:18px;margin-top:18px}
+img{max-width:100%;border-radius:18px;margin-top:10px;box-shadow:0 10px 24px rgba(0,0,0,.08)}
 .btn{display:block;text-align:center;padding:15px;border-radius:16px;background:#2563eb;color:white;text-decoration:none;font-weight:900;margin-top:14px}
 .btn.green{background:#16a34a}
 select,button,textarea,input{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:10px}
 select,textarea,input{border:1px solid #d1d5db;background:white}
 textarea{height:140px;resize:vertical}
 button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
-@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:26px}}
+.small-note{font-size:13px;color:#6b7280;margin-top:8px;line-height:1.4}
+.photo-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:20px;padding:16px}
+.empty-photo{padding:22px;border-radius:16px;background:#eef2ff;color:#3730a3;font-weight:800;text-align:center;margin-top:10px}
+@media(max-width:700px){.container{padding:16px}.grid,.photo-grid{grid-template-columns:1fr}h1{font-size:26px}.card{padding:22px}}
 </style>
 </head>
 
@@ -68,11 +73,39 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 📄 Скачать PDF акт
 </a>
 
+</div>
+
+<div class="card">
+<h2>Фото до / после</h2>
+
+<div class="photo-grid">
+
+<div class="photo-box">
+<div class="label">Фото до работы</div>
 {% if task[9] %}
-<h2>Фото до работы</h2>
 <img src="/uploads/{{ task[9] }}">
+{% else %}
+<div class="empty-photo">Фото до пока не загружено</div>
 {% endif %}
 
+<form method="post" action="/task/{{ task[0] }}/before-photo" enctype="multipart/form-data">
+<input type="file" name="before_photo" accept="image/*,.heic,.heif">
+<button type="submit">📷 Загрузить / заменить фото до</button>
+</form>
+<div class="small-note">Можно загрузить JPG, PNG, WEBP или HEIC. В PDF напрямую вставляются JPG/PNG/WEBP.</div>
+</div>
+
+<div class="photo-box">
+<div class="label">Фото после работы</div>
+{% if task["after_photo"] %}
+<img src="/uploads/{{ task['after_photo'] }}">
+{% else %}
+<div class="empty-photo">Фото после пока не загружено</div>
+{% endif %}
+<div class="small-note">Фото после загружается вместе с отчётом монтажника ниже.</div>
+</div>
+
+</div>
 </div>
 
 <div class="card">
@@ -82,10 +115,10 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <form method="post" action="/task/{{ task[0] }}/status">
 
 <select name="status">
-<option value="Новая">Новая</option>
-<option value="В работе">В работе</option>
-<option value="Завершено">Завершено</option>
-<option value="Отменено">Отменено</option>
+<option value="Новая" {% if task[10] == "Новая" %}selected{% endif %}>Новая</option>
+<option value="В работе" {% if task[10] == "В работе" %}selected{% endif %}>В работе</option>
+<option value="Завершено" {% if task[10] == "Завершено" %}selected{% endif %}>Завершено</option>
+<option value="Отменено" {% if task[10] == "Отменено" %}selected{% endif %}>Отменено</option>
 </select>
 
 <button type="submit">💾 Сохранить статус</button>
@@ -104,22 +137,17 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <textarea name="report" placeholder="Что было сделано...">{{ task["report"] or "" }}</textarea>
 
 <label>Фото после работы</label>
-<input type="file" name="after_photo">
+<input type="file" name="after_photo" accept="image/*,.heic,.heif">
 
 <button type="submit">📝 Сохранить отчёт</button>
 
 </form>
 
 {% if task["report"] %}
-<div class="row">
+<div class="row" style="margin-top:18px">
 <div class="label">Текущий отчёт</div>
 <div class="value">{{ task["report"] }}</div>
 </div>
-{% endif %}
-
-{% if task["after_photo"] %}
-<h2>Фото после работы</h2>
-<img src="/uploads/{{ task['after_photo'] }}">
 {% endif %}
 
 </div>

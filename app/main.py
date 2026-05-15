@@ -7,6 +7,12 @@ from app.database import connect, init_db
 from app.telegram_utils import send_message, send_photo
 
 from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 import shutil
@@ -24,6 +30,142 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
+
+UPLOAD_DIR = Path("uploads")
+DOCS_DIR = UPLOAD_DIR / "docs"
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
+PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def safe_upload_filename(task_id, prefix, original_filename):
+    original = Path(original_filename or "photo").name
+    extension = Path(original).suffix.lower()
+
+    if extension not in ALLOWED_IMAGE_EXTENSIONS:
+        extension = ".jpg"
+
+    return f"task_{task_id}_{prefix}_{uuid4().hex}{extension}"
+
+
+def save_upload_file(upload_file, task_id, prefix):
+    if not upload_file or not upload_file.filename:
+        return ""
+
+    filename = safe_upload_filename(task_id, prefix, upload_file.filename)
+    file_path = UPLOAD_DIR / filename
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(upload_file.file, buffer)
+
+    return filename
+
+
+def can_access_task(username, role, task):
+    if not task:
+        return False
+
+    if role == "boss":
+        return True
+
+    return task["worker"] == username
+
+
+def register_pdf_font():
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
+    ]
+
+    for font_path in font_paths:
+        if os.path.exists(font_path):
+            try:
+                pdfmetrics.registerFont(TTFont("CRMFont", font_path))
+                return "CRMFont"
+            except Exception:
+                pass
+
+    return "Helvetica"
+
+
+def draw_text(pdf, text, x, y, font_name, size=10, max_chars=88, line_height=16):
+    pdf.setFont(font_name, size)
+    text = str(text or "")
+    lines = []
+
+    for paragraph in text.split("\n"):
+        words = paragraph.split()
+
+        if not words:
+            lines.append("")
+            continue
+
+        line = ""
+
+        for word in words:
+            candidate = f"{line} {word}".strip()
+
+            if len(candidate) <= max_chars:
+                line = candidate
+            else:
+                lines.append(line)
+                line = word
+
+        if line:
+            lines.append(line)
+
+    for line in lines:
+        if y < 70:
+            pdf.showPage()
+            y = 800
+            pdf.setFont(font_name, size)
+
+        pdf.drawString(x, y, line)
+        y -= line_height
+
+    return y
+
+
+def draw_pdf_image(pdf, filename, title, x, y, font_name):
+    if not filename:
+        return y
+
+    file_path = UPLOAD_DIR / filename
+
+    if not file_path.exists():
+        return y
+
+    if file_path.suffix.lower() not in PDF_IMAGE_EXTENSIONS:
+        pdf.setFont(font_name, 10)
+        pdf.drawString(x, y, f"{title}: файл сохранён, но формат не вставляется в PDF")
+        return y - 24
+
+    if y < 270:
+        pdf.showPage()
+        y = 800
+
+    try:
+        pdf.setFont(font_name, 11)
+        pdf.drawString(x, y, title)
+        y -= 16
+        image = ImageReader(str(file_path))
+        pdf.drawImage(
+            image,
+            x,
+            y - 170,
+            width=240,
+            height=170,
+            preserveAspectRatio=True,
+            mask="auto"
+        )
+        y -= 200
+    except Exception:
+        pdf.setFont(font_name, 10)
+        pdf.drawString(x, y, f"{title}: не удалось вставить изображение")
+        y -= 24
+
+    return y
 
 
 def get_user(request: Request):
@@ -506,6 +648,7 @@ async def create_task_page(request: Request):
     )
 
 
+
 @app.post("/create-task")
 async def create_task(
     request: Request,
@@ -532,15 +675,6 @@ async def create_task(
     worker = form.get("worker")
     priority = form.get("priority")
     price = form.get("price")
-
-    filename = ""
-
-    if photo and photo.filename:
-        filename = f"{datetime.now().timestamp()}_{photo.filename}"
-        file_path = f"uploads/{filename}"
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(photo.file, buffer)
 
     conn = connect()
     c = conn.cursor()
@@ -570,7 +704,7 @@ async def create_task(
         worker,
         priority,
         price,
-        filename,
+        "",
         "Новая",
         "",
         ""
@@ -578,6 +712,15 @@ async def create_task(
 
     conn.commit()
     task_id = c.lastrowid
+
+    filename = save_upload_file(photo, task_id, "before")
+
+    if filename:
+        c.execute("""
+        UPDATE tasks SET photo=? WHERE id=?
+        """, (filename, task_id))
+        conn.commit()
+
     conn.close()
 
     text = f"""
@@ -598,9 +741,9 @@ async def create_task(
         if filename:
             send_photo(
                 f"uploads/{filename}",
-                f"Фото к заявке #{task_id}"
+                f"Фото до работы к заявке #{task_id}"
             )
-    except:
+    except Exception:
         pass
 
     return RedirectResponse("/", status_code=302)
@@ -629,7 +772,7 @@ async def task_detail(request: Request, task_id: int):
     if not task:
         return HTMLResponse("Task not found", status_code=404)
 
-    if role != "boss" and task["worker"] != username:
+    if not can_access_task(username, role, task):
         return RedirectResponse("/", status_code=302)
 
     return templates.TemplateResponse(
@@ -667,7 +810,7 @@ async def update_status(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    if role != "boss" and task["worker"] != username:
+    if not can_access_task(username, role, task):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
@@ -701,6 +844,58 @@ async def update_status(request: Request, task_id: int):
     )
 
 
+
+@app.post("/task/{task_id}/before-photo")
+async def update_before_photo(
+    request: Request,
+    task_id: int,
+    before_photo: UploadFile = File(None)
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    filename = save_upload_file(before_photo, task_id, "before")
+
+    if filename:
+        c.execute("""
+        UPDATE tasks SET photo=? WHERE id=?
+        """, (filename, task_id))
+        conn.commit()
+
+    conn.close()
+
+    try:
+        if filename:
+            send_photo(
+                f"uploads/{filename}",
+                f"Фото до работы по заявке #{task_id}"
+            )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
 @app.post("/task/{task_id}/report")
 async def update_report(
     request: Request,
@@ -729,18 +924,15 @@ async def update_report(
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    if role != "boss" and task["worker"] != username:
+    if not can_access_task(username, role, task):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
     after_filename = task["after_photo"] if "after_photo" in task.keys() else ""
+    new_after_filename = save_upload_file(after_photo, task_id, "after")
 
-    if after_photo and after_photo.filename:
-        after_filename = f"after_{datetime.now().timestamp()}_{after_photo.filename}"
-        file_path = f"uploads/{after_filename}"
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(after_photo.file, buffer)
+    if new_after_filename:
+        after_filename = new_after_filename
 
     c.execute("""
     UPDATE tasks
@@ -760,26 +952,27 @@ async def update_report(
             f"""
 📝 Отчёт по заявке #{task_id}
 
-Клиент: {task[1]}
-Монтажник: {task[6]}
+Клиент: {task['client']}
+Монтажник: {task['worker']}
 
 Отчёт:
 {report}
 """
         )
 
-        if after_filename:
+        if new_after_filename:
             send_photo(
-                f"uploads/{after_filename}",
+                f"uploads/{new_after_filename}",
                 f"Фото после работы по заявке #{task_id}"
             )
-    except:
+    except Exception:
         pass
 
     return RedirectResponse(
         f"/task/{task_id}",
         status_code=302
     )
+
 
 
 @app.get("/task/{task_id}/pdf")
@@ -804,43 +997,69 @@ async def task_pdf(request: Request, task_id: int):
     if not task:
         return HTMLResponse("Task not found", status_code=404)
 
-    if role != "boss" and task["worker"] != username:
+    if not can_access_task(username, role, task):
         return RedirectResponse("/", status_code=302)
 
-    pdf_path = f"uploads/docs/task_{task_id}.pdf"
+    pdf_path = DOCS_DIR / f"task_{task_id}.pdf"
+    font_name = register_pdf_font()
 
-    pdf = canvas.Canvas(pdf_path)
-    pdf.setFont("Helvetica-Bold", 20)
-    pdf.drawString(50, 800, f"Service Report #{task[0]}")
-    pdf.setFont("Helvetica", 12)
+    pdf = canvas.Canvas(str(pdf_path), pagesize=A4)
+    page_width, page_height = A4
 
-    y = 750
+    pdf.setFont(font_name, 20)
+    pdf.drawString(40, page_height - 50, f"Акт выполненных работ №{task['id']}")
 
-    lines = [
-        f"Client: {task[1]}",
-        f"Phone: {task[2]}",
-        f"Address: {task[3]}",
-        f"Description: {task[4]}",
-        f"Date: {task[5]}",
-        f"Worker: {task[6]}",
-        f"Priority: {task[7]}",
-        f"Price: ${task[8]}",
-        f"Status: {task[10]}",
-        "",
-        "Worker Report:",
-        task["report"] if "report" in task.keys() else "",
-        "",
-        "Signature: ______________________________"
+    pdf.setFont(font_name, 10)
+    pdf.drawString(40, page_height - 72, f"Дата формирования: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+    y = page_height - 110
+
+    fields = [
+        ("Клиент", task["client"]),
+        ("Телефон", task["phone"]),
+        ("Адрес", task["address"]),
+        ("Дата заявки", task["task_date"]),
+        ("Монтажник", task["worker"]),
+        ("Приоритет", task["priority"]),
+        ("Стоимость", f"${task['price']}"),
+        ("Статус", task["status"]),
     ]
 
-    for line in lines:
-        pdf.drawString(50, y, str(line))
-        y -= 28
+    for label, value in fields:
+        pdf.setFont(font_name, 10)
+        pdf.drawString(40, y, f"{label}:")
+        y = draw_text(pdf, value, 145, y, font_name, size=10, max_chars=58, line_height=15)
+        y -= 4
+
+    y -= 8
+    pdf.setFont(font_name, 12)
+    pdf.drawString(40, y, "Описание работ")
+    y -= 20
+    y = draw_text(pdf, task["description"], 40, y, font_name, size=10)
+
+    y -= 14
+    pdf.setFont(font_name, 12)
+    pdf.drawString(40, y, "Отчёт монтажника")
+    y -= 20
+    y = draw_text(pdf, task["report"] if "report" in task.keys() else "", 40, y, font_name, size=10)
+
+    y -= 18
+    y = draw_pdf_image(pdf, task["photo"], "Фото до работы", 40, y, font_name)
+    y = draw_pdf_image(pdf, task["after_photo"] if "after_photo" in task.keys() else "", "Фото после работы", 40, y, font_name)
+
+    if y < 120:
+        pdf.showPage()
+        y = page_height - 60
+
+    pdf.setFont(font_name, 11)
+    pdf.drawString(40, y, "Подпись клиента: ______________________________")
+    y -= 35
+    pdf.drawString(40, y, "Подпись монтажника: ___________________________")
 
     pdf.save()
 
     return FileResponse(
-        pdf_path,
+        str(pdf_path),
         media_type="application/pdf",
-        filename=f"task_{task_id}.pdf"
+        filename=f"task_{task_id}_act.pdf"
     )
