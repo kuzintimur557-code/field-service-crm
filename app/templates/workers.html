@@ -38,6 +38,36 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div style="color:#6b7280;font-weight:800">
 Управление менеджерами и исполнителями платформы
 </div>
+
+{% if request.query_params.get("created") == "1" %}
+<div style="margin-top:16px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900">
+✅ Пользователь создан
+</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "empty" %}
+<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
+❌ Логин и пароль обязательны
+</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "exists" %}
+<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
+❌ Пользователь с таким логином уже существует
+</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "bad_role" %}
+<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
+❌ Нельзя создать пользователя с такой ролью
+</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "only_boss" %}
+<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
+❌ Создавать пользователей может только Босс
+</div>
+{% endif %}
 </div>
 
 {% if role == "boss" %}

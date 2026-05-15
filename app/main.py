@@ -603,17 +603,20 @@ async def create_worker(request: Request):
 
     role = get_role(username)
 
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
+    if role != "boss":
+        return RedirectResponse("/workers?error=only_boss", status_code=302)
 
     form = await request.form()
 
-    worker_username = form.get("username")
-    worker_password = form.get("password")
-    worker_role = form.get("role") or "worker"
+    worker_username = (form.get("username") or "").strip()
+    worker_password = (form.get("password") or "").strip()
+    worker_role = (form.get("role") or "worker").strip()
+
+    if not worker_username or not worker_password:
+        return RedirectResponse("/workers?error=empty", status_code=302)
 
     if worker_role not in ("manager", "worker"):
-        worker_role = "worker"
+        return RedirectResponse("/workers?error=bad_role", status_code=302)
 
     conn = connect()
     c = conn.cursor()
@@ -622,21 +625,37 @@ async def create_worker(request: Request):
     SELECT * FROM users WHERE username=?
     """, (worker_username,)).fetchone()
 
-    if not existing:
-        c.execute("""
-        INSERT INTO users (username, password, role, last_seen)
-        VALUES (?, ?, ?, ?)
-        """, (
-            worker_username,
-            worker_password,
-            "worker",
-            ""
-        ))
+    if existing:
+        conn.close()
+        return RedirectResponse("/workers?error=exists", status_code=302)
+
+    c.execute("""
+    INSERT INTO users (username, password, role, last_seen)
+    VALUES (?, ?, ?, ?)
+    """, (
+        worker_username,
+        worker_password,
+        worker_role,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
 
     conn.commit()
     conn.close()
 
-    return RedirectResponse("/workers", status_code=302)
+    try:
+        send_message(
+            f"""
+👥 Создан новый пользователь
+
+Логин: {worker_username}
+Роль: {get_role_title(worker_role)}
+Создал: {username} ({get_role_title(role)})
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse("/workers?created=1", status_code=302)
 
 
 @app.get("/login", response_class=HTMLResponse)
