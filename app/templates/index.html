@@ -56,7 +56,7 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
     <div class="actions">
         {% if role in ["boss", "manager"] %}
         <a href="/reports" class="btn green">📊 Отчёты</a>
-        <a href="/workers" class="btn dark">👷 Исполнители</a>
+        <a href="/workers" class="btn dark">👥 Команда</a>
         <a href="/create-task" class="btn">➕ Новая заявка</a>
         {% endif %}
 
@@ -75,7 +75,7 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
 
 {% if role in ["boss", "manager"] %}
 
-<div class="section-title">👷 Исполнители</div>
+<div class="section-title">👥 Команда</div>
 
 <div class="worker-grid">
 

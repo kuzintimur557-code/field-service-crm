@@ -577,8 +577,8 @@ async def workers_page(request: Request):
 
     workers = c.execute("""
     SELECT * FROM users
-    WHERE role='worker'
-    ORDER BY username
+    WHERE role IN ('manager', 'worker')
+    ORDER BY role, username
     """).fetchall()
 
     conn.close()
@@ -610,6 +610,10 @@ async def create_worker(request: Request):
 
     worker_username = form.get("username")
     worker_password = form.get("password")
+    worker_role = form.get("role") or "worker"
+
+    if worker_role not in ("manager", "worker"):
+        worker_role = "worker"
 
     conn = connect()
     c = conn.cursor()
