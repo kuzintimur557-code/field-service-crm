@@ -18,6 +18,7 @@ init_db()
 
 os.makedirs("uploads", exist_ok=True)
 
+
 app.mount(
     "/uploads",
     StaticFiles(directory="uploads"),
@@ -29,6 +30,7 @@ app.mount(
     StaticFiles(directory="app/static"),
     name="static"
 )
+
 
 templates = Jinja2Templates(
     directory="app/templates"
@@ -46,7 +48,11 @@ async def home(request: Request):
     username = get_user(request)
 
     if not username:
-        return RedirectResponse("/login", status_code=302)
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
 
     conn = connect()
     c = conn.cursor()
@@ -62,9 +68,9 @@ async def home(request: Request):
     conn.close()
 
     return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
+        "index.html",
+        {
+            "request": request,
             "tasks": tasks,
             "username": username
         }
@@ -75,9 +81,10 @@ async def home(request: Request):
 async def login_page(request: Request):
 
     return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={}
+        "login.html",
+        {
+            "request": request
+        }
     )
 
 
@@ -144,12 +151,16 @@ async def create_task_page(request: Request):
     username = get_user(request)
 
     if not username:
-        return RedirectResponse("/login", status_code=302)
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
 
     return templates.TemplateResponse(
-        request=request,
-        name="create_task.html",
-        context={
+        "create_task.html",
+        {
+            "request": request,
             "username": username
         }
     )
@@ -164,7 +175,11 @@ async def create_task(
     username = get_user(request)
 
     if not username:
-        return RedirectResponse("/login", status_code=302)
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
 
     form = await request.form()
 
@@ -186,6 +201,7 @@ async def create_task(
         file_path = f"uploads/{filename}"
 
         with open(file_path, "wb") as buffer:
+
             shutil.copyfileobj(photo.file, buffer)
 
     conn = connect()
@@ -256,12 +272,19 @@ async def create_task(
 
 
 @app.get("/task/{task_id}", response_class=HTMLResponse)
-async def task_detail(request: Request, task_id: int):
+async def task_detail(
+    request: Request,
+    task_id: int
+):
 
     username = get_user(request)
 
     if not username:
-        return RedirectResponse("/login", status_code=302)
+
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
 
     conn = connect()
     c = conn.cursor()
@@ -284,9 +307,9 @@ async def task_detail(request: Request, task_id: int):
         )
 
     return templates.TemplateResponse(
-        request=request,
-        name="task_detail.html",
-        context={
+        "task_detail.html",
+        {
+            "request": request,
             "task": task,
             "username": username
         }
