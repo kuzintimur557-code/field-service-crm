@@ -766,7 +766,6 @@ async def task_detail(request: Request, task_id: int):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
-    update_last_seen(username)
     role = get_role(username)
 
     conn = connect()
@@ -776,23 +775,102 @@ async def task_detail(request: Request, task_id: int):
     SELECT * FROM tasks WHERE id=?
     """, (task_id,)).fetchone()
 
-    conn.close()
-
     if not task:
-        return HTMLResponse("Task not found", status_code=404)
-
-    if not can_access_task(username, role, task):
+        conn.close()
         return RedirectResponse("/", status_code=302)
 
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    comments = c.execute("""
+    SELECT *
+    FROM task_comments
+    WHERE task_id=?
+    ORDER BY id ASC
+    """, (task_id,)).fetchall()
+
+    conn.close()
+
     return templates.TemplateResponse(
-        request=request,
         name="task_detail.html",
         context={
+            "request": request,
             "task": task,
             "username": username,
-            "role": role
+            "role": role,
+            "comments": comments
         }
     )
+
+
+@app.post("/task/{task_id}/comment")
+async def add_task_comment(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    form = await request.form()
+    message = (form.get("message") or "").strip()
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if message:
+        c.execute("""
+        INSERT INTO task_comments (
+            task_id,
+            username,
+            role,
+            message,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """, (
+            task_id,
+            username,
+            role,
+            message,
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
+
+        conn.commit()
+
+        try:
+            send_message(
+                f"""
+💬 Новый комментарий в заявке #{task_id}
+
+Клиент: {task['client']}
+Адрес: {task['address']}
+Автор: {username} ({get_role_title(role)})
+
+Комментарий:
+{message}
+"""
+            )
+        except Exception:
+            pass
+
+    conn.close()
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
 @app.post("/task/{task_id}/status")
