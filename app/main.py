@@ -79,6 +79,33 @@ def get_role_title(role):
     return titles.get(role, role)
 
 
+def log_task_activity(task_id, username, role, action, details=""):
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 def register_pdf_font():
     font_paths = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -732,6 +759,14 @@ async def create_task(
 
     conn.close()
 
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Создана заявка",
+        f"Клиент: {client}. Исполнитель: {worker}. Дата: {task_date}"
+    )
+
     text = f"""
 🚀 Новая заявка #{task_id}
 
@@ -790,6 +825,13 @@ async def task_detail(request: Request, task_id: int):
     ORDER BY id ASC
     """, (task_id,)).fetchall()
 
+    activity = c.execute("""
+    SELECT *
+    FROM task_activity
+    WHERE task_id=?
+    ORDER BY id DESC
+    """, (task_id,)).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -799,7 +841,8 @@ async def task_detail(request: Request, task_id: int):
             "task": task,
             "username": username,
             "role": role,
-            "comments": comments
+            "comments": comments,
+            "activity": activity
         }
     )
 
@@ -851,6 +894,14 @@ async def add_task_comment(request: Request, task_id: int):
         ))
 
         conn.commit()
+
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Добавлен комментарий",
+            message
+        )
 
         try:
             send_message(
@@ -913,6 +964,14 @@ async def update_task_status(request: Request, task_id: int):
     conn.close()
 
     if old_status != new_status:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Изменён статус",
+            f"{old_status} → {new_status}"
+        )
+
         role_title = get_role_title(role)
 
         status_icons = {
@@ -984,6 +1043,15 @@ async def update_before_photo(
 
     conn.close()
 
+    if filename:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Загружено фото до",
+            filename
+        )
+
     try:
         if filename:
             send_photo(
@@ -1046,6 +1114,23 @@ async def update_report(
 
     conn.commit()
     conn.close()
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Обновлён отчёт исполнителя",
+        report or ""
+    )
+
+    if new_after_filename:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Загружено фото после",
+            new_after_filename
+        )
 
     try:
         send_message(
@@ -1157,6 +1242,14 @@ async def task_pdf(request: Request, task_id: int):
     pdf.drawString(40, y, "Подпись исполнителя: ___________________________")
 
     pdf.save()
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Сформирован PDF акт",
+        f"task_{task_id}_act.pdf"
+    )
 
     return FileResponse(
         str(pdf_path),

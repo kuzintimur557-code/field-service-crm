@@ -33,6 +33,16 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS task_activity (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER,
+        username TEXT,
+        role TEXT,
+        action TEXT,
+        details TEXT,
+        created_at TEXT
+    )
+
     CREATE TABLE IF NOT EXISTS task_comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER,

@@ -32,6 +32,11 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 .chat-item{background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:14px;margin-bottom:12px}
 .chat-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:13px;color:#6b7280;font-weight:800}
 .chat-message{font-size:16px;line-height:1.45;white-space:pre-wrap}
+.timeline-item{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:14px 0;border-bottom:1px solid #e5e7eb}
+.timeline-time{font-size:13px;color:#6b7280;font-weight:800}
+.timeline-action{font-size:16px;font-weight:900}
+.timeline-details{font-size:14px;color:#4b5563;margin-top:5px;white-space:pre-wrap}
+@media(max-width:700px){.timeline-item{grid-template-columns:1fr;gap:6px}}
 @media(max-width:700px){.container{padding:16px}.grid,.photo-grid{grid-template-columns:1fr}h1{font-size:26px}.card{padding:22px}}
 </style>
 </head>
@@ -133,6 +138,31 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <textarea name="message" placeholder="Написать внутренний комментарий по заявке..."></textarea>
 <button type="submit">💬 Отправить комментарий</button>
 </form>
+
+</div>
+
+<div class="card">
+
+<h2>🧾 История действий</h2>
+
+{% if activity %}
+{% for item in activity %}
+<div class="timeline-item">
+    <div class="timeline-time">{{ item["created_at"] }}</div>
+    <div>
+        <div class="timeline-action">{{ item["action"] }}</div>
+        <div class="timeline-details">
+            {{ item["username"] }} / {{ item["role"] }}
+            {% if item["details"] %}
+            — {{ item["details"] }}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-photo">История действий пока пустая</div>
+{% endif %}
 
 </div>
 
