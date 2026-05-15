@@ -33,6 +33,15 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS client_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER,
+        username TEXT,
+        role TEXT,
+        note TEXT,
+        created_at TEXT
+    )
+
     CREATE TABLE IF NOT EXISTS clients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,

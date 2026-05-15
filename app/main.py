@@ -591,6 +591,13 @@ async def client_detail(request: Request, client_id: int):
     ORDER BY id DESC
     """, (client_id,)).fetchall()
 
+    client_notes = c.execute("""
+    SELECT *
+    FROM client_notes
+    WHERE client_id=?
+    ORDER BY id DESC
+    """, (client_id,)).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -600,9 +607,80 @@ async def client_detail(request: Request, client_id: int):
             "username": username,
             "role": role,
             "client": client,
-            "tasks": tasks
+            "tasks": tasks,
+            "client_notes": client_notes
         }
     )
+
+
+@app.post("/clients/{client_id}/notes")
+async def add_client_note(request: Request, client_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    note = (form.get("note") or "").strip()
+
+    if not note:
+        return RedirectResponse(f"/clients/{client_id}?note_error=empty", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    client = c.execute("""
+    SELECT *
+    FROM clients
+    WHERE id=?
+    """, (client_id,)).fetchone()
+
+    if not client:
+        conn.close()
+        return RedirectResponse("/clients", status_code=302)
+
+    c.execute("""
+    INSERT INTO client_notes (
+        client_id,
+        username,
+        role,
+        note,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        client_id,
+        username,
+        role,
+        note,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        send_message(
+            f"""
+📝 Новая заметка по клиенту
+
+Клиент: {client['name']}
+Автор: {username} ({get_role_title(role)})
+
+Заметка:
+{note}
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/clients/{client_id}?note_created=1", status_code=302)
 
 
 @app.post("/clients/{client_id}/edit")
