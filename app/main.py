@@ -148,6 +148,35 @@ async def home(
     )
 
 
+@app.get("/calendar", response_class=HTMLResponse)
+async def calendar_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    ORDER BY task_date ASC, id DESC
+    """).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="calendar.html",
+        context={
+            "tasks": tasks,
+            "username": username
+        }
+    )
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
 

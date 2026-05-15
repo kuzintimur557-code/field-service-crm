@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Календарь заявок</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1100px;margin:auto;padding:28px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:12px;flex-wrap:wrap}
+h1{font-size:32px;margin:0}
+.btn{display:inline-block;padding:14px 18px;background:#2563eb;color:white;border-radius:16px;text-decoration:none;font-weight:900}
+.day{background:white;border-radius:24px;padding:22px;margin-bottom:18px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
+.date{font-size:22px;font-weight:900;margin-bottom:14px;color:#111827}
+.task{padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px;border-left:6px solid #2563eb}
+.task a{text-decoration:none;color:#111827;font-weight:900}
+.meta{margin-top:6px;color:#4b5563}
+.badge{display:inline-block;margin-top:8px;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800}
+.empty{background:white;padding:24px;border-radius:24px;color:#6b7280}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="header">
+    <h1>📅 Календарь заявок</h1>
+    <a href="/" class="btn">← Dashboard</a>
+</div>
+
+{% set ns = namespace(current_date="") %}
+
+{% for task in tasks %}
+
+    {% if task[5] != ns.current_date %}
+
+        {% if ns.current_date != "" %}
+            </div>
+        {% endif %}
+
+        <div class="day">
+        <div class="date">
+            {{ task[5] if task[5] else "Без даты" }}
+        </div>
+
+        {% set ns.current_date = task[5] %}
+
+    {% endif %}
+
+    <div class="task">
+        <a href="/task/{{ task[0] }}">
+            #{{ task[0] }} — {{ task[1] }}
+        </a>
+
+        <div class="meta">📍 {{ task[3] }}</div>
+        <div class="meta">👷 {{ task[6] }}</div>
+        <div class="badge">{{ task[10] }}</div>
+    </div>
+
+{% else %}
+
+<div class="empty">
+    Заявок в календаре пока нет.
+</div>
+
+{% endfor %}
+
+{% if tasks %}
+</div>
+{% endif %}
+
+</div>
+</body>
+</html>
