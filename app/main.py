@@ -21,6 +21,8 @@ import csv
 import io
 
 
+APP_VERSION = "0.2.0"
+
 app = FastAPI()
 
 init_db()
