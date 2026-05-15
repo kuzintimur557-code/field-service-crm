@@ -1,35 +1,175 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Login</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Service CRM</title>
+
+<style>
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    font-family:Arial,sans-serif;
+    background:
+    linear-gradient(135deg,#2563eb,#1e293b);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+}
+
+.card{
+    width:100%;
+    max-width:420px;
+    background:white;
+    border-radius:30px;
+    padding:40px;
+    box-shadow:0 20px 50px rgba(0,0,0,.25);
+}
+
+.logo{
+    font-size:48px;
+    text-align:center;
+    margin-bottom:12px;
+}
+
+h1{
+    margin:0;
+    text-align:center;
+    font-size:34px;
+    color:#111827;
+}
+
+.subtitle{
+    text-align:center;
+    color:#6b7280;
+    margin-top:10px;
+    margin-bottom:30px;
+    line-height:1.5;
+}
+
+label{
+    display:block;
+    margin-bottom:8px;
+    font-weight:800;
+    color:#111827;
+}
+
+input{
+    width:100%;
+    padding:16px;
+    border-radius:16px;
+    border:1px solid #d1d5db;
+    margin-bottom:20px;
+    font-size:16px;
+    transition:.2s;
+}
+
+input:focus{
+    outline:none;
+    border-color:#2563eb;
+    box-shadow:0 0 0 4px rgba(37,99,235,.15);
+}
+
+button{
+    width:100%;
+    padding:17px;
+    border:0;
+    border-radius:18px;
+    background:#2563eb;
+    color:white;
+    font-size:18px;
+    font-weight:900;
+    cursor:pointer;
+    transition:.2s;
+}
+
+button:hover{
+    background:#1d4ed8;
+    transform:translateY(-1px);
+}
+
+.demo{
+    margin-top:24px;
+    padding:18px;
+    border-radius:18px;
+    background:#f3f4f6;
+    color:#374151;
+    font-size:14px;
+    line-height:1.6;
+}
+
+.demo b{
+    color:#111827;
+}
+
+.footer{
+    margin-top:24px;
+    text-align:center;
+    color:#9ca3af;
+    font-size:13px;
+}
+</style>
 </head>
+
 <body>
 
-<h1>Login</h1>
+<div class="card">
+
+<div class="logo">🚀</div>
+
+<h1>Field Service CRM</h1>
+
+<div class="subtitle">
+CRM система для монтажников,<br>
+заявок и выездных работ
+</div>
 
 <form method="post" action="/login">
 
-    <input
-        type="text"
-        name="username"
-        placeholder="Username"
-    >
+<label>Логин</label>
+<input
+    type="text"
+    name="username"
+    placeholder="Введите логин"
+    required
+>
 
-    <br><br>
+<label>Пароль</label>
+<input
+    type="password"
+    name="password"
+    placeholder="Введите пароль"
+    required
+>
 
-    <input
-        type="password"
-        name="password"
-        placeholder="Password"
-    >
-
-    <br><br>
-
-    <button type="submit">
-        Login
-    </button>
+<button type="submit">
+    Войти
+</button>
 
 </form>
+
+<div class="demo">
+<b>Boss:</b><br>
+логин: boss<br>
+пароль: boss123
+
+<br><br>
+
+<b>Worker:</b><br>
+логин: worker<br>
+пароль: worker123
+</div>
+
+<div class="footer">
+Field Service CRM • Railway Edition
+</div>
+
+</div>
 
 </body>
 </html>
