@@ -1669,6 +1669,86 @@ async def add_task_comment(request: Request, task_id: int):
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
+@app.post("/task/{task_id}/payment")
+async def update_payment_status(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    new_status = form.get("payment_status") or "Не оплачено"
+
+    allowed = [
+        "Не оплачено",
+        "Частично оплачено",
+        "Оплачено"
+    ]
+
+    if new_status not in allowed:
+        new_status = "Не оплачено"
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    old_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
+
+    c.execute("""
+    UPDATE tasks
+    SET payment_status=?
+    WHERE id=?
+    """, (new_status, task_id))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Изменён статус оплаты",
+            f"{old_status} → {new_status}"
+        )
+    except Exception:
+        pass
+
+    try:
+        send_message(
+            f"""
+💳 Изменён статус оплаты
+
+Заявка: #{task_id}
+Клиент: {task['client']}
+
+Было: {old_status}
+Стало: {new_status}
+
+Изменил: {username} ({get_role_title(role)})
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
 @app.post("/task/{task_id}/status")
 async def update_task_status(request: Request, task_id: int):
 
