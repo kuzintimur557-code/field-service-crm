@@ -289,13 +289,6 @@ def verify_session_value(value):
 
 
 def get_user(request: Request):
-    signed_value = request.cookies.get(SESSION_COOKIE_NAME)
-    username = verify_session_value(signed_value)
-
-    if username:
-        return username
-
-    # backward compatibility with old local cookie during migration
     return request.cookies.get("user")
 
 
@@ -1714,7 +1707,6 @@ async def login(request: Request):
         max_age=60 * 60 * 24 * 30,
         path="/"
     )
-    response.delete_cookie(SESSION_COOKIE_NAME)
     response.delete_cookie("user")
 
     return response
@@ -1724,7 +1716,6 @@ async def login(request: Request):
 async def logout():
 
     response = RedirectResponse("/login", status_code=302)
-    response.delete_cookie(SESSION_COOKIE_NAME)
     response.delete_cookie("user")
 
     return response
