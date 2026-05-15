@@ -2393,6 +2393,62 @@ async def unarchive_task(request: Request, task_id: int):
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
+@app.post("/task/{task_id}/delete")
+async def delete_task_forever(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if "archived" in task.keys() and task["archived"] != 1:
+        conn.close()
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    c.execute("DELETE FROM task_items WHERE task_id=?", (task_id,))
+    c.execute("DELETE FROM task_comments WHERE task_id=?", (task_id,))
+    c.execute("DELETE FROM task_activity WHERE task_id=?", (task_id,))
+    c.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        send_message(
+            f"""
+🗑 Заявка удалена навсегда
+
+Заявка: #{task_id}
+Клиент: {task['client']}
+Адрес: {task['address']}
+
+Удалил: {username} ({get_role_title(role)})
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse("/archive", status_code=302)
+
+
 @app.get("/task/{task_id}/invoice")
 async def task_invoice_pdf(request: Request, task_id: int):
 

@@ -284,9 +284,17 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 
 {% if task["archived"] %}
 <div class="empty-photo">Эта заявка находится в архиве</div>
+
 <form method="post" action="/task/{{ task[0] }}/unarchive">
 <button type="submit">↩️ Вернуть из архива</button>
 </form>
+
+{% if role == "boss" %}
+<form method="post" action="/task/{{ task[0] }}/delete" onsubmit="return confirm('Удалить заявку навсегда? Это действие нельзя отменить.')" style="margin-top:12px">
+<button type="submit" style="background:#7f1d1d">🗑 Удалить навсегда</button>
+</form>
+{% endif %}
+
 {% else %}
 <form method="post" action="/task/{{ task[0] }}/archive">
 <button type="submit" style="background:#991b1b">🗄 Отправить заявку в архив</button>
