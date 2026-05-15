@@ -19,6 +19,7 @@ h1{margin:0 0 24px;font-size:32px}
 .status{display:inline-block;padding:9px 15px;border-radius:999px;font-weight:800;background:#dbeafe;color:#1d4ed8}
 img{max-width:100%;border-radius:18px;margin-top:18px}
 .btn{display:block;text-align:center;padding:15px;border-radius:16px;background:#2563eb;color:white;text-decoration:none;font-weight:900;margin-top:14px}
+.btn.green{background:#16a34a}
 select,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:10px}
 select{border:1px solid #d1d5db;background:white}
 button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
@@ -58,12 +59,12 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <div class="value">{{ task[4] }}</div>
 </div>
 
-<a
-class="btn"
-target="_blank"
-href="https://www.google.com/maps/search/?api=1&query={{ task[3] }}"
->
+<a class="btn" target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ task[3] }}">
 🗺 Открыть маршрут
+</a>
+
+<a class="btn green" target="_blank" href="/task/{{ task[0] }}/pdf">
+📄 Скачать PDF акт
 </a>
 
 {% if task[9] %}

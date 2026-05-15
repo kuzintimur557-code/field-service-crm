@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -7,6 +7,8 @@ from app.database import connect, init_db
 from app.telegram_utils import send_message, send_photo
 
 from datetime import datetime
+from reportlab.pdfgen import canvas
+
 import shutil
 import os
 
@@ -16,6 +18,7 @@ app = FastAPI()
 init_db()
 
 os.makedirs("uploads", exist_ok=True)
+os.makedirs("uploads/docs", exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -44,12 +47,7 @@ async def home(
     conn = connect()
     c = conn.cursor()
 
-    query = """
-    SELECT *
-    FROM tasks
-    WHERE 1=1
-    """
-
+    query = "SELECT * FROM tasks WHERE 1=1"
     params = []
 
     if status:
@@ -75,37 +73,26 @@ async def home(
     total_tasks = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
 
     new_tasks = c.execute("""
-    SELECT COUNT(*)
-    FROM tasks
-    WHERE status='Новая'
+    SELECT COUNT(*) FROM tasks WHERE status='Новая'
     """).fetchone()[0]
 
     working_tasks = c.execute("""
-    SELECT COUNT(*)
-    FROM tasks
-    WHERE status='В работе'
+    SELECT COUNT(*) FROM tasks WHERE status='В работе'
     """).fetchone()[0]
 
     done_tasks = c.execute("""
-    SELECT COUNT(*)
-    FROM tasks
-    WHERE status='Завершено'
+    SELECT COUNT(*) FROM tasks WHERE status='Завершено'
     """).fetchone()[0]
 
     revenue = c.execute("""
-    SELECT SUM(price)
-    FROM tasks
-    WHERE status='Завершено'
+    SELECT SUM(price) FROM tasks WHERE status='Завершено'
     """).fetchone()[0]
 
     if revenue is None:
         revenue = 0
 
     workers = c.execute("""
-    SELECT username
-    FROM users
-    WHERE role='worker'
-    ORDER BY username
+    SELECT username FROM users WHERE role='worker' ORDER BY username
     """).fetchall()
 
     conn.close()
@@ -152,9 +139,7 @@ async def login(request: Request):
     c = conn.cursor()
 
     user = c.execute("""
-    SELECT *
-    FROM users
-    WHERE username=? AND password=?
+    SELECT * FROM users WHERE username=? AND password=?
     """, (
         username,
         password
@@ -222,7 +207,6 @@ async def create_task(
     filename = ""
 
     if photo and photo.filename:
-
         filename = f"{datetime.now().timestamp()}_{photo.filename}"
         file_path = f"uploads/{filename}"
 
@@ -301,9 +285,7 @@ async def task_detail(request: Request, task_id: int):
     c = conn.cursor()
 
     task = c.execute("""
-    SELECT *
-    FROM tasks
-    WHERE id=?
+    SELECT * FROM tasks WHERE id=?
     """, (task_id,)).fetchone()
 
     conn.close()
@@ -336,9 +318,7 @@ async def update_status(request: Request, task_id: int):
     c = conn.cursor()
 
     task = c.execute("""
-    SELECT *
-    FROM tasks
-    WHERE id=?
+    SELECT * FROM tasks WHERE id=?
     """, (task_id,)).fetchone()
 
     if not task:
@@ -346,9 +326,7 @@ async def update_status(request: Request, task_id: int):
         return RedirectResponse("/", status_code=302)
 
     c.execute("""
-    UPDATE tasks
-    SET status=?
-    WHERE id=?
+    UPDATE tasks SET status=? WHERE id=?
     """, (
         status,
         task_id
@@ -373,4 +351,62 @@ async def update_status(request: Request, task_id: int):
     return RedirectResponse(
         f"/task/{task_id}",
         status_code=302
+    )
+
+
+@app.get("/task/{task_id}/pdf")
+async def task_pdf(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks WHERE id=?
+    """, (task_id,)).fetchone()
+
+    conn.close()
+
+    if not task:
+        return HTMLResponse("Task not found", status_code=404)
+
+    pdf_path = f"uploads/docs/task_{task_id}.pdf"
+
+    pdf = canvas.Canvas(pdf_path)
+
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawString(50, 800, f"Service Report #{task[0]}")
+
+    pdf.setFont("Helvetica", 12)
+
+    y = 750
+
+    lines = [
+        f"Client: {task[1]}",
+        f"Phone: {task[2]}",
+        f"Address: {task[3]}",
+        f"Description: {task[4]}",
+        f"Date: {task[5]}",
+        f"Worker: {task[6]}",
+        f"Priority: {task[7]}",
+        f"Price: ${task[8]}",
+        f"Status: {task[10]}",
+        "",
+        "Signature: ______________________________"
+    ]
+
+    for line in lines:
+        pdf.drawString(50, y, str(line))
+        y -= 28
+
+    pdf.save()
+
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=f"task_{task_id}.pdf"
     )
