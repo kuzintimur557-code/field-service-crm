@@ -405,7 +405,6 @@ async def home(
             "done_tasks": done_tasks,
             "revenue": revenue,
             "workers": workers,
-            "clients": clients,
             "worker_stats": worker_stats,
             "selected_status": status,
             "selected_worker": worker,
@@ -619,8 +618,9 @@ async def finance_page(request: Request, month: str = ""):
     conn.close()
 
     return templates.TemplateResponse(
-        name="finance.html",
-        context={
+        request,
+        "finance.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -673,22 +673,22 @@ async def reports_page(request: Request, month: str = ""):
         worker_name = w[0]
 
         completed = c.execute("""
-        SELECT COUNT(*) FROM tasks WHERE archived=0
+        SELECT COUNT(*) FROM tasks
         WHERE archived=0 AND worker=? AND status='Завершено' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
         active = c.execute("""
-        SELECT COUNT(*) FROM tasks WHERE archived=0
+        SELECT COUNT(*) FROM tasks
         WHERE archived=0 AND worker=? AND status='В работе' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
         new = c.execute("""
-        SELECT COUNT(*) FROM tasks WHERE archived=0
+        SELECT COUNT(*) FROM tasks
         WHERE archived=0 AND worker=? AND status='Новая' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
         cancelled = c.execute("""
-        SELECT COUNT(*) FROM tasks WHERE archived=0
+        SELECT COUNT(*) FROM tasks
         WHERE archived=0 AND worker=? AND status='Отменено' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
@@ -759,8 +759,9 @@ async def calls_page(request: Request):
     settings = get_company_settings()
 
     return templates.TemplateResponse(
-        name="calls.html",
-        context={
+        request,
+        "calls.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -785,8 +786,9 @@ async def integration_1c_page(request: Request):
     settings = get_company_settings()
 
     return templates.TemplateResponse(
-        name="integration_1c.html",
-        context={
+        request,
+        "integration_1c.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -813,8 +815,9 @@ async def billing_page(request: Request):
     user_limit = get_plan_user_limit(plan)
 
     return templates.TemplateResponse(
-        name="billing.html",
-        context={
+        request,
+        "billing.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -841,8 +844,9 @@ async def settings_page(request: Request):
     settings = get_company_settings()
 
     return templates.TemplateResponse(
-        name="settings.html",
-        context={
+        request,
+        "settings.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -955,8 +959,9 @@ async def catalog_page(request: Request):
     conn.close()
 
     return templates.TemplateResponse(
-        name="catalog.html",
-        context={
+        request,
+        "catalog.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -1113,8 +1118,9 @@ async def clients_page(request: Request):
     conn.close()
 
     return templates.TemplateResponse(
-        name="clients.html",
-        context={
+        request,
+        "clients.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -1166,8 +1172,9 @@ async def client_detail(request: Request, client_id: int):
     conn.close()
 
     return templates.TemplateResponse(
-        name="client_detail.html",
-        context={
+        request,
+        "client_detail.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -1431,8 +1438,9 @@ async def archive_page(request: Request):
     conn.close()
 
     return templates.TemplateResponse(
-        name="archive.html",
-        context={
+        request,
+        "archive.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -1471,7 +1479,6 @@ async def workers_page(request: Request):
         name="workers.html",
         context={
             "workers": workers,
-            "clients": clients,
             "username": username
         }
     )
@@ -1583,8 +1590,9 @@ async def debug_page(request: Request):
     conn.close()
 
     return templates.TemplateResponse(
-        name="debug.html",
-        context={
+        request,
+        "debug.html",
+        {
             "request": request,
             "username": username,
             "role": role,
@@ -1891,8 +1899,9 @@ async def task_detail(request: Request, task_id: int):
     conn.close()
 
     return templates.TemplateResponse(
-        name="task_detail.html",
-        context={
+        request,
+        "task_detail.html",
+        {
             "request": request,
             "task": task,
             "username": username,
