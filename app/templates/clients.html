@@ -115,6 +115,9 @@ h1{font-size:28px;margin-bottom:12px}
         {% if client["notes"] %}
         <div class="meta">📝 {{ client["notes"] }}</div>
         {% endif %}
+        <div style="margin-top:10px">
+            <a href="/clients/{{ client['id'] }}" style="display:inline-block;padding:10px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900">Открыть клиента</a>
+        </div>
     </div>
 </div>
 {% endfor %}

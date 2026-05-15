@@ -64,6 +64,7 @@ def init_db():
 
     CREATE TABLE IF NOT EXISTS tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER,
         client TEXT,
         phone TEXT,
         address TEXT,

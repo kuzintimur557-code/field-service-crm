@@ -68,6 +68,13 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 
 </div>
 
+{% if linked_client %}
+<div class="row">
+<div class="label">Карточка клиента</div>
+<div class="value"><a href="/clients/{{ linked_client['id'] }}" style="color:#2563eb;text-decoration:none">👤 {{ linked_client["name"] }}</a></div>
+</div>
+{% endif %}
+
 <div class="row">
 <div class="label">Описание</div>
 <div class="value">{{ task[4] }}</div>

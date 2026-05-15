@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Клиент</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1000px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 20px;font-size:34px}
+h2{margin:0 0 16px;font-size:22px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:5px}
+.value{font-size:18px;font-weight:900;word-break:break-word}
+.task{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
+.btn{display:inline-block;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
+.badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
+.empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
+@media(max-width:800px){.container{padding:16px}.grid,.task{grid-template-columns:1fr}h1{font-size:28px}.btn{display:block;text-align:center}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/clients" class="back">← Назад к клиентам</a>
+
+<div class="card">
+<h1>👤 {{ client["name"] }}</h1>
+
+<div class="grid">
+    <div>
+        <div class="label">Телефон</div>
+        <div class="value">{{ client["phone"] or "Не указан" }}</div>
+    </div>
+
+    <div>
+        <div class="label">Email</div>
+        <div class="value">{{ client["email"] or "Не указан" }}</div>
+    </div>
+
+    <div>
+        <div class="label">Адрес</div>
+        <div class="value">{{ client["address"] or "Не указан" }}</div>
+    </div>
+
+    <div>
+        <div class="label">Создан</div>
+        <div class="value">{{ client["created_at"] }}</div>
+    </div>
+</div>
+
+{% if client["notes"] %}
+<div style="margin-top:18px">
+    <div class="label">Заметки</div>
+    <div class="value">{{ client["notes"] }}</div>
+</div>
+{% endif %}
+</div>
+
+<div class="card">
+<h2>Заявки клиента</h2>
+
+{% if tasks %}
+{% for task in tasks %}
+<div class="task">
+    <div>
+        <div class="label">Заявка</div>
+        <div class="value">#{{ task["id"] }} — {{ task["task_date"] }}</div>
+    </div>
+
+    <div>
+        <div class="label">Исполнитель</div>
+        <div class="value">{{ task["worker"] }}</div>
+    </div>
+
+    <div>
+        <div class="label">Статус</div>
+        <div class="badge">{{ task["status"] }}</div>
+    </div>
+
+    <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">У клиента пока нет заявок</div>
+{% endif %}
+
+</div>
+
+</div>
+</body>
+</html>

@@ -366,6 +366,7 @@ async def home(
             "done_tasks": done_tasks,
             "revenue": revenue,
             "workers": workers,
+            "clients": clients,
             "worker_stats": worker_stats,
             "selected_status": status,
             "selected_worker": worker,
@@ -557,6 +558,53 @@ async def clients_page(request: Request):
     )
 
 
+@app.get("/clients/{client_id}", response_class=HTMLResponse)
+async def client_detail(request: Request, client_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    client = c.execute("""
+    SELECT *
+    FROM clients
+    WHERE id=?
+    """, (client_id,)).fetchone()
+
+    if not client:
+        conn.close()
+        return RedirectResponse("/clients", status_code=302)
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE client_id=?
+    ORDER BY id DESC
+    """, (client_id,)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        name="client_detail.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "client": client,
+            "tasks": tasks
+        }
+    )
+
+
 @app.post("/clients")
 async def create_client(request: Request):
 
@@ -690,6 +738,7 @@ async def workers_page(request: Request):
         name="workers.html",
         context={
             "workers": workers,
+            "clients": clients,
             "username": username
         }
     )
@@ -833,6 +882,12 @@ async def create_task_page(request: Request):
     ORDER BY username
     """).fetchall()
 
+    clients = c.execute("""
+    SELECT *
+    FROM clients
+    ORDER BY name
+    """).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -840,7 +895,8 @@ async def create_task_page(request: Request):
         name="create_task.html",
         context={
             "username": username,
-            "workers": workers
+            "workers": workers,
+            "clients": clients
         }
     )
 
@@ -864,9 +920,22 @@ async def create_task(
 
     form = await request.form()
 
+    client_id = form.get("client_id") or None
     client = form.get("client")
     phone = form.get("phone")
     address = form.get("address")
+
+    if client_id:
+        existing_client = c.execute("""
+        SELECT *
+        FROM clients
+        WHERE id=?
+        """, (client_id,)).fetchone()
+
+        if existing_client:
+            client = existing_client["name"]
+            phone = existing_client["phone"]
+            address = existing_client["address"]
     description = form.get("description")
     task_date = form.get("task_date")
     worker = form.get("worker")
@@ -878,6 +947,7 @@ async def create_task(
 
     c.execute("""
     INSERT INTO tasks (
+        client_id,
         client,
         phone,
         address,
@@ -891,8 +961,9 @@ async def create_task(
         report,
         after_photo
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
+        client_id,
         client,
         phone,
         address,
@@ -979,6 +1050,15 @@ async def task_detail(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    linked_client = None
+
+    if "client_id" in task.keys() and task["client_id"]:
+        linked_client = c.execute("""
+        SELECT *
+        FROM clients
+        WHERE id=?
+        """, (task["client_id"],)).fetchone()
+
     comments = c.execute("""
     SELECT *
     FROM task_comments
@@ -1003,7 +1083,8 @@ async def task_detail(request: Request, task_id: int):
             "username": username,
             "role": role,
             "comments": comments,
-            "activity": activity
+            "activity": activity,
+            "linked_client": linked_client
         }
     )
 
