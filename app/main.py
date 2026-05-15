@@ -1709,9 +1709,10 @@ async def login(request: Request):
         key=SESSION_COOKIE_NAME,
         value=sign_session_value(username),
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
-        max_age=60 * 60 * 24 * 30
+        max_age=60 * 60 * 24 * 30,
+        path="/"
     )
     response.delete_cookie(SESSION_COOKIE_NAME)
     response.delete_cookie("user")
