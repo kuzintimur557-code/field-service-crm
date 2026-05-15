@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:900px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 14px;font-size:34px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.box{background:#f9fafb;border-radius:18px;padding:18px}
+.label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
+.value{font-size:24px;font-weight:900}
+.ok{color:#166534}.bad{color:#991b1b}
+@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<a href="/settings" class="back">← Назад</a>
+
+<div class="card">
+<h1>🟢 System Status</h1>
+<div style="color:#6b7280;font-weight:800">Техническая проверка платформы.</div>
+</div>
+
+<div class="card">
+<div class="grid">
+    <div class="box">
+        <div class="label">Приложение</div>
+        <div class="value ok">OK</div>
+    </div>
+
+    <div class="box">
+        <div class="label">База данных</div>
+        <div class="value {% if db_exists %}ok{% else %}bad{% endif %}">
+            {% if db_exists %}OK{% else %}NO{% endif %}
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="label">Размер базы</div>
+        <div class="value">{{ db_size }} bytes</div>
+    </div>
+
+    <div class="box">
+        <div class="label">Uploads</div>
+        <div class="value {% if uploads_exists %}ok{% else %}bad{% endif %}">
+            {% if uploads_exists %}OK{% else %}NO{% endif %}
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="label">Файлов uploads</div>
+        <div class="value">{{ uploads_files }}</div>
+    </div>
+</div>
+</div>
+
+</div>
+</body>
+</html>
