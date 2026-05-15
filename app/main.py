@@ -1534,6 +1534,64 @@ async def add_task_item(request: Request, task_id: int):
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
+@app.post("/task/{task_id}/items/{item_id}/delete")
+async def delete_task_item(request: Request, task_id: int, item_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    item = c.execute("""
+    SELECT *
+    FROM task_items
+    WHERE id=? AND task_id=?
+    """, (item_id, task_id)).fetchone()
+
+    if not item:
+        conn.close()
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    c.execute("""
+    DELETE FROM task_items
+    WHERE id=? AND task_id=?
+    """, (item_id, task_id))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Удалена позиция из сметы",
+            f"{item['item_name']} × {item['qty']}"
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
 @app.post("/task/{task_id}/comment")
 async def add_task_comment(request: Request, task_id: int):
 

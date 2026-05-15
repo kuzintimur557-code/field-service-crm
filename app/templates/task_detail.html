@@ -193,6 +193,12 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
     <div>
         <div class="estimate-meta">Прибыль</div>
         <div class="estimate-name">${{ item["profit"] }}</div>
+
+        <form method="post" action="/task/{{ task[0] }}/items/{{ item['id'] }}/delete" style="margin-top:10px">
+            <button type="submit" style="background:#991b1b;padding:10px;font-size:13px">
+                Удалить из сметы
+            </button>
+        </form>
     </div>
 
 </div>
