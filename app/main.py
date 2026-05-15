@@ -263,7 +263,7 @@ async def home(
     conn = connect()
     c = conn.cursor()
 
-    query = "SELECT * FROM tasks WHERE 1=1"
+    query = "SELECT * FROM tasks WHERE archived=0"
     params = []
 
     if role not in ("boss", "manager"):
@@ -291,23 +291,23 @@ async def home(
     tasks = c.execute(query, params).fetchall()
 
     if role in ("boss", "manager"):
-        total_tasks = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
-        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Новая'").fetchone()[0]
-        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='В работе'").fetchone()[0]
-        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Завершено'").fetchone()[0]
+        total_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0").fetchone()[0]
+        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND status='Новая'").fetchone()[0]
+        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND status='В работе'").fetchone()[0]
+        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND status='Завершено'").fetchone()[0]
 
         revenue = c.execute("""
-        SELECT SUM(price) FROM tasks WHERE status='Завершено'
+        SELECT SUM(price) FROM tasks WHERE archived=0 AND status='Завершено'
         """).fetchone()[0]
     else:
         total_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=?", (username,)).fetchone()[0]
-        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=? AND status='Новая'", (username,)).fetchone()[0]
-        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=? AND status='В работе'", (username,)).fetchone()[0]
-        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=? AND status='Завершено'", (username,)).fetchone()[0]
+        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND worker=? AND status='Новая'", (username,)).fetchone()[0]
+        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND worker=? AND status='В работе'", (username,)).fetchone()[0]
+        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND worker=? AND status='Завершено'", (username,)).fetchone()[0]
 
         revenue = c.execute("""
         SELECT SUM(price) FROM tasks
-        WHERE worker=? AND status='Завершено'
+        WHERE archived=0 AND worker=? AND status='Завершено'
         """, (username,)).fetchone()[0]
 
     if revenue is None:
@@ -326,18 +326,18 @@ async def home(
             worker_name = w["username"]
 
             completed = c.execute("""
-            SELECT COUNT(*) FROM tasks
-            WHERE worker=? AND status='Завершено'
+            SELECT COUNT(*) FROM tasks WHERE archived=0
+            WHERE archived=0 AND worker=? AND status='Завершено'
             """, (worker_name,)).fetchone()[0]
 
             active = c.execute("""
-            SELECT COUNT(*) FROM tasks
-            WHERE worker=? AND status='В работе'
+            SELECT COUNT(*) FROM tasks WHERE archived=0
+            WHERE archived=0 AND worker=? AND status='В работе'
             """, (worker_name,)).fetchone()[0]
 
             worker_revenue = c.execute("""
             SELECT SUM(price) FROM tasks
-            WHERE worker=? AND status='Завершено'
+            WHERE archived=0 AND worker=? AND status='Завершено'
             """, (worker_name,)).fetchone()[0]
 
             if worker_revenue is None:
@@ -452,28 +452,28 @@ async def reports_page(request: Request, month: str = ""):
         worker_name = w[0]
 
         completed = c.execute("""
-        SELECT COUNT(*) FROM tasks
-        WHERE worker=? AND status='Завершено' AND task_date LIKE ?
+        SELECT COUNT(*) FROM tasks WHERE archived=0
+        WHERE archived=0 AND worker=? AND status='Завершено' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
         active = c.execute("""
-        SELECT COUNT(*) FROM tasks
-        WHERE worker=? AND status='В работе' AND task_date LIKE ?
+        SELECT COUNT(*) FROM tasks WHERE archived=0
+        WHERE archived=0 AND worker=? AND status='В работе' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
         new = c.execute("""
-        SELECT COUNT(*) FROM tasks
-        WHERE worker=? AND status='Новая' AND task_date LIKE ?
+        SELECT COUNT(*) FROM tasks WHERE archived=0
+        WHERE archived=0 AND worker=? AND status='Новая' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
         cancelled = c.execute("""
-        SELECT COUNT(*) FROM tasks
-        WHERE worker=? AND status='Отменено' AND task_date LIKE ?
+        SELECT COUNT(*) FROM tasks WHERE archived=0
+        WHERE archived=0 AND worker=? AND status='Отменено' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
         revenue = c.execute("""
         SELECT SUM(price) FROM tasks
-        WHERE worker=? AND status='Завершено' AND task_date LIKE ?
+        WHERE archived=0 AND worker=? AND status='Завершено' AND task_date LIKE ?
         """, (worker_name, f"{month}%")).fetchone()[0]
 
         if revenue is None:
@@ -1158,6 +1158,100 @@ async def update_report(
         status_code=302
     )
 
+
+
+@app.post("/task/{task_id}/archive")
+async def archive_task(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    c.execute("""
+    UPDATE tasks
+    SET archived=1
+    WHERE id=?
+    """, (task_id,))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Заявка отправлена в архив",
+            f"Клиент: {task['client']}"
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/task/{task_id}/unarchive")
+async def unarchive_task(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    c.execute("""
+    UPDATE tasks
+    SET archived=0
+    WHERE id=?
+    """, (task_id,))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Заявка возвращена из архива",
+            f"Клиент: {task['client']}"
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
 @app.get("/task/{task_id}/pdf")

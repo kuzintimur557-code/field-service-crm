@@ -166,6 +166,25 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 
 </div>
 
+{% if role in ["boss", "manager"] %}
+<div class="card">
+
+<h2>🗄 Архив заявки</h2>
+
+{% if task["archived"] %}
+<div class="empty-photo">Эта заявка находится в архиве</div>
+<form method="post" action="/task/{{ task[0] }}/unarchive">
+<button type="submit">↩️ Вернуть из архива</button>
+</form>
+{% else %}
+<form method="post" action="/task/{{ task[0] }}/archive">
+<button type="submit" style="background:#991b1b">🗄 Отправить заявку в архив</button>
+</form>
+{% endif %}
+
+</div>
+{% endif %}
+
 <div class="card">
 
 <h2>Изменить статус</h2>
