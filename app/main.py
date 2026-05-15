@@ -17,11 +17,18 @@ from reportlab.pdfgen import canvas
 
 import shutil
 import os
+import hmac
+import hashlib
+import base64
+import secrets
 import csv
 import io
 
 
 APP_VERSION = "0.2.0"
+
+SESSION_COOKIE_NAME = "crm_session"
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 
 app = FastAPI()
 
@@ -243,7 +250,52 @@ def draw_pdf_image(pdf, filename, title, x, y, font_name):
     return y
 
 
+def sign_session_value(username):
+    raw = username.encode("utf-8")
+    signature = hmac.new(
+        SECRET_KEY.encode("utf-8"),
+        raw,
+        hashlib.sha256
+    ).digest()
+
+    token = base64.urlsafe_b64encode(raw).decode("utf-8")
+    sig = base64.urlsafe_b64encode(signature).decode("utf-8")
+
+    return f"{token}.{sig}"
+
+
+def verify_session_value(value):
+    if not value or "." not in value:
+        return None
+
+    try:
+        token, sig = value.split(".", 1)
+        username = base64.urlsafe_b64decode(token.encode("utf-8")).decode("utf-8")
+
+        expected_signature = hmac.new(
+            SECRET_KEY.encode("utf-8"),
+            username.encode("utf-8"),
+            hashlib.sha256
+        ).digest()
+
+        expected_sig = base64.urlsafe_b64encode(expected_signature).decode("utf-8")
+
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+
+        return username
+    except Exception:
+        return None
+
+
 def get_user(request: Request):
+    signed_value = request.cookies.get(SESSION_COOKIE_NAME)
+    username = verify_session_value(signed_value)
+
+    if username:
+        return username
+
+    # backward compatibility with old local cookie during migration
     return request.cookies.get("user")
 
 
@@ -1653,7 +1705,16 @@ async def login(request: Request):
     update_last_seen(username)
 
     response = RedirectResponse("/", status_code=302)
-    response.set_cookie(key="user", value=username)
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=sign_session_value(username),
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30
+    )
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    response.delete_cookie("user")
 
     return response
 
@@ -1662,6 +1723,7 @@ async def login(request: Request):
 async def logout():
 
     response = RedirectResponse("/login", status_code=302)
+    response.delete_cookie(SESSION_COOKIE_NAME)
     response.delete_cookie("user")
 
     return response
