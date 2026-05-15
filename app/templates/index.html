@@ -1,86 +1,216 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+
     <meta charset="UTF-8">
-    <title>CRM</title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Field Service CRM</title>
 
     <style>
-        body {
-            font-family: Arial;
-            background: #f4f7fb;
-            margin: 0;
-            padding: 30px;
+
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
         }
 
-        .top {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
+        body{
+            font-family:Arial, sans-serif;
+            background:#f3f4f6;
+            color:#111827;
         }
 
-        .btn {
-            background: #2563eb;
-            color: white;
-            padding: 12px 18px;
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: bold;
-            margin-left: 8px;
+        .container{
+            max-width:1200px;
+            margin:auto;
+            padding:30px;
         }
 
-        .logout {
-            background: #ef4444;
+        .header{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:30px;
+            flex-wrap:wrap;
+            gap:15px;
         }
 
-        .task {
-            background: white;
-            padding: 22px;
-            border-radius: 18px;
-            margin-bottom: 16px;
-            box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+        .title{
+            font-size:34px;
+            font-weight:bold;
         }
 
-        .task a {
-            color: black;
-            text-decoration: none;
+        .buttons{
+            display:flex;
+            gap:12px;
+            flex-wrap:wrap;
         }
+
+        .btn{
+            padding:14px 20px;
+            border-radius:14px;
+            text-decoration:none;
+            color:white;
+            font-weight:bold;
+            transition:0.2s;
+        }
+
+        .btn:hover{
+            transform:translateY(-2px);
+        }
+
+        .blue{
+            background:#2563eb;
+        }
+
+        .red{
+            background:#ef4444;
+        }
+
+        .tasks{
+            display:grid;
+            gap:20px;
+        }
+
+        .card{
+            background:white;
+            border-radius:24px;
+            padding:24px;
+            box-shadow:0 10px 25px rgba(0,0,0,0.08);
+            transition:0.2s;
+        }
+
+        .card:hover{
+            transform:translateY(-3px);
+        }
+
+        .card a{
+            text-decoration:none;
+            color:#111827;
+        }
+
+        .task-title{
+            font-size:24px;
+            font-weight:bold;
+            margin-bottom:14px;
+        }
+
+        .meta{
+            margin-bottom:8px;
+            color:#374151;
+            font-size:16px;
+        }
+
+        .status{
+            margin-top:15px;
+            display:inline-block;
+            background:#dbeafe;
+            color:#1d4ed8;
+            padding:8px 14px;
+            border-radius:999px;
+            font-weight:bold;
+        }
+
+        @media(max-width:700px){
+
+            .container{
+                padding:18px;
+            }
+
+            .title{
+                font-size:26px;
+            }
+
+            .task-title{
+                font-size:20px;
+            }
+
+        }
+
     </style>
+
 </head>
 
 <body>
 
-<div class="top">
-    <h1>🚀 Field Service CRM</h1>
+<div class="container">
 
-    <div>
-        <a class="btn" href="/create-task">➕ Новая заявка</a>
-        <a class="btn logout" href="/logout">Выйти</a>
+    <div class="header">
+
+        <div class="title">
+            🚀 Field Service CRM
+        </div>
+
+        <div class="buttons">
+
+            <a
+                href="/create-task"
+                class="btn blue"
+            >
+                ➕ Новая заявка
+            </a>
+
+            <a
+                href="/logout"
+                class="btn red"
+            >
+                Выйти
+            </a>
+
+        </div>
+
     </div>
+
+    <div class="tasks">
+
+        {% for task in tasks %}
+
+        <div class="card">
+
+            <a href="/task/{{ task[0] }}">
+
+                <div class="task-title">
+                    #{{ task[0] }} — {{ task[1] }}
+                </div>
+
+                <div class="meta">
+                    📞 {{ task[2] }}
+                </div>
+
+                <div class="meta">
+                    📍 {{ task[3] }}
+                </div>
+
+                <div class="meta">
+                    📅 {{ task[5] }}
+                </div>
+
+                <div class="meta">
+                    👷 {{ task[6] }}
+                </div>
+
+                <div class="meta">
+                    💰 ${{ task[8] }}
+                </div>
+
+                <div class="status">
+                    {{ task[10] }}
+                </div>
+
+            </a>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
 </div>
-
-{% for task in tasks %}
-
-<div class="task">
-
-    <a href="/task/{{ task[0] }}">
-        <h2>#{{ task[0] }} — {{ task[1] }}</h2>
-    </a>
-
-    <p>📞 {{ task[2] }}</p>
-    <p>📍 {{ task[3] }}</p>
-    <p>📝 {{ task[4] }}</p>
-    <p>📅 {{ task[5] }}</p>
-    <p>👷 {{ task[6] }}</p>
-    <p>💰 ${{ task[8] }}</p>
-    <p>📌 {{ task[10] }}</p>
-
-</div>
-
-{% else %}
-
-<p>Заявок пока нет.</p>
-
-{% endfor %}
 
 </body>
 </html>
