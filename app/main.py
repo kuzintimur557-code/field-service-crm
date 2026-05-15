@@ -2262,6 +2262,132 @@ async def unarchive_task(request: Request, task_id: int):
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
+@app.get("/task/{task_id}/invoice")
+async def task_invoice_pdf(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return HTMLResponse("Task not found", status_code=404)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    task_items = c.execute("""
+    SELECT *
+    FROM task_items
+    WHERE task_id=?
+    ORDER BY id ASC
+    """, (task_id,)).fetchall()
+
+    conn.close()
+
+    estimate_total = sum(item["total"] for item in task_items)
+    payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
+
+    pdf_path = DOCS_DIR / f"task_{task_id}_invoice.pdf"
+    font_name = register_pdf_font()
+
+    pdf = canvas.Canvas(str(pdf_path), pagesize=A4)
+    page_width, page_height = A4
+
+    pdf.setFont(font_name, 22)
+    pdf.drawString(40, page_height - 50, f"Счёт по заявке №{task['id']}")
+
+    pdf.setFont(font_name, 10)
+    pdf.drawString(40, page_height - 72, f"Дата формирования: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+    y = page_height - 115
+
+    fields = [
+        ("Клиент", task["client"]),
+        ("Телефон", task["phone"]),
+        ("Адрес", task["address"]),
+        ("Дата заявки", task["task_date"]),
+        ("Исполнитель", task["worker"]),
+        ("Статус оплаты", payment_status),
+    ]
+
+    for label, value in fields:
+        pdf.setFont(font_name, 10)
+        pdf.drawString(40, y, f"{label}:")
+        y = draw_text(pdf, value, 150, y, font_name, size=10, max_chars=58, line_height=15)
+        y -= 4
+
+    y -= 16
+    pdf.setFont(font_name, 13)
+    pdf.drawString(40, y, "Позиции счёта")
+    y -= 24
+
+    if task_items:
+        pdf.setFont(font_name, 9)
+        pdf.drawString(40, y, "Наименование")
+        pdf.drawString(275, y, "Кол-во")
+        pdf.drawString(350, y, "Цена")
+        pdf.drawString(430, y, "Сумма")
+        y -= 14
+
+        for item in task_items:
+            if y < 90:
+                pdf.showPage()
+                y = page_height - 60
+                pdf.setFont(font_name, 9)
+
+            item_name = str(item["item_name"] or "")
+            if len(item_name) > 42:
+                item_name = item_name[:39] + "..."
+
+            pdf.drawString(40, y, item_name)
+            pdf.drawString(275, y, f"{item['qty']} {item['unit']}")
+            pdf.drawString(350, y, f"${item['price']}")
+            pdf.drawString(430, y, f"${item['total']}")
+            y -= 16
+
+        y -= 12
+        pdf.setFont(font_name, 13)
+        pdf.drawString(350, y, "Итого:")
+        pdf.drawString(430, y, f"${estimate_total}")
+    else:
+        y = draw_text(pdf, "Позиции счёта пока не добавлены", 40, y, font_name, size=10)
+
+    y -= 50
+    pdf.setFont(font_name, 10)
+    pdf.drawString(40, y, "Спасибо за обращение!")
+
+    pdf.save()
+
+    try:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Сформирован PDF счёт",
+            f"task_{task_id}_invoice.pdf"
+        )
+    except Exception:
+        pass
+
+    return FileResponse(
+        str(pdf_path),
+        media_type="application/pdf",
+        filename=f"task_{task_id}_invoice.pdf"
+    )
+
+
 @app.get("/task/{task_id}/pdf")
 async def task_pdf(request: Request, task_id: int):
 
