@@ -68,6 +68,12 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 ❌ Создавать пользователей может только Босс
 </div>
 {% endif %}
+
+{% if request.query_params.get("error") == "user_limit" %}
+<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
+❌ Достигнут лимит пользователей по текущему тарифу
+</div>
+{% endif %}
 </div>
 
 {% if role == "boss" %}

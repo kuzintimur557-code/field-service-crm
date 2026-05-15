@@ -81,6 +81,17 @@ def get_role_title(role):
     return titles.get(role, role)
 
 
+def get_plan_user_limit(plan):
+    limits = {
+        "basic": 3,
+        "team": 10,
+        "business": 30,
+        "business_1c": 30,
+        "enterprise_1c": None
+    }
+    return limits.get(plan, 3)
+
+
 def get_company_settings():
     conn = connect()
     c = conn.cursor()
@@ -1419,6 +1430,19 @@ async def create_worker(request: Request):
     if existing:
         conn.close()
         return RedirectResponse("/workers?error=exists", status_code=302)
+
+    settings = get_company_settings()
+    current_plan = settings["plan"] if settings and "plan" in settings.keys() else "basic"
+    user_limit = get_plan_user_limit(current_plan)
+
+    users_count = c.execute("""
+    SELECT COUNT(*)
+    FROM users
+    """).fetchone()[0]
+
+    if user_limit is not None and users_count >= user_limit:
+        conn.close()
+        return RedirectResponse("/workers?error=user_limit", status_code=302)
 
     c.execute("""
     INSERT INTO users (username, password, role, last_seen)
