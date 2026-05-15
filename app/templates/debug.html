@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debug</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:900px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 20px;font-size:34px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.stat{background:#f9fafb;border-radius:20px;padding:18px}
+.label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
+.value{font-size:26px;font-weight:900}
+.ok{color:#166534}
+.no{color:#991b1b}
+@media(max-width:750px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/" class="back">← Назад</a>
+
+<div class="card">
+<h1>🧪 Debug / Проверка системы</h1>
+<div style="color:#6b7280;font-weight:800">
+Техническая страница только для boss.
+</div>
+</div>
+
+<div class="card">
+<div class="grid">
+    <div class="stat">
+        <div class="label">Пользователи</div>
+        <div class="value">{{ users_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Все заявки</div>
+        <div class="value">{{ tasks_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Активные заявки</div>
+        <div class="value">{{ active_tasks_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Архив</div>
+        <div class="value">{{ archived_tasks_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Клиенты</div>
+        <div class="value">{{ clients_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Каталог</div>
+        <div class="value">{{ catalog_count }}</div>
+    </div>
+</div>
+</div>
+
+<div class="card">
+<h2>Тарифные функции</h2>
+
+<div class="grid">
+    <div class="stat">
+        <div class="label">Тариф</div>
+        <div class="value">{{ settings["plan"] }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">1С</div>
+        <div class="value {% if settings['one_c_enabled'] %}ok{% else %}no{% endif %}">
+            {% if settings["one_c_enabled"] %}ON{% else %}OFF{% endif %}
+        </div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Звонки</div>
+        <div class="value {% if settings['calls_enabled'] %}ok{% else %}no{% endif %}">
+            {% if settings["calls_enabled"] %}ON{% else %}OFF{% endif %}
+        </div>
+    </div>
+
+    <div class="stat">
+        <div class="label">AI звонки</div>
+        <div class="value {% if settings['ai_calls_enabled'] %}ok{% else %}no{% endif %}">
+            {% if settings["ai_calls_enabled"] %}ON{% else %}OFF{% endif %}
+        </div>
+    </div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

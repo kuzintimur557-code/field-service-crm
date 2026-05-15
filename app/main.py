@@ -1449,6 +1449,50 @@ async def create_worker(request: Request):
     return RedirectResponse("/workers?created=1", status_code=302)
 
 
+@app.get("/debug", response_class=HTMLResponse)
+async def debug_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    users_count = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    tasks_count = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+    active_tasks_count = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0").fetchone()[0]
+    archived_tasks_count = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=1").fetchone()[0]
+    clients_count = c.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
+    catalog_count = c.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
+
+    settings = get_company_settings()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        name="debug.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "users_count": users_count,
+            "tasks_count": tasks_count,
+            "active_tasks_count": active_tasks_count,
+            "archived_tasks_count": archived_tasks_count,
+            "clients_count": clients_count,
+            "catalog_count": catalog_count,
+            "settings": settings
+        }
+    )
+
+
 @app.get("/health")
 async def health_check():
     return {
