@@ -70,6 +70,15 @@ def can_access_task(username, role, task):
     return task["worker"] == username
 
 
+def get_role_title(role):
+    titles = {
+        "boss": "Босс",
+        "manager": "Менеджер",
+        "worker": "Исполнитель"
+    }
+    return titles.get(role, role)
+
+
 def register_pdf_font():
     font_paths = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -787,7 +796,7 @@ async def task_detail(request: Request, task_id: int):
 
 
 @app.post("/task/{task_id}/status")
-async def update_status(request: Request, task_id: int):
+async def update_task_status(request: Request, task_id: int):
 
     username = get_user(request)
 
@@ -797,7 +806,7 @@ async def update_status(request: Request, task_id: int):
     role = get_role(username)
 
     form = await request.form()
-    status = form.get("status")
+    new_status = form.get("status")
 
     conn = connect()
     c = conn.cursor()
@@ -814,35 +823,48 @@ async def update_status(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    old_status = task["status"]
+
     c.execute("""
-    UPDATE tasks SET status=? WHERE id=?
-    """, (
-        status,
-        task_id
-    ))
+    UPDATE tasks
+    SET status=?
+    WHERE id=?
+    """, (new_status, task_id))
 
     conn.commit()
     conn.close()
 
-    try:
-        send_message(
-            f"""
-🔔 Статус заявки изменён
+    if old_status != new_status:
+        role_title = get_role_title(role)
 
-Заявка #{task_id}
-Клиент: {task[1]}
-Исполнитель: {task[6]}
-Новый статус: {status}
+        status_icons = {
+            "Новая": "🆕",
+            "В работе": "🚧",
+            "Завершено": "✅",
+            "Отменено": "❌"
+        }
+
+        icon = status_icons.get(new_status, "🔄")
+
+        try:
+            send_message(
+                f"""
+{icon} Статус заявки #{task_id} изменён
+
+Клиент: {task['client']}
+Адрес: {task['address']}
+Исполнитель: {task['worker']}
+
+Было: {old_status}
+Стало: {new_status}
+
+Изменил: {username} ({role_title})
 """
-        )
-    except:
-        pass
+            )
+        except Exception:
+            pass
 
-    return RedirectResponse(
-        f"/task/{task_id}",
-        status_code=302
-    )
-
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
 @app.post("/task/{task_id}/before-photo")
