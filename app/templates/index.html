@@ -1,216 +1,174 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Service CRM</title>
 
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Field Service CRM</title>
-
-    <style>
-
-        *{
-            margin:0;
-            padding:0;
-            box-sizing:border-box;
-        }
-
-        body{
-            font-family:Arial, sans-serif;
-            background:#f3f4f6;
-            color:#111827;
-        }
-
-        .container{
-            max-width:1200px;
-            margin:auto;
-            padding:30px;
-        }
-
-        .header{
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            margin-bottom:30px;
-            flex-wrap:wrap;
-            gap:15px;
-        }
-
-        .title{
-            font-size:34px;
-            font-weight:bold;
-        }
-
-        .buttons{
-            display:flex;
-            gap:12px;
-            flex-wrap:wrap;
-        }
-
-        .btn{
-            padding:14px 20px;
-            border-radius:14px;
-            text-decoration:none;
-            color:white;
-            font-weight:bold;
-            transition:0.2s;
-        }
-
-        .btn:hover{
-            transform:translateY(-2px);
-        }
-
-        .blue{
-            background:#2563eb;
-        }
-
-        .red{
-            background:#ef4444;
-        }
-
-        .tasks{
-            display:grid;
-            gap:20px;
-        }
-
-        .card{
-            background:white;
-            border-radius:24px;
-            padding:24px;
-            box-shadow:0 10px 25px rgba(0,0,0,0.08);
-            transition:0.2s;
-        }
-
-        .card:hover{
-            transform:translateY(-3px);
-        }
-
-        .card a{
-            text-decoration:none;
-            color:#111827;
-        }
-
-        .task-title{
-            font-size:24px;
-            font-weight:bold;
-            margin-bottom:14px;
-        }
-
-        .meta{
-            margin-bottom:8px;
-            color:#374151;
-            font-size:16px;
-        }
-
-        .status{
-            margin-top:15px;
-            display:inline-block;
-            background:#dbeafe;
-            color:#1d4ed8;
-            padding:8px 14px;
-            border-radius:999px;
-            font-weight:bold;
-        }
-
-        @media(max-width:700px){
-
-            .container{
-                padding:18px;
-            }
-
-            .title{
-                font-size:26px;
-            }
-
-            .task-title{
-                font-size:20px;
-            }
-
-        }
-
-    </style>
-
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1250px;margin:auto;padding:28px}
+.header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:26px}
+.title{font-size:34px;font-weight:800}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;padding:14px 20px;border-radius:16px;text-decoration:none;color:white;font-weight:800;background:#2563eb}
+.logout{background:#ef4444}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:24px}
+.stat{background:white;padding:22px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
+.stat .label{color:#6b7280;font-weight:700;margin-bottom:8px}
+.stat .num{font-size:32px;font-weight:900}
+.filters{background:white;padding:22px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:24px}
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+input,select,button{width:100%;padding:14px;border-radius:14px;border:1px solid #d1d5db;font-size:16px}
+button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
+.tasks{display:grid;gap:18px}
+.card{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);border-left:8px solid #2563eb}
+.card a{text-decoration:none;color:#111827}
+.task-title{font-size:24px;font-weight:900;margin-bottom:12px}
+.meta{margin:7px 0;color:#374151;font-size:16px}
+.badge{display:inline-block;margin-top:12px;padding:8px 14px;border-radius:999px;font-weight:800;background:#dbeafe;color:#1d4ed8}
+.badge.work{background:#fef3c7;color:#92400e}
+.badge.done{background:#dcfce7;color:#166534}
+.badge.cancel{background:#fee2e2;color:#991b1b}
+.empty{background:white;padding:24px;border-radius:24px;color:#6b7280}
+@media(max-width:700px){.container{padding:16px}.title{font-size:26px}.task-title{font-size:20px}}
+</style>
 </head>
 
 <body>
-
 <div class="container">
 
-    <div class="header">
+<div class="header">
+    <div class="title">🚀 Field Service CRM</div>
 
-        <div class="title">
-            🚀 Field Service CRM
-        </div>
+    <div class="actions">
+        <a href="/create-task" class="btn">➕ Новая заявка</a>
+        <a href="/logout" class="btn logout">Выйти</a>
+    </div>
+</div>
 
-        <div class="buttons">
-
-            <a
-                href="/create-task"
-                class="btn blue"
-            >
-                ➕ Новая заявка
-            </a>
-
-            <a
-                href="/logout"
-                class="btn red"
-            >
-                Выйти
-            </a>
-
-        </div>
-
+<div class="stats">
+    <div class="stat">
+        <div class="label">Всего заявок</div>
+        <div class="num">{{ total_tasks }}</div>
     </div>
 
-    <div class="tasks">
+    <div class="stat">
+        <div class="label">Новые</div>
+        <div class="num">{{ new_tasks }}</div>
+    </div>
 
-        {% for task in tasks %}
+    <div class="stat">
+        <div class="label">В работе</div>
+        <div class="num">{{ working_tasks }}</div>
+    </div>
 
-        <div class="card">
+    <div class="stat">
+        <div class="label">Завершено</div>
+        <div class="num">{{ done_tasks }}</div>
+    </div>
 
-            <a href="/task/{{ task[0] }}">
+    <div class="stat">
+        <div class="label">Доход</div>
+        <div class="num">${{ revenue }}</div>
+    </div>
+</div>
 
-                <div class="task-title">
-                    #{{ task[0] }} — {{ task[1] }}
-                </div>
+<div class="filters">
+    <form method="get" action="/">
+        <div class="filter-grid">
 
-                <div class="meta">
-                    📞 {{ task[2] }}
-                </div>
+            <input
+                type="text"
+                name="search"
+                placeholder="Поиск клиента"
+                value="{{ search }}"
+            >
 
-                <div class="meta">
-                    📍 {{ task[3] }}
-                </div>
+            <input
+                type="date"
+                name="task_date"
+                value="{{ selected_date }}"
+            >
 
-                <div class="meta">
-                    📅 {{ task[5] }}
-                </div>
+            <select name="status">
+                <option value="">Все статусы</option>
 
-                <div class="meta">
-                    👷 {{ task[6] }}
-                </div>
+                <option value="Новая" {% if selected_status == "Новая" %}selected{% endif %}>
+                    Новая
+                </option>
 
-                <div class="meta">
-                    💰 ${{ task[8] }}
-                </div>
+                <option value="В работе" {% if selected_status == "В работе" %}selected{% endif %}>
+                    В работе
+                </option>
 
-                <div class="status">
-                    {{ task[10] }}
-                </div>
+                <option value="Завершено" {% if selected_status == "Завершено" %}selected{% endif %}>
+                    Завершено
+                </option>
 
-            </a>
+                <option value="Отменено" {% if selected_status == "Отменено" %}selected{% endif %}>
+                    Отменено
+                </option>
+            </select>
+
+            <select name="worker">
+                <option value="">Все монтажники</option>
+
+                {% for worker in workers %}
+                <option value="{{ worker[0] }}" {% if selected_worker == worker[0] %}selected{% endif %}>
+                    {{ worker[0] }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit">🔎 Фильтр</button>
 
         </div>
+    </form>
+</div>
 
-        {% endfor %}
+<div class="tasks">
 
-    </div>
+{% for task in tasks %}
+
+<div class="card">
+    <a href="/task/{{ task[0] }}">
+
+        <div class="task-title">
+            #{{ task[0] }} — {{ task[1] }}
+        </div>
+
+        <div class="meta">📞 {{ task[2] }}</div>
+        <div class="meta">📍 {{ task[3] }}</div>
+        <div class="meta">📅 {{ task[5] }}</div>
+        <div class="meta">👷 {{ task[6] }}</div>
+        <div class="meta">🔥 {{ task[7] }}</div>
+        <div class="meta">💰 ${{ task[8] }}</div>
+
+        {% if task[10] == "В работе" %}
+            <div class="badge work">{{ task[10] }}</div>
+        {% elif task[10] == "Завершено" %}
+            <div class="badge done">{{ task[10] }}</div>
+        {% elif task[10] == "Отменено" %}
+            <div class="badge cancel">{{ task[10] }}</div>
+        {% else %}
+            <div class="badge">{{ task[10] }}</div>
+        {% endif %}
+
+    </a>
+</div>
+
+{% else %}
+
+<div class="empty">
+    Заявок пока нет.
+</div>
+
+{% endfor %}
 
 </div>
 
+</div>
 </body>
 </html>

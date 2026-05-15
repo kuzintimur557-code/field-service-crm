@@ -28,7 +28,13 @@ def get_user(request: Request):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
+async def home(
+    request: Request,
+    status: str = "",
+    worker: str = "",
+    task_date: str = "",
+    search: str = ""
+):
 
     username = get_user(request)
 
@@ -38,10 +44,68 @@ async def home(request: Request):
     conn = connect()
     c = conn.cursor()
 
-    tasks = c.execute("""
+    query = """
     SELECT *
     FROM tasks
-    ORDER BY id DESC
+    WHERE 1=1
+    """
+
+    params = []
+
+    if status:
+        query += " AND status=?"
+        params.append(status)
+
+    if worker:
+        query += " AND worker=?"
+        params.append(worker)
+
+    if task_date:
+        query += " AND task_date=?"
+        params.append(task_date)
+
+    if search:
+        query += " AND client LIKE ?"
+        params.append(f"%{search}%")
+
+    query += " ORDER BY id DESC"
+
+    tasks = c.execute(query, params).fetchall()
+
+    total_tasks = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+
+    new_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE status='Новая'
+    """).fetchone()[0]
+
+    working_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE status='В работе'
+    """).fetchone()[0]
+
+    done_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE status='Завершено'
+    """).fetchone()[0]
+
+    revenue = c.execute("""
+    SELECT SUM(price)
+    FROM tasks
+    WHERE status='Завершено'
+    """).fetchone()[0]
+
+    if revenue is None:
+        revenue = 0
+
+    workers = c.execute("""
+    SELECT username
+    FROM users
+    WHERE role='worker'
+    ORDER BY username
     """).fetchall()
 
     conn.close()
@@ -51,7 +115,17 @@ async def home(request: Request):
         name="index.html",
         context={
             "tasks": tasks,
-            "username": username
+            "username": username,
+            "total_tasks": total_tasks,
+            "new_tasks": new_tasks,
+            "working_tasks": working_tasks,
+            "done_tasks": done_tasks,
+            "revenue": revenue,
+            "workers": workers,
+            "selected_status": status,
+            "selected_worker": worker,
+            "selected_date": task_date,
+            "search": search
         }
     )
 
