@@ -33,6 +33,16 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        notes TEXT,
+        created_at TEXT
+    )
+
     CREATE TABLE IF NOT EXISTS task_activity (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER,

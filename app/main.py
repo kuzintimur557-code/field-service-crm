@@ -522,6 +522,108 @@ async def reports_page(request: Request, month: str = ""):
     )
 
 
+@app.get("/clients", response_class=HTMLResponse)
+async def clients_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    clients = c.execute("""
+    SELECT *
+    FROM clients
+    ORDER BY id DESC
+    """).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        name="clients.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "clients": clients
+        }
+    )
+
+
+@app.post("/clients")
+async def create_client(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    email = (form.get("email") or "").strip()
+    address = (form.get("address") or "").strip()
+    notes = (form.get("notes") or "").strip()
+
+    if not name:
+        return RedirectResponse("/clients?error=empty", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO clients (
+        name,
+        phone,
+        email,
+        address,
+        notes,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        name,
+        phone,
+        email,
+        address,
+        notes,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        send_message(
+            f"""
+👤 Новый клиент
+
+Имя: {name}
+Телефон: {phone}
+Адрес: {address}
+
+Создал: {username} ({get_role_title(role)})
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse("/clients?created=1", status_code=302)
+
+
 @app.get("/archive", response_class=HTMLResponse)
 async def archive_page(request: Request):
 

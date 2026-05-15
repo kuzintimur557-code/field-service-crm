@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Клиенты</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1100px;margin:auto;padding:28px}
+.header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
+h1{margin:0;font-size:34px}
+h2{margin:0 0 16px;font-size:22px}
+.back{color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label{display:block;margin-top:12px;font-weight:900;color:#374151}
+input,textarea,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
+input,textarea{border:1px solid #d1d5db;background:white}
+textarea{height:110px;resize:vertical}
+button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.client{display:grid;grid-template-columns:1.2fr 1fr 1.5fr;gap:14px;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
+.name{font-size:18px;font-weight:900}
+.meta{font-size:14px;color:#4b5563;font-weight:700;margin-top:5px;word-break:break-word}
+.empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
+.notice{margin-top:16px;padding:14px;border-radius:16px;font-weight:900}
+.notice.ok{background:#dcfce7;color:#166534}
+.notice.err{background:#fee2e2;color:#991b1b}
+@media(max-width:800px){
+.container{padding:16px}
+.header{display:block}
+h1{font-size:28px;margin-bottom:12px}
+.grid,.client{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="header">
+    <div>
+        <h1>👤 Клиенты</h1>
+        <div style="color:#6b7280;font-weight:800;margin-top:6px">
+            База клиентов платформы
+        </div>
+    </div>
+    <a href="/" class="back">← Назад</a>
+</div>
+
+<div class="card">
+<h2>Добавить клиента</h2>
+
+{% if request.query_params.get("created") == "1" %}
+<div class="notice ok">✅ Клиент создан</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "empty" %}
+<div class="notice err">❌ Имя клиента обязательно</div>
+{% endif %}
+
+<form method="post" action="/clients">
+
+<div class="grid">
+    <div>
+        <label>Имя / Компания</label>
+        <input type="text" name="name" placeholder="ООО Ромашка или Иван Петров" required>
+    </div>
+
+    <div>
+        <label>Телефон</label>
+        <input type="text" name="phone" placeholder="+31...">
+    </div>
+</div>
+
+<div class="grid">
+    <div>
+        <label>Email</label>
+        <input type="email" name="email" placeholder="client@example.com">
+    </div>
+
+    <div>
+        <label>Адрес</label>
+        <input type="text" name="address" placeholder="Город, улица, дом">
+    </div>
+</div>
+
+<label>Заметки</label>
+<textarea name="notes" placeholder="Важная информация по клиенту..."></textarea>
+
+<button type="submit">➕ Создать клиента</button>
+
+</form>
+</div>
+
+<div class="card">
+<h2>Список клиентов</h2>
+
+{% if clients %}
+{% for client in clients %}
+<div class="client">
+    <div>
+        <div class="name">{{ client["name"] }}</div>
+        <div class="meta">Создан: {{ client["created_at"] }}</div>
+    </div>
+
+    <div>
+        <div class="meta">📞 {{ client["phone"] or "телефон не указан" }}</div>
+        <div class="meta">✉️ {{ client["email"] or "email не указан" }}</div>
+    </div>
+
+    <div>
+        <div class="meta">📍 {{ client["address"] or "адрес не указан" }}</div>
+        {% if client["notes"] %}
+        <div class="meta">📝 {{ client["notes"] }}</div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">Клиентов пока нет</div>
+{% endif %}
+
+</div>
+
+</div>
+</body>
+</html>
