@@ -1,36 +1,51 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Task</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Заявка</title>
+
+<style>
+body{margin:0;font-family:Arial;background:#f3f4f6;color:#111827}
+.container{max-width:850px;margin:auto;padding:28px}
+.card{background:white;padding:28px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.08);margin-bottom:20px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:bold}
+.row{margin-bottom:14px}
+.label{font-size:13px;color:#6b7280;margin-bottom:4px}
+.value{font-size:18px;font-weight:bold}
+.status{display:inline-block;background:#dbeafe;color:#1d4ed8;padding:9px 14px;border-radius:999px;font-weight:bold}
+img{max-width:100%;border-radius:18px;margin-top:16px}
+</style>
 </head>
+
 <body>
+<div class="container">
 
-<h1>Task #{{ task[0] }}</h1>
+<a href="/" class="back">← Назад</a>
 
-<p>Client: {{ task[1] }}</p>
+<div class="card">
+<h1>Заявка #{{ task[0] }}</h1>
 
-<p>Phone: {{ task[2] }}</p>
+<div class="row"><div class="label">Клиент</div><div class="value">{{ task[1] }}</div></div>
+<div class="row"><div class="label">Телефон</div><div class="value">{{ task[2] }}</div></div>
+<div class="row"><div class="label">Адрес</div><div class="value">{{ task[3] }}</div></div>
+<div class="row"><div class="label">Описание</div><div class="value">{{ task[4] }}</div></div>
+<div class="row"><div class="label">Дата</div><div class="value">{{ task[5] }}</div></div>
+<div class="row"><div class="label">Монтажник</div><div class="value">{{ task[6] }}</div></div>
+<div class="row"><div class="label">Приоритет</div><div class="value">{{ task[7] }}</div></div>
+<div class="row"><div class="label">Цена</div><div class="value">${{ task[8] }}</div></div>
 
-<p>Address: {{ task[3] }}</p>
-
-<p>Description: {{ task[4] }}</p>
-
-<p>Date: {{ task[5] }}</p>
-
-<p>Worker: {{ task[6] }}</p>
-
-<p>Priority: {{ task[7] }}</p>
-
-<p>Price: {{ task[8] }}</p>
+<div class="row">
+<div class="label">Статус</div>
+<div class="status">{{ task[10] }}</div>
+</div>
 
 {% if task[9] %}
-
-<img
-    src="/uploads/{{ task[9] }}"
-    width="300"
->
-
+<img src="/uploads/{{ task[9] }}">
 {% endif %}
 
+</div>
+
+</div>
 </body>
 </html>
