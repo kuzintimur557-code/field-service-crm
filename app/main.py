@@ -1449,6 +1449,14 @@ async def create_worker(request: Request):
     return RedirectResponse("/workers?created=1", status_code=302)
 
 
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "ok",
+        "app": "Field Service CRM"
+    }
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
 
