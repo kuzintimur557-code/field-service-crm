@@ -300,9 +300,9 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <form method="post" action="/task/{{ task[0] }}/payment">
 
 <select name="payment_status">
-<option value="Не оплачено">Не оплачено</option>
-<option value="Частично оплачено">Частично оплачено</option>
-<option value="Оплачено">Оплачено</option>
+<option value="Не оплачено" {% if task["payment_status"] == "Не оплачено" %}selected{% endif %}>Не оплачено</option>
+<option value="Частично оплачено" {% if task["payment_status"] == "Частично оплачено" %}selected{% endif %}>Частично оплачено</option>
+<option value="Оплачено" {% if task["payment_status"] == "Оплачено" %}selected{% endif %}>Оплачено</option>
 </select>
 
 <button type="submit">💾 Обновить оплату</button>

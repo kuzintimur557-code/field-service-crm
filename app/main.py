@@ -2136,6 +2136,7 @@ async def task_pdf(request: Request, task_id: int):
         ("Приоритет", task["priority"]),
         ("Стоимость", f"${task['price']}"),
         ("Статус", task["status"]),
+        ("Статус оплаты", task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"),
     ]
 
     for label, value in fields:
