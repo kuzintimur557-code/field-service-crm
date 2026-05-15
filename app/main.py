@@ -2412,6 +2412,7 @@ async def task_invoice_pdf(request: Request, task_id: int):
 
     estimate_total = sum(item["total"] for item in task_items)
     payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
+    settings = get_company_settings()
 
     pdf_path = DOCS_DIR / f"task_{task_id}_invoice.pdf"
     font_name = register_pdf_font()
@@ -2425,7 +2426,24 @@ async def task_invoice_pdf(request: Request, task_id: int):
     pdf.setFont(font_name, 10)
     pdf.drawString(40, page_height - 72, f"Дата формирования: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-    y = page_height - 115
+    y = page_height - 100
+
+    if settings and settings["company_name"]:
+        pdf.setFont(font_name, 11)
+        pdf.drawString(40, y, "Исполнитель / компания:")
+        y -= 16
+        y = draw_text(pdf, settings["company_name"], 40, y, font_name, size=10)
+        if settings["phone"]:
+            y = draw_text(pdf, f"Телефон: {settings['phone']}", 40, y, font_name, size=10)
+        if settings["email"]:
+            y = draw_text(pdf, f"Email: {settings['email']}", 40, y, font_name, size=10)
+        if settings["address"]:
+            y = draw_text(pdf, f"Адрес: {settings['address']}", 40, y, font_name, size=10)
+        if settings["tax_number"]:
+            y = draw_text(pdf, f"VAT / налоговый номер: {settings['tax_number']}", 40, y, font_name, size=10)
+        y -= 12
+    else:
+        y = page_height - 115
 
     fields = [
         ("Клиент", task["client"]),
@@ -2478,7 +2496,15 @@ async def task_invoice_pdf(request: Request, task_id: int):
     else:
         y = draw_text(pdf, "Позиции счёта пока не добавлены", 40, y, font_name, size=10)
 
-    y -= 50
+    y -= 35
+
+    if settings and settings["bank_details"]:
+        pdf.setFont(font_name, 12)
+        pdf.drawString(40, y, "Банковские реквизиты")
+        y -= 18
+        y = draw_text(pdf, settings["bank_details"], 40, y, font_name, size=10)
+        y -= 12
+
     pdf.setFont(font_name, 10)
     pdf.drawString(40, y, "Спасибо за обращение!")
 
@@ -2535,6 +2561,7 @@ async def task_pdf(request: Request, task_id: int):
     """, (task_id,)).fetchall()
 
     estimate_total = sum(item["total"] for item in task_items)
+    settings = get_company_settings()
 
     pdf_path = DOCS_DIR / f"task_{task_id}.pdf"
     font_name = register_pdf_font()
@@ -2548,7 +2575,24 @@ async def task_pdf(request: Request, task_id: int):
     pdf.setFont(font_name, 10)
     pdf.drawString(40, page_height - 72, f"Дата формирования: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-    y = page_height - 110
+    y = page_height - 100
+
+    if settings and settings["company_name"]:
+        pdf.setFont(font_name, 11)
+        pdf.drawString(40, y, "Исполнитель / компания:")
+        y -= 16
+        y = draw_text(pdf, settings["company_name"], 40, y, font_name, size=10)
+        if settings["phone"]:
+            y = draw_text(pdf, f"Телефон: {settings['phone']}", 40, y, font_name, size=10)
+        if settings["email"]:
+            y = draw_text(pdf, f"Email: {settings['email']}", 40, y, font_name, size=10)
+        if settings["address"]:
+            y = draw_text(pdf, f"Адрес: {settings['address']}", 40, y, font_name, size=10)
+        if settings["tax_number"]:
+            y = draw_text(pdf, f"VAT / налоговый номер: {settings['tax_number']}", 40, y, font_name, size=10)
+        y -= 12
+    else:
+        y = page_height - 110
 
     fields = [
         ("Клиент", task["client"]),
