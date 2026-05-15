@@ -743,6 +743,36 @@ async def reports_page(request: Request, month: str = ""):
     )
 
 
+@app.get("/billing", response_class=HTMLResponse)
+async def billing_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    settings = get_company_settings()
+    plan = settings["plan"] if settings and "plan" in settings.keys() else "basic"
+    user_limit = get_plan_user_limit(plan)
+
+    return templates.TemplateResponse(
+        name="billing.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "plan": plan,
+            "user_limit": user_limit
+        }
+    )
+
+
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
 

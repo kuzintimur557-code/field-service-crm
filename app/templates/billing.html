@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тарифы</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1100px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 12px;font-size:34px}
+h2{margin:0 0 16px;font-size:22px}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.plan{border:2px solid #e5e7eb;border-radius:22px;padding:18px;background:#f9fafb}
+.plan.active{border-color:#2563eb;background:#eff6ff}
+.name{font-size:20px;font-weight:900;margin-bottom:8px}
+.price{font-size:24px;font-weight:900;margin-bottom:12px}
+.feature{font-size:14px;color:#374151;font-weight:800;margin:8px 0}
+.badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
+.small{color:#6b7280;font-weight:800;line-height:1.45}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}.container{padding:16px}h1{font-size:28px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/settings" class="back">← Назад к настройкам</a>
+
+<div class="card">
+<h1>💳 Тарифы</h1>
+<div class="small">
+Текущий тариф: <span class="badge">{{ plan }}</span><br>
+Лимит пользователей:
+{% if user_limit %}
+{{ user_limit }}
+{% else %}
+без лимита
+{% endif %}
+</div>
+</div>
+
+<div class="card">
+<h2>Доступные тарифы</h2>
+
+<div class="grid">
+
+<div class="plan {% if plan == 'basic' %}active{% endif %}">
+    <div class="name">Basic</div>
+    <div class="price">до 3 пользователей</div>
+    <div class="feature">✅ Заявки</div>
+    <div class="feature">✅ Фото</div>
+    <div class="feature">✅ PDF акты</div>
+    <div class="feature">❌ 1С</div>
+    <div class="feature">❌ Звонки</div>
+</div>
+
+<div class="plan {% if plan == 'team' %}active{% endif %}">
+    <div class="name">Team</div>
+    <div class="price">до 10 пользователей</div>
+    <div class="feature">✅ Всё из Basic</div>
+    <div class="feature">✅ Клиенты</div>
+    <div class="feature">✅ Финансы</div>
+    <div class="feature">❌ 1С</div>
+    <div class="feature">❌ Звонки</div>
+</div>
+
+<div class="plan {% if plan == 'business' %}active{% endif %}">
+    <div class="name">Business</div>
+    <div class="price">до 30 пользователей</div>
+    <div class="feature">✅ Всё из Team</div>
+    <div class="feature">✅ Каталог</div>
+    <div class="feature">✅ Звонки</div>
+    <div class="feature">❌ 1С</div>
+    <div class="feature">❌ AI звонки</div>
+</div>
+
+<div class="plan {% if plan == 'business_1c' %}active{% endif %}">
+    <div class="name">Business + 1С</div>
+    <div class="price">до 30 пользователей</div>
+    <div class="feature">✅ Всё из Business</div>
+    <div class="feature">✅ 1С</div>
+    <div class="feature">✅ Обмен клиентами</div>
+    <div class="feature">✅ Счета / акты</div>
+</div>
+
+<div class="plan {% if plan == 'enterprise_1c' %}active{% endif %}">
+    <div class="name">Enterprise + 1С</div>
+    <div class="price">без лимита</div>
+    <div class="feature">✅ Всё</div>
+    <div class="feature">✅ 1С</div>
+    <div class="feature">✅ Звонки</div>
+    <div class="feature">✅ AI-анализ звонков</div>
+    <div class="feature">✅ Enterprise support</div>
+</div>
+
+</div>
+</div>
+
+</div>
+</body>
+</html>
