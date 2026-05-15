@@ -777,6 +777,16 @@ async def update_settings(request: Request):
     address = (form.get("address") or "").strip()
     tax_number = (form.get("tax_number") or "").strip()
     bank_details = (form.get("bank_details") or "").strip()
+    plan = (form.get("plan") or "basic").strip()
+
+    allowed_plans = ["basic", "team", "business", "business_1c", "enterprise_1c"]
+
+    if plan not in allowed_plans:
+        plan = "basic"
+
+    one_c_enabled = 1 if plan in ("business_1c", "enterprise_1c") else 0
+    calls_enabled = 1 if plan in ("business", "business_1c", "enterprise_1c") else 0
+    ai_calls_enabled = 1 if plan == "enterprise_1c" else 0
 
     conn = connect()
     c = conn.cursor()
@@ -790,7 +800,8 @@ async def update_settings(request: Request):
 
     c.execute("""
     UPDATE company_settings
-    SET company_name=?, phone=?, email=?, address=?, tax_number=?, bank_details=?, updated_at=?
+    SET company_name=?, phone=?, email=?, address=?, tax_number=?, bank_details=?,
+        plan=?, one_c_enabled=?, calls_enabled=?, ai_calls_enabled=?, updated_at=?
     WHERE id=1
     """, (
         company_name,
@@ -799,6 +810,10 @@ async def update_settings(request: Request):
         address,
         tax_number,
         bank_details,
+        plan,
+        one_c_enabled,
+        calls_enabled,
+        ai_calls_enabled,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 

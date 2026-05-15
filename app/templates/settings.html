@@ -70,6 +70,21 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <label>Банковские реквизиты</label>
 <textarea name="bank_details" placeholder="IBAN, банк, получатель...">{{ settings['bank_details'] or '' }}</textarea>
 
+<label>Тариф</label>
+<select name="plan">
+    <option value="basic" {% if settings["plan"] == "basic" %}selected{% endif %}>Basic — без 1С</option>
+    <option value="team" {% if settings["plan"] == "team" %}selected{% endif %}>Team — без 1С</option>
+    <option value="business" {% if settings["plan"] == "business" %}selected{% endif %}>Business — звонки без 1С</option>
+    <option value="business_1c" {% if settings["plan"] == "business_1c" %}selected{% endif %}>Business + 1С</option>
+    <option value="enterprise_1c" {% if settings["plan"] == "enterprise_1c" %}selected{% endif %}>Enterprise + 1С + AI звонки</option>
+</select>
+
+<div style="margin-top:14px;padding:14px;border-radius:16px;background:#f9fafb;color:#374151;font-weight:800;line-height:1.5">
+    1С: {% if settings["one_c_enabled"] %}✅ включено{% else %}❌ выключено{% endif %}<br>
+    Звонки: {% if settings["calls_enabled"] %}✅ включено{% else %}❌ выключено{% endif %}<br>
+    AI-анализ звонков: {% if settings["ai_calls_enabled"] %}✅ включено{% else %}❌ выключено{% endif %}
+</div>
+
 <button type="submit">💾 Сохранить настройки</button>
 
 </form>

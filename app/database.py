@@ -41,6 +41,10 @@ def init_db():
         address TEXT,
         tax_number TEXT,
         bank_details TEXT,
+        plan TEXT DEFAULT 'basic',
+        one_c_enabled INTEGER DEFAULT 0,
+        calls_enabled INTEGER DEFAULT 0,
+        ai_calls_enabled INTEGER DEFAULT 0,
         updated_at TEXT
     )
 
