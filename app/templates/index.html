@@ -11,6 +11,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .container{max-width:1250px;margin:auto;padding:28px}
 .header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:26px}
 .title{font-size:34px;font-weight:800}
+.subtitle{color:#6b7280;font-weight:700;margin-top:6px}
 .actions{display:flex;gap:12px;flex-wrap:wrap}
 .btn{display:inline-block;padding:14px 20px;border-radius:16px;text-decoration:none;color:white;font-weight:800;background:#2563eb}
 .btn.dark{background:#111827}
@@ -47,13 +48,19 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
 <div class="container">
 
 <div class="header">
-    <div class="title">🚀 Field Service CRM</div>
+    <div>
+        <div class="title">🚀 Field Service CRM</div>
+        <div class="subtitle">Вы вошли как: {{ username }} / {{ role }}</div>
+    </div>
 
     <div class="actions">
+        {% if role == "boss" %}
         <a href="/reports" class="btn green">📊 Отчёты</a>
-        <a href="/calendar" class="btn dark">📅 Календарь</a>
         <a href="/workers" class="btn dark">👷 Монтажники</a>
         <a href="/create-task" class="btn">➕ Новая заявка</a>
+        {% endif %}
+
+        <a href="/calendar" class="btn dark">📅 Календарь</a>
         <a href="/logout" class="btn logout">Выйти</a>
     </div>
 </div>
@@ -66,6 +73,8 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
     <div class="stat"><div class="label">Доход</div><div class="num">${{ revenue }}</div></div>
 </div>
 
+{% if role == "boss" %}
+
 <div class="section-title">👷 Монтажники</div>
 
 <div class="worker-grid">
@@ -77,6 +86,7 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
     <div class="worker-line">✅ Завершено: <b>{{ stat.completed }}</b></div>
     <div class="worker-line">🚧 В работе: <b>{{ stat.active }}</b></div>
     <div class="worker-line">💰 Доход: <b>${{ stat.revenue }}</b></div>
+    <div class="worker-line">🕒 Был онлайн: <b>{{ stat.last_seen }}</b></div>
 </div>
 
 {% else %}
@@ -86,6 +96,8 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
 {% endfor %}
 
 </div>
+
+{% endif %}
 
 <div class="filters">
     <form method="get" action="/">
@@ -102,6 +114,7 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
                 <option value="Отменено" {% if selected_status == "Отменено" %}selected{% endif %}>Отменено</option>
             </select>
 
+            {% if role == "boss" %}
             <select name="worker">
                 <option value="">Все монтажники</option>
                 {% for worker in workers %}
@@ -110,6 +123,7 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
                 </option>
                 {% endfor %}
             </select>
+            {% endif %}
 
             <button type="submit">🔎 Фильтр</button>
 

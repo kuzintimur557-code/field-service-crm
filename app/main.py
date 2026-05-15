@@ -30,6 +30,40 @@ def get_user(request: Request):
     return request.cookies.get("user")
 
 
+def get_role(username):
+    conn = connect()
+    c = conn.cursor()
+
+    user = c.execute("""
+    SELECT * FROM users
+    WHERE username=?
+    """, (username,)).fetchone()
+
+    conn.close()
+
+    if not user:
+        return None
+
+    return user["role"]
+
+
+def update_last_seen(username):
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    UPDATE users
+    SET last_seen=?
+    WHERE username=?
+    """, (
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        username
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(
     request: Request,
@@ -44,17 +78,25 @@ async def home(
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    update_last_seen(username)
+
+    role = get_role(username)
+
     conn = connect()
     c = conn.cursor()
 
     query = "SELECT * FROM tasks WHERE 1=1"
     params = []
 
+    if role != "boss":
+        query += " AND worker=?"
+        params.append(username)
+
     if status:
         query += " AND status=?"
         params.append(status)
 
-    if worker:
+    if worker and role == "boss":
         query += " AND worker=?"
         params.append(worker)
 
@@ -70,51 +112,66 @@ async def home(
 
     tasks = c.execute(query, params).fetchall()
 
-    total_tasks = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
-    new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Новая'").fetchone()[0]
-    working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='В работе'").fetchone()[0]
-    done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Завершено'").fetchone()[0]
+    if role == "boss":
+        total_tasks = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Новая'").fetchone()[0]
+        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='В работе'").fetchone()[0]
+        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE status='Завершено'").fetchone()[0]
 
-    revenue = c.execute("""
-    SELECT SUM(price) FROM tasks WHERE status='Завершено'
-    """).fetchone()[0]
+        revenue = c.execute("""
+        SELECT SUM(price) FROM tasks WHERE status='Завершено'
+        """).fetchone()[0]
+    else:
+        total_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=?", (username,)).fetchone()[0]
+        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=? AND status='Новая'", (username,)).fetchone()[0]
+        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=? AND status='В работе'", (username,)).fetchone()[0]
+        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=? AND status='Завершено'", (username,)).fetchone()[0]
+
+        revenue = c.execute("""
+        SELECT SUM(price) FROM tasks
+        WHERE worker=? AND status='Завершено'
+        """, (username,)).fetchone()[0]
 
     if revenue is None:
         revenue = 0
 
     workers = c.execute("""
-    SELECT username FROM users WHERE role='worker' ORDER BY username
+    SELECT username, last_seen FROM users
+    WHERE role='worker'
+    ORDER BY username
     """).fetchall()
 
     worker_stats = []
 
-    for w in workers:
-        worker_name = w[0]
+    if role == "boss":
+        for w in workers:
+            worker_name = w["username"]
 
-        completed = c.execute("""
-        SELECT COUNT(*) FROM tasks
-        WHERE worker=? AND status='Завершено'
-        """, (worker_name,)).fetchone()[0]
+            completed = c.execute("""
+            SELECT COUNT(*) FROM tasks
+            WHERE worker=? AND status='Завершено'
+            """, (worker_name,)).fetchone()[0]
 
-        active = c.execute("""
-        SELECT COUNT(*) FROM tasks
-        WHERE worker=? AND status='В работе'
-        """, (worker_name,)).fetchone()[0]
+            active = c.execute("""
+            SELECT COUNT(*) FROM tasks
+            WHERE worker=? AND status='В работе'
+            """, (worker_name,)).fetchone()[0]
 
-        worker_revenue = c.execute("""
-        SELECT SUM(price) FROM tasks
-        WHERE worker=? AND status='Завершено'
-        """, (worker_name,)).fetchone()[0]
+            worker_revenue = c.execute("""
+            SELECT SUM(price) FROM tasks
+            WHERE worker=? AND status='Завершено'
+            """, (worker_name,)).fetchone()[0]
 
-        if worker_revenue is None:
-            worker_revenue = 0
+            if worker_revenue is None:
+                worker_revenue = 0
 
-        worker_stats.append({
-            "username": worker_name,
-            "completed": completed,
-            "active": active,
-            "revenue": worker_revenue
-        })
+            worker_stats.append({
+                "username": worker_name,
+                "completed": completed,
+                "active": active,
+                "revenue": worker_revenue,
+                "last_seen": w["last_seen"]
+            })
 
     conn.close()
 
@@ -124,6 +181,7 @@ async def home(
         context={
             "tasks": tasks,
             "username": username,
+            "role": role,
             "total_tasks": total_tasks,
             "new_tasks": new_tasks,
             "working_tasks": working_tasks,
@@ -139,6 +197,45 @@ async def home(
     )
 
 
+@app.get("/calendar", response_class=HTMLResponse)
+async def calendar_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    update_last_seen(username)
+    role = get_role(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    if role == "boss":
+        tasks = c.execute("""
+        SELECT * FROM tasks
+        ORDER BY task_date ASC, id DESC
+        """).fetchall()
+    else:
+        tasks = c.execute("""
+        SELECT * FROM tasks
+        WHERE worker=?
+        ORDER BY task_date ASC, id DESC
+        """, (username,)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="calendar.html",
+        context={
+            "tasks": tasks,
+            "username": username,
+            "role": role
+        }
+    )
+
+
 @app.get("/reports", response_class=HTMLResponse)
 async def reports_page(request: Request, month: str = ""):
 
@@ -146,6 +243,12 @@ async def reports_page(request: Request, month: str = ""):
 
     if not username:
         return RedirectResponse("/login", status_code=302)
+
+    update_last_seen(username)
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -172,53 +275,28 @@ async def reports_page(request: Request, month: str = ""):
 
         completed = c.execute("""
         SELECT COUNT(*) FROM tasks
-        WHERE worker=?
-        AND status='Завершено'
-        AND task_date LIKE ?
-        """, (
-            worker_name,
-            f"{month}%"
-        )).fetchone()[0]
+        WHERE worker=? AND status='Завершено' AND task_date LIKE ?
+        """, (worker_name, f"{month}%")).fetchone()[0]
 
         active = c.execute("""
         SELECT COUNT(*) FROM tasks
-        WHERE worker=?
-        AND status='В работе'
-        AND task_date LIKE ?
-        """, (
-            worker_name,
-            f"{month}%"
-        )).fetchone()[0]
+        WHERE worker=? AND status='В работе' AND task_date LIKE ?
+        """, (worker_name, f"{month}%")).fetchone()[0]
 
         new = c.execute("""
         SELECT COUNT(*) FROM tasks
-        WHERE worker=?
-        AND status='Новая'
-        AND task_date LIKE ?
-        """, (
-            worker_name,
-            f"{month}%"
-        )).fetchone()[0]
+        WHERE worker=? AND status='Новая' AND task_date LIKE ?
+        """, (worker_name, f"{month}%")).fetchone()[0]
 
         cancelled = c.execute("""
         SELECT COUNT(*) FROM tasks
-        WHERE worker=?
-        AND status='Отменено'
-        AND task_date LIKE ?
-        """, (
-            worker_name,
-            f"{month}%"
-        )).fetchone()[0]
+        WHERE worker=? AND status='Отменено' AND task_date LIKE ?
+        """, (worker_name, f"{month}%")).fetchone()[0]
 
         revenue = c.execute("""
         SELECT SUM(price) FROM tasks
-        WHERE worker=?
-        AND status='Завершено'
-        AND task_date LIKE ?
-        """, (
-            worker_name,
-            f"{month}%"
-        )).fetchone()[0]
+        WHERE worker=? AND status='Завершено' AND task_date LIKE ?
+        """, (worker_name, f"{month}%")).fetchone()[0]
 
         if revenue is None:
             revenue = 0
@@ -242,8 +320,7 @@ async def reports_page(request: Request, month: str = ""):
         total_revenue += revenue
 
     tasks = c.execute("""
-    SELECT *
-    FROM tasks
+    SELECT * FROM tasks
     WHERE task_date LIKE ?
     ORDER BY task_date ASC, id DESC
     """, (f"{month}%",)).fetchall()
@@ -275,6 +352,12 @@ async def workers_page(request: Request):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    update_last_seen(username)
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
     conn = connect()
     c = conn.cursor()
 
@@ -304,6 +387,11 @@ async def create_worker(request: Request):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
     form = await request.form()
 
     worker_username = form.get("username")
@@ -313,18 +401,12 @@ async def create_worker(request: Request):
     c = conn.cursor()
 
     existing = c.execute("""
-    SELECT * FROM users
-    WHERE username=?
+    SELECT * FROM users WHERE username=?
     """, (worker_username,)).fetchone()
 
     if not existing:
         c.execute("""
-        INSERT INTO users (
-            username,
-            password,
-            role,
-            last_seen
-        )
+        INSERT INTO users (username, password, role, last_seen)
         VALUES (?, ?, ?, ?)
         """, (
             worker_username,
@@ -337,35 +419,6 @@ async def create_worker(request: Request):
     conn.close()
 
     return RedirectResponse("/workers", status_code=302)
-
-
-@app.get("/calendar", response_class=HTMLResponse)
-async def calendar_page(request: Request):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    conn = connect()
-    c = conn.cursor()
-
-    tasks = c.execute("""
-    SELECT *
-    FROM tasks
-    ORDER BY task_date ASC, id DESC
-    """).fetchall()
-
-    conn.close()
-
-    return templates.TemplateResponse(
-        request=request,
-        name="calendar.html",
-        context={
-            "tasks": tasks,
-            "username": username
-        }
-    )
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -401,6 +454,8 @@ async def login(request: Request):
     if not user:
         return RedirectResponse("/login", status_code=302)
 
+    update_last_seen(username)
+
     response = RedirectResponse("/", status_code=302)
     response.set_cookie(key="user", value=username)
 
@@ -424,11 +479,19 @@ async def create_task_page(request: Request):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    update_last_seen(username)
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
     conn = connect()
     c = conn.cursor()
 
     workers = c.execute("""
-    SELECT username FROM users WHERE role='worker' ORDER BY username
+    SELECT username FROM users
+    WHERE role='worker'
+    ORDER BY username
     """).fetchall()
 
     conn.close()
@@ -453,6 +516,11 @@ async def create_task(
 
     if not username:
         return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
 
     form = await request.form()
 
@@ -546,6 +614,9 @@ async def task_detail(request: Request, task_id: int):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    update_last_seen(username)
+    role = get_role(username)
+
     conn = connect()
     c = conn.cursor()
 
@@ -558,12 +629,16 @@ async def task_detail(request: Request, task_id: int):
     if not task:
         return HTMLResponse("Task not found", status_code=404)
 
+    if role != "boss" and task["worker"] != username:
+        return RedirectResponse("/", status_code=302)
+
     return templates.TemplateResponse(
         request=request,
         name="task_detail.html",
         context={
             "task": task,
-            "username": username
+            "username": username,
+            "role": role
         }
     )
 
@@ -576,6 +651,8 @@ async def update_status(request: Request, task_id: int):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    role = get_role(username)
+
     form = await request.form()
     status = form.get("status")
 
@@ -587,6 +664,10 @@ async def update_status(request: Request, task_id: int):
     """, (task_id,)).fetchone()
 
     if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if role != "boss" and task["worker"] != username:
         conn.close()
         return RedirectResponse("/", status_code=302)
 
@@ -607,6 +688,7 @@ async def update_status(request: Request, task_id: int):
 
 Заявка #{task_id}
 Клиент: {task[1]}
+Монтажник: {task[6]}
 Новый статус: {status}
 """
         )
@@ -631,6 +713,8 @@ async def update_report(
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    role = get_role(username)
+
     form = await request.form()
     report = form.get("report")
 
@@ -642,6 +726,10 @@ async def update_report(
     """, (task_id,)).fetchone()
 
     if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if role != "boss" and task["worker"] != username:
         conn.close()
         return RedirectResponse("/", status_code=302)
 
@@ -702,6 +790,8 @@ async def task_pdf(request: Request, task_id: int):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    role = get_role(username)
+
     conn = connect()
     c = conn.cursor()
 
@@ -713,6 +803,9 @@ async def task_pdf(request: Request, task_id: int):
 
     if not task:
         return HTMLResponse("Task not found", status_code=404)
+
+    if role != "boss" and task["worker"] != username:
+        return RedirectResponse("/", status_code=302)
 
     pdf_path = f"uploads/docs/task_{task_id}.pdf"
 
