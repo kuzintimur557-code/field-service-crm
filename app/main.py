@@ -288,9 +288,11 @@ async def create_task(
         priority,
         price,
         photo,
-        status
+        status,
+        report,
+        after_photo
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         client,
         phone,
@@ -301,7 +303,9 @@ async def create_task(
         priority,
         price,
         filename,
-        "Новая"
+        "Новая",
+        "",
+        ""
     ))
 
     conn.commit()
@@ -415,6 +419,81 @@ async def update_status(request: Request, task_id: int):
     )
 
 
+@app.post("/task/{task_id}/report")
+async def update_report(
+    request: Request,
+    task_id: int,
+    after_photo: UploadFile = File(None)
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    form = await request.form()
+    report = form.get("report")
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT * FROM tasks WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    after_filename = task["after_photo"] if "after_photo" in task.keys() else ""
+
+    if after_photo and after_photo.filename:
+        after_filename = f"after_{datetime.now().timestamp()}_{after_photo.filename}"
+        file_path = f"uploads/{after_filename}"
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(after_photo.file, buffer)
+
+    c.execute("""
+    UPDATE tasks
+    SET report=?, after_photo=?
+    WHERE id=?
+    """, (
+        report,
+        after_filename,
+        task_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        send_message(
+            f"""
+📝 Отчёт по заявке #{task_id}
+
+Клиент: {task[1]}
+Монтажник: {task[6]}
+
+Отчёт:
+{report}
+"""
+        )
+
+        if after_filename:
+            send_photo(
+                f"uploads/{after_filename}",
+                f"Фото после работы по заявке #{task_id}"
+            )
+    except:
+        pass
+
+    return RedirectResponse(
+        f"/task/{task_id}",
+        status_code=302
+    )
+
+
 @app.get("/task/{task_id}/pdf")
 async def task_pdf(request: Request, task_id: int):
 
@@ -454,6 +533,9 @@ async def task_pdf(request: Request, task_id: int):
         f"Priority: {task[7]}",
         f"Price: ${task[8]}",
         f"Status: {task[10]}",
+        "",
+        "Worker Report:",
+        task["report"] if "report" in task.keys() else "",
         "",
         "Signature: ______________________________"
     ]

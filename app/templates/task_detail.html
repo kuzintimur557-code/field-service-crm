@@ -20,8 +20,9 @@ h1{margin:0 0 24px;font-size:32px}
 img{max-width:100%;border-radius:18px;margin-top:18px}
 .btn{display:block;text-align:center;padding:15px;border-radius:16px;background:#2563eb;color:white;text-decoration:none;font-weight:900;margin-top:14px}
 .btn.green{background:#16a34a}
-select,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:10px}
-select{border:1px solid #d1d5db;background:white}
+select,button,textarea,input{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:10px}
+select,textarea,input{border:1px solid #d1d5db;background:white}
+textarea{height:140px;resize:vertical}
 button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 @media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:26px}}
 </style>
@@ -68,6 +69,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 </a>
 
 {% if task[9] %}
+<h2>Фото до работы</h2>
 <img src="/uploads/{{ task[9] }}">
 {% endif %}
 
@@ -89,6 +91,36 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <button type="submit">💾 Сохранить статус</button>
 
 </form>
+
+</div>
+
+<div class="card">
+
+<h2>Отчёт монтажника</h2>
+
+<form method="post" action="/task/{{ task[0] }}/report" enctype="multipart/form-data">
+
+<label>Комментарий по работе</label>
+<textarea name="report" placeholder="Что было сделано...">{{ task["report"] or "" }}</textarea>
+
+<label>Фото после работы</label>
+<input type="file" name="after_photo">
+
+<button type="submit">📝 Сохранить отчёт</button>
+
+</form>
+
+{% if task["report"] %}
+<div class="row">
+<div class="label">Текущий отчёт</div>
+<div class="value">{{ task["report"] }}</div>
+</div>
+{% endif %}
+
+{% if task["after_photo"] %}
+<h2>Фото после работы</h2>
+<img src="/uploads/{{ task['after_photo'] }}">
+{% endif %}
 
 </div>
 

@@ -5,18 +5,21 @@ DB_NAME = "crm.db"
 
 
 def connect():
-
     conn = sqlite3.connect(DB_NAME)
-
     conn.row_factory = sqlite3.Row
-
     return conn
 
 
+def add_column_if_missing(cursor, table, column, column_type):
+    columns = cursor.execute(f"PRAGMA table_info({table})").fetchall()
+    column_names = [column_info["name"] for column_info in columns]
+
+    if column not in column_names:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+
+
 def init_db():
-
     conn = connect()
-
     c = conn.cursor()
 
     c.execute("""
@@ -38,29 +41,23 @@ def init_db():
         description TEXT,
         task_date TEXT,
         worker TEXT,
-        status TEXT,
         priority TEXT,
-        photo TEXT,
         price REAL,
-        report TEXT,
-        after_photo TEXT
+        photo TEXT,
+        status TEXT
     )
     """)
 
+    add_column_if_missing(c, "tasks", "report", "TEXT")
+    add_column_if_missing(c, "tasks", "after_photo", "TEXT")
+
     boss = c.execute("""
-    SELECT * FROM users
-    WHERE username='boss'
+    SELECT * FROM users WHERE username='boss'
     """).fetchone()
 
     if not boss:
-
         c.execute("""
-        INSERT INTO users (
-            username,
-            password,
-            role,
-            last_seen
-        )
+        INSERT INTO users (username, password, role, last_seen)
         VALUES (?, ?, ?, ?)
         """, (
             "boss",
@@ -70,19 +67,12 @@ def init_db():
         ))
 
     worker = c.execute("""
-    SELECT * FROM users
-    WHERE username='worker'
+    SELECT * FROM users WHERE username='worker'
     """).fetchone()
 
     if not worker:
-
         c.execute("""
-        INSERT INTO users (
-            username,
-            password,
-            role,
-            last_seen
-        )
+        INSERT INTO users (username, password, role, last_seen)
         VALUES (?, ?, ?, ?)
         """, (
             "worker",
@@ -91,27 +81,5 @@ def init_db():
             ""
         ))
 
-    columns = [
-        row["name"]
-        for row in c.execute(
-            "PRAGMA table_info(tasks)"
-        ).fetchall()
-    ]
-
-    if "report" not in columns:
-
-        c.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN report TEXT
-        """)
-
-    if "after_photo" not in columns:
-
-        c.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN after_photo TEXT
-        """)
-
     conn.commit()
-
     conn.close()
