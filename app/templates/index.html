@@ -41,6 +41,13 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
 .badge.cancel{background:#fee2e2;color:#991b1b}
 .empty{background:white;padding:24px;border-radius:24px;color:#6b7280}
 @media(max-width:700px){.container{padding:16px}.title{font-size:26px}.task-title{font-size:20px}}
+
+.nav{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 24px}
+.nav a{display:inline-block;padding:12px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
+.nav a.dark{background:#111827}
+.nav a.green{background:#16a34a}
+.nav a.red{background:#991b1b}
+@media(max-width:700px){.nav a{width:100%;text-align:center}}
 </style>
 </head>
 
@@ -51,6 +58,28 @@ button{border:0;background:#111827;color:white;font-weight:800;cursor:pointer}
     <div>
         <div class="title">🚀 Field Service CRM</div>
         <div class="subtitle">Вы вошли как: {{ username }} / {{ role }}</div>
+
+<!-- main-nav-v2 -->
+<div class="nav">
+    <a href="/create-task">➕ Новая заявка</a>
+    <a href="/calendar">📅 Календарь</a>
+
+    {% if role in ["boss", "manager"] %}
+    <a href="/clients">👤 Клиенты</a>
+    <a href="/catalog">📦 Каталог</a>
+    <a href="/finance">💰 Финансы</a>
+    <a href="/workers" class="dark">👥 Команда</a>
+    <a href="/archive" class="dark">🗄 Архив</a>
+    <a href="/calls">☎️ Звонки</a>
+    {% endif %}
+
+    {% if role == "boss" %}
+    <a href="/settings" class="dark">⚙️ Настройки</a>
+    {% endif %}
+
+    <a href="/logout" class="red">Выйти</a>
+</div>
+
     </div>
 
     <div class="actions">
