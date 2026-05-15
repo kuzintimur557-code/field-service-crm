@@ -415,6 +415,99 @@ async def calendar_page(request: Request):
     )
 
 
+@app.get("/finance", response_class=HTMLResponse)
+async def finance_page(request: Request, month: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0 AND task_date LIKE ?
+    ORDER BY task_date DESC
+    """, (f"{month}%",)).fetchall()
+
+    total_estimate = 0
+    total_profit = 0
+    paid_total = 0
+    partial_total = 0
+    unpaid_total = 0
+
+    rows = []
+
+    for task in tasks:
+        items = c.execute("""
+        SELECT *
+        FROM task_items
+        WHERE task_id=?
+        """, (task["id"],)).fetchall()
+
+        task_total = sum(item["total"] for item in items)
+        task_profit = sum(item["profit"] for item in items)
+
+        if not items:
+            try:
+                task_total = float(task["price"] or 0)
+            except Exception:
+                task_total = 0
+            task_profit = 0
+
+        payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
+
+        total_estimate += task_total
+        total_profit += task_profit
+
+        if payment_status == "Оплачено":
+            paid_total += task_total
+        elif payment_status == "Частично оплачено":
+            partial_total += task_total
+        else:
+            unpaid_total += task_total
+
+        rows.append({
+            "id": task["id"],
+            "client": task["client"],
+            "worker": task["worker"],
+            "task_date": task["task_date"],
+            "status": task["status"],
+            "payment_status": payment_status,
+            "total": task_total,
+            "profit": task_profit
+        })
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        name="finance.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "month": month,
+            "rows": rows,
+            "total_estimate": total_estimate,
+            "total_profit": total_profit,
+            "paid_total": paid_total,
+            "partial_total": partial_total,
+            "unpaid_total": unpaid_total
+        }
+    )
+
+
 @app.get("/reports", response_class=HTMLResponse)
 async def reports_page(request: Request, month: str = ""):
 
