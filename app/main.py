@@ -18,7 +18,6 @@ init_db()
 
 os.makedirs("uploads", exist_ok=True)
 
-
 app.mount(
     "/uploads",
     StaticFiles(directory="uploads"),
@@ -30,7 +29,6 @@ app.mount(
     StaticFiles(directory="app/static"),
     name="static"
 )
-
 
 templates = Jinja2Templates(
     directory="app/templates"
@@ -68,9 +66,9 @@ async def home(request: Request):
     conn.close()
 
     return templates.TemplateResponse(
+        request,
         "index.html",
         {
-            "request": request,
             "tasks": tasks,
             "username": username
         }
@@ -81,10 +79,8 @@ async def home(request: Request):
 async def login_page(request: Request):
 
     return templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request
-        }
+        request,
+        "login.html"
     )
 
 
@@ -158,9 +154,9 @@ async def create_task_page(request: Request):
         )
 
     return templates.TemplateResponse(
+        request,
         "create_task.html",
         {
-            "request": request,
             "username": username
         }
     )
@@ -307,9 +303,9 @@ async def task_detail(
         )
 
     return templates.TemplateResponse(
+        request,
         "task_detail.html",
         {
-            "request": request,
             "task": task,
             "username": username
         }
