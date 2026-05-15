@@ -743,6 +743,32 @@ async def reports_page(request: Request, month: str = ""):
     )
 
 
+@app.get("/integrations/1c", response_class=HTMLResponse)
+async def integration_1c_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    settings = get_company_settings()
+
+    return templates.TemplateResponse(
+        name="integration_1c.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings
+        }
+    )
+
+
 @app.get("/billing", response_class=HTMLResponse)
 async def billing_page(request: Request):
 

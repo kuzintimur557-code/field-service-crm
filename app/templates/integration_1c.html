@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Интеграция 1С</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:900px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 14px;font-size:34px}
+h2{margin:0 0 16px;font-size:22px}
+.notice{padding:18px;border-radius:18px;font-weight:900;line-height:1.5}
+.locked{background:#fee2e2;color:#991b1b}
+.open{background:#dcfce7;color:#166534}
+.small{color:#6b7280;font-weight:800;line-height:1.5}
+.field{background:#f9fafb;border-radius:18px;padding:16px;margin-bottom:12px}
+.label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
+.value{font-size:16px;font-weight:900}
+@media(max-width:700px){.container{padding:16px}h1{font-size:28px}.card{padding:22px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/billing" class="back">← Назад к тарифам</a>
+
+<div class="card">
+<h1>🔗 Интеграция с 1С</h1>
+<div class="small">
+Здесь будет настройка обмена CRM ↔ 1С: клиенты, заявки, счета, акты, оплаты и материалы.
+</div>
+</div>
+
+{% if not settings["one_c_enabled"] %}
+<div class="card">
+<div class="notice locked">
+🔒 Интеграция с 1С недоступна на текущем тарифе.<br>
+Перейдите на тариф Business + 1С или Enterprise + 1С.
+</div>
+</div>
+{% else %}
+<div class="card">
+<div class="notice open">
+✅ 1С включена на текущем тарифе.
+</div>
+</div>
+
+<div class="card">
+<h2>Будущие настройки обмена</h2>
+
+<div class="field">
+    <div class="label">Статус</div>
+    <div class="value">Подготовка модуля интеграции</div>
+</div>
+
+<div class="field">
+    <div class="label">Что будет синхронизироваться</div>
+    <div class="value">Клиенты, заявки, счета, акты, оплаты, материалы</div>
+</div>
+
+<div class="field">
+    <div class="label">Формат обмена</div>
+    <div class="value">HTTP API / JSON / XML — выберем под конкретную конфигурацию 1С</div>
+</div>
+</div>
+{% endif %}
+
+</div>
+</body>
+</html>
