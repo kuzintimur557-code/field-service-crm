@@ -1,45 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Create task</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Новая заявка</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:820px;margin:auto;padding:28px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.back{color:#2563eb;text-decoration:none;font-weight:bold}
+.card{background:white;padding:30px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08)}
+h1{margin:0 0 24px;font-size:32px}
+label{display:block;font-weight:bold;margin:14px 0 7px}
+input,textarea,select{width:100%;padding:15px;border:1px solid #d1d5db;border-radius:14px;font-size:16px;background:#fff}
+textarea{height:130px;resize:vertical}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+button{width:100%;margin-top:22px;padding:16px;border:0;border-radius:16px;background:#2563eb;color:white;font-size:18px;font-weight:bold;cursor:pointer}
+button:hover{background:#1d4ed8}
+@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:26px}}
+</style>
 </head>
+
 <body>
+<div class="container">
 
-<h1>Create task</h1>
+<div class="header">
+<a href="/" class="back">← Назад</a>
+</div>
 
-<form
-    method="post"
-    enctype="multipart/form-data"
->
+<div class="card">
+<h1>➕ Новая заявка</h1>
 
-    <input type="text" name="client" placeholder="Client"><br><br>
+<form method="post" action="/create-task" enctype="multipart/form-data">
 
-    <input type="text" name="phone" placeholder="Phone"><br><br>
+<label>Клиент</label>
+<input name="client" placeholder="Например: Иван Петров" required>
 
-    <input type="text" name="address" placeholder="Address"><br><br>
+<div class="grid">
+<div>
+<label>Телефон</label>
+<input name="phone" placeholder="+1 555 000 0000">
+</div>
 
-    <textarea
-        name="description"
-        placeholder="Description"
-    ></textarea>
+<div>
+<label>Дата</label>
+<input name="task_date" type="date">
+</div>
+</div>
 
-    <br><br>
+<label>Адрес</label>
+<input name="address" placeholder="Адрес объекта">
 
-    <input type="text" name="task_date" placeholder="Date"><br><br>
+<label>Описание</label>
+<textarea name="description" placeholder="Что нужно сделать"></textarea>
 
-    <input type="text" name="worker" placeholder="Worker"><br><br>
+<div class="grid">
+<div>
+<label>Монтажник</label>
+<input name="worker" placeholder="worker">
+</div>
 
-    <input type="text" name="priority" placeholder="Priority"><br><br>
+<div>
+<label>Цена</label>
+<input name="price" type="number" placeholder="0">
+</div>
+</div>
 
-    <input type="text" name="price" placeholder="Price"><br><br>
+<label>Приоритет</label>
+<select name="priority">
+<option value="Обычный">Обычный</option>
+<option value="Срочно">Срочно</option>
+<option value="Низкий">Низкий</option>
+</select>
 
-    <input type="file" name="photo"><br><br>
+<label>Фото / файл</label>
+<input name="photo" type="file">
 
-    <button type="submit">
-        Create
-    </button>
+<button type="submit">🚀 Создать заявку</button>
 
 </form>
+</div>
 
+</div>
 </body>
 </html>
