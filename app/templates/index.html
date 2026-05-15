@@ -1,175 +1,86 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Field Service CRM</title>
+    <title>CRM</title>
 
     <style>
         body {
-            margin: 0;
-            font-family: Arial, sans-serif;
+            font-family: Arial;
             background: #f4f7fb;
-            color: #111827;
+            margin: 0;
+            padding: 30px;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: auto;
-            padding: 24px;
-        }
-
-        .topbar {
+        .top {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
-            margin-bottom: 28px;
-        }
-
-        .title {
-            font-size: 32px;
-            font-weight: bold;
-        }
-
-        .actions {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
+            margin-bottom: 30px;
         }
 
         .btn {
-            display: inline-block;
             background: #2563eb;
             color: white;
-            padding: 13px 18px;
-            border-radius: 14px;
+            padding: 12px 18px;
+            border-radius: 12px;
             text-decoration: none;
             font-weight: bold;
+            margin-left: 8px;
         }
 
-        .btn.logout {
+        .logout {
             background: #ef4444;
         }
 
-        .panel {
-            background: white;
-            padding: 22px;
-            border-radius: 24px;
-            box-shadow: 0 6px 24px rgba(0,0,0,0.06);
-            margin-bottom: 24px;
-        }
-
-        .tasks {
-            display: grid;
-            gap: 18px;
-        }
-
         .task {
-            display: block;
             background: white;
             padding: 22px;
-            border-radius: 22px;
+            border-radius: 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+        }
+
+        .task a {
+            color: black;
             text-decoration: none;
-            color: #111827;
-            box-shadow: 0 6px 24px rgba(0,0,0,0.06);
-            border-left: 8px solid #2563eb;
-        }
-
-        .task:hover {
-            transform: translateY(-2px);
-        }
-
-        .task h2 {
-            margin: 0 0 12px;
-        }
-
-        .meta {
-            margin: 6px 0;
-            color: #374151;
-        }
-
-        .status {
-            display: inline-block;
-            margin-top: 12px;
-            padding: 8px 12px;
-            border-radius: 999px;
-            background: #dbeafe;
-            color: #1d4ed8;
-            font-weight: bold;
-        }
-
-        .empty {
-            color: #6b7280;
-            font-size: 18px;
-        }
-
-        @media(max-width: 700px) {
-            .container {
-                padding: 14px;
-            }
-
-            .title {
-                font-size: 24px;
-            }
         }
     </style>
 </head>
 
 <body>
 
-<div class="container">
+<div class="top">
+    <h1>🚀 Field Service CRM</h1>
 
-    <div class="topbar">
-
-        <div class="title">
-            🚀 Field Service CRM
-        </div>
-
-        <div class="actions">
-            <a class="btn" href="/create-task">➕ Новая заявка</a>
-            <a class="btn logout" href="/logout">Выйти</a>
-        </div>
-
+    <div>
+        <a class="btn" href="/create-task">➕ Новая заявка</a>
+        <a class="btn logout" href="/logout">Выйти</a>
     </div>
+</div>
 
-    <div class="panel">
-        <h2>📦 Все заявки</h2>
-        <p>Telegram уведомления включены: при создании заявки отправляется сообщение и файл, если он прикреплен.</p>
-    </div>
+{% for task in tasks %}
 
-    <div class="tasks">
+<div class="task">
 
-        {% for task in tasks %}
+    <a href="/task/{{ task[0] }}">
+        <h2>#{{ task[0] }} — {{ task[1] }}</h2>
+    </a>
 
-        <a class="task" href="/task/{{ task['id'] }}">
-
-            <h2>#{{ task['id'] }} — {{ task['client'] }}</h2>
-
-            <div class="meta">📞 {{ task['phone'] }}</div>
-            <div class="meta">📍 {{ task['address'] }}</div>
-            <div class="meta">📅 {{ task['task_date'] }}</div>
-            <div class="meta">👷 {{ task['worker'] }}</div>
-            <div class="meta">💰 ${{ task['price'] }}</div>
-
-            <div class="status">
-                {{ task['status'] }}
-            </div>
-
-        </a>
-
-        {% else %}
-
-        <div class="panel empty">
-            Заявок пока нет.
-        </div>
-
-        {% endfor %}
-
-    </div>
+    <p>📞 {{ task[2] }}</p>
+    <p>📍 {{ task[3] }}</p>
+    <p>📝 {{ task[4] }}</p>
+    <p>📅 {{ task[5] }}</p>
+    <p>👷 {{ task[6] }}</p>
+    <p>💰 ${{ task[8] }}</p>
+    <p>📌 {{ task[10] }}</p>
 
 </div>
+
+{% else %}
+
+<p>Заявок пока нет.</p>
+
+{% endfor %}
 
 </body>
 </html>
