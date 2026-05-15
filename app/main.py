@@ -2024,6 +2024,15 @@ async def task_pdf(request: Request, task_id: int):
     if not can_access_task(username, role, task):
         return RedirectResponse("/", status_code=302)
 
+    task_items = c.execute("""
+    SELECT *
+    FROM task_items
+    WHERE task_id=?
+    ORDER BY id ASC
+    """, (task_id,)).fetchall()
+
+    estimate_total = sum(item["total"] for item in task_items)
+
     pdf_path = DOCS_DIR / f"task_{task_id}.pdf"
     font_name = register_pdf_font()
 
@@ -2066,6 +2075,46 @@ async def task_pdf(request: Request, task_id: int):
     pdf.drawString(40, y, "Отчёт исполнителя")
     y -= 20
     y = draw_text(pdf, task["report"] if "report" in task.keys() else "", 40, y, font_name, size=10)
+
+    y -= 18
+    pdf.setFont(font_name, 12)
+    pdf.drawString(40, y, "Смета / выполненные работы")
+    y -= 22
+
+    if task_items:
+        pdf.setFont(font_name, 9)
+        pdf.drawString(40, y, "Наименование")
+        pdf.drawString(275, y, "Кол-во")
+        pdf.drawString(350, y, "Цена")
+        pdf.drawString(430, y, "Сумма")
+        y -= 14
+
+        for item in task_items:
+            if y < 90:
+                pdf.showPage()
+                y = page_height - 60
+                pdf.setFont(font_name, 9)
+
+            pdf.setFont(font_name, 9)
+
+            item_name = str(item["item_name"] or "")
+            if len(item_name) > 42:
+                item_name = item_name[:39] + "..."
+
+            pdf.drawString(40, y, item_name)
+            pdf.drawString(275, y, f"{item['qty']} {item['unit']}")
+            pdf.drawString(350, y, f"${item['price']}")
+            pdf.drawString(430, y, f"${item['total']}")
+            y -= 16
+
+        y -= 8
+        pdf.setFont(font_name, 11)
+        pdf.drawString(350, y, "Итого:")
+        pdf.drawString(430, y, f"${estimate_total}")
+        y -= 18
+    else:
+        y = draw_text(pdf, "Смета пока не заполнена", 40, y, font_name, size=10)
+        y -= 10
 
     y -= 18
     y = draw_pdf_image(pdf, task["photo"], "Фото до работы", 40, y, font_name)
