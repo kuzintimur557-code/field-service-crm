@@ -522,6 +522,42 @@ async def reports_page(request: Request, month: str = ""):
     )
 
 
+@app.get("/archive", response_class=HTMLResponse)
+async def archive_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=1
+    ORDER BY id DESC
+    """).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        name="archive.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "tasks": tasks
+        }
+    )
+
+
 @app.get("/workers", response_class=HTMLResponse)
 async def workers_page(request: Request):
 
