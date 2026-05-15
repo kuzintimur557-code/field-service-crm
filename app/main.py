@@ -345,6 +345,8 @@ async def home(
     ORDER BY username
     """).fetchall()
 
+    clients = []
+
     worker_stats = []
 
     if role in ("boss", "manager"):
@@ -352,12 +354,12 @@ async def home(
             worker_name = w["username"]
 
             completed = c.execute("""
-            SELECT COUNT(*) FROM tasks WHERE archived=0
+            SELECT COUNT(*) FROM tasks
             WHERE archived=0 AND worker=? AND status='Завершено'
             """, (worker_name,)).fetchone()[0]
 
             active = c.execute("""
-            SELECT COUNT(*) FROM tasks WHERE archived=0
+            SELECT COUNT(*) FROM tasks
             WHERE archived=0 AND worker=? AND status='В работе'
             """, (worker_name,)).fetchone()[0]
 
