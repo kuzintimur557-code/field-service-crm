@@ -8,19 +8,21 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:900px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:bold}
+.container{max-width:950px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:800}
 .card{background:white;padding:30px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:20px}
 h1{margin:0 0 24px;font-size:32px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .row{margin-bottom:16px}
-.label{font-size:13px;color:#6b7280;margin-bottom:5px}
-.value{font-size:18px;font-weight:bold}
-.status{display:inline-block;padding:9px 15px;border-radius:999px;font-weight:bold;background:#dbeafe;color:#1d4ed8}
+.label{font-size:13px;color:#6b7280;margin-bottom:5px;font-weight:700}
+.value{font-size:18px;font-weight:800}
+.status{display:inline-block;padding:9px 15px;border-radius:999px;font-weight:800;background:#dbeafe;color:#1d4ed8}
 img{max-width:100%;border-radius:18px;margin-top:18px}
+.btn{display:block;text-align:center;padding:15px;border-radius:16px;background:#2563eb;color:white;text-decoration:none;font-weight:900;margin-top:14px}
 select,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:10px}
 select{border:1px solid #d1d5db;background:white}
-button{border:0;background:#2563eb;color:white;font-weight:bold;cursor:pointer}
-button:hover{background:#1d4ed8}
+button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
+@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:26px}}
 </style>
 </head>
 
@@ -33,19 +35,36 @@ button:hover{background:#1d4ed8}
 
 <h1>Заявка #{{ task[0] }}</h1>
 
+<div class="grid">
+
+<div>
 <div class="row"><div class="label">Клиент</div><div class="value">{{ task[1] }}</div></div>
 <div class="row"><div class="label">Телефон</div><div class="value">{{ task[2] }}</div></div>
 <div class="row"><div class="label">Адрес</div><div class="value">{{ task[3] }}</div></div>
-<div class="row"><div class="label">Описание</div><div class="value">{{ task[4] }}</div></div>
 <div class="row"><div class="label">Дата</div><div class="value">{{ task[5] }}</div></div>
+</div>
+
+<div>
 <div class="row"><div class="label">Монтажник</div><div class="value">{{ task[6] }}</div></div>
 <div class="row"><div class="label">Приоритет</div><div class="value">{{ task[7] }}</div></div>
 <div class="row"><div class="label">Цена</div><div class="value">${{ task[8] }}</div></div>
+<div class="row"><div class="label">Статус</div><div class="status">{{ task[10] }}</div></div>
+</div>
+
+</div>
 
 <div class="row">
-<div class="label">Статус</div>
-<div class="status">{{ task[10] }}</div>
+<div class="label">Описание</div>
+<div class="value">{{ task[4] }}</div>
 </div>
+
+<a
+class="btn"
+target="_blank"
+href="https://www.google.com/maps/search/?api=1&query={{ task[3] }}"
+>
+🗺 Открыть маршрут
+</a>
 
 {% if task[9] %}
 <img src="/uploads/{{ task[9] }}">
