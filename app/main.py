@@ -1668,6 +1668,11 @@ async def debug_page(request: Request):
     )
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse("app/static/favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/health")
 async def health_check():
     return {
