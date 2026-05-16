@@ -1,8 +1,13 @@
 import sqlite3
+import os
+from pathlib import Path
 from datetime import datetime
 
 
-DB_NAME = "crm.db"
+DATA_DIR = Path(os.getenv("DATA_DIR", "."))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DB_NAME = str(DATA_DIR / "crm.db")
 
 
 def connect():

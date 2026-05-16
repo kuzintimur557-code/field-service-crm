@@ -42,8 +42,12 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
 
-UPLOAD_DIR = Path("uploads")
+DATA_DIR = Path(os.getenv("DATA_DIR", "."))
+UPLOAD_DIR = DATA_DIR / "uploads"
 DOCS_DIR = UPLOAD_DIR / "docs"
+
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+DOCS_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
