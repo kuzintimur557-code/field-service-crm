@@ -1045,7 +1045,6 @@ async def finance_export(request: Request, month: str = ""):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
-    client_company_id = get_user_company_id(username)
 
     if role != "boss":
         return RedirectResponse("/", status_code=302)
@@ -1627,6 +1626,8 @@ async def create_catalog_item(request: Request):
     except Exception:
         cost = 0
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
@@ -1643,7 +1644,7 @@ async def create_catalog_item(request: Request):
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        catalog_company_id,
+        company_id,
         item_type,
         name,
         unit,
@@ -1688,14 +1689,16 @@ async def toggle_catalog_item(request: Request, item_id: int):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
     item = c.execute("""
     SELECT *
     FROM catalog_items
-    WHERE id=?
-    """, (item_id,)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (item_id, company_id)).fetchone()
 
     if not item:
         conn.close()
@@ -1706,8 +1709,8 @@ async def toggle_catalog_item(request: Request, item_id: int):
     c.execute("""
     UPDATE catalog_items
     SET active=?
-    WHERE id=?
-    """, (new_active, item_id))
+    WHERE id=? AND company_id=?
+    """, (new_active, item_id, company_id))
 
     conn.commit()
     conn.close()
@@ -3128,11 +3131,17 @@ async def add_task_item(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+
     item = c.execute("""
     SELECT *
     FROM catalog_items
-    WHERE id=?
-    """, (catalog_item_id,)).fetchone()
+    WHERE id=? AND company_id=? AND active=1
+    """, (catalog_item_id, company_id)).fetchone()
 
     if not item:
         conn.close()
@@ -3143,6 +3152,7 @@ async def add_task_item(request: Request, task_id: int):
 
     c.execute("""
     INSERT INTO task_items (
+        company_id,
         task_id,
         catalog_item_id,
         item_name,
@@ -3155,8 +3165,9 @@ async def add_task_item(request: Request, task_id: int):
         profit,
         created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
+        company_id,
         task_id,
         item["id"],
         item["name"],
@@ -3213,11 +3224,17 @@ async def delete_task_item(request: Request, task_id: int, item_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+
     item = c.execute("""
     SELECT *
     FROM task_items
-    WHERE id=? AND task_id=?
-    """, (item_id, task_id)).fetchone()
+    WHERE id=? AND task_id=? AND company_id=?
+    """, (item_id, task_id, company_id)).fetchone()
 
     if not item:
         conn.close()
@@ -3225,8 +3242,8 @@ async def delete_task_item(request: Request, task_id: int, item_id: int):
 
     c.execute("""
     DELETE FROM task_items
-    WHERE id=? AND task_id=?
-    """, (item_id, task_id))
+    WHERE id=? AND task_id=? AND company_id=?
+    """, (item_id, task_id, company_id))
 
     conn.commit()
     conn.close()
