@@ -48,6 +48,18 @@ CRM система для исполнителей,<br>
 </div>
 {% endif %}
 
+{% if request.query_params.get("error") == "invalid" %}
+<div style="margin-bottom:16px;padding:14px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+❌ Неверный логин или пароль
+</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "blocked" %}
+<div style="margin-bottom:16px;padding:14px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+🔒 Слишком много попыток входа. Попробуйте позже.
+</div>
+{% endif %}
+
 <form method="post" action="/login">
 
 <label>Логин</label>
