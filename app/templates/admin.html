@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1000px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
+h1{margin:0 0 12px;font-size:36px}
+.subtitle{color:#6b7280;font-weight:800}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.tile{display:block;background:#f9fafb;padding:22px;border-radius:22px;text-decoration:none;color:#111827;border:1px solid #e5e7eb}
+.tile-title{font-size:20px;font-weight:900;margin-bottom:8px}
+.tile-text{color:#6b7280;font-weight:800;line-height:1.4}
+@media(max-width:850px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:30px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/" class="back">← Назад</a>
+
+<div class="card">
+<h1>🛠 Admin Center</h1>
+<div class="subtitle">Центр управления production-настройками платформы</div>
+</div>
+
+<div class="card">
+<div class="grid">
+
+<a class="tile" href="/debug">
+    <div class="tile-title">🧪 Debug</div>
+    <div class="tile-text">Пользователи, входы, ошибки логина</div>
+</a>
+
+<a class="tile" href="/system">
+    <div class="tile-title">🟢 System</div>
+    <div class="tile-text">Статус базы, uploads, версия приложения</div>
+</a>
+
+<a class="tile" href="/backup">
+    <div class="tile-title">💾 Backup</div>
+    <div class="tile-text">Скачать базу данных и uploads</div>
+</a>
+
+<a class="tile" href="/billing">
+    <div class="tile-title">💳 Billing</div>
+    <div class="tile-text">Тарифы, лимиты, paid-функции</div>
+</a>
+
+<a class="tile" href="/integrations/1c">
+    <div class="tile-title">🔗 1С</div>
+    <div class="tile-text">Статус и будущие настройки интеграции</div>
+</a>
+
+<a class="tile" href="/workers">
+    <div class="tile-title">👥 Команда</div>
+    <div class="tile-text">Пользователи, пароли, роли</div>
+</a>
+
+<a class="tile" href="/settings">
+    <div class="tile-title">⚙️ Настройки</div>
+    <div class="tile-text">Компания, реквизиты, тариф</div>
+</a>
+
+</div>
+</div>
+
+</div>
+</body>
+</html>
