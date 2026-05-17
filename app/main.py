@@ -1042,9 +1042,6 @@ async def billing_page(request: Request):
             "username": username,
             "role": role,
             "settings": settings,
-            "recent_users": recent_users,
-            "login_events": login_events,
-            "login_attempts": login_attempts,
             "plan": plan,
             "user_limit": user_limit
         }
