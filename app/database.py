@@ -184,6 +184,10 @@ def init_db():
     """)
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "users", "full_name", "TEXT")
+    add_column_if_missing(c, "users", "position", "TEXT")
+    add_column_if_missing(c, "users", "phone", "TEXT")
+    add_column_if_missing(c, "users", "email", "TEXT")
     add_column_if_missing(c, "task_items", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "client_notes", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "catalog_items", "company_id", "INTEGER DEFAULT 1")
