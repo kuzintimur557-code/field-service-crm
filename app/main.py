@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from app.database import connect, init_db
 from app.telegram_utils import send_message, send_photo
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 from reportlab.lib.pagesizes import A4
@@ -136,6 +136,11 @@ def get_plan_user_limit(plan):
 
 
 def get_company_settings():
+    ip = get_request_ip(request)
+
+    if is_login_blocked(username, ip):
+        return RedirectResponse("/login?error=blocked", status_code=302)
+
     conn = connect()
     c = conn.cursor()
 
@@ -351,6 +356,100 @@ def get_role(username):
         return None
 
     return user["role"]
+
+
+def get_request_ip(request):
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+
+    return request.client.host if request.client else ""
+
+
+def is_login_blocked(username, ip):
+    conn = connect()
+    c = conn.cursor()
+
+    row = c.execute("""
+    SELECT *
+    FROM login_attempts
+    WHERE username=? AND ip=?
+    """, (username, ip)).fetchone()
+
+    conn.close()
+
+    if not row or not row["blocked_until"]:
+        return False
+
+    try:
+        blocked_until = datetime.strptime(row["blocked_until"], "%Y-%m-%d %H:%M:%S")
+        return datetime.now() < blocked_until
+    except Exception:
+        return False
+
+
+def register_failed_login(username, ip):
+    conn = connect()
+    c = conn.cursor()
+
+    row = c.execute("""
+    SELECT *
+    FROM login_attempts
+    WHERE username=? AND ip=?
+    """, (username, ip)).fetchone()
+
+    now = datetime.now()
+    blocked_until = ""
+
+    if row:
+        attempts = int(row["attempts"] or 0) + 1
+
+        if attempts >= 5:
+            blocked_until = (now + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+
+        c.execute("""
+        UPDATE login_attempts
+        SET attempts=?, blocked_until=?, updated_at=?
+        WHERE id=?
+        """, (
+            attempts,
+            blocked_until,
+            now.strftime("%Y-%m-%d %H:%M:%S"),
+            row["id"]
+        ))
+    else:
+        c.execute("""
+        INSERT INTO login_attempts (
+            username,
+            ip,
+            attempts,
+            blocked_until,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """, (
+            username,
+            ip,
+            1,
+            "",
+            now.strftime("%Y-%m-%d %H:%M:%S")
+        ))
+
+    conn.commit()
+    conn.close()
+
+
+def clear_failed_logins(username, ip):
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    DELETE FROM login_attempts
+    WHERE username=? AND ip=?
+    """, (username, ip))
+
+    conn.commit()
+    conn.close()
 
 
 def log_login_event(request, username, role):
@@ -1943,6 +2042,11 @@ async def login(request: Request):
     username = (form.get("username") or "").strip()
     password = (form.get("password") or "").strip()
 
+    ip = get_request_ip(request)
+
+    if is_login_blocked(username, ip):
+        return RedirectResponse("/login?error=blocked", status_code=302)
+
     conn = connect()
     c = conn.cursor()
 
@@ -1954,7 +2058,8 @@ async def login(request: Request):
 
     if not user or not verify_password(password, user["password"]):
         conn.close()
-        return RedirectResponse("/login", status_code=302)
+        register_failed_login(username, ip)
+        return RedirectResponse("/login?error=invalid", status_code=302)
 
     if password_needs_upgrade(user["password"]):
         c.execute("""
