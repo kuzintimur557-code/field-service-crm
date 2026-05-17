@@ -673,7 +673,7 @@ async def platform_dashboard(request: Request):
 
 
 @app.get("/my-tasks", response_class=HTMLResponse)
-async def my_tasks_page(request: Request, status: str = "")
+async def my_tasks_page(request: Request, status: str = ""):
 
     username = get_user(request)
 
@@ -716,6 +716,8 @@ async def my_tasks_page(request: Request, status: str = "")
     if status:
         query += " AND status=?"
         params.append(status)
+    else:
+        query += " AND status!='Завершено'"
 
     query += " ORDER BY task_date DESC"
 
