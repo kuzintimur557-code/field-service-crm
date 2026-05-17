@@ -787,6 +787,7 @@ async def finance_page(request: Request, month: str = ""):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
+    catalog_company_id = get_user_company_id(username)
 
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
@@ -1258,6 +1259,7 @@ async def create_catalog_item(request: Request):
 
     c.execute("""
     INSERT INTO catalog_items (
+        company_id,
         item_type,
         name,
         unit,
@@ -1266,8 +1268,9 @@ async def create_catalog_item(request: Request):
         active,
         created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
+        catalog_company_id,
         item_type,
         name,
         unit,
