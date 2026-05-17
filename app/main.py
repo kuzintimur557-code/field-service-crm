@@ -672,6 +672,45 @@ async def platform_dashboard(request: Request):
     )
 
 
+@app.get("/my-tasks", response_class=HTMLResponse)
+async def my_tasks_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "worker":
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0 AND company_id=? AND worker=?
+    ORDER BY task_date DESC
+    """, (company_id, username)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "my_tasks.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "tasks": tasks
+        }
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(
     request: Request,
@@ -692,6 +731,9 @@ async def home(
 
     if role == "superadmin":
         return RedirectResponse("/platform", status_code=302)
+
+    if role == "worker":
+        return RedirectResponse("/my-tasks", status_code=302)
 
     company_id = get_user_company_id(username)
 

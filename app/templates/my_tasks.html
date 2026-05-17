@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Мои заявки</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:900px;margin:auto;padding:24px}
+.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
+h1{margin:0 0 8px;font-size:32px}
+.meta{color:#6b7280;font-weight:800}
+.task{background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px}
+.title{font-size:20px;font-weight:900}
+.btn{display:block;margin-top:12px;padding:12px;border-radius:12px;background:#2563eb;color:white;text-align:center;text-decoration:none;font-weight:900}
+.nav{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.nav a{padding:12px 14px;border-radius:14px;text-decoration:none;background:#111827;color:white;font-weight:900}
+.nav a.red{background:#991b1b}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="card">
+<h1>📋 Мои заявки</h1>
+<div class="meta">{{ username }} / исполнитель</div>
+<div class="nav">
+<a href="/profile">👤 Профиль</a>
+<a href="/logout" class="red">Выйти</a>
+</div>
+</div>
+
+<div class="card">
+{% if tasks %}
+{% for task in tasks %}
+<div class="task">
+    <div class="title">{{ task["client"] }}</div>
+    <div class="meta">Адрес: {{ task["address"] }}</div>
+    <div class="meta">Дата: {{ task["task_date"] }}</div>
+    <div class="meta">Статус: {{ task["status"] }}</div>
+    <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
+</div>
+{% endfor %}
+{% else %}
+<div class="meta">У вас пока нет заявок.</div>
+{% endif %}
+</div>
+
+</div>
+{% include 'mobile_nav.html' %}
+</body>
+</html>
