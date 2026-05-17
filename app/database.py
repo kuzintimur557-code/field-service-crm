@@ -195,7 +195,7 @@ def init_db():
     add_column_if_missing(c, "clients", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "tasks", "company_id", "INTEGER DEFAULT 1")
 
-    add_column_if_missing(c, "tasks", "workers", "TEXT")
+    add_column_if_missing(c, "tasks", "workers", "TEXT")\n    add_column_if_missing(c, "tasks", "created_at", "TEXT")
     add_column_if_missing(c, "tasks", "client_id", "INTEGER")
     add_column_if_missing(c, "tasks", "after_photo", "TEXT")
     add_column_if_missing(c, "tasks", "archived", "INTEGER DEFAULT 0")

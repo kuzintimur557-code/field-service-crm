@@ -2735,9 +2735,10 @@ async def create_task(
         photo,
         status,
         report,
-        after_photo
+        after_photo,
+        created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         client_id,
@@ -2753,7 +2754,8 @@ async def create_task(
         "",
         "Новая",
         "",
-        ""
+        "",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
     conn.commit()
