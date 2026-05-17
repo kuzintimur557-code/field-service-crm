@@ -515,6 +515,51 @@ def update_last_seen(username):
     conn.close()
 
 
+@app.get("/platform", response_class=HTMLResponse)
+async def platform_dashboard(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    companies_count = c.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
+    users_count = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    tasks_count = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+    clients_count = c.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
+
+    companies = c.execute("""
+    SELECT *
+    FROM companies
+    ORDER BY id DESC
+    """).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "platform.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "companies_count": companies_count,
+            "users_count": users_count,
+            "tasks_count": tasks_count,
+            "clients_count": clients_count,
+            "companies": companies
+        }
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(
     request: Request,
@@ -532,6 +577,9 @@ async def home(
     update_last_seen(username)
 
     role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
 
     conn = connect()
     c = conn.cursor()

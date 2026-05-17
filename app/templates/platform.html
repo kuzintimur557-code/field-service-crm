@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1200px;margin:auto;padding:28px}
+.header{background:white;padding:30px;border-radius:28px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:24px}
+h1{margin:0;font-size:38px}
+.subtitle{color:#6b7280;font-weight:800;margin-top:10px;font-size:18px}
+.nav{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+.nav a{display:inline-block;padding:14px 18px;border-radius:15px;background:#111827;color:white;text-decoration:none;font-weight:900}
+.nav a.blue{background:#2563eb}
+.nav a.red{background:#991b1b}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
+.label{font-size:14px;color:#6b7280;font-weight:900;margin-bottom:10px}
+.value{font-size:32px;font-weight:900}
+.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+.company{display:grid;grid-template-columns:.5fr 1.5fr 1fr 1fr;gap:14px;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px;align-items:center}
+.name{font-size:18px;font-weight:900}
+.meta{font-size:14px;color:#6b7280;font-weight:800}
+@media(max-width:900px){
+.container{padding:16px}
+.stats,.company{grid-template-columns:1fr}
+.nav a{width:100%;text-align:center}
+h1{font-size:30px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="header">
+    <h1>🛠 Platform Dashboard</h1>
+    <div class="subtitle">Вы вошли как владелец платформы: {{ username }} / {{ role }}</div>
+
+    <div class="nav">
+        <a href="/admin">🛠 Admin Center</a>
+        <a href="/debug">🧪 Debug</a>
+        <a href="/system">🟢 System</a>
+        <a href="/backup">💾 Backup</a>
+        <a href="/admin/checklist">✅ Checklist</a>
+        <a href="/admin/roadmap">🧭 Roadmap</a>
+        <a href="/admin/notes">📝 Notes</a>
+        <a href="/profile" class="blue">👤 Профиль</a>
+        <a href="/logout" class="red">Выйти</a>
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat">
+        <div class="label">Компаний</div>
+        <div class="value">{{ companies_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Пользователей</div>
+        <div class="value">{{ users_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Заявок всего</div>
+        <div class="value">{{ tasks_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Клиентов всего</div>
+        <div class="value">{{ clients_count }}</div>
+    </div>
+</div>
+
+<div class="card">
+<h2>🏢 Компании</h2>
+
+{% if companies %}
+{% for company in companies %}
+<div class="company">
+    <div class="name">#{{ company["id"] }}</div>
+    <div>
+        <div class="name">{{ company["name"] }}</div>
+        <div class="meta">Создана: {{ company["created_at"] }}</div>
+    </div>
+    <div class="meta">Owner: {{ company["owner_username"] }}</div>
+    <div class="meta">Статус: active</div>
+</div>
+{% endfor %}
+{% else %}
+<div class="meta">Компаний пока нет</div>
+{% endif %}
+</div>
+
+</div>
+</body>
+</html>
