@@ -3118,8 +3118,7 @@ async def add_task_comment(request: Request, task_id: int):
         )
 
         try:
-            send_message(
-                f"""
+            comment_text = f"""
 💬 Новый комментарий в заявке #{task_id}
 
 Клиент: {task['client']}
@@ -3129,9 +3128,23 @@ async def add_task_comment(request: Request, task_id: int):
 Комментарий:
 {message}
 """
-            )
-        except Exception:
-            pass
+
+            send_message(comment_text)
+
+            worker_user = c.execute("""
+            SELECT telegram_chat_id
+            FROM users
+            WHERE username=?
+            """, (task["worker"],)).fetchone()
+
+            if worker_user and worker_user["telegram_chat_id"]:
+                send_message_to_chat(
+                    worker_user["telegram_chat_id"],
+                    comment_text
+                )
+
+        except Exception as e:
+            print("Telegram comment notification error:", e)
 
     conn.close()
 
