@@ -47,8 +47,10 @@ h1{margin:0 0 8px;font-size:32px}
     {% endif %}
 
     {% if task["status"] == "В работе" %}
-    <form method="post" action="/task/{{ task['id'] }}/complete">
-        <button class="btn" type="submit" style="border:0;width:100%;background:#16a34a">✅ Завершить</button>
+    <form method="post" action="/task/{{ task['id'] }}/complete" enctype="multipart/form-data">
+        <textarea name="report" placeholder="Отчёт по работе" required style="width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5db;margin-top:12px"></textarea>
+        <input type="file" name="after_photo" accept="image/*" style="margin-top:10px">
+        <button class="btn" type="submit" style="border:0;width:100%;background:#16a34a">✅ Завершить с отчётом</button>
     </form>
     {% endif %}
 
