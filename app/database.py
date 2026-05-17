@@ -142,6 +142,17 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS login_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        ip TEXT,
+        attempts INTEGER DEFAULT 0,
+        blocked_until TEXT,
+        updated_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS login_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT,
