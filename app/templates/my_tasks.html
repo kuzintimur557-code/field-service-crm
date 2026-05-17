@@ -40,6 +40,12 @@ h1{margin:0 0 8px;font-size:32px}
     <div class="meta">Адрес: {{ task["address"] }}</div>
     <div class="meta">Дата: {{ task["task_date"] }}</div>
     <div class="meta">Статус: {{ task["status"] }}</div>
+    {% if task["status"] == "Новая" %}
+    <form method="post" action="/task/{{ task['id'] }}/start">
+        <button class="btn" type="submit" style="border:0;width:100%">▶️ Взять в работу</button>
+    </form>
+    {% endif %}
+
     <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
 </div>
 {% endfor %}
