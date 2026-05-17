@@ -50,6 +50,7 @@ def init_db():
     c.execute("""
     CREATE TABLE IF NOT EXISTS company_settings (
         id INTEGER PRIMARY KEY,
+        company_id INTEGER DEFAULT 1,
         company_name TEXT,
         phone TEXT,
         email TEXT,
@@ -202,10 +203,31 @@ def init_db():
     add_column_if_missing(c, "tasks", "archived", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "tasks", "payment_status", "TEXT DEFAULT 'Не оплачено'")
 
+    add_column_if_missing(c, "company_settings", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_settings", "plan", "TEXT DEFAULT 'basic'")
     add_column_if_missing(c, "company_settings", "one_c_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calls_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "ai_calls_enabled", "INTEGER DEFAULT 0")
+
+    c.execute("""
+    UPDATE company_settings
+    SET company_id=1
+    WHERE company_id IS NULL
+    """)
+
+    c.execute("""
+    DELETE FROM company_settings
+    WHERE id NOT IN (
+        SELECT MIN(id)
+        FROM company_settings
+        GROUP BY company_id
+    )
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_company_settings_company_id
+    ON company_settings(company_id)
+    """)
 
     c.execute("""
     INSERT OR IGNORE INTO companies (
@@ -225,6 +247,7 @@ def init_db():
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
         id,
+        company_id,
         company_name,
         phone,
         email,
@@ -237,8 +260,9 @@ def init_db():
         ai_calls_enabled,
         updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
+        1,
         1,
         "",
         "",

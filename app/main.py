@@ -193,25 +193,27 @@ def get_plan_user_limit(plan):
     return limits.get(plan, 3)
 
 
-def get_company_settings():
+def get_company_settings(company_id=1):
+    company_id = company_id or 1
+
     conn = connect()
     c = conn.cursor()
 
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
-        id, company_name, phone, email, address, tax_number, bank_details,
+        company_id, company_name, phone, email, address, tax_number, bank_details,
         plan, one_c_enabled, calls_enabled, ai_calls_enabled, updated_at
     )
-    VALUES (1, '', '', '', '', '', '', 'basic', 0, 0, 0, '')
-    """)
+    VALUES (?, '', '', '', '', '', '', 'basic', 0, 0, 0, '')
+    """, (company_id,))
 
     conn.commit()
 
     settings = c.execute("""
     SELECT *
     FROM company_settings
-    WHERE id=1
-    """).fetchone()
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
 
     conn.close()
 
@@ -640,6 +642,28 @@ async def create_platform_company(request: Request):
         hash_password(owner_password),
         "boss",
         company_id,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    c.execute("""
+    INSERT OR IGNORE INTO company_settings (
+        company_id,
+        company_name,
+        phone,
+        email,
+        address,
+        tax_number,
+        bank_details,
+        plan,
+        one_c_enabled,
+        calls_enabled,
+        ai_calls_enabled,
+        updated_at
+    )
+    VALUES (?, ?, '', '', '', '', '', 'basic', 0, 0, 0, ?)
+    """, (
+        company_id,
+        company_name,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
@@ -1321,7 +1345,8 @@ async def calls_page(request: Request):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
-    settings = get_company_settings()
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
 
     return templates.TemplateResponse(
         request,
@@ -1330,10 +1355,7 @@ async def calls_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "settings": settings,
-            "recent_users": recent_users,
-            "login_events": login_events,
-            "login_attempts": login_attempts
+            "settings": settings
         }
     )
 
@@ -1348,10 +1370,11 @@ async def integration_1c_page(request: Request):
 
     role = get_role(username)
 
-    if role != "superadmin":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
-    settings = get_company_settings()
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
 
     return templates.TemplateResponse(
         request,
@@ -1360,10 +1383,7 @@ async def integration_1c_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "settings": settings,
-            "recent_users": recent_users,
-            "login_events": login_events,
-            "login_attempts": login_attempts
+            "settings": settings
         }
     )
 
@@ -1378,10 +1398,11 @@ async def billing_page(request: Request):
 
     role = get_role(username)
 
-    if role != "superadmin":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
-    settings = get_company_settings()
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
     plan = settings["plan"] if settings and "plan" in settings.keys() else "basic"
     user_limit = get_plan_user_limit(plan)
 
@@ -1409,10 +1430,11 @@ async def settings_page(request: Request):
 
     role = get_role(username)
 
-    if role != "superadmin":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
-    settings = get_company_settings()
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
 
     return templates.TemplateResponse(
         request,
@@ -1421,10 +1443,7 @@ async def settings_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "settings": settings,
-            "recent_users": recent_users,
-            "login_events": login_events,
-            "login_attempts": login_attempts
+            "settings": settings
         }
     )
 
@@ -1439,7 +1458,7 @@ async def update_settings(request: Request):
 
     role = get_role(username)
 
-    if role != "superadmin":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
     form = await request.form()
@@ -1461,22 +1480,24 @@ async def update_settings(request: Request):
     one_c_enabled = 1 if plan in ("business_1c", "enterprise_1c") else 0
     calls_enabled = 1 if plan in ("business", "business_1c", "enterprise_1c") else 0
     ai_calls_enabled = 1 if plan == "enterprise_1c" else 0
+    company_id = get_user_company_id(username)
 
     conn = connect()
     c = conn.cursor()
 
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
-        id, company_name, phone, email, address, tax_number, bank_details, updated_at
+        company_id, company_name, phone, email, address, tax_number, bank_details, plan,
+        one_c_enabled, calls_enabled, ai_calls_enabled, updated_at
     )
-    VALUES (1, '', '', '', '', '', '', '')
-    """)
+    VALUES (?, '', '', '', '', '', '', 'basic', 0, 0, 0, '')
+    """, (company_id,))
 
     c.execute("""
     UPDATE company_settings
     SET company_name=?, phone=?, email=?, address=?, tax_number=?, bank_details=?,
         plan=?, one_c_enabled=?, calls_enabled=?, ai_calls_enabled=?, updated_at=?
-    WHERE id=1
+    WHERE company_id=?
     """, (
         company_name,
         phone,
@@ -1488,7 +1509,8 @@ async def update_settings(request: Request):
         one_c_enabled,
         calls_enabled,
         ai_calls_enabled,
-        datetime.now().strftime("%Y-%m-%d %H:%M")
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        company_id
     ))
 
     conn.commit()
@@ -2597,7 +2619,8 @@ async def debug_page(request: Request):
     clients_count = c.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
     catalog_count = c.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
 
-    settings = get_company_settings()
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
 
     recent_users = c.execute("""
     SELECT username, role, last_seen
@@ -4088,7 +4111,8 @@ async def task_invoice_pdf(request: Request, task_id: int):
 
     estimate_total = sum(item["total"] for item in task_items)
     payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
-    settings = get_company_settings()
+    task_company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    settings = get_company_settings(task_company_id)
 
     pdf_path = DOCS_DIR / f"task_{task_id}_invoice.pdf"
     font_name = register_pdf_font()
@@ -4221,12 +4245,12 @@ async def task_pdf(request: Request, task_id: int):
     SELECT * FROM tasks WHERE id=?
     """, (task_id,)).fetchone()
 
-    conn.close()
-
     if not task:
+        conn.close()
         return HTMLResponse("Task not found", status_code=404)
 
     if not can_access_task(username, role, task):
+        conn.close()
         return RedirectResponse("/", status_code=302)
 
     task_items = c.execute("""
@@ -4236,8 +4260,11 @@ async def task_pdf(request: Request, task_id: int):
     ORDER BY id ASC
     """, (task_id,)).fetchall()
 
+    conn.close()
+
     estimate_total = sum(item["total"] for item in task_items)
-    settings = get_company_settings()
+    task_company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    settings = get_company_settings(task_company_id)
 
     pdf_path = DOCS_DIR / f"task_{task_id}.pdf"
     font_name = register_pdf_font()
