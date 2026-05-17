@@ -102,6 +102,20 @@ h1{margin:0 0 20px;font-size:34px}
 </div>
 </div>
 
+<div class="card">
+<h2>Последние входы</h2>
+
+{% if recent_users %}
+{% for user in recent_users %}
+<div style="padding:12px;border-radius:14px;background:#f9fafb;margin-bottom:8px;font-weight:800">
+{{ user["username"] }} / {{ user["role"] }} — {{ user["last_seen"] }}
+</div>
+{% endfor %}
+{% else %}
+<div style="color:#6b7280;font-weight:900">Нет данных</div>
+{% endif %}
+</div>
+
 </div>
 </body>
 </html>

@@ -856,7 +856,8 @@ async def calls_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "settings": settings
+            "settings": settings,
+            "recent_users": recent_users
         }
     )
 
@@ -883,7 +884,8 @@ async def integration_1c_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "settings": settings
+            "settings": settings,
+            "recent_users": recent_users
         }
     )
 
@@ -913,6 +915,7 @@ async def billing_page(request: Request):
             "username": username,
             "role": role,
             "settings": settings,
+            "recent_users": recent_users,
             "plan": plan,
             "user_limit": user_limit
         }
@@ -941,7 +944,8 @@ async def settings_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "settings": settings
+            "settings": settings,
+            "recent_users": recent_users
         }
     )
 
@@ -1841,6 +1845,12 @@ async def debug_page(request: Request):
 
     settings = get_company_settings()
 
+    recent_users = c.execute("""
+    SELECT username, role, last_seen
+    FROM users
+    ORDER BY last_seen DESC
+    """).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -1856,7 +1866,8 @@ async def debug_page(request: Request):
             "archived_tasks_count": archived_tasks_count,
             "clients_count": clients_count,
             "catalog_count": catalog_count,
-            "settings": settings
+            "settings": settings,
+            "recent_users": recent_users
         }
     )
 
