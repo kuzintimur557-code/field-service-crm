@@ -77,27 +77,27 @@ input,button{width:100%;margin-top:8px}
 <div class="stats">
     <div class="stat">
         <div class="label">Всего по заявкам</div>
-        <div class="value">${{ total_estimate }}</div>
+        <div class="value">{{ total_estimate }} ₽</div>
     </div>
 
     <div class="stat">
         <div class="label">Оплачено</div>
-        <div class="value" style="color:#166534">${{ paid_total }}</div>
+        <div class="value" style="color:#166534">{{ paid_total }} ₽</div>
     </div>
 
     <div class="stat">
         <div class="label">Частично</div>
-        <div class="value" style="color:#92400e">${{ partial_total }}</div>
+        <div class="value" style="color:#92400e">{{ partial_total }} ₽</div>
     </div>
 
     <div class="stat">
         <div class="label">Не оплачено</div>
-        <div class="value" style="color:#991b1b">${{ unpaid_total }}</div>
+        <div class="value" style="color:#991b1b">{{ unpaid_total }} ₽</div>
     </div>
 
     <div class="stat">
         <div class="label">Прибыль</div>
-        <div class="value">${{ total_profit }}</div>
+        <div class="value">{{ total_profit }} ₽</div>
     </div>
 </div>
 </div>
@@ -133,8 +133,8 @@ input,button{width:100%;margin-top:8px}
             {% endif %}
         </div>
         <div>
-            <b>${{ row.total }}</b>
-            <div style="color:#6b7280;font-size:13px">Прибыль: ${{ row.profit }}</div>
+            <b>{{ row.total }} ₽</b>
+            <div style="color:#6b7280;font-size:13px">Прибыль: {{ row.profit }} ₽</div>
         </div>
         <a class="btn" href="/task/{{ row.id }}">Открыть</a>
     </div>

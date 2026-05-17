@@ -4274,14 +4274,14 @@ async def task_invoice_pdf(request: Request, task_id: int):
 
             pdf.drawString(40, y, item_name)
             pdf.drawString(275, y, f"{item['qty']} {item['unit']}")
-            pdf.drawString(350, y, f"${item['price']}")
-            pdf.drawString(430, y, f"${item['total']}")
+            pdf.drawString(350, y, f"{item['price']} RUB")
+            pdf.drawString(430, y, f"{item['total']} RUB")
             y -= 16
 
         y -= 12
         pdf.setFont(font_name, 13)
         pdf.drawString(350, y, "Итого:")
-        pdf.drawString(430, y, f"${estimate_total}")
+        pdf.drawString(430, y, f"{estimate_total} RUB")
     else:
         y = draw_text(pdf, "Позиции счёта пока не добавлены", 40, y, font_name, size=10)
 
@@ -4393,7 +4393,7 @@ async def task_pdf(request: Request, task_id: int):
         ("Дата заявки", task["task_date"]),
         ("Исполнитель", task["worker"]),
         ("Приоритет", task["priority"]),
-        ("Стоимость", f"${task['price']}"),
+        ("Стоимость", f"{task['price']} RUB"),
         ("Статус", task["status"]),
         ("Статус оплаты", task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"),
     ]
@@ -4443,14 +4443,14 @@ async def task_pdf(request: Request, task_id: int):
 
             pdf.drawString(40, y, item_name)
             pdf.drawString(275, y, f"{item['qty']} {item['unit']}")
-            pdf.drawString(350, y, f"${item['price']}")
-            pdf.drawString(430, y, f"${item['total']}")
+            pdf.drawString(350, y, f"{item['price']} RUB")
+            pdf.drawString(430, y, f"{item['total']} RUB")
             y -= 16
 
         y -= 8
         pdf.setFont(font_name, 11)
         pdf.drawString(350, y, "Итого:")
-        pdf.drawString(430, y, f"${estimate_total}")
+        pdf.drawString(430, y, f"{estimate_total} RUB")
         y -= 18
     else:
         y = draw_text(pdf, "Смета пока не заполнена", 40, y, font_name, size=10)

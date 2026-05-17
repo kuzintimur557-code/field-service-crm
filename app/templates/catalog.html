@@ -122,8 +122,8 @@ h1{font-size:28px;margin-bottom:12px}
     </div>
 
     <div class="meta">Ед.: <b>{{ item["unit"] }}</b></div>
-    <div class="meta">Цена: <b>${{ item["price"] }}</b></div>
-    <div class="meta">Себест.: <b>${{ item["cost"] }}</b></div>
+    <div class="meta">Цена: <b>{{ item["price"] }} ₽</b></div>
+    <div class="meta">Себест.: <b>{{ item["cost"] }} ₽</b></div>
 
     <div>
         <form method="post" action="/catalog/{{ item['id'] }}/toggle">

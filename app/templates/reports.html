@@ -52,7 +52,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <div class="stat"><div class="label">В работе</div><div class="num">{{ total_active }}</div></div>
 <div class="stat"><div class="label">Завершено</div><div class="num">{{ total_completed }}</div></div>
 <div class="stat"><div class="label">Отменено</div><div class="num">{{ total_cancelled }}</div></div>
-<div class="stat"><div class="label">Доход</div><div class="num">${{ total_revenue }}</div></div>
+<div class="stat"><div class="label">Доход</div><div class="num">{{ total_revenue }} ₽</div></div>
 </div>
 
 <div class="card">
@@ -80,7 +80,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <td>{{ row.active }}</td>
 <td>{{ row.completed }}</td>
 <td>{{ row.cancelled }}</td>
-<td><b>${{ row.revenue }}</b></td>
+<td><b>{{ row.revenue }} ₽</b></td>
 </tr>
 {% endfor %}
 </tbody>
@@ -94,7 +94,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 
 <div class="task">
 <a href="/task/{{ task[0] }}">#{{ task[0] }} — {{ task[1] }}</a>
-<div class="meta">📅 {{ task[5] }} | 👷 {{ task[6] }} | 💰 ${{ task[8] }}</div>
+<div class="meta">📅 {{ task[5] }} | 👷 {{ task[6] }} | 💰 {{ task[8] }} ₽</div>
 <div class="badge">{{ task[10] }}</div>
 </div>
 
