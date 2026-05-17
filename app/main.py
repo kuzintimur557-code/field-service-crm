@@ -2726,8 +2726,9 @@ async def create_task(
         report,
         after_photo
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
+        company_id,
         client_id,
         client,
         phone,
