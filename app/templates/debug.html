@@ -103,7 +103,21 @@ h1{margin:0 0 20px;font-size:34px}
 </div>
 
 <div class="card">
-<h2>Последние входы</h2>
+<h2>Журнал входов</h2>
+
+{% if login_events %}
+{% for event in login_events %}
+<div style="padding:12px;border-radius:14px;background:#f9fafb;margin-bottom:8px;font-weight:800">
+{{ event["created_at"] }} — {{ event["username"] }} / {{ event["role"] }} — {{ event["ip"] }}
+</div>
+{% endfor %}
+{% else %}
+<div style="color:#6b7280;font-weight:900">Журнал входов пока пуст</div>
+{% endif %}
+</div>
+
+<div class="card">
+<h2>Пользователи</h2>
 
 {% if recent_users %}
 {% for user in recent_users %}

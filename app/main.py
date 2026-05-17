@@ -353,6 +353,34 @@ def get_role(username):
     return user["role"]
 
 
+def log_login_event(request, username, role):
+    conn = connect()
+    c = conn.cursor()
+
+    ip = request.client.host if request.client else ""
+    user_agent = request.headers.get("user-agent", "")
+
+    c.execute("""
+    INSERT INTO login_events (
+        username,
+        role,
+        ip,
+        user_agent,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        username,
+        role,
+        ip,
+        user_agent,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 def update_last_seen(username):
     conn = connect()
     c = conn.cursor()
@@ -857,7 +885,8 @@ async def calls_page(request: Request):
             "username": username,
             "role": role,
             "settings": settings,
-            "recent_users": recent_users
+            "recent_users": recent_users,
+            "login_events": login_events
         }
     )
 
@@ -885,7 +914,8 @@ async def integration_1c_page(request: Request):
             "username": username,
             "role": role,
             "settings": settings,
-            "recent_users": recent_users
+            "recent_users": recent_users,
+            "login_events": login_events
         }
     )
 
@@ -916,6 +946,7 @@ async def billing_page(request: Request):
             "role": role,
             "settings": settings,
             "recent_users": recent_users,
+            "login_events": login_events,
             "plan": plan,
             "user_limit": user_limit
         }
@@ -945,7 +976,8 @@ async def settings_page(request: Request):
             "username": username,
             "role": role,
             "settings": settings,
-            "recent_users": recent_users
+            "recent_users": recent_users,
+            "login_events": login_events
         }
     )
 
@@ -1851,6 +1883,13 @@ async def debug_page(request: Request):
     ORDER BY last_seen DESC
     """).fetchall()
 
+    login_events = c.execute("""
+    SELECT *
+    FROM login_events
+    ORDER BY id DESC
+    LIMIT 20
+    """).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -1867,7 +1906,8 @@ async def debug_page(request: Request):
             "clients_count": clients_count,
             "catalog_count": catalog_count,
             "settings": settings,
-            "recent_users": recent_users
+            "recent_users": recent_users,
+            "login_events": login_events
         }
     )
 

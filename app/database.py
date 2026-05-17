@@ -142,6 +142,17 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS login_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        role TEXT,
+        ip TEXT,
+        user_agent TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS task_comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER,
