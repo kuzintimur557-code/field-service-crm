@@ -2033,76 +2033,63 @@ async def create_worker(request: Request):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
-    new_user_company_id = get_user_company_id(username)
 
     if role != "boss":
-        return RedirectResponse("/workers?error=only_boss", status_code=302)
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
 
     form = await request.form()
 
     worker_username = (form.get("username") or "").strip()
     worker_password = (form.get("password") or "").strip()
     worker_role = (form.get("role") or "worker").strip()
+
     full_name = (form.get("full_name") or "").strip()
     position = (form.get("position") or "").strip()
     phone = (form.get("phone") or "").strip()
     email = (form.get("email") or "").strip()
 
-    if not worker_username or not worker_password:
-        return RedirectResponse("/workers?error=empty", status_code=302)
-
-    if worker_role not in ("manager", "worker"):
-        return RedirectResponse("/workers?error=bad_role", status_code=302)
-
     conn = connect()
     c = conn.cursor()
 
     existing = c.execute("""
-    SELECT * FROM users WHERE username=?
+    SELECT *
+    FROM users
+    WHERE username=?
     """, (worker_username,)).fetchone()
 
     if existing:
         conn.close()
         return RedirectResponse("/workers?error=exists", status_code=302)
 
-    settings = get_company_settings()
-    current_plan = settings["plan"] if settings and "plan" in settings.keys() else "basic"
-    user_limit = get_plan_user_limit(current_plan)
-
-    users_count = c.execute("""
-    SELECT COUNT(*)
-    FROM users
-    """).fetchone()[0]
-
-    if user_limit is not None and users_count >= user_limit:
-        conn.close()
-        return RedirectResponse("/workers?error=user_limit", status_code=302)
-
     c.execute("""
-    INSERT INTO users (username, password, role, last_seen)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO users (
+        username,
+        password,
+        role,
+        company_id,
+        full_name,
+        position,
+        phone,
+        email,
+        last_seen
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         worker_username,
-        worker_password,
+        hash_password(worker_password),
         worker_role,
+        company_id,
+        full_name,
+        position,
+        phone,
+        email,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
     conn.commit()
     conn.close()
-
-    try:
-        send_message(
-            f"""
-👥 Создан новый пользователь
-
-Логин: {worker_username}
-Роль: {get_role_title(worker_role)}
-Создал: {username} ({get_role_title(role)})
-"""
-        )
-    except Exception:
-        pass
 
     return RedirectResponse("/workers?created=1", status_code=302)
 
