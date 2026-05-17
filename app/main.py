@@ -698,6 +698,7 @@ async def finance_export(request: Request, month: str = ""):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
+    client_company_id = get_user_company_id(username)
 
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
@@ -1619,6 +1620,7 @@ async def create_client(request: Request):
 
     c.execute("""
     INSERT INTO clients (
+        company_id,
         name,
         phone,
         email,
@@ -1626,8 +1628,9 @@ async def create_client(request: Request):
         notes,
         created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
+        client_company_id,
         name,
         phone,
         email,
