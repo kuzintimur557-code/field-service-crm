@@ -693,11 +693,13 @@ async def home(
     if role == "superadmin":
         return RedirectResponse("/platform", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
-    query = "SELECT * FROM tasks WHERE archived=0"
-    params = []
+    query = "SELECT * FROM tasks WHERE archived=0 AND company_id=?"
+    params = [company_id]
 
     if role not in ("boss", "manager"):
         query += " AND worker=?"
