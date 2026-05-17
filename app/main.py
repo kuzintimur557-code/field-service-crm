@@ -1510,6 +1510,71 @@ async def archive_page(request: Request):
     )
 
 
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    return templates.TemplateResponse(
+        request,
+        "profile.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role
+        }
+    )
+
+
+@app.post("/profile/password")
+async def change_my_password(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    form = await request.form()
+    old_password = (form.get("old_password") or "").strip()
+    new_password = (form.get("new_password") or "").strip()
+
+    if not old_password or not new_password:
+        return RedirectResponse("/profile?error=empty", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    user = c.execute("""
+    SELECT *
+    FROM users
+    WHERE username=?
+    """, (username,)).fetchone()
+
+    if not user:
+        conn.close()
+        return RedirectResponse("/logout", status_code=302)
+
+    if user["password"] != old_password:
+        conn.close()
+        return RedirectResponse("/profile?error=wrong_old", status_code=302)
+
+    c.execute("""
+    UPDATE users
+    SET password=?
+    WHERE username=?
+    """, (new_password, username))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/profile?changed=1", status_code=302)
+
+
 @app.get("/workers", response_class=HTMLResponse)
 async def workers_page(request: Request):
 
