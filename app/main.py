@@ -985,7 +985,8 @@ async def calls_page(request: Request):
             "role": role,
             "settings": settings,
             "recent_users": recent_users,
-            "login_events": login_events
+            "login_events": login_events,
+            "login_attempts": login_attempts
         }
     )
 
@@ -1014,7 +1015,8 @@ async def integration_1c_page(request: Request):
             "role": role,
             "settings": settings,
             "recent_users": recent_users,
-            "login_events": login_events
+            "login_events": login_events,
+            "login_attempts": login_attempts
         }
     )
 
@@ -1046,6 +1048,7 @@ async def billing_page(request: Request):
             "settings": settings,
             "recent_users": recent_users,
             "login_events": login_events,
+            "login_attempts": login_attempts,
             "plan": plan,
             "user_limit": user_limit
         }
@@ -1076,7 +1079,8 @@ async def settings_page(request: Request):
             "role": role,
             "settings": settings,
             "recent_users": recent_users,
-            "login_events": login_events
+            "login_events": login_events,
+            "login_attempts": login_attempts
         }
     )
 
@@ -1989,6 +1993,13 @@ async def debug_page(request: Request):
     LIMIT 20
     """).fetchall()
 
+    login_attempts = c.execute("""
+    SELECT *
+    FROM login_attempts
+    ORDER BY id DESC
+    LIMIT 20
+    """).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -2006,7 +2017,8 @@ async def debug_page(request: Request):
             "catalog_count": catalog_count,
             "settings": settings,
             "recent_users": recent_users,
-            "login_events": login_events
+            "login_events": login_events,
+            "login_attempts": login_attempts
         }
     )
 

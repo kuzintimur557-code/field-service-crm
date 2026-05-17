@@ -103,6 +103,23 @@ h1{margin:0 0 20px;font-size:34px}
 </div>
 
 <div class="card">
+<h2>Неудачные попытки входа</h2>
+
+{% if login_attempts %}
+{% for attempt in login_attempts %}
+<div style="padding:12px;border-radius:14px;background:#fee2e2;color:#991b1b;margin-bottom:8px;font-weight:800">
+{{ attempt["updated_at"] }} — {{ attempt["username"] }} — IP: {{ attempt["ip"] }} — попыток: {{ attempt["attempts"] }}
+{% if attempt["blocked_until"] %}
+<br>Заблокирован до: {{ attempt["blocked_until"] }}
+{% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div style="color:#6b7280;font-weight:900">Неудачных попыток нет</div>
+{% endif %}
+</div>
+
+<div class="card">
 <h2>Журнал входов</h2>
 
 {% if login_events %}
