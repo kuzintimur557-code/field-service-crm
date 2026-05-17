@@ -2030,6 +2030,7 @@ async def create_worker(request: Request):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
+    new_user_company_id = get_user_company_id(username)
 
     if role not in ("boss", "superadmin"):
         return RedirectResponse("/workers?error=only_boss", status_code=302)
