@@ -69,6 +69,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     <input type="text" name="position" placeholder="Должность">
     <input type="text" name="phone" placeholder="Телефон">
     <input type="email" name="email" placeholder="Email">
+    <input type="text" name="telegram_chat_id" placeholder="Telegram Chat ID">
 
     <select name="role" style="width:100%;padding:13px;border-radius:14px;border:1px solid #d1d5db">
         <option value="worker">Исполнитель</option>
@@ -94,6 +95,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
             <div class="meta">Должность: {{ worker["position"] or "—" }}</div>
             <div class="meta">Телефон: {{ worker["phone"] or "—" }}</div>
             <div class="meta">Email: {{ worker["email"] or "—" }}</div>
+            <div class="meta">Telegram ID: {{ worker["telegram_chat_id"] or "—" }}</div>
             <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
         </div>
 
