@@ -3263,6 +3263,23 @@ async def complete_task(request: Request, task_id: int):
     conn.commit()
     conn.close()
 
+    try:
+        send_message(
+            f"""
+✅ Заявка завершена исполнителем
+
+Заявка: #{task_id}
+Клиент: {task["client"]}
+Адрес: {task["address"]}
+Исполнитель: {username}
+
+Отчёт:
+{report}
+"""
+        )
+    except Exception:
+        pass
+
     return RedirectResponse("/my-tasks", status_code=302)
 
 
