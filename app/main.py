@@ -3380,6 +3380,87 @@ async def start_task(request: Request, task_id: int):
 
 
 
+@app.post("/task/{task_id}/edit")
+async def edit_task_field(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    field = (form.get("field") or "").strip()
+    value = (form.get("value") or "").strip()
+
+    allowed_fields = {
+        "client": "client",
+        "phone": "phone",
+        "address": "address",
+        "description": "description",
+        "priority": "priority",
+        "price": "price",
+        "status": "status",
+        "worker": "worker"
+    }
+
+    if field not in allowed_fields:
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    column = allowed_fields[field]
+
+    c.execute(f"""
+    UPDATE tasks
+    SET {column}=?
+    WHERE id=?
+    """, (value, task_id))
+
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Изменено поле",
+        f"{field}: {value}",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
 @app.post("/task/{task_id}/date")
 async def update_task_date(request: Request, task_id: int):
 
