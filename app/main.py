@@ -1672,6 +1672,27 @@ async def archive_page(request: Request):
     )
 
 
+@app.get("/more", response_class=HTMLResponse)
+async def more_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    return templates.TemplateResponse(
+        request,
+        "more.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role
+        }
+    )
+
+
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
 

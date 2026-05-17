@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ещё</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:800px;margin:auto;padding:22px}
+.card{background:white;padding:24px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 8px;font-size:32px}
+.meta{color:#6b7280;font-weight:800}
+.menu{display:grid;gap:12px}
+.menu a{display:block;background:#f9fafb;padding:18px;border-radius:18px;text-decoration:none;color:#111827;font-weight:900;border:1px solid #e5e7eb}
+.menu a.red{background:#fee2e2;color:#991b1b}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="card">
+<h1>☰ Ещё</h1>
+<div class="meta">{{ username }} / {{ role }}</div>
+</div>
+
+<div class="card">
+<div class="menu">
+
+<a href="/">🏠 Главная</a>
+<a href="/profile">👤 Мой профиль</a>
+<a href="/calendar">📅 Календарь</a>
+
+{% if role in ["boss", "manager"] %}
+<a href="/clients">👤 Клиенты</a>
+<a href="/finance">💰 Финансы</a>
+<a href="/catalog">📦 Каталог</a>
+<a href="/workers">👥 Команда</a>
+<a href="/archive">🗄 Архив</a>
+<a href="/calls">☎️ Звонки</a>
+{% endif %}
+
+{% if role == "boss" %}
+<a href="/admin">🛠 Admin Center</a>
+<a href="/settings">⚙️ Настройки</a>
+{% endif %}
+
+<a class="red" href="/logout">🚪 Выйти</a>
+
+</div>
+</div>
+
+</div>
+
+{% include 'mobile_nav.html' %}
+</body>
+</html>
