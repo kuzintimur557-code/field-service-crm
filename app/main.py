@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.database import connect, init_db
-from app.telegram_utils import send_message, send_photo
+from app.telegram_utils import send_message, send_photo, send_message_to_chat
 
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -2788,13 +2788,33 @@ async def create_task(
     try:
         send_message(text)
 
+        worker_user = c.execute("""
+        SELECT telegram_chat_id
+        FROM users
+        WHERE username=?
+        """, (worker,)).fetchone()
+
+        if worker_user and worker_user["telegram_chat_id"]:
+            send_message_to_chat(
+                worker_user["telegram_chat_id"],
+                f"""
+📋 Вам назначена новая заявка #{task_id}
+
+👤 Клиент: {client}
+📞 Телефон: {phone}
+📍 Адрес: {address}
+📅 Дата: {task_date}
+🔥 Приоритет: {priority}
+"""
+            )
+
         if filename:
             send_photo(
                 f"uploads/{filename}",
                 f"Фото до работы к заявке #{task_id}"
             )
-    except Exception:
-        pass
+    except Exception as e:
+        print("Telegram notification error:", e)
 
     return RedirectResponse("/", status_code=302)
 
