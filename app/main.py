@@ -1335,6 +1335,7 @@ async def update_settings(request: Request):
     company_name = (form.get("company_name") or "").strip()
     phone = (form.get("phone") or "").strip()
     email = (form.get("email") or "").strip()
+    telegram_chat_id = (form.get("telegram_chat_id") or "").strip()
     address = (form.get("address") or "").strip()
     tax_number = (form.get("tax_number") or "").strip()
     bank_details = (form.get("bank_details") or "").strip()
@@ -1755,6 +1756,7 @@ async def edit_client(request: Request, client_id: int):
     name = (form.get("name") or "").strip()
     phone = (form.get("phone") or "").strip()
     email = (form.get("email") or "").strip()
+    telegram_chat_id = (form.get("telegram_chat_id") or "").strip()
     address = (form.get("address") or "").strip()
     notes = (form.get("notes") or "").strip()
 
@@ -1845,6 +1847,7 @@ async def create_client(request: Request):
     name = (form.get("name") or "").strip()
     phone = (form.get("phone") or "").strip()
     email = (form.get("email") or "").strip()
+    telegram_chat_id = (form.get("telegram_chat_id") or "").strip()
     address = (form.get("address") or "").strip()
     notes = (form.get("notes") or "").strip()
 
@@ -2156,6 +2159,7 @@ async def create_worker(request: Request):
     position = (form.get("position") or "").strip()
     phone = (form.get("phone") or "").strip()
     email = (form.get("email") or "").strip()
+    telegram_chat_id = (form.get("telegram_chat_id") or "").strip()
 
     conn = connect()
     c = conn.cursor()
@@ -2180,9 +2184,10 @@ async def create_worker(request: Request):
         position,
         phone,
         email,
+        telegram_chat_id,
         last_seen
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         worker_username,
         hash_password(worker_password),
@@ -2192,6 +2197,7 @@ async def create_worker(request: Request):
         position,
         phone,
         email,
+        telegram_chat_id,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
