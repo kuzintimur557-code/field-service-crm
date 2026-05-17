@@ -25,7 +25,7 @@ import csv
 import io
 
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.2.1"
 
 SESSION_COOKIE_NAME = "crm_session"
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
