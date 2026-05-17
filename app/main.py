@@ -3380,6 +3380,67 @@ async def start_task(request: Request, task_id: int):
 
 
 
+@app.post("/task/{task_id}/date")
+async def update_task_date(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    new_date = (form.get("task_date") or "").strip()
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    c.execute("""
+    UPDATE tasks
+    SET task_date=?
+    WHERE id=?
+    """, (new_date, task_id))
+
+    conn.commit()
+    conn.close()
+
+    try:
+        send_message(
+            f"""
+📅 Дата заявки изменена
+
+Заявка: #{task_id}
+Клиент: {task['client']}
+Адрес: {task['address']}
+Новая дата: {new_date}
+
+Изменил: {username} ({get_role_title(role)})
+"""
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
 @app.post("/task/{task_id}/status")
 async def update_task_status(request: Request, task_id: int):
 
