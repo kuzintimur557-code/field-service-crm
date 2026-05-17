@@ -2645,14 +2645,16 @@ async def create_task_page(request: Request):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
     workers = c.execute("""
     SELECT username FROM users
-    WHERE role='worker'
+    WHERE role='worker' AND company_id=?
     ORDER BY username
-    """).fetchall()
+    """, (company_id,)).fetchall()
 
     clients = c.execute("""
     SELECT *
