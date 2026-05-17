@@ -194,6 +194,20 @@ def init_db():
     ))
 
     c.execute("""
+    DELETE FROM users
+    WHERE id NOT IN (
+        SELECT MIN(id)
+        FROM users
+        GROUP BY username
+    )
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username
+    ON users(username)
+    """)
+
+    c.execute("""
     INSERT OR IGNORE INTO users (username, password, role, last_seen)
     VALUES (?, ?, ?, ?)
     """, (
