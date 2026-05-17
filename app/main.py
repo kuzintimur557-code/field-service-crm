@@ -1533,20 +1533,16 @@ async def clients_page(request: Request):
     c = conn.cursor()
 
     if role == "superadmin":
-        clients = c.execute("""
-        SELECT *
-        FROM clients
-        ORDER BY id DESC
-        """).fetchall()
-    else:
-        company_id = get_user_company_id(username)
+        return RedirectResponse("/platform", status_code=302)
 
-        clients = c.execute("""
-        SELECT *
-        FROM clients
-        WHERE company_id=?
-        ORDER BY id DESC
-        """, (company_id,)).fetchall()
+    company_id = get_user_company_id(username)
+
+    clients = c.execute("""
+    SELECT *
+    FROM clients
+    WHERE company_id=?
+    ORDER BY id DESC
+    """, (company_id,)).fetchall()
 
     conn.close()
 
