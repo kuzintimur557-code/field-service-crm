@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Production Notes</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1000px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
+h1{margin:0 0 12px;font-size:36px}
+h2{margin:0 0 16px;font-size:24px}
+.note{padding:18px;border-radius:20px;background:#f9fafb;margin-bottom:14px;border-left:7px solid #2563eb}
+.note.important{border-left-color:#991b1b}
+.note.good{border-left-color:#16a34a}
+.title{font-size:20px;font-weight:900;margin-bottom:8px}
+.text{font-weight:800;color:#374151;line-height:1.5}
+.small{color:#6b7280;font-weight:800;line-height:1.45}
+@media(max-width:700px){.container{padding:16px}h1{font-size:30px}.card{padding:22px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/admin" class="back">← Назад в Admin</a>
+
+<div class="card">
+<h1>📝 Production Notes</h1>
+<div class="small">Важные решения, которые нельзя забыть перед запуском продукта.</div>
+</div>
+
+<div class="card">
+<h2>Юрисдикция и сервер</h2>
+
+<div class="note important">
+    <div class="title">🇷🇺 Для клиентов РФ нужен российский production-сервер</div>
+    <div class="text">
+        Перед продажами на российский рынок перенести production с Railway на РФ-хостинг:
+        Selectel / Yandex Cloud РФ / VK Cloud / Timeweb Cloud / Reg.ru VPS.
+    </div>
+</div>
+
+<div class="note important">
+    <div class="title">Персональные данные</div>
+    <div class="text">
+        CRM хранит имена, телефоны, адреса, заявки, фото, историю общения и в будущем звонки.
+        Перед коммерческим запуском нужны политика обработки ПДн и корректная инфраструктура.
+    </div>
+</div>
+</div>
+
+<div class="card">
+<h2>Технические решения</h2>
+
+<div class="note good">
+    <div class="title">Railway</div>
+    <div class="text">
+        Используется как dev/staging окружение. Для тестов и разработки подходит.
+    </div>
+</div>
+
+<div class="note">
+    <div class="title">Storage</div>
+    <div class="text">
+        Перед production нужны persistent volume/storage для crm.db и uploads.
+    </div>
+</div>
+
+<div class="note">
+    <div class="title">1С</div>
+    <div class="text">
+        1С — отдельная платная функция тарифов Business + 1С и Enterprise + 1С.
+    </div>
+</div>
+
+<div class="note">
+    <div class="title">Звонки и AI</div>
+    <div class="text">
+        Запись звонков и AI-анализ скриптов — Enterprise-модуль после стабилизации CRM-core.
+    </div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

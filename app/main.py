@@ -1979,6 +1979,30 @@ async def clear_login_attempts_admin(request: Request):
     return RedirectResponse("/debug?login_attempts_cleared=1", status_code=302)
 
 
+@app.get("/admin/notes", response_class=HTMLResponse)
+async def admin_notes_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    return templates.TemplateResponse(
+        request,
+        "admin_notes.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role
+        }
+    )
+
+
 @app.get("/admin/roadmap", response_class=HTMLResponse)
 async def admin_roadmap_page(request: Request):
 
