@@ -68,7 +68,9 @@ h1{font-size:30px}
         {% endif %}
 
         {% if role == "boss" %}
+        {% if role == "superadmin" %}
         <a href="/admin" class="dark">🛠 Admin</a>
+        {% endif %}
         <a href="/settings" class="dark">⚙️ Настройки</a>
         {% endif %}
 

@@ -59,6 +59,22 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 </div>
 
 <div class="card">
+<h2>➕ Добавить пользователя</h2>
+
+<form method="post" action="/workers" style="display:grid;gap:12px;margin-bottom:20px">
+    <input type="text" name="username" placeholder="Логин" required>
+    <input type="text" name="password" placeholder="Пароль" required>
+
+    <select name="role" style="width:100%;padding:13px;border-radius:14px;border:1px solid #d1d5db">
+        <option value="worker">Исполнитель</option>
+        <option value="manager">Менеджер</option>
+    </select>
+
+    <button type="submit" style="background:#2563eb">Создать пользователя</button>
+</form>
+</div>
+
+<div class="card">
 <h2>Список команды</h2>
 
 {% if workers %}
