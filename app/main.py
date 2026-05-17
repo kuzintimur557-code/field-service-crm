@@ -1623,6 +1623,54 @@ async def create_worker(request: Request):
     return RedirectResponse("/workers?created=1", status_code=302)
 
 
+@app.post("/workers/{user_id}/password")
+async def change_team_user_password(request: Request, user_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/workers?error=only_boss", status_code=302)
+
+    form = await request.form()
+    new_password = (form.get("password") or "").strip()
+
+    if not new_password:
+        return RedirectResponse("/workers?error=empty_password", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    user = c.execute("""
+    SELECT *
+    FROM users
+    WHERE id=?
+    """, (user_id,)).fetchone()
+
+    if not user:
+        conn.close()
+        return RedirectResponse("/workers", status_code=302)
+
+    if user["username"] == username:
+        conn.close()
+        return RedirectResponse("/workers?error=cannot_change_self_here", status_code=302)
+
+    c.execute("""
+    UPDATE users
+    SET password=?
+    WHERE id=?
+    """, (new_password, user_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/workers?password_changed=1", status_code=302)
+
+
 @app.post("/workers/{user_id}/delete")
 async def delete_team_user(request: Request, user_id: int):
 
