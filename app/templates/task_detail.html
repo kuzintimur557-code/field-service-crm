@@ -383,21 +383,21 @@ button{
 <div class="icon">👷</div>
 <div class="label">Исполнитель</div>
 <div class="value">{{ task["worker"] }}</div>
-<button class="edit-btn">✎</button>
+<button class="edit-btn" onclick="openEdit('worker','{{ task['worker'] }}')">✎</button>
 </div>
 
 <div class="info-row">
 <div class="icon">🚩</div>
 <div class="label">Приоритет</div>
 <div class="value">{{ task["priority"] }}</div>
-<button class="edit-btn">✎</button>
+<button class="edit-btn" onclick="openEdit('priority','{{ task['priority'] }}')">✎</button>
 </div>
 
 <div class="info-row">
 <div class="icon">₽</div>
 <div class="label">Цена</div>
 <div class="value">{{ task["price"] }} ₽</div>
-<button class="edit-btn">✎</button>
+<button class="edit-btn" onclick="openEdit('price','{{ task['price'] }}')">✎</button>
 </div>
 
 </div>
