@@ -136,19 +136,15 @@ def get_plan_user_limit(plan):
 
 
 def get_company_settings():
-    ip = get_request_ip(request)
-
-    if is_login_blocked(username, ip):
-        return RedirectResponse("/login?error=blocked", status_code=302)
-
     conn = connect()
     c = conn.cursor()
 
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
-        id, company_name, phone, email, address, tax_number, bank_details, updated_at
+        id, company_name, phone, email, address, tax_number, bank_details,
+        plan, one_c_enabled, calls_enabled, ai_calls_enabled, updated_at
     )
-    VALUES (1, '', '', '', '', '', '', '')
+    VALUES (1, '', '', '', '', '', '', 'basic', 0, 0, 0, '')
     """)
 
     conn.commit()
@@ -2071,6 +2067,43 @@ async def admin_page(request: Request):
             "request": request,
             "username": username,
             "role": role
+        }
+    )
+
+
+@app.get("/system", response_class=HTMLResponse)
+async def system_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    db_path = Path(DB_NAME)
+    uploads_path = UPLOAD_DIR
+
+    db_exists = db_path.exists()
+    db_size = db_path.stat().st_size if db_exists else 0
+    uploads_exists = uploads_path.exists()
+    uploads_files = len([f for f in uploads_path.rglob("*") if f.is_file()]) if uploads_exists else 0
+
+    return templates.TemplateResponse(
+        request,
+        "system.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "db_exists": db_exists,
+            "db_size": db_size,
+            "uploads_exists": uploads_exists,
+            "uploads_files": uploads_files,
+            "app_version": APP_VERSION
         }
     )
 
