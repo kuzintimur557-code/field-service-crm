@@ -1955,6 +1955,30 @@ async def delete_team_user(request: Request, user_id: int):
     return RedirectResponse("/workers?deleted=1", status_code=302)
 
 
+@app.post("/debug/login-attempts/clear")
+async def clear_login_attempts_admin(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("DELETE FROM login_attempts")
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/debug?login_attempts_cleared=1", status_code=302)
+
+
 @app.get("/debug", response_class=HTMLResponse)
 async def debug_page(request: Request):
 
