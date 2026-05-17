@@ -1368,11 +1368,17 @@ async def catalog_page(request: Request):
     conn = connect()
     c = conn.cursor()
 
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
+    company_id = get_user_company_id(username)
+
     items = c.execute("""
     SELECT *
     FROM catalog_items
+    WHERE company_id=?
     ORDER BY active DESC, item_type, name
-    """).fetchall()
+    """, (company_id,)).fetchall()
 
     conn.close()
 
