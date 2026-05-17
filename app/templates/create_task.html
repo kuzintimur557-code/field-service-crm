@@ -64,14 +64,18 @@ button:hover{background:#1d4ed8}
 <div class="grid">
 <div>
 <label>Исполнитель</label>
-<select name="workers" multiple size="5">
-{% for worker in workers %}
-<option value="{{ worker[0] }}">{{ worker[0] }}</option>
-{% endfor %}
-</select>
-<div style="font-size:13px;color:#6b7280;font-weight:800;margin-top:6px">
-Можно выбрать несколько исполнителей: зажми Cmd и нажимай нужных.
-</div>
+<details style="background:white;border:1px solid #d1d5db;border-radius:14px;padding:12px">
+    <summary style="cursor:pointer;font-weight:900">Выбрать исполнителей</summary>
+
+    <div style="display:grid;gap:10px;margin-top:12px">
+        {% for worker in workers %}
+        <label style="display:flex;align-items:center;gap:10px;font-weight:800">
+            <input type="checkbox" name="workers" value="{{ worker[0] }}" style="width:auto">
+            {{ worker[0] }}
+        </label>
+        {% endfor %}
+    </div>
+</details>
 </div>
 
 <div>
