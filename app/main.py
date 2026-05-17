@@ -38,10 +38,8 @@ app = FastAPI()
 
 init_db()
 
-os.makedirs("uploads", exist_ok=True)
 os.makedirs("uploads/docs", exist_ok=True)
 
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
@@ -440,6 +438,43 @@ def get_role(username):
         return None
 
     return user["role"]
+
+
+@app.get("/uploads/{filename:path}")
+async def uploaded_file(request: Request, filename: str):
+
+    username = get_user(request)
+
+    if not username:
+        return Response(status_code=404)
+
+    safe_filename = Path(filename or "").name
+
+    if not safe_filename or safe_filename != filename:
+        return Response(status_code=404)
+
+    file_path = UPLOAD_DIR / safe_filename
+
+    if not file_path.is_file():
+        return Response(status_code=404)
+
+    role = get_role(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE photo=? OR after_photo=?
+    """, (safe_filename, safe_filename)).fetchone()
+
+    conn.close()
+
+    if not task or not can_access_task(username, role, task):
+        return Response(status_code=404)
+
+    return FileResponse(str(file_path))
 
 
 def get_request_ip(request):
