@@ -93,7 +93,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
         {% endif %}
     </div>
 
-    {% if username == "boss" and worker["role"] != "boss" %}
+    {% if role == "boss" and worker["role"] != "boss" %}
     <form method="post" action="/workers/{{ worker['id'] }}/password">
         <input type="text" name="password" placeholder="Новый пароль">
         <button class="btn-dark" type="submit">Сменить пароль</button>
