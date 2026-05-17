@@ -2400,6 +2400,7 @@ async def create_task(
 
     c.execute("""
     INSERT INTO tasks (
+        company_id,
         client_id,
         client,
         phone,
