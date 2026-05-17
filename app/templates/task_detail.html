@@ -3,48 +3,37 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Заявка</title>
+<title>Заявка #{{ task["id"] }}</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:950px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:800}
-.card{background:white;padding:30px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:20px}
-h1{margin:0 0 24px;font-size:32px}
-h2{margin:0 0 16px;font-size:22px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
-.row{margin-bottom:16px}
-.label{font-size:13px;color:#6b7280;margin-bottom:5px;font-weight:700}
-.value{font-size:18px;font-weight:800;word-break:break-word}
-.status{display:inline-block;padding:9px 15px;border-radius:999px;font-weight:800;background:#dbeafe;color:#1d4ed8}
-img{max-width:100%;border-radius:18px;margin-top:10px;box-shadow:0 10px 24px rgba(0,0,0,.08)}
-.btn{display:block;text-align:center;padding:15px;border-radius:16px;background:#2563eb;color:white;text-decoration:none;font-weight:900;margin-top:14px}
-.btn.green{background:#16a34a}
-select,button,textarea,input{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:10px}
-select,textarea,input{border:1px solid #d1d5db;background:white}
-textarea{height:140px;resize:vertical}
-button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
-.small-note{font-size:13px;color:#6b7280;margin-top:8px;line-height:1.4}
-.photo-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:20px;padding:16px}
-.empty-photo{padding:22px;border-radius:16px;background:#eef2ff;color:#3730a3;font-weight:800;text-align:center;margin-top:10px}
-.chat-item{background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:14px;margin-bottom:12px}
-.chat-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:13px;color:#6b7280;font-weight:800}
-.chat-message{font-size:16px;line-height:1.45;white-space:pre-wrap}
-.timeline-item{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:14px 0;border-bottom:1px solid #e5e7eb}
-.timeline-time{font-size:13px;color:#6b7280;font-weight:800}
-.timeline-action{font-size:16px;font-weight:900}
-.timeline-details{font-size:14px;color:#4b5563;margin-top:5px;white-space:pre-wrap}
-.estimate-item{display:grid;grid-template-columns:1.2fr .8fr .7fr .7fr .7fr;gap:12px;padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px}
-.estimate-name{font-size:16px;font-weight:900}
-.estimate-meta{font-size:13px;color:#6b7280;font-weight:700;margin-top:4px}
-.estimate-total{margin-top:18px;padding:18px;border-radius:18px;background:#eff6ff}
-@media(max-width:700px){.estimate-item{grid-template-columns:1fr}}
-@media(max-width:700px){.timeline-item{grid-template-columns:1fr;gap:6px}}
-@media(max-width:700px){.container{padding:16px}.grid,.photo-grid{grid-template-columns:1fr}h1{font-size:26px}.card{padding:22px}}
+.container{max-width:1200px;margin:auto;padding:24px}
+.back{display:inline-block;margin-bottom:16px;color:#2563eb;text-decoration:none;font-weight:900}
+.grid{display:grid;grid-template-columns:1.4fr .8fr;gap:18px}
+.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+h1{margin:0 0 8px;font-size:34px}
+h2{margin:0 0 14px;font-size:22px}
+.label{font-size:13px;color:#6b7280;font-weight:900;margin-bottom:5px}
+.value{font-size:17px;font-weight:900;line-height:1.4}
+.row{padding:13px 0;border-bottom:1px solid #eef2f7}
+.row:last-child{border-bottom:0}
+.badge{display:inline-block;padding:8px 13px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
+input,select,textarea,button{width:100%;padding:13px;border-radius:14px;font-size:15px;font-family:inherit}
+input,select,textarea{border:1px solid #d1d5db;background:white}
+textarea{min-height:90px}
+button,.btn{display:block;border:0;background:#2563eb;color:white;text-decoration:none;text-align:center;font-weight:900;cursor:pointer;margin-top:10px}
+.green{background:#16a34a!important}
+.dark{background:#111827!important}
+.red{background:#991b1b!important}
+.photo{max-width:100%;border-radius:18px;margin-top:10px}
+.notice{padding:16px;border-radius:18px;background:#f0fdf4;border:1px solid #bbf7d0;margin-top:14px}
+.notice-title{font-size:18px;font-weight:900;color:#166534;margin-bottom:8px}
+.comment{background:#f9fafb;padding:14px;border-radius:16px;margin-bottom:10px}
+.small{color:#6b7280;font-weight:800;font-size:14px}
+@media(max-width:900px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}}
 </style>
 </head>
 
@@ -53,344 +42,178 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 
 <a href="/" class="back">← Назад</a>
 
-<div class="card">
-
-<h1>Заявка #{{ task[0] }}</h1>
-
 <div class="grid">
 
 <div>
-<div class="row"><div class="label">Клиент</div><div class="value">{{ task[1] }}</div></div>
-<div class="row"><div class="label">Телефон</div><div class="value">{{ task[2] }}</div></div>
-<div class="row"><div class="label">Адрес</div><div class="value">{{ task[3] }}</div></div>
-<div class="row"><div class="label">Дата</div><div class="value">{{ task[5] }}</div></div>
-</div>
 
-<div>
-<div class="row"><div class="label">Исполнитель</div><div class="value">{{ task[6] }}</div></div>
-<div class="row"><div class="label">Приоритет</div><div class="value">{{ task[7] }}</div></div>
-<div class="row"><div class="label">Цена</div><div class="value">{{ task["price"] }} ₽</div></div>
-<div class="row"><div class="label">Статус</div><div class="status">{{ task[10] }}</div></div>
-</div>
-
-</div>
-
-{% if linked_client %}
-<div class="row">
-<div class="label">Карточка клиента</div>
-<div class="value"><a href="/clients/{{ linked_client['id'] }}" style="color:#2563eb;text-decoration:none">👤 {{ linked_client["name"] }}</a></div>
-</div>
-{% endif %}
+<div class="card">
+<h1>Заявка #{{ task["id"] }}</h1>
+<div class="badge">{{ task["status"] }}</div>
 
 <div class="row">
-<div class="label">Описание</div>
-<div class="value">{{ task[4] }}</div>
+    <div class="label">Клиент</div>
+    <div class="value">{{ task["client"] }}</div>
 </div>
 
-<a class="btn" target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ task[3] }}">
-🗺 Открыть маршрут
-</a>
+<div class="row">
+    <div class="label">Телефон</div>
+    <div class="value">{{ task["phone"] }}</div>
+</div>
 
-<a class="btn green" target="_blank" href="/task/{{ task[0] }}/pdf">
-📄 Скачать PDF акт
-</a>
+<div class="row">
+    <div class="label">Адрес</div>
+    <div class="value">{{ task["address"] }}</div>
+</div>
 
-<a class="btn" target="_blank" href="/task/{{ task[0] }}/invoice">
-💳 Скачать счёт PDF
-</a>
+<div class="row">
+    <div class="label">Описание</div>
+    <div class="value">{{ task["description"] or "—" }}</div>
+</div>
 
+<div class="row">
+    <div class="label">Дата и время</div>
+    <div class="value">{{ task["task_date"] }}</div>
+</div>
+
+<div class="row">
+    <div class="label">Исполнитель</div>
+    <div class="value">{{ task["worker"] }}</div>
+</div>
+
+<div class="row">
+    <div class="label">Приоритет</div>
+    <div class="value">{{ task["priority"] }}</div>
+</div>
+
+<div class="row">
+    <div class="label">Цена</div>
+    <div class="value">{{ task["price"] }} ₽</div>
+</div>
 </div>
 
 <div class="card">
-<h2>Фото до / после</h2>
+<h2>📸 Фото</h2>
 
-<div class="photo-grid">
-
-<div class="photo-box">
+{% if task["photo"] %}
 <div class="label">Фото до работы</div>
-{% if task[9] %}
-<img src="/uploads/{{ task[9] }}">
+<img class="photo" src="/uploads/{{ task['photo'] }}">
 {% else %}
-<div class="empty-photo">Фото до пока не загружено</div>
+<div class="small">Фото до работы нет</div>
 {% endif %}
 
-<form method="post" action="/task/{{ task[0] }}/before-photo" enctype="multipart/form-data">
-<input type="file" name="before_photo" accept="image/*,.heic,.heif">
-<button type="submit">📷 Загрузить / заменить фото до</button>
-</form>
-<div class="small-note">Можно загрузить JPG, PNG, WEBP или HEIC. В PDF напрямую вставляются JPG/PNG/WEBP.</div>
-</div>
-
-<div class="photo-box">
-<div class="label">Фото после работы</div>
 {% if task["after_photo"] %}
-<img src="/uploads/{{ task['after_photo'] }}">
-{% else %}
-<div class="empty-photo">Фото после пока не загружено</div>
+<div style="margin-top:18px" class="label">Фото после работы</div>
+<img class="photo" src="/uploads/{{ task['after_photo'] }}">
 {% endif %}
-<div class="small-note">Фото после загружается вместе с отчётом исполнителя ниже.</div>
 </div>
 
-</div>
-</div>
-
-{% if role in ["boss", "manager"] %}
+{% if task["report"] %}
 <div class="card">
-
-<h2>💰 Смета заявки</h2>
-
-<form method="post" action="/task/{{ task[0] }}/items">
-
-<label>Позиция из каталога</label>
-<select name="catalog_item_id" required>
-<option value="">Выберите позицию</option>
-{% for item in catalog_items %}
-<option value="{{ item['id'] }}">
-{{ item["name"] }} —
-{% if item["item_type"] == "service" %}
-Услуга
-{% else %}
-Материал
-{% endif %}
-— {{ item["price"] }} ₽
-</option>
-{% endfor %}
-</select>
-
-<label>Количество</label>
-<input type="number" step="0.01" name="qty" value="1">
-
-<button type="submit">➕ Добавить в смету</button>
-
-</form>
-
-<div style="margin-top:18px">
-
-{% if task_items %}
-{% for item in task_items %}
-<div class="estimate-item">
-
-    <div>
-        <div class="estimate-name">{{ item["item_name"] }}</div>
-        <div class="estimate-meta">
-            {% if item["item_type"] == "service" %}
-            Услуга
-            {% else %}
-            Материал
-            {% endif %}
-        </div>
-    </div>
-
-    <div>
-        <div class="estimate-meta">Кол-во</div>
-        <div class="estimate-name">{{ item["qty"] }} {{ item["unit"] }}</div>
-    </div>
-
-    <div>
-        <div class="estimate-meta">Цена</div>
-        <div class="estimate-name">{{ item["price"] }} ₽</div>
-    </div>
-
-    <div>
-        <div class="estimate-meta">Сумма</div>
-        <div class="estimate-name">${{ item["total"] }}</div>
-    </div>
-
-    <div>
-        <div class="estimate-meta">Прибыль</div>
-        <div class="estimate-name">${{ item["profit"] }}</div>
-
-        <form method="post" action="/task/{{ task[0] }}/items/{{ item['id'] }}/delete" style="margin-top:10px">
-            <button type="submit" style="background:#991b1b;padding:10px;font-size:13px">
-                Удалить из сметы
-            </button>
-        </form>
-    </div>
-
+<h2>✅ Отчёт исполнителя</h2>
+<div class="notice">
+    <div class="notice-title">Работа завершена</div>
+    <div style="white-space:pre-wrap;font-weight:800;line-height:1.5">{{ task["report"] }}</div>
 </div>
-{% endfor %}
-
-<div class="estimate-total">
-    <div style="font-size:20px;font-weight:900">
-        Итого: ${{ estimate_total }}
-    </div>
-
-    <div style="margin-top:8px;font-size:18px;color:#166534;font-weight:900">
-        Прибыль: ${{ estimate_profit }}
-    </div>
-</div>
-
-{% else %}
-<div class="empty-photo">Смета пока пустая</div>
-{% endif %}
-
-</div>
-
 </div>
 {% endif %}
 
 <div class="card">
-
-<h2>💬 Внутренний чат</h2>
+<h2>💬 Комментарии</h2>
 
 {% if comments %}
 {% for comment in comments %}
-<div class="chat-item">
-    <div class="chat-head">
-        <span>{{ comment["username"] }} / {{ comment["role"] }}</span>
-        <span>{{ comment["created_at"] }}</span>
-    </div>
-    <div class="chat-message">{{ comment["message"] }}</div>
+<div class="comment">
+    <div style="font-weight:900">{{ comment["username"] }} / {{ comment["role"] }}</div>
+    <div class="small">{{ comment["created_at"] }}</div>
+    <div style="margin-top:8px;font-weight:800">{{ comment["message"] }}</div>
 </div>
 {% endfor %}
 {% else %}
-<div class="empty-photo">Комментариев пока нет</div>
+<div class="small">Комментариев пока нет</div>
 {% endif %}
-
-<form method="post" action="/task/{{ task[0] }}/comment">
-<textarea name="message" placeholder="Написать внутренний комментарий по заявке..."></textarea>
-<button type="submit">💬 Отправить комментарий</button>
-</form>
-
 </div>
 
 <div class="card">
+<h2>🕒 История</h2>
 
-<h2>🧾 История действий</h2>
-
-{% if activity %}
-{% for item in activity %}
-<div class="timeline-item">
-    <div class="timeline-time">{{ item["created_at"] }}</div>
-    <div>
-        <div class="timeline-action">{{ item["action"] }}</div>
-        <div class="timeline-details">
-            {{ item["username"] }} / {{ item["role"] }}
-            {% if item["details"] %}
-            — {{ item["details"] }}
-            {% endif %}
-        </div>
-    </div>
+{% if activities %}
+{% for item in activities %}
+<div class="comment">
+    <div style="font-weight:900">{{ item["action"] }}</div>
+    <div class="small">{{ item["created_at"] }} — {{ item["username"] }} / {{ item["role"] }}</div>
+    <div style="margin-top:8px;font-weight:800">{{ item["details"] }}</div>
 </div>
 {% endfor %}
 {% else %}
-<div class="empty-photo">История действий пока пустая</div>
+<div class="small">История пока пустая</div>
 {% endif %}
+</div>
 
 </div>
+
+<div>
+
+<div class="card">
+<h2>⚙️ Управление</h2>
 
 {% if role in ["boss", "manager"] %}
-<div class="card">
-
-<h2>🗄 Архив заявки</h2>
-
-{% if task["archived"] %}
-<div class="empty-photo">Эта заявка находится в архиве</div>
-
-<form method="post" action="/task/{{ task[0] }}/unarchive">
-<button type="submit">↩️ Вернуть из архива</button>
+<form method="post" action="/task/{{ task['id'] }}/status">
+    <label class="label">Статус</label>
+    <select name="status">
+        <option value="Новая" {% if task["status"] == "Новая" %}selected{% endif %}>Новая</option>
+        <option value="В работе" {% if task["status"] == "В работе" %}selected{% endif %}>В работе</option>
+        <option value="Завершено" {% if task["status"] == "Завершено" %}selected{% endif %}>Завершено</option>
+        <option value="Отменено" {% if task["status"] == "Отменено" %}selected{% endif %}>Отменено</option>
+    </select>
+    <button type="submit">Сохранить статус</button>
 </form>
 
-{% if role == "boss" %}
-<form method="post" action="/task/{{ task[0] }}/delete" onsubmit="return confirm('Удалить заявку навсегда? Это действие нельзя отменить.')" style="margin-top:12px">
-<button type="submit" style="background:#7f1d1d">🗑 Удалить навсегда</button>
-</form>
-{% endif %}
-
-{% else %}
-<form method="post" action="/task/{{ task[0] }}/archive">
-<button type="submit" style="background:#991b1b">🗄 Отправить заявку в архив</button>
+<form method="post" action="/task/{{ task['id'] }}/date" style="margin-top:16px">
+    <label class="label">Дата и время</label>
+    <input type="datetime-local" name="task_date" required>
+    <button type="submit">Сохранить дату</button>
 </form>
 {% endif %}
 
-</div>
+{% if role == "worker" and task["status"] == "Новая" %}
+<form method="post" action="/task/{{ task['id'] }}/start">
+    <button type="submit">▶️ Взять в работу</button>
+</form>
 {% endif %}
 
-{% if role in ["boss", "manager"] %}
-<div class="card">
+{% if role == "worker" and task["status"] == "В работе" %}
+<form method="post" action="/task/{{ task['id'] }}/complete" enctype="multipart/form-data">
+    <label class="label">Отчёт</label>
+    <textarea name="report" placeholder="Что было сделано..." required></textarea>
 
-<h2>💳 Изменить оплату</h2>
+    <label class="label" style="margin-top:10px">Фото после</label>
+    <input type="file" name="after_photo" accept="image/*">
 
-<form method="post" action="/task/{{ task[0] }}/payment">
-
-<select name="payment_status">
-<option value="Не оплачено" {% if task["payment_status"] == "Не оплачено" %}selected{% endif %}>Не оплачено</option>
-<option value="Частично оплачено" {% if task["payment_status"] == "Частично оплачено" %}selected{% endif %}>Частично оплачено</option>
-<option value="Оплачено" {% if task["payment_status"] == "Оплачено" %}selected{% endif %}>Оплачено</option>
-</select>
-
-<button type="submit">💾 Обновить оплату</button>
-
+    <button class="green" type="submit">✅ Завершить с отчётом</button>
 </form>
-
-</div>
 {% endif %}
-
-<div class="card">
-
-<h2>Изменить статус</h2>
-
-<form method="post" action="/task/{{ task[0] }}/status">
-
-<select name="status">
-<option value="Новая" {% if task[10] == "Новая" %}selected{% endif %}>Новая</option>
-<option value="В работе" {% if task[10] == "В работе" %}selected{% endif %}>В работе</option>
-<option value="Завершено" {% if task[10] == "Завершено" %}selected{% endif %}>Завершено</option>
-<option value="Отменено" {% if task[10] == "Отменено" %}selected{% endif %}>Отменено</option>
-</select>
-
-<button type="submit">💾 Сохранить статус</button>
-
-</form>
-
 </div>
 
 <div class="card">
-
-
-{% if role in ["boss", "manager"] %}
-<div class="card" style="margin-top:20px">
-<h2>📅 Изменить дату и время</h2>
-
-<form method="post" action="/task/{{ task['id'] }}/date">
-    <input
-        type="datetime-local"
-        name="task_date"
-        required
-        style="width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5db;margin-top:12px"
-    >
-
-    <button class="btn" type="submit" style="margin-top:12px;width:100%;border:0">
-        Сохранить дату и время
-    </button>
+<h2>💬 Добавить комментарий</h2>
+<form method="post" action="/task/{{ task['id'] }}/comment">
+    <textarea name="message" placeholder="Комментарий..." required></textarea>
+    <button class="dark" type="submit">Отправить</button>
 </form>
 </div>
-{% endif %}
 
-<h2>Отчёт исполнителя</h2>
-
-<form method="post" action="/task/{{ task[0] }}/report" enctype="multipart/form-data">
-
-<label>Комментарий по работе</label>
-<textarea name="report" placeholder="Что было сделано...">{{ task["report"] or "" }}</textarea>
-
-<label>Фото после работы</label>
-<input type="file" name="after_photo" accept="image/*,.heic,.heif">
-
-<button type="submit">📝 Сохранить отчёт</button>
-
-</form>
-
-{% if task["report"] %}
-<div class="row" style="margin-top:18px">
-<div class="label">Текущий отчёт</div>
-<div class="value">{{ task["report"] }}</div>
+<div class="card">
+<h2>📄 Документы</h2>
+<a class="btn green" href="/task/{{ task['id'] }}/act">Скачать акт</a>
+<a class="btn" href="/task/{{ task['id'] }}/invoice">Скачать счёт</a>
 </div>
-{% endif %}
+
+</div>
 
 </div>
 
 </div>
+
 {% include 'mobile_nav.html' %}
 </body>
 </html>
