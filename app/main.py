@@ -726,33 +726,33 @@ async def home(
     tasks = c.execute(query, params).fetchall()
 
     if role in ("boss", "manager"):
-        total_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0").fetchone()[0]
-        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND status='Новая'").fetchone()[0]
-        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND status='В работе'").fetchone()[0]
-        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND status='Завершено'").fetchone()[0]
+        total_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND company_id=?", (company_id,)).fetchone()[0]
+        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND company_id=? AND status='Новая'", (company_id,)).fetchone()[0]
+        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND company_id=? AND status='В работе'", (company_id,)).fetchone()[0]
+        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND company_id=? AND status='Завершено'", (company_id,)).fetchone()[0]
 
         revenue = c.execute("""
-        SELECT SUM(price) FROM tasks WHERE archived=0 AND status='Завершено'
-        """).fetchone()[0]
+        SELECT SUM(price) FROM tasks WHERE archived=0 AND company_id=? AND status='Завершено'
+        """, (company_id,)).fetchone()[0]
     else:
-        total_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE worker=?", (username,)).fetchone()[0]
-        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND worker=? AND status='Новая'", (username,)).fetchone()[0]
-        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND worker=? AND status='В работе'", (username,)).fetchone()[0]
-        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND worker=? AND status='Завершено'", (username,)).fetchone()[0]
+        total_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE company_id=? AND worker=?", (company_id, username)).fetchone()[0]
+        new_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND company_id=? AND worker=? AND status='Новая'", (company_id, username)).fetchone()[0]
+        working_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND company_id=? AND worker=? AND status='В работе'", (company_id, username)).fetchone()[0]
+        done_tasks = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=0 AND company_id=? AND worker=? AND status='Завершено'", (company_id, username)).fetchone()[0]
 
         revenue = c.execute("""
         SELECT SUM(price) FROM tasks
-        WHERE archived=0 AND worker=? AND status='Завершено'
-        """, (username,)).fetchone()[0]
+        WHERE archived=0 AND company_id=? AND worker=? AND status='Завершено'
+        """, (company_id, username)).fetchone()[0]
 
     if revenue is None:
         revenue = 0
 
     workers = c.execute("""
     SELECT username, last_seen FROM users
-    WHERE role='worker'
+    WHERE role='worker' AND company_id=?
     ORDER BY username
-    """).fetchall()
+    """, (company_id,)).fetchall()
 
     clients = []
 
@@ -764,18 +764,18 @@ async def home(
 
             completed = c.execute("""
             SELECT COUNT(*) FROM tasks
-            WHERE archived=0 AND worker=? AND status='Завершено'
-            """, (worker_name,)).fetchone()[0]
+            WHERE archived=0 AND company_id=? AND worker=? AND status='Завершено'
+            """, (company_id, worker_name)).fetchone()[0]
 
             active = c.execute("""
             SELECT COUNT(*) FROM tasks
-            WHERE archived=0 AND worker=? AND status='В работе'
-            """, (worker_name,)).fetchone()[0]
+            WHERE archived=0 AND company_id=? AND worker=? AND status='В работе'
+            """, (company_id, worker_name)).fetchone()[0]
 
             worker_revenue = c.execute("""
             SELECT SUM(price) FROM tasks
-            WHERE archived=0 AND worker=? AND status='Завершено'
-            """, (worker_name,)).fetchone()[0]
+            WHERE archived=0 AND company_id=? AND worker=? AND status='Завершено'
+            """, (company_id, worker_name)).fetchone()[0]
 
             if worker_revenue is None:
                 worker_revenue = 0
