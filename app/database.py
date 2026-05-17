@@ -39,6 +39,15 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS companies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        owner_username TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS company_settings (
         id INTEGER PRIMARY KEY,
         company_name TEXT,
@@ -174,6 +183,8 @@ def init_db():
     )
     """)
 
+    add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
+
     add_column_if_missing(c, "tasks", "client_id", "INTEGER")
     add_column_if_missing(c, "tasks", "after_photo", "TEXT")
     add_column_if_missing(c, "tasks", "archived", "INTEGER DEFAULT 0")
@@ -183,6 +194,21 @@ def init_db():
     add_column_if_missing(c, "company_settings", "one_c_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calls_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "ai_calls_enabled", "INTEGER DEFAULT 0")
+
+    c.execute("""
+    INSERT OR IGNORE INTO companies (
+        id,
+        name,
+        owner_username,
+        created_at
+    )
+    VALUES (?, ?, ?, ?)
+    """, (
+        1,
+        "Default Company",
+        "boss",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
 
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
