@@ -141,10 +141,16 @@ def can_access_task(username, role, task):
     if not task:
         return False
 
-    if role in ("boss", "manager"):
+    if role == "superadmin":
         return True
 
-    return task_has_worker(username, task)
+    user_company_id = get_user_company_id(username)
+    task_company_id = task["company_id"] if "company_id" in task.keys() else 1
+
+    if role in ("boss", "manager"):
+        return task_company_id == user_company_id
+
+    return task_company_id == user_company_id and task_has_worker(username, task)
 
 
 def get_role_title(role):
@@ -1136,10 +1142,11 @@ async def finance_page(request: Request, month: str = ""):
 
     if role == "superadmin":
         return RedirectResponse("/platform", status_code=302)
-    catalog_company_id = get_user_company_id(username)
 
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -1150,9 +1157,9 @@ async def finance_page(request: Request, month: str = ""):
     tasks = c.execute("""
     SELECT *
     FROM tasks
-    WHERE archived=0 AND task_date LIKE ?
+    WHERE archived=0 AND company_id=? AND task_date LIKE ?
     ORDER BY task_date DESC
-    """, (f"{month}%",)).fetchall()
+    """, (company_id, f"{month}%")).fetchall()
 
     total_estimate = 0
     total_profit = 0
@@ -1260,31 +1267,38 @@ async def reports_page(request: Request, month: str = ""):
 
     for w in workers:
         worker_name = w[0]
+        worker_condition = worker_task_condition()
+        worker_params = worker_task_params(worker_name)
 
-        completed = c.execute("""
+        completed = c.execute(f"""
         SELECT COUNT(*) FROM tasks
-        WHERE archived=0 AND worker=? AND status='Завершено' AND task_date LIKE ?
-        """, (worker_name, f"{month}%")).fetchone()[0]
+        WHERE archived=0 AND company_id=? AND {worker_condition}
+          AND status='Завершено' AND task_date LIKE ?
+        """, [company_id] + worker_params + [f"{month}%"]).fetchone()[0]
 
-        active = c.execute("""
+        active = c.execute(f"""
         SELECT COUNT(*) FROM tasks
-        WHERE archived=0 AND worker=? AND status='В работе' AND task_date LIKE ?
-        """, (worker_name, f"{month}%")).fetchone()[0]
+        WHERE archived=0 AND company_id=? AND {worker_condition}
+          AND status='В работе' AND task_date LIKE ?
+        """, [company_id] + worker_params + [f"{month}%"]).fetchone()[0]
 
-        new = c.execute("""
+        new = c.execute(f"""
         SELECT COUNT(*) FROM tasks
-        WHERE archived=0 AND worker=? AND status='Новая' AND task_date LIKE ?
-        """, (worker_name, f"{month}%")).fetchone()[0]
+        WHERE archived=0 AND company_id=? AND {worker_condition}
+          AND status='Новая' AND task_date LIKE ?
+        """, [company_id] + worker_params + [f"{month}%"]).fetchone()[0]
 
-        cancelled = c.execute("""
+        cancelled = c.execute(f"""
         SELECT COUNT(*) FROM tasks
-        WHERE archived=0 AND worker=? AND status='Отменено' AND task_date LIKE ?
-        """, (worker_name, f"{month}%")).fetchone()[0]
+        WHERE archived=0 AND company_id=? AND {worker_condition}
+          AND status='Отменено' AND task_date LIKE ?
+        """, [company_id] + worker_params + [f"{month}%"]).fetchone()[0]
 
-        revenue = c.execute("""
+        revenue = c.execute(f"""
         SELECT SUM(price) FROM tasks
-        WHERE archived=0 AND worker=? AND status='Завершено' AND task_date LIKE ?
-        """, (worker_name, f"{month}%")).fetchone()[0]
+        WHERE archived=0 AND company_id=? AND {worker_condition}
+          AND status='Завершено' AND task_date LIKE ?
+        """, [company_id] + worker_params + [f"{month}%"]).fetchone()[0]
 
         if revenue is None:
             revenue = 0
@@ -1309,9 +1323,9 @@ async def reports_page(request: Request, month: str = ""):
 
     tasks = c.execute("""
     SELECT * FROM tasks
-    WHERE task_date LIKE ?
+    WHERE company_id=? AND task_date LIKE ?
     ORDER BY task_date ASC, id DESC
-    """, (f"{month}%",)).fetchall()
+    """, (company_id, f"{month}%")).fetchall()
 
     conn.close()
 
@@ -2046,15 +2060,17 @@ async def archive_page(request: Request):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
     tasks = c.execute("""
     SELECT *
     FROM tasks
-    WHERE archived=1
+    WHERE archived=1 AND company_id=?
     ORDER BY id DESC
-    """).fetchall()
+    """, (company_id,)).fetchall()
 
     conn.close()
 
@@ -2232,23 +2248,26 @@ async def worker_detail(request: Request, worker_id: int):
         conn.close()
         return RedirectResponse("/workers", status_code=302)
 
-    total_tasks = c.execute("""
+    worker_condition = worker_task_condition()
+    worker_params = worker_task_params(worker["username"])
+
+    total_tasks = c.execute(f"""
     SELECT COUNT(*)
     FROM tasks
-    WHERE worker=?
-    """, (worker["username"],)).fetchone()[0]
+    WHERE company_id=? AND {worker_condition}
+    """, [company_id] + worker_params).fetchone()[0]
 
-    done_tasks = c.execute("""
+    done_tasks = c.execute(f"""
     SELECT COUNT(*)
     FROM tasks
-    WHERE worker=? AND status='Завершено'
-    """, (worker["username"],)).fetchone()[0]
+    WHERE company_id=? AND {worker_condition} AND status='Завершено'
+    """, [company_id] + worker_params).fetchone()[0]
 
-    income = c.execute("""
+    income = c.execute(f"""
     SELECT SUM(price)
     FROM tasks
-    WHERE worker=? AND status='Завершено'
-    """, (worker["username"],)).fetchone()[0] or 0
+    WHERE company_id=? AND {worker_condition} AND status='Завершено'
+    """, [company_id] + worker_params).fetchone()[0] or 0
 
     conn.close()
 
@@ -3344,6 +3363,10 @@ async def update_payment_status(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
     old_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
 
     c.execute("""
@@ -3941,6 +3964,10 @@ async def archive_task(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
     c.execute("""
     UPDATE tasks
     SET archived=1
@@ -3985,6 +4012,10 @@ async def unarchive_task(request: Request, task_id: int):
     """, (task_id,)).fetchone()
 
     if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
@@ -4034,6 +4065,10 @@ async def delete_task_forever(request: Request, task_id: int):
     """, (task_id,)).fetchone()
 
     if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
