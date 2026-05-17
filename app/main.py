@@ -3207,6 +3207,13 @@ async def complete_task(request: Request, task_id: int):
     if role != "worker":
         return RedirectResponse("/", status_code=302)
 
+    form = await request.form()
+    report = (form.get("report") or "").strip()
+    after_photo = form.get("after_photo")
+
+    if not report:
+        return RedirectResponse("/my-tasks?error=report_required", status_code=302)
+
     conn = connect()
     c = conn.cursor()
 
@@ -3220,17 +3227,24 @@ async def complete_task(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/my-tasks", status_code=302)
 
+    filename = save_upload_file(after_photo, task_id, "after")
+
     c.execute("""
     UPDATE tasks
-    SET status='Завершено'
+    SET status='Завершено',
+        report=?,
+        after_photo=?
     WHERE id=?
-    """, (task_id,))
+    """, (
+        report,
+        filename or task["after_photo"],
+        task_id
+    ))
 
     conn.commit()
     conn.close()
 
     return RedirectResponse("/my-tasks", status_code=302)
-
 
 
 @app.post("/task/{task_id}/start")
