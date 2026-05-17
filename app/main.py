@@ -2708,7 +2708,9 @@ async def create_task(
             address = existing_client["address"]
     description = form.get("description")
     task_date = form.get("task_date")
-    worker = form.get("worker")
+    selected_workers = form.getlist("workers")
+    worker = selected_workers[0] if selected_workers else ""
+    workers_text = ",".join(selected_workers)
     priority = form.get("priority")
     price = form.get("price")
 
@@ -2727,6 +2729,7 @@ async def create_task(
         description,
         task_date,
         worker,
+        workers,
         priority,
         price,
         photo,
@@ -2734,7 +2737,7 @@ async def create_task(
         report,
         after_photo
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         client_id,
@@ -2744,6 +2747,7 @@ async def create_task(
         description,
         task_date,
         worker,
+        workers_text,
         priority,
         price,
         "",
