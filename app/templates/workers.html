@@ -87,7 +87,9 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="user">
     <div class="user-top">
         <div>
-            <div class="name">{{ worker["full_name"] or worker["username"] }}</div>
+            <a href="/workers/{{ worker['id'] }}" class="name" style="color:#111827;text-decoration:none">
+                {{ worker["full_name"] or worker["username"] }}
+            </a>
             <div class="meta">Логин: {{ worker["username"] }}</div>
             <div class="meta">Должность: {{ worker["position"] or "—" }}</div>
             <div class="meta">Телефон: {{ worker["phone"] or "—" }}</div>

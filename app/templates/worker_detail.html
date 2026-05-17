@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Сотрудник</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:900px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:20px}
+h1{margin:0 0 10px;font-size:34px}
+.meta{color:#6b7280;font-weight:800;margin:6px 0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.stat{background:#f9fafb;padding:20px;border-radius:20px}
+.label{font-size:13px;color:#6b7280;font-weight:900;margin-bottom:8px}
+.value{font-size:28px;font-weight:900}
+@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/workers" class="back">← Назад к команде</a>
+
+<div class="card">
+<h1>{{ worker["full_name"] or worker["username"] }}</h1>
+<div class="meta">Логин: {{ worker["username"] }}</div>
+<div class="meta">Роль: {{ worker["role"] }}</div>
+<div class="meta">Должность: {{ worker["position"] or "—" }}</div>
+<div class="meta">Телефон: {{ worker["phone"] or "—" }}</div>
+<div class="meta">Email: {{ worker["email"] or "—" }}</div>
+<div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
+</div>
+
+<div class="card">
+<h2>Статистика</h2>
+<div class="grid">
+    <div class="stat">
+        <div class="label">Всего заявок</div>
+        <div class="value">{{ total_tasks }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Завершено</div>
+        <div class="value">{{ done_tasks }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Доход</div>
+        <div class="value">{{ income }} ₽</div>
+    </div>
+</div>
+</div>
+
+</div>
+{% include 'mobile_nav.html' %}
+</body>
+</html>
