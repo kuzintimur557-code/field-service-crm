@@ -3193,6 +3193,46 @@ async def update_payment_status(request: Request, task_id: int):
 
 
 
+
+@app.post("/task/{task_id}/complete")
+async def complete_task(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "worker":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=? AND worker=?
+    """, (task_id, username)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/my-tasks", status_code=302)
+
+    c.execute("""
+    UPDATE tasks
+    SET status='Завершено'
+    WHERE id=?
+    """, (task_id,))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/my-tasks", status_code=302)
+
+
+
 @app.post("/task/{task_id}/start")
 async def start_task(request: Request, task_id: int):
 
