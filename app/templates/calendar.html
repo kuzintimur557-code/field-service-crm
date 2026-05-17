@@ -24,9 +24,16 @@ h1{font-size:32px;margin:0}
 	.filters{background:white;border-radius:20px;padding:16px;margin-bottom:18px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
 	.filters form{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
 	.filters label{display:block;font-size:13px;font-weight:900;color:#6b7280;margin-bottom:6px}
-	.filters select{min-width:220px;padding:12px;border-radius:14px;border:1px solid #d1d5db;background:white;font-weight:800}
+	.filters select,.filters input{min-width:220px;padding:12px;border-radius:14px;border:1px solid #d1d5db;background:white;font-weight:800}
 	.filters button{padding:12px 16px;border:0;border-radius:14px;background:#111827;color:white;font-weight:900;cursor:pointer}
-	@media(max-width:700px){.container{padding:16px}h1{font-size:26px}.filters select,.filters button{width:100%}}
+	.reset{display:inline-flex;align-items:center;padding:12px 14px;border-radius:14px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-weight:900}
+	.load-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
+	.load-card{background:white;border-radius:18px;padding:16px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
+	.load-name{font-weight:900;margin-bottom:6px}
+	.load-total{font-size:24px;font-weight:900;margin-bottom:10px}
+	.load-row{display:flex;justify-content:space-between;gap:10px;color:#4b5563;margin-top:5px}
+	.load-row b{color:#111827}
+	@media(max-width:700px){.container{padding:16px}h1{font-size:26px}.filters select,.filters input,.filters button,.reset{width:100%}}
 	</style>
 </head>
 
@@ -39,23 +46,42 @@ h1{font-size:32px;margin:0}
 	</div>
 
 	{% if role in ("boss", "manager") %}
-	<div class="filters">
-	<form method="get" action="/calendar">
-	    <div>
-	        <label>Исполнитель</label>
-	        <select name="worker">
+		<div class="filters">
+		<form method="get" action="/calendar">
+		    <div>
+		        <label>Месяц</label>
+		        <input type="month" name="month" value="{{ selected_month }}">
+		    </div>
+		    <div>
+		        <label>Исполнитель</label>
+		        <select name="worker">
 	            <option value="">Все исполнители</option>
 	            {% for worker in workers %}
 	            <option value="{{ worker['username'] }}" {% if selected_worker == worker['username'] %}selected{% endif %}>
 	                {{ worker["username"] }}
 	            </option>
 	            {% endfor %}
-	        </select>
-	    </div>
-	    <button type="submit">Показать</button>
-	</form>
-	</div>
-	{% endif %}
+		        </select>
+		    </div>
+		    <button type="submit">Показать</button>
+		    <a class="reset" href="/calendar">Сбросить</a>
+		</form>
+		</div>
+		{% endif %}
+
+		{% if role in ("boss", "manager") and worker_loads %}
+		<div class="load-grid">
+		{% for load in worker_loads %}
+		    <div class="load-card">
+		        <div class="load-name">{{ load["username"] }}</div>
+		        <div class="load-total">{{ load["total"] }} заявок</div>
+		        <div class="load-row"><span>Новые</span><b>{{ load["new"] }}</b></div>
+		        <div class="load-row"><span>В работе</span><b>{{ load["active"] }}</b></div>
+		        <div class="load-row"><span>Завершено</span><b>{{ load["completed"] }}</b></div>
+		    </div>
+		{% endfor %}
+		</div>
+		{% endif %}
 
 	{% if calendar_days %}
 	{% for day in calendar_days %}

@@ -1019,7 +1019,7 @@ async def home(
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-async def calendar_page(request: Request, worker: str = ""):
+async def calendar_page(request: Request, worker: str = "", month: str = ""):
 
     username = get_user(request)
 
@@ -1038,12 +1038,17 @@ async def calendar_page(request: Request, worker: str = ""):
     c = conn.cursor()
 
     workers = []
+    worker_loads = []
     query = """
     SELECT *
     FROM tasks
     WHERE archived=0 AND company_id=?
     """
     params = [company_id]
+
+    if month:
+        query += " AND task_date LIKE ?"
+        params.append(f"{month}%")
 
     if role in ("boss", "manager"):
         workers = c.execute("""
@@ -1056,6 +1061,48 @@ async def calendar_page(request: Request, worker: str = ""):
         if worker:
             query += f" AND {worker_task_condition()}"
             params += worker_task_params(worker)
+
+        for worker_row in workers:
+            worker_name = worker_row["username"]
+            worker_condition = worker_task_condition()
+            worker_params = worker_task_params(worker_name)
+            load_params = [company_id] + worker_params
+            date_filter = ""
+
+            if month:
+                date_filter = " AND task_date LIKE ?"
+                load_params.append(f"{month}%")
+
+            total = c.execute(f"""
+            SELECT COUNT(*) FROM tasks
+            WHERE archived=0 AND company_id=? AND {worker_condition}{date_filter}
+            """, load_params).fetchone()[0]
+
+            new = c.execute(f"""
+            SELECT COUNT(*) FROM tasks
+            WHERE archived=0 AND company_id=? AND {worker_condition}
+              AND status='Новая'{date_filter}
+            """, load_params).fetchone()[0]
+
+            active = c.execute(f"""
+            SELECT COUNT(*) FROM tasks
+            WHERE archived=0 AND company_id=? AND {worker_condition}
+              AND status='В работе'{date_filter}
+            """, load_params).fetchone()[0]
+
+            completed = c.execute(f"""
+            SELECT COUNT(*) FROM tasks
+            WHERE archived=0 AND company_id=? AND {worker_condition}
+              AND status='Завершено'{date_filter}
+            """, load_params).fetchone()[0]
+
+            worker_loads.append({
+                "username": worker_name,
+                "total": total,
+                "new": new,
+                "active": active,
+                "completed": completed
+            })
     else:
         worker = ""
         query += f" AND {worker_task_condition()}"
@@ -1091,7 +1138,9 @@ async def calendar_page(request: Request, worker: str = ""):
             "tasks": tasks,
             "calendar_days": calendar_days,
             "workers": workers,
+            "worker_loads": worker_loads,
             "selected_worker": worker,
+            "selected_month": month,
             "username": username,
             "role": role
         }

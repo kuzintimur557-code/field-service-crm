@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
+from starlette.requests import Request
+
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -25,6 +27,21 @@ def make_request(username=None, cookies=None):
         request_cookies[crm.SESSION_COOKIE_NAME] = crm.sign_session_value(username)
 
     return SimpleNamespace(cookies=request_cookies, headers={}, client=None)
+
+
+def make_asgi_request(username, path="/calendar"):
+    cookie = f"{crm.SESSION_COOKIE_NAME}={crm.sign_session_value(username)}"
+
+    return Request({
+        "type": "http",
+        "method": "GET",
+        "path": path,
+        "headers": [(b"cookie", cookie.encode("utf-8"))],
+        "query_string": b"",
+        "scheme": "http",
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    })
 
 
 def seed_data():
@@ -136,12 +153,40 @@ async def assert_upload_access():
     assert worker_file.status_code == 200
 
 
+async def assert_calendar_access():
+    manager_response = await crm.calendar_page(
+        make_asgi_request("owner2"),
+        worker="helper2",
+        month="2026-05",
+    )
+    assert manager_response.status_code == 200
+    manager_html = manager_response.body.decode("utf-8")
+    assert "Client 2" in manager_html
+    assert "helper2" in manager_html
+    assert "load-card" in manager_html
+
+    worker_response = await crm.calendar_page(
+        make_asgi_request("helper2"),
+        month="2026-05",
+    )
+    assert worker_response.status_code == 200
+    assert "Client 2" in worker_response.body.decode("utf-8")
+
+    outsider_response = await crm.calendar_page(
+        make_asgi_request("outsider_worker"),
+        month="2026-05",
+    )
+    assert outsider_response.status_code == 200
+    assert "Client 2" not in outsider_response.body.decode("utf-8")
+
+
 def main():
     try:
         task = seed_data()
         assert_session_cookie_auth()
         assert_task_access(task)
         asyncio.run(assert_upload_access())
+        asyncio.run(assert_calendar_access())
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()
