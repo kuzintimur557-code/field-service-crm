@@ -3241,6 +3241,25 @@ async def complete_task(request: Request, task_id: int):
         task_id
     ))
 
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Завершил заявку",
+        report,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
     conn.commit()
     conn.close()
 
@@ -3278,6 +3297,25 @@ async def start_task(request: Request, task_id: int):
     SET status='В работе'
     WHERE id=?
     """, (task_id,))
+
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Взял в работу",
+        "Исполнитель начал выполнение заявки",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
 
     conn.commit()
     conn.close()
