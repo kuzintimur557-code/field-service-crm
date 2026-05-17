@@ -10,23 +10,27 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:900px;margin:auto;padding:28px}
+.container{max-width:950px;margin:auto;padding:28px}
 .back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
 .card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
 h1{margin:0 0 22px;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
-label{display:block;margin-top:12px;font-weight:900;color:#374151}
-input,select,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
-input,select{border:1px solid #d1d5db;background:white}
-button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
-.user{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
-.name{font-size:18px;font-weight:900}
-.meta{font-size:13px;color:#6b7280;font-weight:800;margin-top:4px}
-.badge{display:inline-block;padding:7px 12px;border-radius:999px;font-weight:900}
-.badge.manager{background:#dbeafe;color:#1d4ed8}
-.badge.worker{background:#dcfce7;color:#166534}
-.empty{font-weight:900;color:#6b7280}
-@media(max-width:700px){.container{padding:16px}.card{padding:22px}h1{font-size:28px}.user{grid-template-columns:1fr}}
+.user{background:#f9fafb;padding:18px;border-radius:20px;margin-bottom:14px}
+.user-top{display:flex;justify-content:space-between;gap:14px;align-items:center}
+.name{font-size:20px;font-weight:900}
+.meta{font-size:14px;color:#6b7280;font-weight:800;margin-top:6px}
+.badge{padding:8px 14px;border-radius:999px;font-weight:900}
+.manager{background:#dbeafe;color:#1d4ed8}
+.worker{background:#dcfce7;color:#166534}
+input,button{width:100%;padding:13px;border-radius:14px;font-size:15px;margin-top:10px}
+input{border:1px solid #d1d5db;background:white}
+button{border:0;color:white;font-weight:900;cursor:pointer}
+.btn-dark{background:#111827}
+.btn-red{background:#991b1b}
+.notice{margin-top:16px;padding:14px;border-radius:16px;font-weight:900}
+.ok{background:#dcfce7;color:#166534}
+.err{background:#fee2e2;color:#991b1b}
+@media(max-width:700px){.container{padding:16px}.user-top{display:block}.badge{display:inline-block;margin-top:12px}h1{font-size:28px}}
 </style>
 </head>
 
@@ -37,100 +41,20 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
 <div class="card">
 <h1>👥 Команда</h1>
-<div style="color:#6b7280;font-weight:800">
-Управление менеджерами и исполнителями платформы
-</div>
+<div class="meta">Управление менеджерами и исполнителями платформы</div>
 
-{% if request.query_params.get("created") == "1" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900">
-✅ Пользователь создан
-</div>
-{% endif %}
-
-{% if request.query_params.get("error") == "empty" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Логин и пароль обязательны
-</div>
-{% endif %}
-
-{% if request.query_params.get("error") == "exists" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Пользователь с таким логином уже существует
-</div>
-{% endif %}
-
-{% if request.query_params.get("error") == "bad_role" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Нельзя создать пользователя с такой ролью
-</div>
-{% endif %}
-
-{% if request.query_params.get("error") == "only_boss" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Создавать пользователей может только Босс
-</div>
-{% endif %}
-
-{% if request.query_params.get("error") == "user_limit" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Достигнут лимит пользователей по текущему тарифу
-</div>
-{% endif %}
-
-{% if request.query_params.get("error") == "cannot_delete_boss" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Нельзя удалить boss
-</div>
+{% if request.query_params.get("password_changed") == "1" %}
+<div class="notice ok">✅ Пароль обновлён</div>
 {% endif %}
 
 {% if request.query_params.get("deleted") == "1" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900">
-✅ Пользователь удалён
-</div>
+<div class="notice ok">✅ Пользователь удалён</div>
 {% endif %}
 
-{% if request.query_params.get("password_changed") == "1" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900">
-✅ Пароль обновлён
-</div>
-{% endif %}
-
-{% if request.query_params.get("error") == "empty_password" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Новый пароль не может быть пустым
-</div>
-{% endif %}
-
-{% if request.query_params.get("error") == "cannot_change_self_here" %}
-<div style="margin-top:16px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Свой пароль меняем отдельно
-</div>
+{% if request.query_params.get("error") %}
+<div class="notice err">❌ Ошибка: {{ request.query_params.get("error") }}</div>
 {% endif %}
 </div>
-
-{% if role == "boss" %}
-<div class="card">
-<h2>Добавить пользователя</h2>
-
-<form method="post" action="/workers">
-
-<label>Логин</label>
-<input type="text" name="username" placeholder="Например: ivan" required>
-
-<label>Пароль</label>
-<input type="text" name="password" placeholder="Временный пароль" required>
-
-<label>Роль</label>
-<select name="role">
-<option value="worker">Исполнитель</option>
-<option value="manager">Менеджер</option>
-</select>
-
-<button type="submit">➕ Создать пользователя</button>
-
-</form>
-</div>
-{% endif %}
 
 <div class="card">
 <h2>Список команды</h2>
@@ -138,26 +62,33 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 {% if workers %}
 {% for worker in workers %}
 <div class="user">
-    <div>
-        <div class="name">{{ worker["username"] }}</div>
-        <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
+    <div class="user-top">
+        <div>
+            <div class="name">{{ worker["username"] }}</div>
+            <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
+        </div>
+
+        {% if worker["role"] == "manager" %}
+        <div class="badge manager">Менеджер</div>
+        {% else %}
+        <div class="badge worker">Исполнитель</div>
+        {% endif %}
     </div>
 
-    {% if worker["role"] == "manager" %}
-    <div class="badge manager">Менеджер</div>
-    {% else %}
-    <div class="badge worker">Исполнитель</div>
-    {% endif %}
-
     {% if role == "boss" and worker["role"] != "boss" %}
-    <form method="post" action="/workers/{{ worker['id'] }}/delete" onsubmit="return confirm('Удалить пользователя?')" style="margin-top:12px">
-        <button type="submit" style="background:#991b1b">Удалить пользователя</button>
+    <form method="post" action="/workers/{{ worker['id'] }}/password">
+        <input type="text" name="password" placeholder="Новый пароль">
+        <button class="btn-dark" type="submit">Сменить пароль</button>
+    </form>
+
+    <form method="post" action="/workers/{{ worker['id'] }}/delete" onsubmit="return confirm('Удалить пользователя?')">
+        <button class="btn-red" type="submit">Удалить пользователя</button>
     </form>
     {% endif %}
 </div>
 {% endfor %}
 {% else %}
-<p class="empty">Команда пока пустая.</p>
+<div class="meta">Команда пока пустая</div>
 {% endif %}
 
 </div>
