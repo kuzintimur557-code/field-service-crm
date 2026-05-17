@@ -62,9 +62,12 @@ h1{font-size:30px}
         <a href="/clients">👤 Клиенты</a>
         <a href="/catalog">📦 Каталог</a>
         <a href="/finance">💰 Финансы</a>
-        <a href="/workers" class="dark">👥 Команда</a>
         <a href="/archive" class="dark">🗄 Архив</a>
         <a href="/calls">☎️ Звонки</a>
+        {% endif %}
+
+        {% if role == "boss" %}
+        <a href="/workers" class="dark">👥 Команда</a>
         {% endif %}
 
         {% if role == "boss" %}
