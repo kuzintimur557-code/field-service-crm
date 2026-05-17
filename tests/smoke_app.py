@@ -49,18 +49,18 @@ def seed_data():
     c = conn.cursor()
 
     users = [
-        ("super", "x", "superadmin", 1),
-        ("owner2", "x", "boss", 2),
-        ("manager1", "x", "manager", 1),
-        ("manager2", "x", "manager", 2),
-        ("worker2", "x", "worker", 2),
-        ("helper2", "x", "worker", 2),
-        ("outsider_worker", "x", "worker", 1),
+        ("super", "x", "superadmin", 1, ""),
+        ("owner2", "x", "boss", 2, ""),
+        ("manager1", "x", "manager", 1, ""),
+        ("manager2", "x", "manager", 2, ""),
+        ("worker2", "x", "worker", 2, "chat-worker2"),
+        ("helper2", "x", "worker", 2, "chat-helper2"),
+        ("outsider_worker", "x", "worker", 1, "chat-outsider"),
     ]
 
     c.executemany("""
-    INSERT INTO users (username, password, role, company_id)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO users (username, password, role, company_id, telegram_chat_id)
+    VALUES (?, ?, ?, ?, ?)
     """, users)
 
     c.execute("""
@@ -126,6 +126,12 @@ def assert_task_access(task):
 
     conn = connect()
     c = conn.cursor()
+
+    assert crm.get_task_worker_chat_ids(c, task) == [
+        "chat-worker2",
+        "chat-helper2",
+    ]
+
     matched = c.execute(f"""
     SELECT *
     FROM tasks

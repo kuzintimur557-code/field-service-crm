@@ -135,6 +135,23 @@ def task_has_worker(username, task):
     return username in get_task_worker_names(task)
 
 
+def get_task_worker_chat_ids(cursor, task):
+    chat_ids = []
+    task_company_id = task["company_id"] if "company_id" in task.keys() else 1
+
+    for worker_name in get_task_worker_names(task):
+        worker = cursor.execute("""
+        SELECT telegram_chat_id
+        FROM users
+        WHERE username=? AND role='worker' AND company_id=?
+        """, (worker_name, task_company_id)).fetchone()
+
+        if worker and worker["telegram_chat_id"] and worker["telegram_chat_id"] not in chat_ids:
+            chat_ids.append(worker["telegram_chat_id"])
+
+    return chat_ids
+
+
 def can_access_task(username, role, task):
     if not task:
         return False
@@ -3443,17 +3460,8 @@ async def add_task_comment(request: Request, task_id: int):
 
             send_message(comment_text)
 
-            worker_user = c.execute("""
-            SELECT telegram_chat_id
-            FROM users
-            WHERE username=?
-            """, (task["worker"],)).fetchone()
-
-            if worker_user and worker_user["telegram_chat_id"]:
-                send_message_to_chat(
-                    worker_user["telegram_chat_id"],
-                    comment_text
-                )
+            for worker_chat_id in get_task_worker_chat_ids(c, task):
+                send_message_to_chat(worker_chat_id, comment_text)
 
         except Exception as e:
             print("Telegram comment notification error:", e)
@@ -3814,6 +3822,9 @@ async def update_task_date(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    old_date = task["task_date"]
+    worker_chat_ids = get_task_worker_chat_ids(c, task)
+
     c.execute("""
     UPDATE tasks
     SET task_date=?
@@ -3823,19 +3834,31 @@ async def update_task_date(request: Request, task_id: int):
     conn.commit()
     conn.close()
 
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Дата заявки изменена",
+        f"Было: {old_date or 'Без даты'}. Стало: {new_date or 'Без даты'}"
+    )
+
     try:
-        send_message(
-            f"""
+        date_text = f"""
 📅 Дата заявки изменена
 
 Заявка: #{task_id}
 Клиент: {task['client']}
 Адрес: {task['address']}
+Старая дата: {old_date or 'Без даты'}
 Новая дата: {new_date}
 
 Изменил: {username} ({get_role_title(role)})
 """
-        )
+
+        send_message(date_text)
+
+        for worker_chat_id in worker_chat_ids:
+            send_message_to_chat(worker_chat_id, date_text)
     except Exception:
         pass
 
