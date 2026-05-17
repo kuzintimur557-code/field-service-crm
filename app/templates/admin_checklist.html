@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Production Checklist</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1000px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
+h1{margin:0 0 12px;font-size:36px}
+h2{margin:0 0 16px;font-size:24px}
+.item{padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px;font-weight:900}
+.ok{border-left:6px solid #16a34a}
+.todo{border-left:6px solid #f59e0b}
+.important{border-left:6px solid #991b1b}
+.small{color:#6b7280;font-weight:800;line-height:1.45}
+@media(max-width:700px){.container{padding:16px}h1{font-size:30px}.card{padding:22px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/admin" class="back">← Назад в Admin</a>
+
+<div class="card">
+<h1>✅ Production Checklist</h1>
+<div class="small">Контрольный список перед реальным запуском SaaS-платформы.</div>
+</div>
+
+<div class="card">
+<h2>Готово</h2>
+<div class="item ok">✅ FastAPI приложение</div>
+<div class="item ok">✅ Railway deploy</div>
+<div class="item ok">✅ Роли boss / manager / worker</div>
+<div class="item ok">✅ Клиенты, заявки, финансы, каталог</div>
+<div class="item ok">✅ PDF акты и счета</div>
+<div class="item ok">✅ Backup / Debug / System</div>
+<div class="item ok">✅ Password hashing</div>
+<div class="item ok">✅ Login audit</div>
+</div>
+
+<div class="card">
+<h2>Перед продажами</h2>
+<div class="item important">🇷🇺 Перенести production на российский сервер для клиентов РФ</div>
+<div class="item important">💾 Подключить persistent storage / volume</div>
+<div class="item important">🔐 Убрать дефолтные пароли</div>
+<div class="item important">🌐 Подключить домен</div>
+<div class="item important">📄 Подготовить политику обработки персональных данных</div>
+<div class="item important">💳 Подключить оплату тарифов</div>
+</div>
+
+<div class="card">
+<h2>Roadmap</h2>
+<div class="item todo">📞 Телефония и запись звонков</div>
+<div class="item todo">🤖 AI-анализ разговоров</div>
+<div class="item todo">🔗 1С интеграция</div>
+<div class="item todo">📱 Мобильная адаптация / PWA polish</div>
+<div class="item todo">🏢 Multi-company SaaS архитектура</div>
+</div>
+
+</div>
+</body>
+</html>
