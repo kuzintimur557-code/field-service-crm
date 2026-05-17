@@ -515,6 +515,82 @@ def update_last_seen(username):
     conn.close()
 
 
+@app.post("/platform/companies")
+async def create_platform_company(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+
+    company_name = (form.get("company_name") or "").strip()
+    owner_username = (form.get("owner_username") or "").strip()
+    owner_password = (form.get("owner_password") or "").strip()
+
+    if not company_name or not owner_username or not owner_password:
+        return RedirectResponse("/platform/companies?error=empty", status_code=302)
+
+    if not is_password_strong(owner_password):
+        return RedirectResponse("/platform/companies?error=weak_password", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    existing_user = c.execute("""
+    SELECT id
+    FROM users
+    WHERE username=?
+    """, (owner_username,)).fetchone()
+
+    if existing_user:
+        conn.close()
+        return RedirectResponse("/platform/companies?error=user_exists", status_code=302)
+
+    c.execute("""
+    INSERT INTO companies (
+        name,
+        owner_username,
+        created_at
+    )
+    VALUES (?, ?, ?)
+    """, (
+        company_name,
+        owner_username,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    company_id = c.lastrowid
+
+    c.execute("""
+    INSERT INTO users (
+        username,
+        password,
+        role,
+        company_id,
+        last_seen
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        owner_username,
+        hash_password(owner_password),
+        "boss",
+        company_id,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/platform/companies?created=1", status_code=302)
+
+
 @app.get("/platform/companies", response_class=HTMLResponse)
 async def platform_companies_page(request: Request):
 
