@@ -874,12 +874,17 @@ async def finance_export(request: Request, month: str = ""):
     conn = connect()
     c = conn.cursor()
 
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
+    company_id = get_user_company_id(username)
+
     tasks = c.execute("""
     SELECT *
     FROM tasks
-    WHERE archived=0 AND task_date LIKE ?
+    WHERE archived=0 AND company_id=? AND task_date LIKE ?
     ORDER BY task_date DESC
-    """, (f"{month}%",)).fetchall()
+    """, (company_id, f"{month}%")).fetchall()
 
     output = io.StringIO()
     writer = csv.writer(output)
