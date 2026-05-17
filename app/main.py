@@ -2043,6 +2043,10 @@ async def create_worker(request: Request):
     worker_username = (form.get("username") or "").strip()
     worker_password = (form.get("password") or "").strip()
     worker_role = (form.get("role") or "worker").strip()
+    full_name = (form.get("full_name") or "").strip()
+    position = (form.get("position") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    email = (form.get("email") or "").strip()
 
     if not worker_username or not worker_password:
         return RedirectResponse("/workers?error=empty", status_code=302)
