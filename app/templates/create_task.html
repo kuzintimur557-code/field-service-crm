@@ -64,11 +64,14 @@ button:hover{background:#1d4ed8}
 <div class="grid">
 <div>
 <label>Исполнитель</label>
-<select name="worker">
+<select name="workers" multiple size="5">
 {% for worker in workers %}
 <option value="{{ worker[0] }}">{{ worker[0] }}</option>
 {% endfor %}
 </select>
+<div style="font-size:13px;color:#6b7280;font-weight:800;margin-top:6px">
+Можно выбрать несколько исполнителей: зажми Cmd и нажимай нужных.
+</div>
 </div>
 
 <div>
