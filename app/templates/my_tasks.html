@@ -46,6 +46,12 @@ h1{margin:0 0 8px;font-size:32px}
     </form>
     {% endif %}
 
+    {% if task["status"] == "В работе" %}
+    <form method="post" action="/task/{{ task['id'] }}/complete">
+        <button class="btn" type="submit" style="border:0;width:100%;background:#16a34a">✅ Завершить</button>
+    </form>
+    {% endif %}
+
     <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
 </div>
 {% endfor %}
