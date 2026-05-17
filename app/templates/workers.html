@@ -51,7 +51,9 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">✅ Пользователь удалён</div>
 {% endif %}
 
-{% if request.query_params.get("error") %}
+{% if request.query_params.get("error") == "weak_password" %}
+<div class="notice err">❌ Пароль должен быть минимум 6 символов</div>
+{% elif request.query_params.get("error") %}
 <div class="notice err">❌ Ошибка: {{ request.query_params.get("error") }}</div>
 {% endif %}
 </div>

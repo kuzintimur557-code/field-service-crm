@@ -120,6 +120,10 @@ def password_needs_upgrade(stored_password):
     return not str(stored_password or "").startswith("sha256$")
 
 
+def is_password_strong(password):
+    return len(password or "") >= 6
+
+
 def get_plan_user_limit(plan):
     limits = {
         "basic": 3,
@@ -1572,6 +1576,9 @@ async def change_my_password(request: Request):
     if not old_password or not new_password:
         return RedirectResponse("/profile?error=empty", status_code=302)
 
+    if not is_password_strong(new_password):
+        return RedirectResponse("/profile?error=weak_password", status_code=302)
+
     conn = connect()
     c = conn.cursor()
 
@@ -1732,6 +1739,9 @@ async def change_team_user_password(request: Request, user_id: int):
 
     if not new_password:
         return RedirectResponse("/workers?error=empty_password", status_code=302)
+
+    if not is_password_strong(new_password):
+        return RedirectResponse("/workers?error=weak_password", status_code=302)
 
     conn = connect()
     c = conn.cursor()

@@ -52,6 +52,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice err">❌ Старый пароль неверный</div>
 {% endif %}
 
+{% if request.query_params.get("error") == "weak_password" %}
+<div class="notice err">❌ Новый пароль должен быть минимум 6 символов</div>
+{% endif %}
+
 <form method="post" action="/profile/password">
 <label>Старый пароль</label>
 <input type="password" name="old_password" required>
