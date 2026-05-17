@@ -1358,11 +1358,21 @@ async def clients_page(request: Request):
     conn = connect()
     c = conn.cursor()
 
-    clients = c.execute("""
-    SELECT *
-    FROM clients
-    ORDER BY id DESC
-    """).fetchall()
+    if role == "superadmin":
+        clients = c.execute("""
+        SELECT *
+        FROM clients
+        ORDER BY id DESC
+        """).fetchall()
+    else:
+        company_id = get_user_company_id(username)
+
+        clients = c.execute("""
+        SELECT *
+        FROM clients
+        WHERE company_id=?
+        ORDER BY id DESC
+        """, (company_id,)).fetchall()
 
     conn.close()
 
