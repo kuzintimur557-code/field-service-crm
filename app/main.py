@@ -997,7 +997,7 @@ async def integration_1c_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     settings = get_company_settings()
@@ -1027,7 +1027,7 @@ async def billing_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     settings = get_company_settings()
@@ -1058,7 +1058,7 @@ async def settings_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     settings = get_company_settings()
@@ -1088,7 +1088,7 @@ async def update_settings(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     form = await request.form()
@@ -1809,7 +1809,7 @@ async def create_worker(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
     form = await request.form()
@@ -1887,7 +1887,7 @@ async def change_team_user_password(request: Request, user_id: int):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
     form = await request.form()
@@ -1938,7 +1938,7 @@ async def delete_team_user(request: Request, user_id: int):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
     conn = connect()
@@ -1979,7 +1979,7 @@ async def clear_login_attempts_admin(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     conn = connect()
@@ -2003,7 +2003,7 @@ async def admin_notes_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     return templates.TemplateResponse(
@@ -2027,7 +2027,7 @@ async def admin_roadmap_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     return templates.TemplateResponse(
@@ -2051,7 +2051,7 @@ async def admin_checklist_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     return templates.TemplateResponse(
@@ -2075,7 +2075,7 @@ async def admin_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
     return templates.TemplateResponse(
@@ -2099,7 +2099,7 @@ async def system_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
     db_path = DATA_DIR / "crm.db"
@@ -2136,7 +2136,7 @@ async def debug_page(request: Request):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
     conn = connect()
@@ -3195,7 +3195,7 @@ async def delete_task_forever(request: Request, task_id: int):
 
     role = get_role(username)
 
-    if role != "boss":
+    if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
     conn = connect()
