@@ -1105,14 +1105,16 @@ async def reports_page(request: Request, month: str = ""):
     if not month:
         month = datetime.now().strftime("%Y-%m")
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
     workers = c.execute("""
     SELECT username FROM users
-    WHERE role='worker'
+    WHERE role='worker' AND company_id=?
     ORDER BY username
-    """).fetchall()
+    """, (company_id,)).fetchall()
 
     report_rows = []
 
