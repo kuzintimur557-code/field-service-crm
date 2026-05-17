@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roadmap</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1050px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
+h1{margin:0 0 12px;font-size:36px}
+h2{margin:0 0 16px;font-size:24px}
+.phase{padding:18px;border-radius:20px;background:#f9fafb;margin-bottom:14px;border-left:7px solid #2563eb}
+.phase.done{border-left-color:#16a34a}
+.phase.next{border-left-color:#f59e0b}
+.phase.future{border-left-color:#7c3aed}
+.title{font-size:20px;font-weight:900;margin-bottom:8px}
+.item{font-weight:800;color:#374151;margin:6px 0}
+.small{color:#6b7280;font-weight:800;line-height:1.45}
+@media(max-width:700px){.container{padding:16px}h1{font-size:30px}.card{padding:22px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/admin" class="back">← Назад в Admin</a>
+
+<div class="card">
+<h1>🧭 Roadmap продукта</h1>
+<div class="small">
+План развития Field Service CRM до полноценной SaaS / ERP платформы.
+</div>
+</div>
+
+<div class="card">
+<h2>Этап 1 — Core CRM ✅</h2>
+<div class="phase done">
+    <div class="title">Готово</div>
+    <div class="item">✅ Заявки</div>
+    <div class="item">✅ Роли boss / manager / worker</div>
+    <div class="item">✅ Клиенты</div>
+    <div class="item">✅ Команда</div>
+    <div class="item">✅ Календарь</div>
+    <div class="item">✅ Фото до/после</div>
+    <div class="item">✅ PDF акты и счета</div>
+    <div class="item">✅ Финансы</div>
+</div>
+</div>
+
+<div class="card">
+<h2>Этап 2 — Production hardening 🟡</h2>
+<div class="phase next">
+    <div class="title">Делаем сейчас</div>
+    <div class="item">🔐 Пароли и безопасность</div>
+    <div class="item">🧾 Audit logs</div>
+    <div class="item">💾 Backup</div>
+    <div class="item">🟢 System status</div>
+    <div class="item">🛠 Admin Center</div>
+    <div class="item">📦 Persistent storage</div>
+    <div class="item">🇷🇺 Подготовка РФ-сервера</div>
+</div>
+</div>
+
+<div class="card">
+<h2>Этап 3 — SaaS monetization</h2>
+<div class="phase future">
+    <div class="title">Следующий этап</div>
+    <div class="item">💳 Подписки</div>
+    <div class="item">📊 Тарифные лимиты</div>
+    <div class="item">🏢 Multi-company</div>
+    <div class="item">🌐 Домен</div>
+    <div class="item">📄 Документы по персональным данным</div>
+</div>
+</div>
+
+<div class="card">
+<h2>Этап 4 — Enterprise</h2>
+<div class="phase future">
+    <div class="title">Большие модули</div>
+    <div class="item">🔗 1С интеграция</div>
+    <div class="item">☎️ Входящие звонки</div>
+    <div class="item">🎙 Запись разговоров</div>
+    <div class="item">🤖 AI-анализ скриптов</div>
+    <div class="item">📱 Mobile-first PWA polish</div>
+</div>
+</div>
+
+</div>
+</body>
+</html>
