@@ -709,6 +709,9 @@ async def calendar_page(request: Request):
     update_last_seen(username)
     role = get_role(username)
 
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
     conn = connect()
     c = conn.cursor()
 
@@ -835,6 +838,9 @@ async def finance_page(request: Request, month: str = ""):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
     catalog_company_id = get_user_company_id(username)
 
     if role not in ("boss", "manager"):
@@ -1239,6 +1245,9 @@ async def catalog_page(request: Request):
 
     role = get_role(username)
 
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
@@ -1399,6 +1408,9 @@ async def clients_page(request: Request):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
 
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
@@ -1860,6 +1872,9 @@ async def workers_page(request: Request):
 
     update_last_seen(username)
     role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
 
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
@@ -2386,6 +2401,9 @@ async def create_task_page(request: Request):
 
     update_last_seen(username)
     role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
 
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
