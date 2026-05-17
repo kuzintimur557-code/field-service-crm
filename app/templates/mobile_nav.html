@@ -1,0 +1,82 @@
+<style>
+.mobile-nav{
+position:fixed;
+bottom:0;
+left:0;
+right:0;
+height:74px;
+background:white;
+border-top:1px solid #e5e7eb;
+display:none;
+z-index:9999;
+padding-bottom:env(safe-area-inset-bottom);
+box-shadow:0 -4px 20px rgba(0,0,0,.06)
+}
+
+.mobile-nav-grid{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+height:100%
+}
+
+.mobile-nav a{
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+text-decoration:none;
+font-size:11px;
+font-weight:900;
+color:#6b7280
+}
+
+.mobile-nav a.active{
+color:#2563eb
+}
+
+.mobile-nav-icon{
+font-size:22px;
+margin-bottom:4px
+}
+
+@media(max-width:768px){
+.mobile-nav{
+display:block
+}
+
+body{
+padding-bottom:92px!important
+}
+}
+</style>
+
+<div class="mobile-nav">
+<div class="mobile-nav-grid">
+
+<a href="/" class="{% if request.url.path == '/' %}active{% endif %}">
+<div class="mobile-nav-icon">🏠</div>
+<div>Главная</div>
+</a>
+
+<a href="/tasks" class="{% if '/task' in request.url.path %}active{% endif %}">
+<div class="mobile-nav-icon">📋</div>
+<div>Задачи</div>
+</a>
+
+<a href="/calendar" class="{% if '/calendar' in request.url.path %}active{% endif %}">
+<div class="mobile-nav-icon">📅</div>
+<div>Календарь</div>
+</a>
+
+<a href="/clients" class="{% if '/clients' in request.url.path %}active{% endif %}">
+<div class="mobile-nav-icon">👤</div>
+<div>Клиенты</div>
+</a>
+
+<a href="/admin">
+<div class="mobile-nav-icon">☰</div>
+<div>Ещё</div>
+</a>
+
+</div>
+</div>
