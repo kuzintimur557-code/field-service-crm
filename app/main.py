@@ -693,9 +693,24 @@ async def my_tasks_page(request: Request):
     tasks = c.execute("""
     SELECT *
     FROM tasks
-    WHERE archived=0 AND company_id=? AND worker=?
+    WHERE archived=0
+      AND company_id=?
+      AND (
+        worker=?
+        OR workers=?
+        OR workers LIKE ?
+        OR workers LIKE ?
+        OR workers LIKE ?
+      )
     ORDER BY task_date DESC
-    """, (company_id, username)).fetchall()
+    """, (
+        company_id,
+        username,
+        username,
+        f"{username},%",
+        f"%,{username},%",
+        f"%,{username}"
+    )).fetchall()
 
     conn.close()
 
