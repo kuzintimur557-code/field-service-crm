@@ -42,6 +42,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="card">
 <h1>👥 Команда</h1>
 <div class="meta">Управление менеджерами и исполнителями платформы</div>
+<div class="meta">DEBUG ROLE: {{ role }} / USER: {{ username }}</div>
 
 {% if request.query_params.get("password_changed") == "1" %}
 <div class="notice ok">✅ Пароль обновлён</div>
@@ -64,6 +65,10 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <form method="post" action="/workers" style="display:grid;gap:12px;margin-bottom:20px">
     <input type="text" name="username" placeholder="Логин" required>
     <input type="text" name="password" placeholder="Пароль" required>
+    <input type="text" name="full_name" placeholder="ФИО">
+    <input type="text" name="position" placeholder="Должность">
+    <input type="text" name="phone" placeholder="Телефон">
+    <input type="email" name="email" placeholder="Email">
 
     <select name="role" style="width:100%;padding:13px;border-radius:14px;border:1px solid #d1d5db">
         <option value="worker">Исполнитель</option>
@@ -82,7 +87,11 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="user">
     <div class="user-top">
         <div>
-            <div class="name">{{ worker["username"] }}</div>
+            <div class="name">{{ worker["full_name"] or worker["username"] }}</div>
+            <div class="meta">Логин: {{ worker["username"] }}</div>
+            <div class="meta">Должность: {{ worker["position"] or "—" }}</div>
+            <div class="meta">Телефон: {{ worker["phone"] or "—" }}</div>
+            <div class="meta">Email: {{ worker["email"] or "—" }}</div>
             <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
         </div>
 
