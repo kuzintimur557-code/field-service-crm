@@ -116,10 +116,27 @@ body{
     font-size:18px;
 }
 
-.value{
-    font-size:22px;
-    font-weight:900;
-}
+	.value{
+	    font-size:22px;
+	    font-weight:900;
+	}
+
+	.worker-list{
+	    display:flex;
+	    gap:8px;
+	    flex-wrap:wrap;
+	}
+
+	.worker-chip{
+	    display:inline-flex;
+	    align-items:center;
+	    padding:8px 12px;
+	    border-radius:999px;
+	    background:#eff6ff;
+	    color:#1d4ed8;
+	    font-size:16px;
+	    font-weight:900;
+	}
 
 .edit-btn{
     width:42px;
@@ -379,12 +396,22 @@ button{
 <button class="edit-btn" onclick="openDate()">✎</button>
 </div>
 
-<div class="info-row">
-<div class="icon">👷</div>
-<div class="label">Исполнитель</div>
-<div class="value">{{ task["worker"] }}</div>
-<button class="edit-btn" onclick="openEdit('worker','{{ task['worker'] }}')">✎</button>
-</div>
+	<div class="info-row">
+	<div class="icon">👷</div>
+	<div class="label">Исполнители</div>
+	<div class="value">
+	<div class="worker-list">
+	{% if task_workers %}
+	{% for worker_name in task_workers %}
+	<span class="worker-chip">{{ worker_name }}</span>
+	{% endfor %}
+	{% else %}
+	<span class="worker-chip">Не назначены</span>
+	{% endif %}
+	</div>
+	</div>
+	<button class="edit-btn" onclick="openEdit('worker','{{ task['worker'] }}')">✎</button>
+	</div>
 
 <div class="info-row">
 <div class="icon">🚩</div>
@@ -491,10 +518,16 @@ button{
 <div class="mini-value">{{ task["task_date"] }}</div>
 </div>
 
-<div class="mini">
-<div class="mini-label">Исполнитель</div>
-<div class="mini-value">{{ task["worker"] }}</div>
-</div>
+	<div class="mini">
+	<div class="mini-label">Исполнители</div>
+	<div class="mini-value">
+	{% if task_workers %}
+	{{ task_workers|join(", ") }}
+	{% else %}
+	Не назначены
+	{% endif %}
+	</div>
+	</div>
 
 <div class="mini">
 <div class="mini-label">Цена</div>

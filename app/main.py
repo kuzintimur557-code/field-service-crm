@@ -75,6 +75,64 @@ def save_upload_file(upload_file, task_id, prefix):
     return filename
 
 
+def get_task_worker_names(task):
+    names = []
+
+    if not task:
+        return names
+
+    task_keys = task.keys() if hasattr(task, "keys") else []
+
+    for field in ("worker", "workers"):
+        if field not in task_keys:
+            continue
+
+        for name in str(task[field] or "").split(","):
+            name = name.strip()
+
+            if name and name not in names:
+                names.append(name)
+
+    return names
+
+
+def format_task_workers(task):
+    names = get_task_worker_names(task)
+    return ", ".join(names) if names else "Не назначены"
+
+
+def worker_task_condition():
+    return """
+    (
+        worker=?
+        OR worker LIKE ?
+        OR worker LIKE ?
+        OR worker LIKE ?
+        OR workers=?
+        OR workers LIKE ?
+        OR workers LIKE ?
+        OR workers LIKE ?
+    )
+    """
+
+
+def worker_task_params(username):
+    return [
+        username,
+        f"{username},%",
+        f"%,{username},%",
+        f"%,{username}",
+        username,
+        f"{username},%",
+        f"%,{username},%",
+        f"%,{username}"
+    ]
+
+
+def task_has_worker(username, task):
+    return username in get_task_worker_names(task)
+
+
 def can_access_task(username, role, task):
     if not task:
         return False
@@ -82,7 +140,7 @@ def can_access_task(username, role, task):
     if role in ("boss", "manager"):
         return True
 
-    return task["worker"] == username
+    return task_has_worker(username, task)
 
 
 def get_role_title(role):
@@ -695,23 +753,10 @@ async def my_tasks_page(request: Request, status: str = ""):
     FROM tasks
     WHERE archived=0
       AND company_id=?
-      AND (
-        worker=?
-        OR workers=?
-        OR workers LIKE ?
-        OR workers LIKE ?
-        OR workers LIKE ?
-      )
     """
 
-    params = [
-        company_id,
-        username,
-        username,
-        f"{username},%",
-        f"%,{username},%",
-        f"%,{username}"
-    ]
+    query += f" AND {worker_task_condition()}"
+    params = [company_id] + worker_task_params(username)
 
     if status:
         query += " AND status=?"
@@ -882,7 +927,7 @@ async def home(
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-async def calendar_page(request: Request):
+async def calendar_page(request: Request, worker: str = ""):
 
     username = get_user(request)
 
@@ -895,28 +940,66 @@ async def calendar_page(request: Request):
     if role == "superadmin":
         return RedirectResponse("/platform", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
+    workers = []
+    query = """
+    SELECT *
+    FROM tasks
+    WHERE archived=0 AND company_id=?
+    """
+    params = [company_id]
+
     if role in ("boss", "manager"):
-        tasks = c.execute("""
-        SELECT * FROM tasks
-        ORDER BY task_date ASC, id DESC
-        """).fetchall()
+        workers = c.execute("""
+        SELECT username
+        FROM users
+        WHERE role='worker' AND company_id=?
+        ORDER BY username
+        """, (company_id,)).fetchall()
+
+        if worker:
+            query += f" AND {worker_task_condition()}"
+            params += worker_task_params(worker)
     else:
-        tasks = c.execute("""
-        SELECT * FROM tasks
-        WHERE worker=?
-        ORDER BY task_date ASC, id DESC
-        """, (username,)).fetchall()
+        worker = ""
+        query += f" AND {worker_task_condition()}"
+        params += worker_task_params(username)
+
+    query += " ORDER BY task_date ASC, id DESC"
+
+    tasks = c.execute(query, params).fetchall()
 
     conn.close()
+
+    calendar_days = []
+
+    for task in tasks:
+        task_date = str(task["task_date"] or "").strip()
+        day_label = task_date[:10] if task_date else "Без даты"
+
+        if not calendar_days or calendar_days[-1]["date"] != day_label:
+            calendar_days.append({
+                "date": day_label,
+                "tasks": []
+            })
+
+        calendar_days[-1]["tasks"].append({
+            "task": task,
+            "workers": format_task_workers(task)
+        })
 
     return templates.TemplateResponse(
         request=request,
         name="calendar.html",
         context={
             "tasks": tasks,
+            "calendar_days": calendar_days,
+            "workers": workers,
+            "selected_worker": worker,
             "username": username,
             "role": role
         }
@@ -2686,8 +2769,9 @@ async def create_task_page(request: Request):
     clients = c.execute("""
     SELECT *
     FROM clients
+    WHERE company_id=?
     ORDER BY name
-    """).fetchall()
+    """, (company_id,)).fetchall()
 
     conn.close()
 
@@ -2725,30 +2809,51 @@ async def create_task(
     client = form.get("client")
     phone = form.get("phone")
     address = form.get("address")
+    description = form.get("description")
+    task_date = form.get("task_date")
+    selected_workers = form.getlist("workers")
+    priority = form.get("priority")
+    price = form.get("price")
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
 
     if client_id:
         existing_client = c.execute("""
         SELECT *
         FROM clients
-        WHERE id=?
-        """, (client_id,)).fetchone()
+        WHERE id=? AND company_id=?
+        """, (client_id, company_id)).fetchone()
 
         if existing_client:
             client = existing_client["name"]
             phone = existing_client["phone"]
             address = existing_client["address"]
-    description = form.get("description")
-    task_date = form.get("task_date")
-    selected_workers = form.getlist("workers")
-    worker = selected_workers[0] if selected_workers else ""
-    workers_text = ",".join(selected_workers)
-    priority = form.get("priority")
-    price = form.get("price")
 
-    company_id = get_user_company_id(username)
+    valid_workers = []
+    worker_chat_ids = []
 
-    conn = connect()
-    c = conn.cursor()
+    for selected_worker in selected_workers:
+        selected_worker = (selected_worker or "").strip()
+
+        if not selected_worker:
+            continue
+
+        worker_user = c.execute("""
+        SELECT username, telegram_chat_id
+        FROM users
+        WHERE username=? AND role='worker' AND company_id=?
+        """, (selected_worker, company_id)).fetchone()
+
+        if worker_user and worker_user["username"] not in valid_workers:
+            valid_workers.append(worker_user["username"])
+
+            if worker_user["telegram_chat_id"]:
+                worker_chat_ids.append(worker_user["telegram_chat_id"])
+
+    worker = valid_workers[0] if valid_workers else ""
+    workers_text = ",".join(valid_workers)
 
     c.execute("""
     INSERT INTO tasks (
@@ -2807,7 +2912,7 @@ async def create_task(
         username,
         role,
         "Создана заявка",
-        f"Клиент: {client}. Исполнитель: {worker}. Дата: {task_date}"
+        f"Клиент: {client}. Исполнители: {format_task_workers({'worker': worker, 'workers': workers_text})}. Дата: {task_date}"
     )
 
     text = f"""
@@ -2817,7 +2922,7 @@ async def create_task(
 📞 Телефон: {phone}
 📍 Адрес: {address}
 📅 Дата: {task_date}
-👷 Исполнитель: {worker}
+👷 Исполнители: {format_task_workers({'worker': worker, 'workers': workers_text})}
 🔥 Приоритет: {priority}
 💰 Цена: {price}
 """
@@ -2825,15 +2930,9 @@ async def create_task(
     try:
         send_message(text)
 
-        worker_user = c.execute("""
-        SELECT telegram_chat_id
-        FROM users
-        WHERE username=?
-        """, (worker,)).fetchone()
-
-        if worker_user and worker_user["telegram_chat_id"]:
+        for worker_chat_id in worker_chat_ids:
             send_message_to_chat(
-                worker_user["telegram_chat_id"],
+                worker_chat_id,
                 f"""
 📋 Вам назначена новая заявка #{task_id}
 
@@ -2911,15 +3010,18 @@ async def task_detail(request: Request, task_id: int):
     ORDER BY id DESC
     """, (task_id,)).fetchall()
 
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+
     catalog_items = c.execute("""
     SELECT *
     FROM catalog_items
-    WHERE active=1
+    WHERE active=1 AND company_id=?
     ORDER BY item_type, name
-    """).fetchall()
+    """, (company_id,)).fetchall()
 
     estimate_total = sum(item["total"] for item in task_items)
     estimate_profit = sum(item["profit"] for item in task_items)
+    task_workers = get_task_worker_names(task)
 
     conn.close()
 
@@ -2937,7 +3039,8 @@ async def task_detail(request: Request, task_id: int):
             "task_items": task_items,
             "catalog_items": catalog_items,
             "estimate_total": estimate_total,
-            "estimate_profit": estimate_profit
+            "estimate_profit": estimate_profit,
+            "task_workers": task_workers
         }
     )
 
@@ -3290,16 +3393,18 @@ async def complete_task(request: Request, task_id: int):
     if not report:
         return RedirectResponse("/my-tasks?error=report_required", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
     task = c.execute("""
     SELECT *
     FROM tasks
-    WHERE id=? AND worker=?
-    """, (task_id, username)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (task_id, company_id)).fetchone()
 
-    if not task:
+    if not task or not task_has_worker(username, task):
         conn.close()
         return RedirectResponse("/my-tasks", status_code=302)
 
@@ -3372,16 +3477,18 @@ async def start_task(request: Request, task_id: int):
     if role != "worker":
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
     task = c.execute("""
     SELECT *
     FROM tasks
-    WHERE id=? AND worker=?
-    """, (task_id, username)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (task_id, company_id)).fetchone()
 
-    if not task:
+    if not task or not task_has_worker(username, task):
         conn.close()
         return RedirectResponse("/my-tasks", status_code=302)
 
