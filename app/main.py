@@ -29,6 +29,10 @@ APP_VERSION = "0.2.1"
 
 SESSION_COOKIE_NAME = "crm_session"
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
+COOKIE_SECURE = (
+    os.getenv("COOKIE_SECURE", "").lower() in ("1", "true", "yes", "on")
+    or bool(os.getenv("RAILWAY_ENVIRONMENT"))
+)
 
 app = FastAPI()
 
@@ -384,10 +388,6 @@ def verify_session_value(value):
 
 
 def get_user(request: Request):
-    user_cookie = request.cookies.get("user")
-    if user_cookie:
-        return user_cookie
-
     signed_value = request.cookies.get(SESSION_COOKIE_NAME)
     username = verify_session_value(signed_value)
 
@@ -2728,22 +2728,13 @@ async def login(request: Request):
     update_last_seen(username)
 
     response = RedirectResponse("/", status_code=302)
-
-    response.set_cookie(
-        key="user",
-        value=username,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 30,
-        path="/"
-    )
+    response.delete_cookie("user")
 
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=sign_session_value(username),
         httponly=True,
-        secure=False,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=60 * 60 * 24 * 30,
         path="/"
@@ -2757,6 +2748,7 @@ async def logout():
 
     response = RedirectResponse("/login", status_code=302)
     response.delete_cookie("user")
+    response.delete_cookie(SESSION_COOKIE_NAME)
 
     return response
 
