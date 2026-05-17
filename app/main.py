@@ -865,7 +865,7 @@ async def finance_export(request: Request, month: str = ""):
     role = get_role(username)
     client_company_id = get_user_company_id(username)
 
-    if role not in ("boss", "manager"):
+    if role != "boss":
         return RedirectResponse("/", status_code=302)
 
     if not month:
