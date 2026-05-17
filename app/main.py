@@ -2032,7 +2032,7 @@ async def create_worker(request: Request):
     role = get_role(username)
     new_user_company_id = get_user_company_id(username)
 
-    if role not in ("boss", "superadmin"):
+    if role != "boss":
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
     form = await request.form()
@@ -2110,7 +2110,7 @@ async def change_team_user_password(request: Request, user_id: int):
 
     role = get_role(username)
 
-    if role not in ("boss", "superadmin"):
+    if role != "boss":
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
     form = await request.form()
@@ -2161,7 +2161,7 @@ async def delete_team_user(request: Request, user_id: int):
 
     role = get_role(username)
 
-    if role not in ("boss", "superadmin"):
+    if role != "boss":
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
     conn = connect()
@@ -2177,9 +2177,15 @@ async def delete_team_user(request: Request, user_id: int):
         conn.close()
         return RedirectResponse("/workers", status_code=302)
 
+    current_company_id = get_user_company_id(username)
+
     if user["username"] == username or user["role"] == "boss":
         conn.close()
         return RedirectResponse("/workers?error=cannot_delete_boss", status_code=302)
+
+    if user["company_id"] != current_company_id:
+        conn.close()
+        return RedirectResponse("/workers?error=wrong_company", status_code=302)
 
     c.execute("""
     DELETE FROM users
