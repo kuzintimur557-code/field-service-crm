@@ -515,6 +515,42 @@ def update_last_seen(username):
     conn.close()
 
 
+@app.get("/platform/companies", response_class=HTMLResponse)
+async def platform_companies_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    companies = c.execute("""
+    SELECT *
+    FROM companies
+    ORDER BY id DESC
+    """).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "platform_companies.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "companies": companies
+        }
+    )
+
+
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_dashboard(request: Request):
 
