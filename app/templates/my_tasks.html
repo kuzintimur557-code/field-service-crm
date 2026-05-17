@@ -6,24 +6,40 @@
 <title>Мои заявки</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
+
 <style>
+*{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:900px;margin:auto;padding:24px}
-.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
-h1{margin:0 0 8px;font-size:32px}
+.container{max-width:980px;margin:auto;padding:22px}
+.header{background:white;padding:24px;border-radius:26px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+h1{margin:0 0 8px;font-size:34px}
 .meta{color:#6b7280;font-weight:800}
-.task{background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px}
-.title{font-size:20px;font-weight:900}
-.btn{display:block;margin-top:12px;padding:12px;border-radius:12px;background:#2563eb;color:white;text-align:center;text-decoration:none;font-weight:900}
-.nav{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.nav a{padding:12px 14px;border-radius:14px;text-decoration:none;background:#111827;color:white;font-weight:900}
+.nav{display:flex;gap:10px;margin-top:16px}
+.nav a{padding:12px 16px;border-radius:14px;text-decoration:none;background:#111827;color:white;font-weight:900}
 .nav a.red{background:#991b1b}
+.tasks{display:grid;gap:14px}
+.task{background:white;padding:18px;border-radius:22px;box-shadow:0 8px 20px rgba(0,0,0,.06)}
+.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.title{font-size:22px;font-weight:900}
+.badge{padding:8px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;white-space:nowrap}
+.info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.item{background:#f9fafb;border-radius:14px;padding:12px}
+.label{font-size:12px;color:#6b7280;font-weight:900;margin-bottom:4px}
+.value{font-weight:900}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+button,.btn{display:block;width:100%;padding:13px;border-radius:14px;border:0;text-align:center;text-decoration:none;font-weight:900;color:white;background:#2563eb;cursor:pointer}
+.green{background:#16a34a}
+.dark{background:#111827}
+.empty{background:white;padding:24px;border-radius:22px;box-shadow:0 8px 20px rgba(0,0,0,.06);font-weight:900;color:#6b7280}
+textarea,input{width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5db;margin-top:10px}
+@media(max-width:700px){.container{padding:14px}h1{font-size:28px}.info,.actions{grid-template-columns:1fr}.top{flex-direction:column}}
 </style>
 </head>
+
 <body>
 <div class="container">
 
-<div class="card">
+<div class="header">
 <h1>📋 Мои заявки</h1>
 <div class="meta">{{ username }} / исполнитель</div>
 <div class="nav">
@@ -32,45 +48,76 @@ h1{margin:0 0 8px;font-size:32px}
 </div>
 </div>
 
-<div class="card">
-
 {% if request.query_params.get("error") == "report_required" %}
-<div style="padding:14px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900;margin-bottom:14px">
+<div class="empty" style="background:#fee2e2;color:#991b1b;margin-bottom:14px">
 ❌ Перед завершением нужно заполнить отчёт
 </div>
 {% endif %}
 
+<div class="tasks">
 {% if tasks %}
 {% for task in tasks %}
 <div class="task">
-    <div class="title">{{ task["client"] }}</div>
-    <div class="meta">Адрес: {{ task["address"] }}</div>
-    <div class="meta">Дата выполнения: {{ task["task_date"] }}</div>
-    <div class="meta">Поступила: {{ task["created_at"] or "—" }}</div>
-    <div class="meta">Статус: {{ task["status"] }}</div>
-    {% if task["status"] == "Новая" %}
-    <form method="post" action="/task/{{ task['id'] }}/start">
-        <button class="btn" type="submit" style="border:0;width:100%">▶️ Взять в работу</button>
-    </form>
-    {% endif %}
 
-    {% if task["status"] == "В работе" %}
-    <form method="post" action="/task/{{ task['id'] }}/complete" enctype="multipart/form-data">
-        <textarea name="report" placeholder="Отчёт по работе" required style="width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5db;margin-top:12px"></textarea>
-        <input type="file" name="after_photo" accept="image/*" style="margin-top:10px">
-        <button class="btn" type="submit" style="border:0;width:100%;background:#16a34a">✅ Завершить с отчётом</button>
-    </form>
-    {% endif %}
+<div class="top">
+    <div>
+        <div class="title">{{ task["client"] }}</div>
+        <div class="meta">{{ task["address"] }}</div>
+    </div>
+    <div class="badge">{{ task["status"] }}</div>
+</div>
 
-    <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
+<div class="info">
+    <div class="item">
+        <div class="label">Дата выполнения</div>
+        <div class="value">{{ task["task_date"] }}</div>
+    </div>
+
+    <div class="item">
+        <div class="label">Поступила</div>
+        <div class="value">{{ task["created_at"] or "—" }}</div>
+    </div>
+
+    <div class="item">
+        <div class="label">Телефон</div>
+        <div class="value">{{ task["phone"] }}</div>
+    </div>
+
+    <div class="item">
+        <div class="label">Приоритет</div>
+        <div class="value">{{ task["priority"] }}</div>
+    </div>
+</div>
+
+{% if task["status"] == "Новая" %}
+<form method="post" action="/task/{{ task['id'] }}/start" class="actions">
+    <button class="green" type="submit">▶️ Взять в работу</button>
+    <a class="btn dark" href="/task/{{ task['id'] }}">Открыть</a>
+</form>
+{% elif task["status"] == "В работе" %}
+<form method="post" action="/task/{{ task['id'] }}/complete" enctype="multipart/form-data">
+    <textarea name="report" placeholder="Краткий отчёт по работе" required></textarea>
+    <input type="file" name="after_photo" accept="image/*">
+    <div class="actions">
+        <button class="green" type="submit">✅ Завершить</button>
+        <a class="btn dark" href="/task/{{ task['id'] }}">Открыть</a>
+    </div>
+</form>
+{% else %}
+<div class="actions">
+    <a class="btn dark" href="/task/{{ task['id'] }}">Открыть</a>
+</div>
+{% endif %}
+
 </div>
 {% endfor %}
 {% else %}
-<div class="meta">У вас пока нет заявок.</div>
+<div class="empty">У вас пока нет заявок.</div>
 {% endif %}
 </div>
 
 </div>
+
 {% include 'mobile_nav.html' %}
 </body>
 </html>
