@@ -1876,27 +1876,36 @@ async def login(request: Request):
 
     form = await request.form()
 
-    username = form.get("username")
-    password = form.get("password")
+    username = (form.get("username") or "").strip()
+    password = (form.get("password") or "").strip()
 
     conn = connect()
     c = conn.cursor()
 
     user = c.execute("""
-    SELECT * FROM users WHERE username=? AND password=?
-    """, (
-        username,
-        password
-    )).fetchone()
+    SELECT *
+    FROM users
+    WHERE username=?
+    """, (username,)).fetchone()
+
+    if not user or not verify_password(password, user["password"]):
+        conn.close()
+        return RedirectResponse("/login", status_code=302)
+
+    if password_needs_upgrade(user["password"]):
+        c.execute("""
+        UPDATE users
+        SET password=?
+        WHERE username=?
+        """, (hash_password(password), username))
+        conn.commit()
 
     conn.close()
-
-    if not user:
-        return RedirectResponse("/login", status_code=302)
 
     update_last_seen(username)
 
     response = RedirectResponse("/", status_code=302)
+
     response.set_cookie(
         key="user",
         value=username,
