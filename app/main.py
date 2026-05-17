@@ -2024,6 +2024,71 @@ async def workers_page(request: Request):
     )
 
 
+
+@app.get("/workers/{worker_id}", response_class=HTMLResponse)
+async def worker_detail(request: Request, worker_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    worker = c.execute("""
+    SELECT *
+    FROM users
+    WHERE id=? AND company_id=?
+    """, (worker_id, company_id)).fetchone()
+
+    if not worker:
+        conn.close()
+        return RedirectResponse("/workers", status_code=302)
+
+    total_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE worker=?
+    """, (worker["username"],)).fetchone()[0]
+
+    done_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE worker=? AND status='Завершено'
+    """, (worker["username"],)).fetchone()[0]
+
+    income = c.execute("""
+    SELECT SUM(price)
+    FROM tasks
+    WHERE worker=? AND status='Завершено'
+    """, (worker["username"],)).fetchone()[0] or 0
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="worker_detail.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "worker": worker,
+            "total_tasks": total_tasks,
+            "done_tasks": done_tasks,
+            "income": income
+        }
+    )
+
+
+
 @app.post("/workers")
 async def create_worker(request: Request):
 
