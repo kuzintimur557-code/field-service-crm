@@ -673,7 +673,7 @@ async def platform_dashboard(request: Request):
 
 
 @app.get("/my-tasks", response_class=HTMLResponse)
-async def my_tasks_page(request: Request):
+async def my_tasks_page(request: Request, status: str = "")
 
     username = get_user(request)
 
@@ -690,7 +690,7 @@ async def my_tasks_page(request: Request):
     conn = connect()
     c = conn.cursor()
 
-    tasks = c.execute("""
+    query = """
     SELECT *
     FROM tasks
     WHERE archived=0
@@ -702,15 +702,24 @@ async def my_tasks_page(request: Request):
         OR workers LIKE ?
         OR workers LIKE ?
       )
-    ORDER BY task_date DESC
-    """, (
+    """
+
+    params = [
         company_id,
         username,
         username,
         f"{username},%",
         f"%,{username},%",
         f"%,{username}"
-    )).fetchall()
+    ]
+
+    if status:
+        query += " AND status=?"
+        params.append(status)
+
+    query += " ORDER BY task_date DESC"
+
+    tasks = c.execute(query, params).fetchall()
 
     conn.close()
 
@@ -721,7 +730,8 @@ async def my_tasks_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "tasks": tasks
+            "tasks": tasks,
+            "selected_status": status
         }
     )
 
