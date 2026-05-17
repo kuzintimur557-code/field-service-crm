@@ -2003,11 +2003,13 @@ async def workers_page(request: Request):
     conn = connect()
     c = conn.cursor()
 
+    company_id = get_user_company_id(username)
+
     workers = c.execute("""
     SELECT * FROM users
-    WHERE role IN ('manager', 'worker')
+    WHERE role IN ('manager', 'worker') AND company_id=?
     ORDER BY role, username
-    """).fetchall()
+    """, (company_id,)).fetchall()
 
     conn.close()
 
@@ -2016,7 +2018,8 @@ async def workers_page(request: Request):
         name="workers.html",
         context={
             "workers": workers,
-            "username": username
+            "username": username,
+            "role": role
         }
     )
 
