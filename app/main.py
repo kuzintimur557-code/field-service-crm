@@ -1605,7 +1605,10 @@ async def change_my_password(request: Request):
     conn.commit()
     conn.close()
 
-    return RedirectResponse("/profile?changed=1", status_code=302)
+    response = RedirectResponse("/login?password_changed=1", status_code=302)
+    response.delete_cookie("user")
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return response
 
 
 @app.get("/workers", response_class=HTMLResponse)
