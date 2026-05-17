@@ -2084,7 +2084,7 @@ async def system_page(request: Request):
     if role != "boss":
         return RedirectResponse("/", status_code=302)
 
-    db_path = Path(DB_NAME)
+    db_path = DATA_DIR / "crm.db"
     uploads_path = UPLOAD_DIR
 
     db_exists = db_path.exists()
