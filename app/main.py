@@ -1623,6 +1623,47 @@ async def create_worker(request: Request):
     return RedirectResponse("/workers?created=1", status_code=302)
 
 
+@app.post("/workers/{user_id}/delete")
+async def delete_team_user(request: Request, user_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/workers?error=only_boss", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    user = c.execute("""
+    SELECT *
+    FROM users
+    WHERE id=?
+    """, (user_id,)).fetchone()
+
+    if not user:
+        conn.close()
+        return RedirectResponse("/workers", status_code=302)
+
+    if user["username"] == username or user["role"] == "boss":
+        conn.close()
+        return RedirectResponse("/workers?error=cannot_delete_boss", status_code=302)
+
+    c.execute("""
+    DELETE FROM users
+    WHERE id=?
+    """, (user_id,))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/workers?deleted=1", status_code=302)
+
+
 @app.get("/debug", response_class=HTMLResponse)
 async def debug_page(request: Request):
 
