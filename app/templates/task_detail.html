@@ -69,7 +69,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <div>
 <div class="row"><div class="label">Исполнитель</div><div class="value">{{ task[6] }}</div></div>
 <div class="row"><div class="label">Приоритет</div><div class="value">{{ task[7] }}</div></div>
-<div class="row"><div class="label">Цена</div><div class="value">${{ task[8] }}</div></div>
+<div class="row"><div class="label">Цена</div><div class="value">{{ task["price"] }} ₽</div></div>
 <div class="row"><div class="label">Статус</div><div class="status">{{ task[10] }}</div></div>
 </div>
 
@@ -152,7 +152,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 {% else %}
 Материал
 {% endif %}
-— ${{ item["price"] }}
+— {{ item["price"] }} ₽
 </option>
 {% endfor %}
 </select>
@@ -188,7 +188,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 
     <div>
         <div class="estimate-meta">Цена</div>
-        <div class="estimate-name">${{ item["price"] }}</div>
+        <div class="estimate-name">{{ item["price"] }} ₽</div>
     </div>
 
     <div>
@@ -346,6 +346,26 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 </div>
 
 <div class="card">
+
+
+{% if role in ["boss", "manager"] %}
+<div class="card" style="margin-top:20px">
+<h2>📅 Изменить дату и время</h2>
+
+<form method="post" action="/task/{{ task['id'] }}/date">
+    <input
+        type="datetime-local"
+        name="task_date"
+        required
+        style="width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5db;margin-top:12px"
+    >
+
+    <button class="btn" type="submit" style="margin-top:12px;width:100%;border:0">
+        Сохранить дату и время
+    </button>
+</form>
+</div>
+{% endif %}
 
 <h2>Отчёт исполнителя</h2>
 
