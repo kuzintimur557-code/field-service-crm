@@ -94,6 +94,32 @@ def get_role_title(role):
     return titles.get(role, role)
 
 
+def hash_password(password):
+    salt = secrets.token_hex(16)
+    digest = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return f"sha256${salt}${digest}"
+
+
+def verify_password(password, stored_password):
+    if not stored_password:
+        return False
+
+    if stored_password.startswith("sha256$"):
+        try:
+            _, salt, digest = stored_password.split("$", 2)
+            check = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+            return secrets.compare_digest(check, digest)
+        except Exception:
+            return False
+
+    # старый формат: обычный текст
+    return secrets.compare_digest(password, stored_password)
+
+
+def password_needs_upgrade(stored_password):
+    return not str(stored_password or "").startswith("sha256$")
+
+
 def get_plan_user_limit(plan):
     limits = {
         "basic": 3,
@@ -1559,7 +1585,7 @@ async def change_my_password(request: Request):
         conn.close()
         return RedirectResponse("/logout", status_code=302)
 
-    if user["password"] != old_password:
+    if not verify_password(old_password, user["password"]):
         conn.close()
         return RedirectResponse("/profile?error=wrong_old", status_code=302)
 
@@ -1567,7 +1593,7 @@ async def change_my_password(request: Request):
     UPDATE users
     SET password=?
     WHERE username=?
-    """, (new_password, username))
+    """, (hash_password(new_password), username))
 
     conn.commit()
     conn.close()
@@ -1728,7 +1754,7 @@ async def change_team_user_password(request: Request, user_id: int):
     UPDATE users
     SET password=?
     WHERE id=?
-    """, (new_password, user_id))
+    """, (hash_password(new_password), user_id))
 
     conn.commit()
     conn.close()
