@@ -337,6 +337,28 @@ def get_user(request: Request):
     return None
 
 
+def is_superadmin(role):
+    return role == "superadmin"
+
+
+def get_user_company_id(username):
+    conn = connect()
+    c = conn.cursor()
+
+    user = c.execute("""
+    SELECT company_id
+    FROM users
+    WHERE username=?
+    """, (username,)).fetchone()
+
+    conn.close()
+
+    if not user:
+        return None
+
+    return user["company_id"] if "company_id" in user.keys() else 1
+
+
 def get_role(username):
     conn = connect()
     c = conn.cursor()
