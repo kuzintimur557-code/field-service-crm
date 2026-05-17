@@ -1773,14 +1773,16 @@ async def client_detail(request: Request, client_id: int):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
     client = c.execute("""
     SELECT *
     FROM clients
-    WHERE id=?
-    """, (client_id,)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (client_id, company_id)).fetchone()
 
     if not client:
         conn.close()
@@ -1789,16 +1791,16 @@ async def client_detail(request: Request, client_id: int):
     tasks = c.execute("""
     SELECT *
     FROM tasks
-    WHERE client_id=?
+    WHERE client_id=? AND company_id=?
     ORDER BY id DESC
-    """, (client_id,)).fetchall()
+    """, (client_id, company_id)).fetchall()
 
     client_notes = c.execute("""
     SELECT *
     FROM client_notes
-    WHERE client_id=?
+    WHERE client_id=? AND company_id=?
     ORDER BY id DESC
-    """, (client_id,)).fetchall()
+    """, (client_id, company_id)).fetchall()
 
     conn.close()
 
@@ -1829,6 +1831,8 @@ async def add_client_note(request: Request, client_id: int):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     form = await request.form()
     note = (form.get("note") or "").strip()
 
@@ -1841,8 +1845,8 @@ async def add_client_note(request: Request, client_id: int):
     client = c.execute("""
     SELECT *
     FROM clients
-    WHERE id=?
-    """, (client_id,)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (client_id, company_id)).fetchone()
 
     if not client:
         conn.close()
@@ -1850,14 +1854,16 @@ async def add_client_note(request: Request, client_id: int):
 
     c.execute("""
     INSERT INTO client_notes (
+        company_id,
         client_id,
         username,
         role,
         note,
         created_at
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
     """, (
+        company_id,
         client_id,
         username,
         role,
@@ -1899,6 +1905,8 @@ async def edit_client(request: Request, client_id: int):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     form = await request.form()
 
     name = (form.get("name") or "").strip()
@@ -1917,8 +1925,8 @@ async def edit_client(request: Request, client_id: int):
     client = c.execute("""
     SELECT *
     FROM clients
-    WHERE id=?
-    """, (client_id,)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (client_id, company_id)).fetchone()
 
     if not client:
         conn.close()
@@ -1927,21 +1935,22 @@ async def edit_client(request: Request, client_id: int):
     c.execute("""
     UPDATE clients
     SET name=?, phone=?, email=?, address=?, notes=?
-    WHERE id=?
+    WHERE id=? AND company_id=?
     """, (
         name,
         phone,
         email,
         address,
         notes,
-        client_id
+        client_id,
+        company_id
     ))
 
     linked_tasks = c.execute("""
     SELECT id
     FROM tasks
-    WHERE client_id=?
-    """, (client_id,)).fetchall()
+    WHERE client_id=? AND company_id=?
+    """, (client_id, company_id)).fetchall()
 
     conn.commit()
     conn.close()
@@ -2002,6 +2011,8 @@ async def create_client(request: Request):
     if not name:
         return RedirectResponse("/clients?error=empty", status_code=302)
 
+    company_id = get_user_company_id(username)
+
     conn = connect()
     c = conn.cursor()
 
@@ -2017,7 +2028,7 @@ async def create_client(request: Request):
     )
     VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
-        client_company_id,
+        company_id,
         name,
         phone,
         email,
@@ -3014,14 +3025,15 @@ async def task_detail(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
     linked_client = None
 
     if "client_id" in task.keys() and task["client_id"]:
         linked_client = c.execute("""
         SELECT *
         FROM clients
-        WHERE id=?
-        """, (task["client_id"],)).fetchone()
+        WHERE id=? AND company_id=?
+        """, (task["client_id"], company_id)).fetchone()
 
     comments = c.execute("""
     SELECT *
@@ -3043,8 +3055,6 @@ async def task_detail(request: Request, task_id: int):
     WHERE task_id=?
     ORDER BY id DESC
     """, (task_id,)).fetchall()
-
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
 
     catalog_items = c.execute("""
     SELECT *
