@@ -50,3 +50,25 @@ def send_photo(photo_path, caption=""):
         return False
 
     return True
+
+
+
+def send_message_to_chat(chat_id, text):
+    if not BOT_TOKEN or not chat_id:
+        print("Telegram user notification disabled: BOT_TOKEN or chat_id missing")
+        return False
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    data = {
+        "chat_id": chat_id,
+        "text": text
+    }
+
+    response = requests.post(url, data=data, timeout=10)
+
+    if not response.ok:
+        print("Telegram send_message_to_chat error:", response.status_code, response.text)
+        return False
+
+    return True
