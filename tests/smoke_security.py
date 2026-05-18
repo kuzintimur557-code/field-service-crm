@@ -24,3 +24,15 @@ if __name__ == "__main__":
     test_fake_user_cookie_does_not_login()
     test_owner_cannot_access_other_company_task()
     print("OK: security smoke tests passed")
+
+
+def test_uploads_require_auth():
+    response = client.get("/uploads/test.jpg", follow_redirects=False)
+    assert response.status_code == 404
+
+
+if __name__ == "__main__":
+    test_fake_user_cookie_does_not_login()
+    test_owner_cannot_access_other_company_task()
+    test_uploads_require_auth()
+    print("OK: security smoke tests passed")
