@@ -92,12 +92,29 @@ def seed_data():
     """, users)
 
     c.execute("""
+    INSERT INTO clients (
+        company_id, name, phone, email, address, notes, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Client 2",
+        "+70000000000",
+        "client@example.com",
+        "Company 2 address",
+        "Smoke client note",
+        "2026-05-17 10:00",
+    ))
+    client_id = c.lastrowid
+
+    c.execute("""
     INSERT INTO tasks (
-        client, phone, address, description, task_date, worker, workers,
+        client_id, client, phone, address, description, task_date, worker, workers,
         priority, price, photo, status, report, after_photo, company_id
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
+        client_id,
         "Client 2",
         "+70000000000",
         "Company 2 address",
@@ -355,6 +372,19 @@ async def assert_notifications(task):
     assert unread_count == 0
 
 
+async def assert_client_card(task):
+    response = await crm.client_detail(
+        make_asgi_request("owner2", f"/clients/{task['client_id']}"),
+        task["client_id"],
+    )
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "Всего заявок" in html
+    assert "Активные" in html
+    assert "Выручка" in html
+    assert f"#{task['id']}" in html
+
+
 def main():
     try:
         task = seed_data()
@@ -365,6 +395,7 @@ def main():
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())
         asyncio.run(assert_notifications(task))
+        asyncio.run(assert_client_card(task))
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()

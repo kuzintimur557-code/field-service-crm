@@ -2303,6 +2303,38 @@ async def client_detail(request: Request, client_id: int):
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
 
+    today = datetime.now().strftime("%Y-%m-%d")
+    client_total_tasks = len(tasks)
+    client_active_tasks = 0
+    client_completed_tasks = 0
+    client_overdue_tasks = 0
+    client_revenue = 0
+
+    for task in tasks:
+        task_status = task["status"] or ""
+        is_archived = "archived" in task.keys() and task["archived"] == 1
+
+        if not is_archived and task_status in ("Новая", "В работе"):
+            client_active_tasks += 1
+
+        if task_status == "Завершено":
+            client_completed_tasks += 1
+
+            try:
+                client_revenue += float(str(task["price"] or 0).replace(",", "."))
+            except Exception:
+                pass
+
+        task_date = str(task["task_date"] or "")[:10]
+
+        if (
+            not is_archived
+            and task_date
+            and task_date < today
+            and task_status not in ("Завершено", "Отменено")
+        ):
+            client_overdue_tasks += 1
+
     client_notes = c.execute("""
     SELECT *
     FROM client_notes
@@ -2321,7 +2353,12 @@ async def client_detail(request: Request, client_id: int):
             "role": role,
             "client": client,
             "tasks": tasks,
-            "client_notes": client_notes
+            "client_notes": client_notes,
+            "client_total_tasks": client_total_tasks,
+            "client_active_tasks": client_active_tasks,
+            "client_completed_tasks": client_completed_tasks,
+            "client_overdue_tasks": client_overdue_tasks,
+            "client_revenue": client_revenue
         }
     )
 
