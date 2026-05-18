@@ -434,7 +434,9 @@ async def assert_recurring_generate(task):
 
     page_response = await crm.recurring_jobs_page(make_asgi_request("owner2", "/recurring"))
     assert page_response.status_code == 200
-    assert f"/recurring/{job_id}/generate" in page_response.body.decode("utf-8")
+    page_html = page_response.body.decode("utf-8")
+    assert f"/recurring/{job_id}/generate" in page_html
+    assert f"/recurring/{job_id}/toggle" in page_html
 
     response = await crm.generate_recurring_task(make_request("owner2"), job_id)
     assert response.status_code == 302
@@ -466,6 +468,28 @@ async def assert_recurring_generate(task):
     assert generated_task["workers"] == "worker2,helper2"
     assert job["next_date"] == "2026-06-17"
     assert activity is not None
+
+    toggle_response = await crm.toggle_recurring_job(make_request("owner2"), job_id)
+    assert toggle_response.status_code == 302
+    assert toggle_response.headers["location"] == "/recurring"
+
+    conn = connect()
+    c = conn.cursor()
+    disabled_job = c.execute("""
+    SELECT active
+    FROM recurring_jobs
+    WHERE id=?
+    """, (job_id,)).fetchone()
+    conn.close()
+
+    assert disabled_job["active"] == 0
+
+    disabled_generate_response = await crm.generate_recurring_task(
+        make_request("owner2"),
+        job_id,
+    )
+    assert disabled_generate_response.status_code == 302
+    assert disabled_generate_response.headers["location"] == "/recurring"
 
 
 def main():

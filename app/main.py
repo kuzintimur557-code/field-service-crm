@@ -1870,6 +1870,48 @@ async def generate_recurring_task(request: Request, job_id: int):
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
+@app.post("/recurring/{job_id}/toggle")
+async def toggle_recurring_job(request: Request, job_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    job = c.execute("""
+    SELECT *
+    FROM recurring_jobs
+    WHERE id=? AND company_id=?
+    """, (job_id, company_id)).fetchone()
+
+    if not job:
+        conn.close()
+        return RedirectResponse("/recurring", status_code=302)
+
+    new_active = 0 if job["active"] else 1
+
+    c.execute("""
+    UPDATE recurring_jobs
+    SET active=?
+    WHERE id=? AND company_id=?
+    """, (new_active, job_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/recurring", status_code=302)
+
+
 @app.get("/finance/export")
 async def finance_export(request: Request, month: str = ""):
 
