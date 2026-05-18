@@ -469,6 +469,25 @@ async def assert_recurring_generate(task):
     assert job["next_date"] == "2026-06-17"
     assert activity is not None
 
+    date_response = await crm.update_recurring_job_date(make_form_request(
+        "owner2",
+        f"/recurring/{job_id}/date",
+        {"next_date": "2026-07-01"},
+    ), job_id)
+    assert date_response.status_code == 302
+    assert date_response.headers["location"] == "/recurring?updated=1"
+
+    conn = connect()
+    c = conn.cursor()
+    updated_job = c.execute("""
+    SELECT next_date
+    FROM recurring_jobs
+    WHERE id=?
+    """, (job_id,)).fetchone()
+    conn.close()
+
+    assert updated_job["next_date"] == "2026-07-01"
+
     toggle_response = await crm.toggle_recurring_job(make_request("owner2"), job_id)
     assert toggle_response.status_code == 302
     assert toggle_response.headers["location"] == "/recurring"

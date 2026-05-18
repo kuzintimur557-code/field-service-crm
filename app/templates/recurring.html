@@ -49,6 +49,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 <div class="notice ok">✅ Повторяющаяся работа добавлена</div>
 {% endif %}
 
+{% if request.query_params.get("updated") == "1" %}
+<div class="notice ok">✅ Дата шаблона обновлена</div>
+{% endif %}
+
 {% if request.query_params.get("error") == "empty" %}
 <div class="notice err">❌ Название и следующая дата обязательны</div>
 {% endif %}
@@ -137,6 +141,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
     <div>
         <div class="meta">Следующая дата</div>
         <b>{{ job["next_date"] }}</b>
+        <form method="post" action="/recurring/{{ job['id'] }}/date" style="margin-top:8px">
+            <input type="date" name="next_date" value="{{ job['next_date'] }}" required>
+            <button type="submit">Изменить дату</button>
+        </form>
     </div>
     <div>
         <span class="badge">{{ job["interval_type"] }}</span>

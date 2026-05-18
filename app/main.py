@@ -1912,6 +1912,52 @@ async def toggle_recurring_job(request: Request, job_id: int):
     return RedirectResponse("/recurring", status_code=302)
 
 
+@app.post("/recurring/{job_id}/date")
+async def update_recurring_job_date(request: Request, job_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    next_date = (form.get("next_date") or "").strip()
+
+    if not next_date:
+        return RedirectResponse("/recurring?error=empty", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    job = c.execute("""
+    SELECT id
+    FROM recurring_jobs
+    WHERE id=? AND company_id=?
+    """, (job_id, company_id)).fetchone()
+
+    if not job:
+        conn.close()
+        return RedirectResponse("/recurring", status_code=302)
+
+    c.execute("""
+    UPDATE recurring_jobs
+    SET next_date=?
+    WHERE id=? AND company_id=?
+    """, (next_date, job_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/recurring?updated=1", status_code=302)
+
+
 @app.get("/finance/export")
 async def finance_export(request: Request, month: str = ""):
 
