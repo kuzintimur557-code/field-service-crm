@@ -1583,6 +1583,163 @@ async def calendar_page(request: Request, worker: str = "", month: str = ""):
     )
 
 
+@app.get("/recurring", response_class=HTMLResponse)
+async def recurring_jobs_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    jobs = c.execute("""
+    SELECT recurring_jobs.*, clients.name AS client_name
+    FROM recurring_jobs
+    LEFT JOIN clients ON clients.id=recurring_jobs.client_id
+    WHERE recurring_jobs.company_id=?
+    ORDER BY recurring_jobs.next_date ASC, recurring_jobs.id DESC
+    """, (company_id,)).fetchall()
+
+    clients = c.execute("""
+    SELECT *
+    FROM clients
+    WHERE company_id=?
+    ORDER BY name
+    """, (company_id,)).fetchall()
+
+    workers = c.execute("""
+    SELECT username
+    FROM users
+    WHERE role='worker' AND company_id=?
+    ORDER BY username
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "recurring.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "jobs": jobs,
+            "clients": clients,
+            "workers": workers
+        }
+    )
+
+
+@app.post("/recurring")
+async def create_recurring_job(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    form = await request.form()
+
+    client_id = form.get("client_id") or None
+    title = (form.get("title") or "").strip()
+    description = (form.get("description") or "").strip()
+    interval_type = (form.get("interval_type") or "monthly").strip()
+    next_date = (form.get("next_date") or "").strip()
+    selected_workers = form.getlist("workers")
+    priority = (form.get("priority") or "Обычный").strip()
+    price = (form.get("price") or "0").strip()
+
+    if not title or not next_date:
+        return RedirectResponse("/recurring?error=empty", status_code=302)
+
+    if interval_type not in ("weekly", "monthly", "quarterly", "yearly"):
+        interval_type = "monthly"
+
+    conn = connect()
+    c = conn.cursor()
+
+    if client_id:
+        client = c.execute("""
+        SELECT id
+        FROM clients
+        WHERE id=? AND company_id=?
+        """, (client_id, company_id)).fetchone()
+
+        if not client:
+            client_id = None
+
+    valid_workers = []
+
+    for selected_worker in selected_workers:
+        selected_worker = (selected_worker or "").strip()
+
+        if not selected_worker:
+            continue
+
+        worker_user = c.execute("""
+        SELECT username
+        FROM users
+        WHERE username=? AND role='worker' AND company_id=?
+        """, (selected_worker, company_id)).fetchone()
+
+        if worker_user and worker_user["username"] not in valid_workers:
+            valid_workers.append(worker_user["username"])
+
+    worker = valid_workers[0] if valid_workers else ""
+    workers_text = ",".join(valid_workers)
+
+    c.execute("""
+    INSERT INTO recurring_jobs (
+        company_id,
+        client_id,
+        title,
+        description,
+        interval_type,
+        next_date,
+        worker,
+        workers,
+        priority,
+        price,
+        active,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        client_id,
+        title,
+        description,
+        interval_type,
+        next_date,
+        worker,
+        workers_text,
+        priority,
+        price,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/recurring?created=1", status_code=302)
+
+
 @app.get("/finance/export")
 async def finance_export(request: Request, month: str = ""):
 

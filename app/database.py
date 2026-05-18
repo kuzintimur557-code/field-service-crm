@@ -165,6 +165,24 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS recurring_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        client_id INTEGER,
+        title TEXT,
+        description TEXT,
+        interval_type TEXT,
+        next_date TEXT,
+        worker TEXT,
+        workers TEXT,
+        priority TEXT,
+        price TEXT,
+        active INTEGER DEFAULT 1,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS login_attempts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT,
@@ -215,6 +233,11 @@ def init_db():
     add_column_if_missing(c, "tasks", "after_photo", "TEXT")
     add_column_if_missing(c, "tasks", "archived", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "tasks", "payment_status", "TEXT DEFAULT 'Не оплачено'")
+
+    add_column_if_missing(c, "recurring_jobs", "company_id", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "recurring_jobs", "client_id", "INTEGER")
+    add_column_if_missing(c, "recurring_jobs", "workers", "TEXT")
+    add_column_if_missing(c, "recurring_jobs", "active", "INTEGER DEFAULT 1")
 
     add_column_if_missing(c, "company_settings", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_settings", "plan", "TEXT DEFAULT 'basic'")
