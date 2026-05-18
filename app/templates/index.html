@@ -82,6 +82,15 @@ h1{font-size:30px}
     </div>
 </div>
 
+{% if overdue_tasks and overdue_tasks > 0 %}
+<div style="background:#fee2e2;color:#991b1b;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
+    ⚠️ Есть просроченные заявки: {{ overdue_tasks }}
+    <a href="/overdue" style="display:inline-block;margin-left:12px;color:#991b1b;text-decoration:underline">
+        Открыть
+    </a>
+</div>
+{% endif %}
+
 <div class="stats">
 
     <a href="/today" class="stat" style="text-decoration:none;color:inherit">
