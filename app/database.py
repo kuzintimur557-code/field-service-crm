@@ -152,6 +152,19 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        username TEXT,
+        title TEXT,
+        message TEXT,
+        link TEXT,
+        is_read INTEGER DEFAULT 0,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS login_attempts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT,
