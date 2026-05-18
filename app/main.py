@@ -1080,6 +1080,101 @@ async def home(
     )
 
 
+@app.get("/workload", response_class=HTMLResponse)
+async def workload_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    workers = c.execute("""
+    SELECT username, full_name, position, last_seen
+    FROM users
+    WHERE role='worker' AND company_id=?
+    ORDER BY username
+    """, (company_id,)).fetchall()
+
+    stats = []
+
+    for worker in workers:
+        name = worker["username"]
+
+        total = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE archived=0
+          AND company_id=?
+          AND ({worker_task_condition()})
+        """, [company_id] + worker_task_params(name)).fetchone()[0]
+
+        active = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE archived=0
+          AND company_id=?
+          AND status='В работе'
+          AND ({worker_task_condition()})
+        """, [company_id] + worker_task_params(name)).fetchone()[0]
+
+        new = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE archived=0
+          AND company_id=?
+          AND status='Новая'
+          AND ({worker_task_condition()})
+        """, [company_id] + worker_task_params(name)).fetchone()[0]
+
+        done = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE archived=0
+          AND company_id=?
+          AND status='Завершено'
+          AND ({worker_task_condition()})
+        """, [company_id] + worker_task_params(name)).fetchone()[0]
+
+        if active >= 3:
+            load_status = "Перегружен"
+        elif active == 0 and new == 0:
+            load_status = "Свободен"
+        else:
+            load_status = "В норме"
+
+        stats.append({
+            "worker": worker,
+            "total": total,
+            "active": active,
+            "new": new,
+            "done": done,
+            "load_status": load_status
+        })
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "workload.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "stats": stats
+        }
+    )
+
+
 @app.get("/today", response_class=HTMLResponse)
 async def today_page(request: Request):
 
