@@ -22,7 +22,8 @@ input,select,textarea,button{width:100%;padding:14px;border-radius:14px;font-siz
 input,select,textarea{border:1px solid #d1d5db;background:white}
 textarea{height:100px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;margin-top:16px}
-.job{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:14px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
+.job{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr auto;gap:14px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
+.job button{margin:0;padding:12px 14px;font-size:14px;white-space:nowrap}
 .title{font-size:18px;font-weight:900}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
 .empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
@@ -140,6 +141,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
         <span class="badge">{{ job["interval_type"] }}</span>
     </div>
     <div class="meta">{{ job["workers"] or job["worker"] or "Исполнители не назначены" }}</div>
+    <form method="post" action="/recurring/{{ job['id'] }}/generate">
+        <button type="submit">Создать заявку</button>
+    </form>
 </div>
 {% endfor %}
 {% else %}

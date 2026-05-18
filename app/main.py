@@ -24,6 +24,7 @@ import base64
 import secrets
 import csv
 import io
+import calendar
 
 
 APP_VERSION = "0.2.1"
@@ -151,6 +152,32 @@ def get_overdue_days(task_date, today=None):
         return max((current_day - due_day).days, 0)
     except Exception:
         return 0
+
+
+def add_months(source_date, months):
+    month = source_date.month - 1 + months
+    year = source_date.year + month // 12
+    month = month % 12 + 1
+    day = min(source_date.day, calendar.monthrange(year, month)[1])
+    return source_date.replace(year=year, month=month, day=day)
+
+
+def get_next_recurring_date(current_date, interval_type):
+    try:
+        due_date = datetime.strptime(str(current_date or "")[:10], "%Y-%m-%d").date()
+    except Exception:
+        return current_date
+
+    if interval_type == "weekly":
+        next_date = due_date + timedelta(weeks=1)
+    elif interval_type == "quarterly":
+        next_date = add_months(due_date, 3)
+    elif interval_type == "yearly":
+        next_date = add_months(due_date, 12)
+    else:
+        next_date = add_months(due_date, 1)
+
+    return next_date.strftime("%Y-%m-%d")
 
 
 def get_task_worker_chat_ids(cursor, task):
@@ -1738,6 +1765,109 @@ async def create_recurring_job(request: Request):
     conn.close()
 
     return RedirectResponse("/recurring?created=1", status_code=302)
+
+
+@app.post("/recurring/{job_id}/generate")
+async def generate_recurring_task(request: Request, job_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    job = c.execute("""
+    SELECT *
+    FROM recurring_jobs
+    WHERE id=? AND company_id=? AND active=1
+    """, (job_id, company_id)).fetchone()
+
+    if not job:
+        conn.close()
+        return RedirectResponse("/recurring", status_code=302)
+
+    client = None
+
+    if job["client_id"]:
+        client = c.execute("""
+        SELECT *
+        FROM clients
+        WHERE id=? AND company_id=?
+        """, (job["client_id"], company_id)).fetchone()
+
+    client_name = client["name"] if client else job["title"]
+    phone = client["phone"] if client else ""
+    address = client["address"] if client else ""
+    next_date = get_next_recurring_date(job["next_date"], job["interval_type"])
+
+    c.execute("""
+    INSERT INTO tasks (
+        company_id,
+        client_id,
+        client,
+        phone,
+        address,
+        description,
+        task_date,
+        worker,
+        workers,
+        priority,
+        price,
+        photo,
+        status,
+        report,
+        after_photo,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        job["client_id"],
+        client_name,
+        phone,
+        address,
+        job["description"],
+        job["next_date"],
+        job["worker"],
+        job["workers"],
+        job["priority"],
+        job["price"],
+        "",
+        "Новая",
+        "",
+        "",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    task_id = c.lastrowid
+
+    c.execute("""
+    UPDATE recurring_jobs
+    SET next_date=?
+    WHERE id=? AND company_id=?
+    """, (next_date, job_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Создана из регулярной работы",
+        f"Шаблон: {job['title']}"
+    )
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
 @app.get("/finance/export")

@@ -403,6 +403,71 @@ async def assert_overdue_sla(task):
     assert f"#{task['id']}" in html
 
 
+async def assert_recurring_generate(task):
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO recurring_jobs (
+        company_id, client_id, title, description, interval_type, next_date,
+        worker, workers, priority, price, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        task["client_id"],
+        "Smoke recurring",
+        "Generated from recurring",
+        "monthly",
+        "2026-05-17",
+        "worker2",
+        "worker2,helper2",
+        "Обычный",
+        "1500",
+        1,
+        "2026-05-17 10:00",
+    ))
+
+    job_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    page_response = await crm.recurring_jobs_page(make_asgi_request("owner2", "/recurring"))
+    assert page_response.status_code == 200
+    assert f"/recurring/{job_id}/generate" in page_response.body.decode("utf-8")
+
+    response = await crm.generate_recurring_task(make_request("owner2"), job_id)
+    assert response.status_code == 302
+    task_location = response.headers["location"]
+    assert task_location.startswith("/task/")
+    generated_task_id = int(task_location.rsplit("/", 1)[1])
+
+    conn = connect()
+    c = conn.cursor()
+    generated_task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=? AND company_id=2
+    """, (generated_task_id,)).fetchone()
+    job = c.execute("""
+    SELECT next_date
+    FROM recurring_jobs
+    WHERE id=?
+    """, (job_id,)).fetchone()
+    activity = c.execute("""
+    SELECT *
+    FROM task_activity
+    WHERE task_id=? AND action='Создана из регулярной работы'
+    """, (generated_task_id,)).fetchone()
+    conn.close()
+
+    assert generated_task is not None
+    assert generated_task["client_id"] == task["client_id"]
+    assert generated_task["workers"] == "worker2,helper2"
+    assert job["next_date"] == "2026-06-17"
+    assert activity is not None
+
+
 def main():
     try:
         task = seed_data()
@@ -415,6 +480,7 @@ def main():
         asyncio.run(assert_notifications(task))
         asyncio.run(assert_client_card(task))
         asyncio.run(assert_overdue_sla(task))
+        asyncio.run(assert_recurring_generate(task))
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()
