@@ -291,35 +291,36 @@ def init_db():
     ON users(username)
     """)
 
-    c.execute("""
-    INSERT OR IGNORE INTO users (username, password, role, last_seen)
-    VALUES (?, ?, ?, ?)
-    """, (
-        "boss",
-        "boss123",
-        "boss",
-        datetime.now().strftime("%Y-%m-%d %H:%M")
-    ))
+    if os.getenv("ENV") != "production":
+        c.execute("""
+        INSERT OR IGNORE INTO users (username, password, role, last_seen)
+        VALUES (?, ?, ?, ?)
+        """, (
+            "boss",
+            "boss123",
+            "boss",
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
 
-    c.execute("""
-    INSERT OR IGNORE INTO users (username, password, role, last_seen)
-    VALUES (?, ?, ?, ?)
-    """, (
-        "manager",
-        "manager123",
-        "manager",
-        datetime.now().strftime("%Y-%m-%d %H:%M")
-    ))
+        c.execute("""
+        INSERT OR IGNORE INTO users (username, password, role, last_seen)
+        VALUES (?, ?, ?, ?)
+        """, (
+            "manager",
+            "manager123",
+            "manager",
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
 
-    c.execute("""
-    INSERT OR IGNORE INTO users (username, password, role, last_seen)
-    VALUES (?, ?, ?, ?)
-    """, (
-        "worker",
-        "worker123",
-        "worker",
-        datetime.now().strftime("%Y-%m-%d %H:%M")
-    ))
+        c.execute("""
+        INSERT OR IGNORE INTO users (username, password, role, last_seen)
+        VALUES (?, ?, ?, ?)
+        """, (
+            "worker",
+            "worker123",
+            "worker",
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
 
     conn.commit()
     conn.close()
