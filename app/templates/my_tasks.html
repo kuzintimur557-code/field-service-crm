@@ -71,7 +71,7 @@ textarea,input{width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5
 
 <div class="top">
     <div>
-        <div class="title">{{ task["client"] }}</div>
+        <div class="title">#{{ task["id"] }} — {{ task["client"] }}</div>
         <div class="meta">{{ task["address"] }}</div>
     </div>
     <div class="badge">{{ task["status"] }}</div>
