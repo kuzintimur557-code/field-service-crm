@@ -259,6 +259,40 @@ def get_company_settings(company_id=1):
     return settings
 
 
+def create_notification(
+    company_id,
+    username,
+    title,
+    message="",
+    link=""
+):
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO notifications (
+        company_id,
+        username,
+        title,
+        message,
+        link,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        username,
+        title,
+        message,
+        link,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 def log_task_activity(task_id, username, role, action, details=""):
     conn = connect()
     c = conn.cursor()
