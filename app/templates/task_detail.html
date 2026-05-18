@@ -439,7 +439,9 @@ button{
 <div class="label">До работы</div>
 
 {% if task["photo"] %}
+<a href="/uploads/{{ task['photo'] }}" target="_blank">
 <img src="/uploads/{{ task['photo'] }}" class="photo">
+</a>
 {% endif %}
 </div>
 
@@ -447,7 +449,9 @@ button{
 <div class="label">После работы</div>
 
 {% if task["after_photo"] %}
+<a href="/uploads/{{ task['after_photo'] }}" target="_blank">
 <img src="/uploads/{{ task['after_photo'] }}" class="photo">
+</a>
 {% endif %}
 </div>
 
