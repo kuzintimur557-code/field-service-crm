@@ -46,6 +46,12 @@ h1{margin:0 0 8px;font-size:34px}
         👷 Исполнитель: {{ task["workers"] or task["worker"] }}
     </div>
     <a class="btn" href="/task/{{ task['id'] }}">Открыть заявку</a>
+
+    <form method="post" action="/task/{{ task['id'] }}/date" style="margin-top:12px">
+        <div style="font-weight:900;margin-bottom:8px">Быстро перенести</div>
+        <input type="datetime-local" name="task_date" required style="width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db">
+        <button class="btn" type="submit" style="border:0;width:100%">Сохранить дату</button>
+    </form>
 </div>
 {% endfor %}
 {% else %}
