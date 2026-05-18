@@ -1080,6 +1080,49 @@ async def home(
     )
 
 
+@app.get("/overdue", response_class=HTMLResponse)
+async def overdue_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status!='Завершено'
+      AND task_date < ?
+    ORDER BY task_date ASC
+    """, (company_id, today)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "overdue.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "tasks": tasks
+        }
+    )
+
+
 @app.get("/calendar", response_class=HTMLResponse)
 async def calendar_page(request: Request, worker: str = "", month: str = ""):
 
