@@ -1114,6 +1114,50 @@ async def home(
     )
 
 
+@app.get("/notifications", response_class=HTMLResponse)
+async def notifications_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    notifications = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
+    ORDER BY id DESC
+    LIMIT 100
+    """, (company_id, username)).fetchall()
+
+    unread_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
+      AND is_read=0
+    """, (company_id, username)).fetchone()[0]
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "notifications.html",
+        {
+            "request": request,
+            "username": username,
+            "notifications": notifications,
+            "unread_count": unread_count
+        }
+    )
+
+
 @app.get("/workload", response_class=HTMLResponse)
 async def workload_page(request: Request):
 
