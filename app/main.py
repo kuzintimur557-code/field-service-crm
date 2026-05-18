@@ -980,6 +980,34 @@ async def home(
     if revenue is None:
         revenue = 0
 
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    today_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND task_date LIKE ?
+    """, (company_id, f"{today}%")).fetchone()[0]
+
+    overdue_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status!='Завершено'
+      AND task_date < ?
+    """, (company_id, today)).fetchone()[0]
+
+    active_workers = c.execute("""
+    SELECT COUNT(DISTINCT worker)
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status='В работе'
+    """, (company_id,)).fetchone()[0]
+
+
     workers = c.execute("""
     SELECT username, last_seen FROM users
     WHERE role='worker' AND company_id=?
@@ -1039,6 +1067,9 @@ async def home(
             "working_tasks": working_tasks,
             "done_tasks": done_tasks,
             "revenue": revenue,
+            "today_tasks": today_tasks,
+            "overdue_tasks": overdue_tasks,
+            "active_workers": active_workers,
             "workers": workers,
             "worker_stats": worker_stats,
             "selected_status": status,
