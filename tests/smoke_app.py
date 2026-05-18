@@ -385,6 +385,24 @@ async def assert_client_card(task):
     assert f"#{task['id']}" in html
 
 
+async def assert_overdue_sla(task):
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE tasks
+    SET archived=0, status='Новая', task_date='2000-01-01'
+    WHERE id=?
+    """, (task["id"],))
+    conn.commit()
+    conn.close()
+
+    response = await crm.overdue_page(make_asgi_request("owner2", "/overdue"))
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "Нарушен SLA" in html
+    assert f"#{task['id']}" in html
+
+
 def main():
     try:
         task = seed_data()
@@ -396,6 +414,7 @@ def main():
         asyncio.run(assert_catalog_create())
         asyncio.run(assert_notifications(task))
         asyncio.run(assert_client_card(task))
+        asyncio.run(assert_overdue_sla(task))
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()

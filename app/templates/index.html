@@ -92,6 +92,15 @@ h1{font-size:30px}
 </div>
 {% endif %}
 
+{% if sla_breached_tasks and sla_breached_tasks > 0 %}
+<div style="background:#7f1d1d;color:white;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
+    ⏱ SLA нарушен: {{ sla_breached_tasks }}
+    <a href="/overdue" style="display:inline-block;margin-left:12px;color:white;text-decoration:underline">
+        Открыть
+    </a>
+</div>
+{% endif %}
+
 {% if today_tasks and today_tasks > 0 %}
 <div style="background:#dbeafe;color:#1d4ed8;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
     📅 Сегодня есть заявки: {{ today_tasks }}
@@ -111,6 +120,11 @@ h1{font-size:30px}
     <a href="/overdue" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">Просрочено</div>
         <div class="stat-value">{{ overdue_tasks }}</div>
+    </a>
+
+    <a href="/overdue" class="stat" style="text-decoration:none;color:inherit">
+        <div class="stat-title">SLA нарушен</div>
+        <div class="stat-value">{{ sla_breached_tasks }}</div>
     </a>
 
     <a href="/workload" class="stat" style="text-decoration:none;color:inherit">

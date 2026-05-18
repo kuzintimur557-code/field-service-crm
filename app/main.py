@@ -139,6 +139,20 @@ def task_has_worker(username, task):
     return username in get_task_worker_names(task)
 
 
+def get_overdue_days(task_date, today=None):
+    task_day = str(task_date or "")[:10]
+
+    if not task_day:
+        return 0
+
+    try:
+        current_day = today or datetime.now().date()
+        due_day = datetime.strptime(task_day, "%Y-%m-%d").date()
+        return max((current_day - due_day).days, 0)
+    except Exception:
+        return 0
+
+
 def get_task_worker_chat_ids(cursor, task):
     chat_ids = []
     task_company_id = task["company_id"] if "company_id" in task.keys() else 1
@@ -1015,6 +1029,7 @@ async def home(
         revenue = 0
 
     today = datetime.now().strftime("%Y-%m-%d")
+    sla_cutoff = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     today_tasks = c.execute("""
     SELECT COUNT(*)
@@ -1029,9 +1044,22 @@ async def home(
     FROM tasks
     WHERE archived=0
       AND company_id=?
-      AND status!='Завершено'
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date!=''
       AND task_date < ?
     """, (company_id, today)).fetchone()[0]
+
+    sla_breached_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date!=''
+      AND task_date < ?
+    """, (company_id, sla_cutoff)).fetchone()[0]
 
     active_workers = c.execute("""
     SELECT COUNT(DISTINCT worker)
@@ -1103,6 +1131,7 @@ async def home(
             "revenue": revenue,
             "today_tasks": today_tasks,
             "overdue_tasks": overdue_tasks,
+            "sla_breached_tasks": sla_breached_tasks,
             "active_workers": active_workers,
             "workers": workers,
             "worker_stats": worker_stats,
@@ -1382,7 +1411,8 @@ async def overdue_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
-    today = datetime.now().strftime("%Y-%m-%d")
+    today_date = datetime.now().date()
+    today = today_date.strftime("%Y-%m-%d")
 
     conn = connect()
     c = conn.cursor()
@@ -1392,10 +1422,22 @@ async def overdue_page(request: Request):
     FROM tasks
     WHERE archived=0
       AND company_id=?
-      AND status!='Завершено'
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date!=''
       AND task_date < ?
     ORDER BY task_date ASC
     """, (company_id, today)).fetchall()
+
+    entries = []
+
+    for task in tasks:
+        overdue_days = get_overdue_days(task["task_date"], today_date)
+        entries.append({
+            "task": task,
+            "overdue_days": overdue_days,
+            "sla_status": "Нарушен SLA" if overdue_days > 1 else "Просрочено"
+        })
 
     conn.close()
 
@@ -1406,7 +1448,8 @@ async def overdue_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "tasks": tasks
+            "tasks": tasks,
+            "entries": entries
         }
     )
 

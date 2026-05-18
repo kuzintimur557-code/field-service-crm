@@ -18,6 +18,7 @@ h1{margin:0 0 8px;font-size:34px}
 .task{background:#f9fafb;padding:18px;border-radius:20px;margin-bottom:12px}
 .title{font-size:22px;font-weight:900}
 .badge{display:inline-block;margin-top:8px;padding:8px 12px;border-radius:999px;background:#fee2e2;color:#991b1b;font-weight:900}
+.badge.sla{background:#7f1d1d;color:white}
 .info{margin-top:10px;color:#374151;font-weight:800;line-height:1.5}
 .btn{display:inline-block;margin-top:12px;padding:12px 16px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
 @media(max-width:700px){.container{padding:14px}h1{font-size:28px}}
@@ -35,11 +36,15 @@ h1{margin:0 0 8px;font-size:34px}
 </div>
 
 <div class="card">
-{% if tasks %}
-{% for task in tasks %}
+{% if entries %}
+{% for entry in entries %}
+{% set task = entry["task"] %}
 <div class="task">
     <div class="title">#{{ task["id"] }} — {{ task["client"] }}</div>
     <div class="badge">{{ task["status"] }}</div>
+    <div class="badge {% if entry['sla_status'] == 'Нарушен SLA' %}sla{% endif %}">
+        {{ entry["sla_status"] }} · {{ entry["overdue_days"] }} дн.
+    </div>
     <div class="info">
         📅 Дата: {{ task["task_date"] }}<br>
         📍 Адрес: {{ task["address"] }}<br>
