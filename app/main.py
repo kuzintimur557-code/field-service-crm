@@ -4561,7 +4561,7 @@ async def unarchive_task(request: Request, task_id: int):
 
 
 @app.post("/task/{task_id}/delete")
-async def delete_task_forever(request: Request, task_id: int):
+async def delete_task(request: Request, task_id: int):
 
     username = get_user(request)
 
@@ -4570,8 +4570,10 @@ async def delete_task_forever(request: Request, task_id: int):
 
     role = get_role(username)
 
-    if role not in ("boss", "superadmin"):
+    if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
 
     conn = connect()
     c = conn.cursor()
@@ -4579,45 +4581,42 @@ async def delete_task_forever(request: Request, task_id: int):
     task = c.execute("""
     SELECT *
     FROM tasks
-    WHERE id=?
-    """, (task_id,)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (task_id, company_id)).fetchone()
 
     if not task:
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    if not can_access_task(username, role, task):
-        conn.close()
-        return RedirectResponse("/", status_code=302)
+    c.execute("""
+    UPDATE tasks
+    SET archived=1
+    WHERE id=? AND company_id=?
+    """, (task_id, company_id))
 
-    if "archived" in task.keys() and task["archived"] != 1:
-        conn.close()
-        return RedirectResponse(f"/task/{task_id}", status_code=302)
-
-    c.execute("DELETE FROM task_items WHERE task_id=?", (task_id,))
-    c.execute("DELETE FROM task_comments WHERE task_id=?", (task_id,))
-    c.execute("DELETE FROM task_activity WHERE task_id=?", (task_id,))
-    c.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Заявка отправлена в архив",
+        "Заявка скрыта с активного списка",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
 
     conn.commit()
     conn.close()
 
-    try:
-        send_message(
-            f"""
-🗑 Заявка удалена навсегда
-
-Заявка: #{task_id}
-Клиент: {task['client']}
-Адрес: {task['address']}
-
-Удалил: {username} ({get_role_title(role)})
-"""
-        )
-    except Exception:
-        pass
-
-    return RedirectResponse("/archive", status_code=302)
+    return RedirectResponse("/?archived=1", status_code=302)
 
 
 @app.get("/task/{task_id}/invoice")
