@@ -3945,6 +3945,21 @@ async def complete_task(request: Request, task_id: int):
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
+    owners = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=? AND role IN ('boss', 'manager')
+    """, (company_id,)).fetchall()
+
+    for owner in owners:
+        create_notification(
+            company_id,
+            owner["username"],
+            "✅ Заявка завершена",
+            f"Исполнитель {username} завершил заявку #{task_id}",
+            f"/task/{task_id}"
+        )
+
     conn.commit()
     conn.close()
 
