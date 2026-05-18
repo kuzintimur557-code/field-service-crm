@@ -1080,6 +1080,49 @@ async def home(
     )
 
 
+@app.get("/today", response_class=HTMLResponse)
+async def today_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND task_date LIKE ?
+    ORDER BY task_date ASC
+    """, (company_id, f"{today}%")).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "today.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "tasks": tasks,
+            "today": today
+        }
+    )
+
+
 @app.get("/overdue", response_class=HTMLResponse)
 async def overdue_page(request: Request):
 
