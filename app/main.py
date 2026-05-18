@@ -2094,13 +2094,24 @@ async def create_catalog_item(request: Request):
     """, (company_id,)).fetchall()
 
     for owner in owners:
-        create_notification(
+        c.execute("""
+        INSERT INTO notifications (
+            company_id,
+            username,
+            title,
+            message,
+            link,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
             company_id,
             owner["username"],
             "✅ Заявка завершена",
             f"Исполнитель {username} завершил заявку #{task_id}",
-            f"/task/{task_id}"
-        )
+            f"/task/{task_id}",
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
 
     conn.commit()
     conn.close()
