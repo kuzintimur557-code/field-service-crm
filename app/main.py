@@ -19,6 +19,7 @@ import shutil
 import os
 import hmac
 import hashlib
+import bcrypt
 import base64
 import secrets
 import csv
@@ -181,14 +182,25 @@ def get_role_title(role):
 
 
 def hash_password(password):
-    salt = secrets.token_hex(16)
-    digest = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
-    return f"sha256${salt}${digest}"
+    hashed = bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt()
+    )
+    return "bcrypt$" + hashed.decode("utf-8")
 
 
 def verify_password(password, stored_password):
     if not stored_password:
         return False
+
+    stored_password = str(stored_password)
+
+    if stored_password.startswith("bcrypt$"):
+        bcrypt_hash = stored_password.replace("bcrypt$", "", 1)
+        return bcrypt.checkpw(
+            password.encode("utf-8"),
+            bcrypt_hash.encode("utf-8")
+        )
 
     if stored_password.startswith("sha256$"):
         try:
@@ -198,12 +210,11 @@ def verify_password(password, stored_password):
         except Exception:
             return False
 
-    # старый формат: обычный текст
     return secrets.compare_digest(password, stored_password)
 
 
 def password_needs_upgrade(stored_password):
-    return not str(stored_password or "").startswith("sha256$")
+    return not str(stored_password or "").startswith("bcrypt$")
 
 
 def is_password_strong(password):
