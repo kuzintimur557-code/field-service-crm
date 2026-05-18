@@ -579,6 +579,12 @@ button{
 
 <div class="section-title">Быстрые действия</div>
 
+{% if role in ["boss", "manager"] %}
+<form method="post" action="/task/{{ task['id'] }}/delete" onsubmit="return confirm('Удалить заявку #{{ task['id'] }}? Это действие нельзя отменить.')">
+<button class="btn red" type="submit">🗑 Удалить заявку</button>
+</form>
+{% endif %}
+
 <div class="quick">
 
 {% if role == "worker" and task["status"] == "Новая" %}
