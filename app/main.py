@@ -34,6 +34,9 @@ COOKIE_SECURE = (
     or bool(os.getenv("RAILWAY_ENVIRONMENT"))
 )
 
+if os.getenv("ENV") == "production" and SECRET_KEY == "dev-secret-change-me":
+    raise RuntimeError("SECRET_KEY must be set in production")
+
 app = FastAPI()
 
 init_db()
