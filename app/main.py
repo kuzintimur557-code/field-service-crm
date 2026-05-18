@@ -1960,23 +1960,6 @@ async def update_settings(request: Request):
 
     conn.commit()
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
-
-    owners = c.execute("""
-    SELECT username
-    FROM users
-    WHERE company_id=? AND role IN ('boss', 'manager')
-    """, (company_id,)).fetchall()
-
-    for owner in owners:
-        create_notification(
-            company_id,
-            owner["username"],
-            "✅ Заявка завершена",
-            f"Исполнитель {username} завершил заявку #{task_id}",
-            f"/task/{task_id}"
-        )
-
     conn.close()
 
     try:
@@ -2103,6 +2086,21 @@ async def create_catalog_item(request: Request):
         1,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
+
+    owners = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=? AND role IN ('boss', 'manager')
+    """, (company_id,)).fetchall()
+
+    for owner in owners:
+        create_notification(
+            company_id,
+            owner["username"],
+            "✅ Заявка завершена",
+            f"Исполнитель {username} завершил заявку #{task_id}",
+            f"/task/{task_id}"
+        )
 
     conn.commit()
     conn.close()
