@@ -4,6 +4,7 @@ import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlencode
 
 from starlette.requests import Request
 
@@ -42,6 +43,33 @@ def make_asgi_request(username, path="/calendar"):
         "client": ("127.0.0.1", 50000),
         "server": ("testserver", 80),
     })
+
+
+def make_form_request(username, path, data):
+    body = urlencode(data).encode("utf-8")
+    cookie = f"{crm.SESSION_COOKIE_NAME}={crm.sign_session_value(username)}"
+
+    async def receive():
+        return {
+            "type": "http.request",
+            "body": body,
+            "more_body": False,
+        }
+
+    return Request({
+        "type": "http",
+        "method": "POST",
+        "path": path,
+        "headers": [
+            (b"cookie", cookie.encode("utf-8")),
+            (b"content-type", b"application/x-www-form-urlencoded"),
+            (b"content-length", str(len(body)).encode("utf-8")),
+        ],
+        "query_string": b"",
+        "scheme": "http",
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    }, receive)
 
 
 def seed_data():
@@ -229,6 +257,40 @@ async def assert_archive_restore(task):
     assert activity is not None
 
 
+async def assert_catalog_create():
+    original_send_message = crm.send_message
+    crm.send_message = lambda text: True
+
+    try:
+        response = await crm.create_catalog_item(make_form_request(
+            "owner2",
+            "/catalog",
+            {
+                "item_type": "service",
+                "name": "Smoke service",
+                "unit": "шт",
+                "price": "1000",
+                "cost": "300",
+            },
+        ))
+    finally:
+        crm.send_message = original_send_message
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/catalog?created=1"
+
+    conn = connect()
+    c = conn.cursor()
+    item = c.execute("""
+    SELECT *
+    FROM catalog_items
+    WHERE company_id=2 AND name='Smoke service'
+    """).fetchone()
+    conn.close()
+
+    assert item is not None
+
+
 def main():
     try:
         task = seed_data()
@@ -237,6 +299,7 @@ def main():
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_archive_restore(task))
+        asyncio.run(assert_catalog_create())
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()
