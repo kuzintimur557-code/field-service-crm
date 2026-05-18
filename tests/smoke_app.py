@@ -186,6 +186,49 @@ async def assert_calendar_access():
     assert "Client 2" not in outsider_response.body.decode("utf-8")
 
 
+async def assert_archive_restore(task):
+    conn = connect()
+    c = conn.cursor()
+    c.execute("UPDATE tasks SET archived=1 WHERE id=?", (task["id"],))
+    conn.commit()
+    conn.close()
+
+    archive_response = await crm.archive_page(make_asgi_request("owner2", "/archive"))
+    assert archive_response.status_code == 200
+    archive_html = archive_response.body.decode("utf-8")
+    assert f"/task/{task['id']}/unarchive" in archive_html
+    assert "Восстановить" in archive_html
+
+    detail_response = await crm.task_detail(
+        make_asgi_request("owner2", f"/task/{task['id']}"),
+        task["id"],
+    )
+    assert detail_response.status_code == 200
+    detail_html = detail_response.body.decode("utf-8")
+    assert f"/task/{task['id']}/unarchive" in detail_html
+    assert "Восстановить из архива" in detail_html
+
+    restore_response = await crm.unarchive_task(make_request("owner2"), task["id"])
+    assert restore_response.status_code == 302
+    assert restore_response.headers["location"] == f"/task/{task['id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    restored = c.execute(
+        "SELECT archived FROM tasks WHERE id=?",
+        (task["id"],)
+    ).fetchone()
+    activity = c.execute("""
+    SELECT *
+    FROM task_activity
+    WHERE task_id=? AND action='Заявка возвращена из архива'
+    """, (task["id"],)).fetchone()
+    conn.close()
+
+    assert restored["archived"] == 0
+    assert activity is not None
+
+
 def main():
     try:
         task = seed_data()
@@ -193,6 +236,7 @@ def main():
         assert_task_access(task)
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
+        asyncio.run(assert_archive_restore(task))
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()

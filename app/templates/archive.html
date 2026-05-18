@@ -15,10 +15,12 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 h1{margin:0;font-size:34px}
 .back{color:#2563eb;text-decoration:none;font-weight:900}
 .card{background:white;padding:22px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:14px}
-.row{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:14px;align-items:center}
+.row{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr auto;gap:14px;align-items:center}
 .label{font-size:12px;color:#6b7280;font-weight:800;margin-bottom:5px}
 .value{font-size:16px;font-weight:900;word-break:break-word}
 .btn{display:inline-block;padding:12px 16px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900;text-align:center}
+.restore{border:0;display:block;width:100%;padding:12px 16px;border-radius:14px;background:#16a34a;color:white;font-weight:900;cursor:pointer}
+.actions{display:grid;grid-template-columns:1fr;gap:8px;min-width:150px}
 .empty{background:white;padding:34px;border-radius:24px;text-align:center;font-size:18px;font-weight:900;color:#6b7280}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#fee2e2;color:#991b1b;font-weight:900}
 @media(max-width:800px){
@@ -27,6 +29,7 @@ h1{margin:0;font-size:34px}
 h1{font-size:28px;margin-bottom:12px}
 .row{grid-template-columns:1fr}
 .btn{display:block}
+.actions{min-width:0}
 }
 </style>
 </head>
@@ -68,8 +71,11 @@ h1{font-size:28px;margin-bottom:12px}
             <div class="badge">{{ task["status"] }}</div>
         </div>
 
-        <div>
+        <div class="actions">
             <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
+            <form method="post" action="/task/{{ task['id'] }}/unarchive" onsubmit="return confirm('Восстановить заявку #{{ task['id'] }} из архива?')">
+                <button class="restore" type="submit">Восстановить</button>
+            </form>
         </div>
     </div>
 </div>

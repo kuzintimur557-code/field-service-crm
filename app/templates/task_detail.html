@@ -580,9 +580,15 @@ button{
 <div class="section-title">Быстрые действия</div>
 
 {% if role in ["boss", "manager"] %}
-<form method="post" action="/task/{{ task['id'] }}/delete" onsubmit="return confirm('Удалить заявку #{{ task['id'] }}? Это действие нельзя отменить.')">
-<button class="btn red" type="submit">🗑 Удалить заявку</button>
+{% if task["archived"] == 1 %}
+<form method="post" action="/task/{{ task['id'] }}/unarchive" onsubmit="return confirm('Восстановить заявку #{{ task['id'] }} из архива?')">
+<button class="btn green" type="submit">🗄 Восстановить из архива</button>
 </form>
+{% else %}
+<form method="post" action="/task/{{ task['id'] }}/delete" onsubmit="return confirm('Отправить заявку #{{ task['id'] }} в архив?')">
+<button class="btn red" type="submit">🗄 В архив</button>
+</form>
+{% endif %}
 {% endif %}
 
 <div class="quick">
