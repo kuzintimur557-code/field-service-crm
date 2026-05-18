@@ -17,6 +17,8 @@ h1{margin:0 0 8px;font-size:34px}
 .meta{color:#6b7280;font-weight:800}
 .notice{display:block;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:12px;text-decoration:none;color:#111827;border:1px solid #e5e7eb}
 .notice.unread{background:#eff6ff;border-color:#bfdbfe}
+.top{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}
+.read-all{border:0;border-radius:14px;background:#111827;color:white;padding:12px 16px;font-weight:900;cursor:pointer}
 .title{font-size:18px;font-weight:900}
 .message{margin-top:8px;color:#374151;font-weight:800}
 .date{margin-top:8px;color:#6b7280;font-size:13px;font-weight:800}
@@ -30,14 +32,23 @@ h1{margin:0 0 8px;font-size:34px}
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
-<h1>🔔 Уведомления</h1>
-<div class="meta">Непрочитанных: {{ unread_count }}</div>
+<div class="top">
+    <div>
+        <h1>🔔 Уведомления</h1>
+        <div class="meta">Непрочитанных: {{ unread_count }}</div>
+    </div>
+    {% if unread_count and unread_count > 0 %}
+    <form method="post" action="/notifications/read-all">
+        <button class="read-all" type="submit">Отметить все прочитанными</button>
+    </form>
+    {% endif %}
+</div>
 </div>
 
 <div class="card">
 {% if notifications %}
 {% for item in notifications %}
-<a class="notice {% if item['is_read'] == 0 %}unread{% endif %}" href="{{ item['link'] or '#' }}">
+<a class="notice {% if item['is_read'] == 0 %}unread{% endif %}" href="/notifications/{{ item['id'] }}/open">
     <div class="title">{{ item["title"] }}</div>
     <div class="message">{{ item["message"] }}</div>
     <div class="date">{{ item["created_at"] }}</div>

@@ -1122,6 +1122,7 @@ async def notifications_page(request: Request):
     if not username:
         return RedirectResponse("/login", status_code=302)
 
+    role = get_role(username)
     company_id = get_user_company_id(username)
 
     conn = connect()
@@ -1152,10 +1153,81 @@ async def notifications_page(request: Request):
         {
             "request": request,
             "username": username,
+            "role": role,
             "notifications": notifications,
             "unread_count": unread_count
         }
     )
+
+
+@app.post("/notifications/read-all")
+async def mark_all_notifications_read(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    UPDATE notifications
+    SET is_read=1
+    WHERE company_id=?
+      AND username=?
+    """, (company_id, username))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/notifications", status_code=302)
+
+
+@app.get("/notifications/{notification_id}/open")
+async def open_notification(request: Request, notification_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE id=?
+      AND company_id=?
+      AND username=?
+    """, (notification_id, company_id, username)).fetchone()
+
+    if not notification:
+        conn.close()
+        return RedirectResponse("/notifications", status_code=302)
+
+    c.execute("""
+    UPDATE notifications
+    SET is_read=1
+    WHERE id=?
+      AND company_id=?
+      AND username=?
+    """, (notification_id, company_id, username))
+
+    conn.commit()
+    conn.close()
+
+    link = (notification["link"] or "").strip()
+
+    if not link or not link.startswith("/") or link.startswith("//"):
+        link = "/notifications"
+
+    return RedirectResponse(link, status_code=302)
 
 
 @app.get("/workload", response_class=HTMLResponse)

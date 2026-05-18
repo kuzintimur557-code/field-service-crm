@@ -291,6 +291,70 @@ async def assert_catalog_create():
     assert item is not None
 
 
+async def assert_notifications(task):
+    crm.create_notification(
+        2,
+        "owner2",
+        "Smoke notification",
+        "Notification body",
+        f"/task/{task['id']}",
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2 AND username='owner2'
+    ORDER BY id DESC
+    """).fetchone()
+    conn.close()
+
+    notifications_response = await crm.notifications_page(
+        make_asgi_request("owner2", "/notifications")
+    )
+    assert notifications_response.status_code == 200
+    notifications_html = notifications_response.body.decode("utf-8")
+    assert f"/notifications/{notification['id']}/open" in notifications_html
+    assert "Отметить все прочитанными" in notifications_html
+
+    open_response = await crm.open_notification(
+        make_request("owner2"),
+        notification["id"],
+    )
+    assert open_response.status_code == 302
+    assert open_response.headers["location"] == f"/task/{task['id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    opened = c.execute("""
+    SELECT is_read
+    FROM notifications
+    WHERE id=?
+    """, (notification["id"],)).fetchone()
+    conn.close()
+
+    assert opened["is_read"] == 1
+
+    crm.create_notification(2, "owner2", "Unread one")
+    crm.create_notification(2, "owner2", "Unread two")
+
+    read_all_response = await crm.mark_all_notifications_read(make_request("owner2"))
+    assert read_all_response.status_code == 302
+    assert read_all_response.headers["location"] == "/notifications"
+
+    conn = connect()
+    c = conn.cursor()
+    unread_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=2 AND username='owner2' AND is_read=0
+    """).fetchone()[0]
+    conn.close()
+
+    assert unread_count == 0
+
+
 def main():
     try:
         task = seed_data()
@@ -300,6 +364,7 @@ def main():
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())
+        asyncio.run(assert_notifications(task))
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()
