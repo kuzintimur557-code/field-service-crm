@@ -2494,6 +2494,158 @@ async def update_settings(request: Request):
     return RedirectResponse("/settings?updated=1", status_code=302)
 
 
+@app.get("/custom-fields", response_class=HTMLResponse)
+async def custom_fields_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+    ORDER BY entity_type, sort_order, id
+    """, (company_id,)).fetchall()
+
+    settings = get_company_settings(company_id)
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "custom_fields.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "fields": fields,
+            "settings": settings
+        }
+    )
+
+
+@app.post("/custom-fields")
+async def create_custom_field(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    entity_type = (form.get("entity_type") or "task").strip()
+    label = (form.get("label") or "").strip()
+    field_type = (form.get("field_type") or "text").strip()
+    is_required = 1 if form.get("is_required") else 0
+
+    if entity_type not in ("task", "client"):
+        entity_type = "task"
+
+    if field_type not in ("text", "number", "date", "select"):
+        field_type = "text"
+
+    if not label:
+        return RedirectResponse("/custom-fields?error=empty", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    sort_order = c.execute("""
+    SELECT COUNT(*)
+    FROM custom_fields
+    WHERE company_id=? AND entity_type=?
+    """, (company_id, entity_type)).fetchone()[0]
+
+    c.execute("""
+    INSERT INTO custom_fields (
+        company_id,
+        entity_type,
+        label,
+        field_type,
+        is_required,
+        active,
+        sort_order,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        entity_type,
+        label,
+        field_type,
+        is_required,
+        1,
+        sort_order + 1,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/custom-fields?created=1", status_code=302)
+
+
+@app.post("/custom-fields/{field_id}/toggle")
+async def toggle_custom_field(request: Request, field_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    field = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE id=? AND company_id=?
+    """, (field_id, company_id)).fetchone()
+
+    if not field:
+        conn.close()
+        return RedirectResponse("/custom-fields", status_code=302)
+
+    new_active = 0 if field["active"] else 1
+
+    c.execute("""
+    UPDATE custom_fields
+    SET active=?
+    WHERE id=? AND company_id=?
+    """, (new_active, field_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/custom-fields", status_code=302)
+
+
 @app.get("/catalog", response_class=HTMLResponse)
 async def catalog_page(request: Request):
 

@@ -188,6 +188,32 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS custom_fields (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        entity_type TEXT,
+        label TEXT,
+        field_type TEXT,
+        is_required INTEGER DEFAULT 0,
+        active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS custom_field_values (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        field_id INTEGER,
+        entity_type TEXT,
+        entity_id INTEGER,
+        value TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS login_attempts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT,
@@ -243,6 +269,19 @@ def init_db():
     add_column_if_missing(c, "recurring_jobs", "client_id", "INTEGER")
     add_column_if_missing(c, "recurring_jobs", "workers", "TEXT")
     add_column_if_missing(c, "recurring_jobs", "active", "INTEGER DEFAULT 1")
+
+    add_column_if_missing(c, "custom_fields", "company_id", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "custom_fields", "entity_type", "TEXT")
+    add_column_if_missing(c, "custom_fields", "label", "TEXT")
+    add_column_if_missing(c, "custom_fields", "field_type", "TEXT DEFAULT 'text'")
+    add_column_if_missing(c, "custom_fields", "is_required", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "custom_fields", "active", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "custom_fields", "sort_order", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "custom_field_values", "company_id", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "custom_field_values", "field_id", "INTEGER")
+    add_column_if_missing(c, "custom_field_values", "entity_type", "TEXT")
+    add_column_if_missing(c, "custom_field_values", "entity_id", "INTEGER")
+    add_column_if_missing(c, "custom_field_values", "value", "TEXT")
 
     add_column_if_missing(c, "company_settings", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_settings", "plan", "TEXT DEFAULT 'basic'")

@@ -511,6 +511,57 @@ async def assert_recurring_generate(task):
     assert disabled_generate_response.headers["location"] == "/recurring"
 
 
+async def assert_custom_fields():
+    response = await crm.create_custom_field(make_form_request(
+        "owner2",
+        "/custom-fields",
+        {
+            "entity_type": "task",
+            "field_type": "text",
+            "label": "VIN",
+            "is_required": "on",
+        },
+    ))
+    assert response.status_code == 302
+    assert response.headers["location"] == "/custom-fields?created=1"
+
+    conn = connect()
+    c = conn.cursor()
+    field = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=2 AND label='VIN'
+    """).fetchone()
+    conn.close()
+
+    assert field is not None
+    assert field["entity_type"] == "task"
+    assert field["is_required"] == 1
+
+    page_response = await crm.custom_fields_page(
+        make_asgi_request("owner2", "/custom-fields")
+    )
+    assert page_response.status_code == 200
+    page_html = page_response.body.decode("utf-8")
+    assert "VIN" in page_html
+    assert f"/custom-fields/{field['id']}/toggle" in page_html
+
+    toggle_response = await crm.toggle_custom_field(make_request("owner2"), field["id"])
+    assert toggle_response.status_code == 302
+    assert toggle_response.headers["location"] == "/custom-fields"
+
+    conn = connect()
+    c = conn.cursor()
+    toggled = c.execute("""
+    SELECT active
+    FROM custom_fields
+    WHERE id=?
+    """, (field["id"],)).fetchone()
+    conn.close()
+
+    assert toggled["active"] == 0
+
+
 def main():
     try:
         task = seed_data()
@@ -524,6 +575,7 @@ def main():
         asyncio.run(assert_client_card(task))
         asyncio.run(assert_overdue_sla(task))
         asyncio.run(assert_recurring_generate(task))
+        asyncio.run(assert_custom_fields())
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()

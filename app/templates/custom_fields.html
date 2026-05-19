@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Поля компании</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:950px;margin:auto;padding:24px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
+h1{margin:0 0 8px;font-size:34px}
+h2{margin:0 0 16px;font-size:22px}
+.meta{color:#6b7280;font-weight:800}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label{display:block;font-weight:900;margin:12px 0 6px;color:#374151}
+input,select,button{width:100%;padding:14px;border-radius:14px;font-size:16px}
+input,select{border:1px solid #d1d5db;background:white}
+button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;margin-top:16px}
+.field{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:14px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
+.title{font-size:18px;font-weight:900}
+.badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
+.badge.off{background:#e5e7eb;color:#374151}
+.notice{margin-bottom:16px;padding:14px;border-radius:16px;font-weight:900}
+.notice.ok{background:#dcfce7;color:#166534}
+.notice.err{background:#fee2e2;color:#991b1b}
+.empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
+@media(max-width:800px){.container{padding:14px}.grid,.field{grid-template-columns:1fr}h1{font-size:28px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/settings" class="back">← Назад к настройкам</a>
+
+<div class="card">
+<h1>🧩 Поля компании</h1>
+<div class="meta">Добавляйте свои поля под отрасль: VIN, госномер, площадь, маршрут, кабинет, вес груза и другие.</div>
+</div>
+
+{% if request.query_params.get("created") == "1" %}
+<div class="notice ok">✅ Поле добавлено</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "empty" %}
+<div class="notice err">❌ Название поля обязательно</div>
+{% endif %}
+
+<div class="card">
+<h2>Добавить поле</h2>
+
+<form method="post" action="/custom-fields">
+<div class="grid">
+    <div>
+        <label>Где использовать</label>
+        <select name="entity_type">
+            <option value="task">{{ settings["task_label"] or "Заявка" }}</option>
+            <option value="client">{{ settings["client_label"] or "Клиент" }}</option>
+        </select>
+    </div>
+    <div>
+        <label>Тип поля</label>
+        <select name="field_type">
+            <option value="text">Текст</option>
+            <option value="number">Число</option>
+            <option value="date">Дата</option>
+            <option value="select">Список</option>
+        </select>
+    </div>
+</div>
+
+<label>Название поля</label>
+<input name="label" placeholder="Например: VIN, госномер, площадь, маршрут" required>
+
+<label style="display:flex;align-items:center;gap:10px">
+    <input type="checkbox" name="is_required" style="width:auto">
+    Обязательное поле
+</label>
+
+<button type="submit">Добавить поле</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Список полей</h2>
+
+{% if fields %}
+{% for field in fields %}
+<div class="field">
+    <div>
+        <div class="title">{{ field["label"] }}</div>
+        <div class="meta">
+            {% if field["entity_type"] == "client" %}
+            {{ settings["client_label"] or "Клиент" }}
+            {% else %}
+            {{ settings["task_label"] or "Заявка" }}
+            {% endif %}
+        </div>
+    </div>
+    <div>
+        <span class="badge">{{ field["field_type"] }}</span>
+        {% if field["is_required"] %}
+        <span class="badge">Обязательное</span>
+        {% endif %}
+    </div>
+    <div>
+        {% if field["active"] %}
+        <span class="badge">Активно</span>
+        {% else %}
+        <span class="badge off">Выключено</span>
+        {% endif %}
+    </div>
+    <form method="post" action="/custom-fields/{{ field['id'] }}/toggle">
+        <button type="submit">{% if field["active"] %}Выключить{% else %}Включить{% endif %}</button>
+    </form>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">Дополнительных полей пока нет</div>
+{% endif %}
+</div>
+
+</div>
+{% include 'mobile_nav.html' %}
+</body>
+</html>
