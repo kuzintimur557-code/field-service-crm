@@ -432,7 +432,7 @@ button{
 	<div class="info-row">
 	<div class="icon">▦</div>
 	<div class="label">{{ field["label"] }}</div>
-	<div class="value">{{ field["value"] }}</div>
+	<div class="value">{{ field["value"] if field["value"] else "Не заполнено" }}</div>
 	<button class="edit-btn" onclick="openCustomField({{ field['id'] }}, {{ field['label']|tojson }}, {{ field['value']|tojson }}, {{ field['field_type']|tojson }})">✎</button>
 	</div>
 	{% endfor %}

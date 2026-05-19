@@ -626,6 +626,23 @@ async def assert_task_custom_fields():
         "2026-05-19 10:00",
     ))
     field_id = c.lastrowid
+    c.execute("""
+    INSERT INTO custom_fields (
+        company_id, entity_type, label, field_type, is_required,
+        active, sort_order, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "task",
+        "Gate code",
+        "text",
+        0,
+        1,
+        2,
+        "2026-05-19 10:01",
+    ))
+    empty_field_id = c.lastrowid
     conn.commit()
     conn.close()
 
@@ -690,6 +707,8 @@ async def assert_task_custom_fields():
     detail_html = detail_response.body.decode("utf-8")
     assert "Route" in detail_html
     assert "Moscow - Tula" in detail_html
+    assert "Gate code" in detail_html
+    assert "Не заполнено" in detail_html
 
     edit_response = await crm.update_task_custom_field(
         make_form_request(
@@ -732,6 +751,33 @@ async def assert_task_custom_fields():
     assert updated_detail_response.status_code == 200
     updated_detail_html = updated_detail_response.body.decode("utf-8")
     assert "Moscow - Kazan" in updated_detail_html
+
+    fill_empty_response = await crm.update_task_custom_field(
+        make_form_request(
+            "owner2",
+            f"/task/{value['task_id']}/custom-field",
+            {
+                "field_id": str(empty_field_id),
+                "value": "42",
+            },
+        ),
+        value["task_id"],
+    )
+    assert fill_empty_response.status_code == 302
+    assert fill_empty_response.headers["location"] == f"/task/{value['task_id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    filled_value = c.execute("""
+    SELECT value
+    FROM custom_field_values
+    WHERE field_id=?
+      AND entity_type='task'
+      AND entity_id=?
+    """, (empty_field_id, value["task_id"])).fetchone()
+    conn.close()
+
+    assert filled_value["value"] == "42"
 
 
 def main():
