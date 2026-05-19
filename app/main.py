@@ -3236,6 +3236,23 @@ async def create_client(request: Request):
     conn = connect()
     c = conn.cursor()
 
+    custom_fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+      AND entity_type='client'
+      AND active=1
+    ORDER BY sort_order, id
+    """, (company_id,)).fetchall()
+
+    for custom_field in custom_fields:
+        field_name = f"custom_field_{custom_field['id']}"
+        custom_value = (form.get(field_name) or "").strip()
+
+        if custom_field["is_required"] and not custom_value:
+            conn.close()
+            return RedirectResponse("/clients?error=custom_required", status_code=302)
+
     c.execute("""
     INSERT INTO clients (
         company_id,
@@ -3259,15 +3276,6 @@ async def create_client(request: Request):
 
     conn.commit()
     client_id = c.lastrowid
-
-    custom_fields = c.execute("""
-    SELECT *
-    FROM custom_fields
-    WHERE company_id=?
-      AND entity_type='client'
-      AND active=1
-    ORDER BY sort_order, id
-    """, (company_id,)).fetchall()
 
     for custom_field in custom_fields:
         field_name = f"custom_field_{custom_field['id']}"
@@ -4134,6 +4142,23 @@ async def create_task(
     conn = connect()
     c = conn.cursor()
 
+    custom_fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+      AND entity_type='task'
+      AND active=1
+    ORDER BY sort_order, id
+    """, (company_id,)).fetchall()
+
+    for custom_field in custom_fields:
+        field_name = f"custom_field_{custom_field['id']}"
+        custom_value = (form.get(field_name) or "").strip()
+
+        if custom_field["is_required"] and not custom_value:
+            conn.close()
+            return RedirectResponse("/create-task?error=custom_required", status_code=302)
+
     if client_id:
         existing_client = c.execute("""
         SELECT *
@@ -4219,15 +4244,6 @@ async def create_task(
         UPDATE tasks SET photo=? WHERE id=?
         """, (filename, task_id))
         conn.commit()
-
-    custom_fields = c.execute("""
-    SELECT *
-    FROM custom_fields
-    WHERE company_id=?
-      AND entity_type='task'
-      AND active=1
-    ORDER BY sort_order, id
-    """, (company_id,)).fetchall()
 
     for custom_field in custom_fields:
         field_name = f"custom_field_{custom_field['id']}"

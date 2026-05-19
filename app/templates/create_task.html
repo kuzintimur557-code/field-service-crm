@@ -34,11 +34,17 @@ button:hover{background:#1d4ed8}
 
 <h1>➕ Новая заявка</h1>
 
-<div class="note">
-После создания заявка появится в CRM и уйдет уведомление в Telegram.
-</div>
+	<div class="note">
+	После создания заявка появится в CRM и уйдет уведомление в Telegram.
+	</div>
 
-<form method="post" action="/create-task" enctype="multipart/form-data">
+	{% if request.query_params.get("error") == "custom_required" %}
+	<div class="note" style="background:#fee2e2;color:#991b1b">
+	Заполните обязательные дополнительные поля.
+	</div>
+	{% endif %}
+
+	<form method="post" action="/create-task" enctype="multipart/form-data">
 
 <label>Клиент</label>
 <input name="client" placeholder="Имя клиента" required>

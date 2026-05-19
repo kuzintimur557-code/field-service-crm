@@ -894,6 +894,78 @@ async def assert_task_custom_fields():
     assert filled_value["value"] == "42"
 
 
+async def assert_required_custom_fields():
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO custom_fields (
+        company_id, entity_type, label, field_type, is_required,
+        active, sort_order, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "client",
+        "Required client code",
+        "text",
+        1,
+        1,
+        10,
+        "2026-05-19 12:00",
+    ))
+    c.execute("""
+    INSERT INTO custom_fields (
+        company_id, entity_type, label, field_type, is_required,
+        active, sort_order, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "task",
+        "Required task code",
+        "text",
+        1,
+        1,
+        10,
+        "2026-05-19 12:01",
+    ))
+    conn.commit()
+    conn.close()
+
+    client_response = await crm.create_client(make_form_request(
+        "owner2",
+        "/clients",
+        {
+            "name": "Missing Required Custom Field Client",
+            "phone": "",
+            "email": "",
+            "address": "",
+            "notes": "",
+        },
+    ))
+    assert client_response.status_code == 302
+    assert client_response.headers["location"] == "/clients?error=custom_required"
+
+    task_response = await crm.create_task(
+        make_multipart_request(
+            "owner2",
+            "/create-task",
+            {
+                "client": "Missing Required Custom Field Task",
+                "phone": "",
+                "address": "",
+                "description": "",
+                "task_date": "2026-05-20",
+                "priority": "Обычный",
+                "price": "0",
+            },
+        ),
+        photo=None,
+    )
+    assert task_response.status_code == 302
+    assert task_response.headers["location"] == "/create-task?error=custom_required"
+
+
 def main():
     try:
         task = seed_data()
@@ -910,6 +982,7 @@ def main():
         asyncio.run(assert_custom_fields())
         asyncio.run(assert_client_custom_fields())
         asyncio.run(assert_task_custom_fields())
+        asyncio.run(assert_required_custom_fields())
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()
