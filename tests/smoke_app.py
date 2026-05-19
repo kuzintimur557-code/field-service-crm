@@ -913,6 +913,7 @@ async def assert_required_custom_fields():
         10,
         "2026-05-19 12:00",
     ))
+    required_client_field_id = c.lastrowid
     c.execute("""
     INSERT INTO custom_fields (
         company_id, entity_type, label, field_type, is_required,
@@ -929,6 +930,21 @@ async def assert_required_custom_fields():
         10,
         "2026-05-19 12:01",
     ))
+    required_task_field_id = c.lastrowid
+    client = c.execute("""
+    SELECT *
+    FROM clients
+    WHERE company_id=?
+    ORDER BY id
+    LIMIT 1
+    """, (2,)).fetchone()
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+    ORDER BY id
+    LIMIT 1
+    """, (2,)).fetchone()
     conn.commit()
     conn.close()
 
@@ -964,6 +980,38 @@ async def assert_required_custom_fields():
     )
     assert task_response.status_code == 302
     assert task_response.headers["location"] == "/create-task?error=custom_required"
+
+    edit_client_response = await crm.edit_client(
+        make_form_request(
+            "owner2",
+            f"/clients/{client['id']}/edit",
+            {
+                "name": client["name"],
+                "phone": client["phone"] or "",
+                "email": client["email"] or "",
+                "address": client["address"] or "",
+                "notes": client["notes"] or "",
+                f"custom_field_{required_client_field_id}": "",
+            },
+        ),
+        client["id"],
+    )
+    assert edit_client_response.status_code == 302
+    assert edit_client_response.headers["location"] == f"/clients/{client['id']}?error=custom_required"
+
+    update_task_response = await crm.update_task_custom_field(
+        make_form_request(
+            "owner2",
+            f"/task/{task['id']}/custom-field",
+            {
+                "field_id": str(required_task_field_id),
+                "value": "",
+            },
+        ),
+        task["id"],
+    )
+    assert update_task_response.status_code == 302
+    assert update_task_response.headers["location"] == f"/task/{task['id']}?error=custom_required"
 
 
 def main():

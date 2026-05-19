@@ -346,10 +346,16 @@ button{
 <span class="badge">{{ task["status"] }}</span>
 </div>
 
-<div class="meta">
-Создана {{ task["created_at"] if task["created_at"] else "" }}
-</div>
-</div>
+	<div class="meta">
+	Создана {{ task["created_at"] if task["created_at"] else "" }}
+	</div>
+
+	{% if request.query_params.get("error") == "custom_required" %}
+	<div style="margin-top:14px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
+	Заполните обязательные дополнительные поля.
+	</div>
+	{% endif %}
+	</div>
 
 </div>
 

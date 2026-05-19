@@ -53,11 +53,15 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">✅ Карточка клиента обновлена</div>
 {% endif %}
 
-{% if request.query_params.get("error") == "empty" %}
-<div class="notice err">❌ Имя клиента обязательно</div>
-{% endif %}
+	{% if request.query_params.get("error") == "empty" %}
+	<div class="notice err">❌ Имя клиента обязательно</div>
+	{% endif %}
 
-<div class="grid">
+	{% if request.query_params.get("error") == "custom_required" %}
+	<div class="notice err">❌ Заполните обязательные дополнительные поля</div>
+	{% endif %}
+
+	<div class="grid">
     <div>
         <div class="label">Телефон</div>
         <div class="value">{{ client["phone"] or "Не указан" }}</div>

@@ -3099,6 +3099,23 @@ async def edit_client(request: Request, client_id: int):
         conn.close()
         return RedirectResponse("/clients", status_code=302)
 
+    custom_fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+      AND entity_type='client'
+      AND active=1
+    ORDER BY sort_order, id
+    """, (company_id,)).fetchall()
+
+    for custom_field in custom_fields:
+        field_name = f"custom_field_{custom_field['id']}"
+        custom_value = (form.get(field_name) or "").strip()
+
+        if custom_field["is_required"] and not custom_value:
+            conn.close()
+            return RedirectResponse(f"/clients/{client_id}?error=custom_required", status_code=302)
+
     c.execute("""
     UPDATE clients
     SET name=?, phone=?, email=?, address=?, notes=?
@@ -3112,15 +3129,6 @@ async def edit_client(request: Request, client_id: int):
         client_id,
         company_id
     ))
-
-    custom_fields = c.execute("""
-    SELECT *
-    FROM custom_fields
-    WHERE company_id=?
-      AND entity_type='client'
-      AND active=1
-    ORDER BY sort_order, id
-    """, (company_id,)).fetchall()
 
     for custom_field in custom_fields:
         field_name = f"custom_field_{custom_field['id']}"
@@ -5075,6 +5083,10 @@ async def update_task_custom_field(request: Request, task_id: int):
     if not custom_field:
         conn.close()
         return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    if custom_field["is_required"] and not value:
+        conn.close()
+        return RedirectResponse(f"/task/{task_id}?error=custom_required", status_code=302)
 
     existing_value = c.execute("""
     SELECT *
