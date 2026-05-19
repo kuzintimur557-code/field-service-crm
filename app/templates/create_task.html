@@ -84,14 +84,34 @@ button:hover{background:#1d4ed8}
 </div>
 </div>
 
-<label>Приоритет</label>
-<select name="priority">
-<option value="Обычный">Обычный</option>
-<option value="Срочно">Срочно</option>
-<option value="Низкий">Низкий</option>
-</select>
+	<label>Приоритет</label>
+	<select name="priority">
+	<option value="Обычный">Обычный</option>
+	<option value="Срочно">Срочно</option>
+	<option value="Низкий">Низкий</option>
+	</select>
 
-<label>Фото / документ</label>
+	{% if custom_fields %}
+	<div style="margin-top:20px;padding:16px;border-radius:18px;background:#f9fafb;border:1px solid #e5e7eb">
+	    <h2 style="margin:0 0 10px;font-size:20px">Дополнительные поля</h2>
+	    <div class="grid">
+	        {% for field in custom_fields %}
+	        <div>
+	            <label>{{ field["label"] }}{% if field["is_required"] %} *{% endif %}</label>
+	            {% if field["field_type"] == "number" %}
+	            <input name="custom_field_{{ field['id'] }}" type="number" step="0.01" {% if field["is_required"] %}required{% endif %}>
+	            {% elif field["field_type"] == "date" %}
+	            <input name="custom_field_{{ field['id'] }}" type="date" {% if field["is_required"] %}required{% endif %}>
+	            {% else %}
+	            <input name="custom_field_{{ field['id'] }}" type="text" {% if field["is_required"] %}required{% endif %}>
+	            {% endif %}
+	        </div>
+	        {% endfor %}
+	    </div>
+	</div>
+		{% endif %}
+
+		<label>Фото / документ</label>
 <input name="photo" type="file">
 
 <button type="submit">🚀 Создать заявку</button>

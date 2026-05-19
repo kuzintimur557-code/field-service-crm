@@ -3960,6 +3960,15 @@ async def create_task_page(request: Request):
     ORDER BY name
     """, (company_id,)).fetchall()
 
+    custom_fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+      AND entity_type='task'
+      AND active=1
+    ORDER BY sort_order, id
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -3968,7 +3977,8 @@ async def create_task_page(request: Request):
         context={
             "username": username,
             "workers": workers,
-            "clients": clients
+            "clients": clients,
+            "custom_fields": custom_fields
         }
     )
 
@@ -4090,6 +4100,44 @@ async def create_task(
         c.execute("""
         UPDATE tasks SET photo=? WHERE id=?
         """, (filename, task_id))
+        conn.commit()
+
+    custom_fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+      AND entity_type='task'
+      AND active=1
+    ORDER BY sort_order, id
+    """, (company_id,)).fetchall()
+
+    for custom_field in custom_fields:
+        field_name = f"custom_field_{custom_field['id']}"
+        custom_value = (form.get(field_name) or "").strip()
+
+        if not custom_value:
+            continue
+
+        c.execute("""
+        INSERT INTO custom_field_values (
+            company_id,
+            field_id,
+            entity_type,
+            entity_id,
+            value,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            custom_field["id"],
+            "task",
+            task_id,
+            custom_value,
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
+
+    if custom_fields:
         conn.commit()
 
     conn.close()

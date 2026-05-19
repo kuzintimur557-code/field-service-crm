@@ -72,6 +72,47 @@ def make_form_request(username, path, data):
     }, receive)
 
 
+def make_multipart_request(username, path, data):
+    boundary = "----smoke-boundary"
+    parts = []
+
+    for key, value in data.items():
+        values = value if isinstance(value, list) else [value]
+
+        for item in values:
+            parts.append(
+                f"--{boundary}\r\n"
+                f"Content-Disposition: form-data; name=\"{key}\"\r\n\r\n"
+                f"{item}\r\n"
+            )
+
+    parts.append(f"--{boundary}--\r\n")
+    body = "".join(parts).encode("utf-8")
+    cookie = f"{crm.SESSION_COOKIE_NAME}={crm.sign_session_value(username)}"
+
+    async def receive():
+        return {
+            "type": "http.request",
+            "body": body,
+            "more_body": False,
+        }
+
+    return Request({
+        "type": "http",
+        "method": "POST",
+        "path": path,
+        "headers": [
+            (b"cookie", cookie.encode("utf-8")),
+            (b"content-type", f"multipart/form-data; boundary={boundary}".encode("utf-8")),
+            (b"content-length", str(len(body)).encode("utf-8")),
+        ],
+        "query_string": b"",
+        "scheme": "http",
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    }, receive)
+
+
 def seed_data():
     conn = connect()
     c = conn.cursor()
@@ -276,7 +317,9 @@ async def assert_archive_restore(task):
 
 async def assert_catalog_create():
     original_send_message = crm.send_message
+    original_send_message_to_chat = crm.send_message_to_chat
     crm.send_message = lambda text: True
+    crm.send_message_to_chat = lambda chat_id, text: True
 
     try:
         response = await crm.create_catalog_item(make_form_request(
@@ -292,6 +335,7 @@ async def assert_catalog_create():
         ))
     finally:
         crm.send_message = original_send_message
+        crm.send_message_to_chat = original_send_message_to_chat
 
     assert response.status_code == 302
     assert response.headers["location"] == "/catalog?created=1"
@@ -562,6 +606,83 @@ async def assert_custom_fields():
     assert toggled["active"] == 0
 
 
+async def assert_task_custom_fields():
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO custom_fields (
+        company_id, entity_type, label, field_type, is_required,
+        active, sort_order, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "task",
+        "Route",
+        "text",
+        0,
+        1,
+        1,
+        "2026-05-19 10:00",
+    ))
+    field_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    page_response = await crm.create_task_page(
+        make_asgi_request("owner2", "/create-task")
+    )
+    assert page_response.status_code == 200
+    page_html = page_response.body.decode("utf-8")
+    assert "Route" in page_html
+    assert f"custom_field_{field_id}" in page_html
+
+    original_send_message = crm.send_message
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message = lambda text: True
+    crm.send_message_to_chat = lambda chat_id, text: True
+
+    try:
+        response = await crm.create_task(
+            make_multipart_request(
+                "owner2",
+                "/create-task",
+                {
+                    "client": "Custom Field Client",
+                    "phone": "+70000000001",
+                    "address": "Custom Address",
+                    "description": "Custom task",
+                    "task_date": "2026-05-20",
+                    "workers": ["worker2"],
+                    "priority": "Обычный",
+                    "price": "500",
+                    f"custom_field_{field_id}": "Moscow - Tula",
+                },
+            ),
+            photo=None,
+        )
+    finally:
+        crm.send_message = original_send_message
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/"
+
+    conn = connect()
+    c = conn.cursor()
+    value = c.execute("""
+    SELECT custom_field_values.*
+    FROM custom_field_values
+    JOIN tasks ON tasks.id=custom_field_values.entity_id
+    WHERE custom_field_values.field_id=?
+      AND custom_field_values.value=?
+      AND tasks.client=?
+    """, (field_id, "Moscow - Tula", "Custom Field Client")).fetchone()
+    conn.close()
+
+    assert value is not None
+
+
 def main():
     try:
         task = seed_data()
@@ -576,6 +697,7 @@ def main():
         asyncio.run(assert_overdue_sla(task))
         asyncio.run(assert_recurring_generate(task))
         asyncio.run(assert_custom_fields())
+        asyncio.run(assert_task_custom_fields())
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()
