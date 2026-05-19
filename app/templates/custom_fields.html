@@ -21,7 +21,7 @@ label{display:block;font-weight:900;margin:12px 0 6px;color:#374151}
 input,select,button{width:100%;padding:14px;border-radius:14px;font-size:16px}
 input,select{border:1px solid #d1d5db;background:white}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;margin-top:16px}
-.field{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:14px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
+	.field{display:grid;grid-template-columns:1.3fr .9fr .8fr .9fr auto;gap:14px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
 .title{font-size:18px;font-weight:900}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
 .badge.off{background:#e5e7eb;color:#374151}
@@ -43,9 +43,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 <div class="meta">Добавляйте свои поля под отрасль: VIN, госномер, площадь, маршрут, кабинет, вес груза и другие.</div>
 </div>
 
-{% if request.query_params.get("created") == "1" %}
-<div class="notice ok">✅ Поле добавлено</div>
-{% endif %}
+	{% if request.query_params.get("created") == "1" %}
+	<div class="notice ok">✅ Поле добавлено</div>
+	{% endif %}
+
+	{% if request.query_params.get("ordered") == "1" %}
+	<div class="notice ok">✅ Порядок поля обновлён</div>
+	{% endif %}
 
 {% if request.query_params.get("error") == "empty" %}
 <div class="notice err">❌ Название поля обязательно</div>
@@ -74,10 +78,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
     </div>
 </div>
 
-<label>Название поля</label>
-<input name="label" placeholder="Например: VIN, госномер, площадь, маршрут" required>
+	<label>Название поля</label>
+	<input name="label" placeholder="Например: VIN, госномер, площадь, маршрут" required>
 
-<label style="display:flex;align-items:center;gap:10px">
+	<label>Порядок</label>
+	<input name="sort_order" type="number" placeholder="Например: 10">
+
+	<label style="display:flex;align-items:center;gap:10px">
     <input type="checkbox" name="is_required" style="width:auto">
     Обязательное поле
 </label>
@@ -107,16 +114,21 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
         {% if field["is_required"] %}
         <span class="badge">Обязательное</span>
         {% endif %}
-    </div>
-    <div>
-        {% if field["active"] %}
-        <span class="badge">Активно</span>
+	    </div>
+	    <div>
+	        <div class="meta">Порядок: {{ field["sort_order"] }}</div>
+	        {% if field["active"] %}
+	        <span class="badge">Активно</span>
         {% else %}
         <span class="badge off">Выключено</span>
-        {% endif %}
-    </div>
-    <form method="post" action="/custom-fields/{{ field['id'] }}/toggle">
-        <button type="submit">{% if field["active"] %}Выключить{% else %}Включить{% endif %}</button>
+	        {% endif %}
+	    </div>
+	    <form method="post" action="/custom-fields/{{ field['id'] }}/order">
+	        <input name="sort_order" type="number" value="{{ field['sort_order'] or 0 }}">
+	        <button type="submit">Сохранить порядок</button>
+	    </form>
+	    <form method="post" action="/custom-fields/{{ field['id'] }}/toggle">
+	        <button type="submit">{% if field["active"] %}Выключить{% else %}Включить{% endif %}</button>
     </form>
 </div>
 {% endfor %}

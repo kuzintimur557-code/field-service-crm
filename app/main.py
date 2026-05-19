@@ -2554,6 +2554,7 @@ async def create_custom_field(request: Request):
     label = (form.get("label") or "").strip()
     field_type = (form.get("field_type") or "text").strip()
     is_required = 1 if form.get("is_required") else 0
+    sort_order_raw = (form.get("sort_order") or "").strip()
 
     if entity_type not in ("task", "client"):
         entity_type = "task"
@@ -2575,6 +2576,11 @@ async def create_custom_field(request: Request):
     WHERE company_id=? AND entity_type=?
     """, (company_id, entity_type)).fetchone()[0]
 
+    try:
+        sort_order_value = int(sort_order_raw) if sort_order_raw else sort_order + 1
+    except ValueError:
+        sort_order_value = sort_order + 1
+
     c.execute("""
     INSERT INTO custom_fields (
         company_id,
@@ -2594,7 +2600,7 @@ async def create_custom_field(request: Request):
         field_type,
         is_required,
         1,
-        sort_order + 1,
+        sort_order_value,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
@@ -2602,6 +2608,44 @@ async def create_custom_field(request: Request):
     conn.close()
 
     return RedirectResponse("/custom-fields?created=1", status_code=302)
+
+
+@app.post("/custom-fields/{field_id}/order")
+async def update_custom_field_order(request: Request, field_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    sort_order_raw = (form.get("sort_order") or "0").strip()
+
+    try:
+        sort_order = int(sort_order_raw)
+    except ValueError:
+        sort_order = 0
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    UPDATE custom_fields
+    SET sort_order=?
+    WHERE id=? AND company_id=?
+    """, (sort_order, field_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/custom-fields?ordered=1", status_code=302)
 
 
 @app.post("/custom-fields/{field_id}/toggle")

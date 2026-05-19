@@ -564,6 +564,7 @@ async def assert_custom_fields():
             "field_type": "text",
             "label": "VIN",
             "is_required": "on",
+            "sort_order": "7",
         },
     ))
     assert response.status_code == 302
@@ -581,6 +582,7 @@ async def assert_custom_fields():
     assert field is not None
     assert field["entity_type"] == "task"
     assert field["is_required"] == 1
+    assert field["sort_order"] == 7
 
     page_response = await crm.custom_fields_page(
         make_asgi_request("owner2", "/custom-fields")
@@ -589,6 +591,17 @@ async def assert_custom_fields():
     page_html = page_response.body.decode("utf-8")
     assert "VIN" in page_html
     assert f"/custom-fields/{field['id']}/toggle" in page_html
+    assert f"/custom-fields/{field['id']}/order" in page_html
+
+    order_response = await crm.update_custom_field_order(make_form_request(
+        "owner2",
+        f"/custom-fields/{field['id']}/order",
+        {
+            "sort_order": "3",
+        },
+    ), field["id"])
+    assert order_response.status_code == 302
+    assert order_response.headers["location"] == "/custom-fields?ordered=1"
 
     toggle_response = await crm.toggle_custom_field(make_request("owner2"), field["id"])
     assert toggle_response.status_code == 302
@@ -597,13 +610,14 @@ async def assert_custom_fields():
     conn = connect()
     c = conn.cursor()
     toggled = c.execute("""
-    SELECT active
+    SELECT active, sort_order
     FROM custom_fields
     WHERE id=?
     """, (field["id"],)).fetchone()
     conn.close()
 
     assert toggled["active"] == 0
+    assert toggled["sort_order"] == 3
 
 
 async def assert_client_custom_fields():
