@@ -4256,6 +4256,17 @@ async def task_detail(request: Request, task_id: int):
     estimate_total = sum(item["total"] for item in task_items)
     estimate_profit = sum(item["profit"] for item in task_items)
     task_workers = get_task_worker_names(task)
+    task_custom_fields = c.execute("""
+    SELECT custom_fields.label, custom_fields.field_type, custom_field_values.value
+    FROM custom_field_values
+    JOIN custom_fields ON custom_fields.id=custom_field_values.field_id
+    WHERE custom_field_values.company_id=?
+      AND custom_field_values.entity_type='task'
+      AND custom_field_values.entity_id=?
+      AND custom_fields.company_id=?
+      AND custom_fields.entity_type='task'
+    ORDER BY custom_fields.sort_order, custom_fields.id
+    """, (company_id, task_id, company_id)).fetchall()
 
     conn.close()
 
@@ -4274,7 +4285,8 @@ async def task_detail(request: Request, task_id: int):
             "catalog_items": catalog_items,
             "estimate_total": estimate_total,
             "estimate_profit": estimate_profit,
-            "task_workers": task_workers
+            "task_workers": task_workers,
+            "task_custom_fields": task_custom_fields
         }
     )
 

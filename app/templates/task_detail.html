@@ -420,14 +420,25 @@ button{
 <button class="edit-btn" onclick="openEdit('priority','{{ task['priority'] }}')">✎</button>
 </div>
 
-<div class="info-row">
-<div class="icon">₽</div>
-<div class="label">Цена</div>
-<div class="value">{{ task["price"] }} ₽</div>
-<button class="edit-btn" onclick="openEdit('price','{{ task['price'] }}')">✎</button>
-</div>
+	<div class="info-row">
+	<div class="icon">₽</div>
+	<div class="label">Цена</div>
+	<div class="value">{{ task["price"] }} ₽</div>
+	<button class="edit-btn" onclick="openEdit('price','{{ task['price'] }}')">✎</button>
+	</div>
 
-</div>
+	{% if task_custom_fields %}
+	{% for field in task_custom_fields %}
+	<div class="info-row">
+	<div class="icon">▦</div>
+	<div class="label">{{ field["label"] }}</div>
+	<div class="value">{{ field["value"] }}</div>
+	<div></div>
+	</div>
+	{% endfor %}
+	{% endif %}
+
+	</div>
 
 <div class="card">
 
