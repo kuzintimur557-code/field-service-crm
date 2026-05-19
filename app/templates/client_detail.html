@@ -153,10 +153,30 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     </div>
 </div>
 
-<label>Заметки</label>
-<textarea name="notes">{{ client["notes"] or "" }}</textarea>
+	<label>Заметки</label>
+	<textarea name="notes">{{ client["notes"] or "" }}</textarea>
 
-<button type="submit">💾 Сохранить изменения</button>
+	{% if client_custom_fields %}
+	<div style="margin-top:18px;padding:16px;border-radius:18px;background:#f9fafb;border:1px solid #e5e7eb">
+	    <h3 style="margin:0 0 12px">Дополнительные поля</h3>
+	    <div class="grid">
+	        {% for field in client_custom_fields %}
+	        <div>
+	            <label>{{ field["label"] }}{% if field["is_required"] %} *{% endif %}</label>
+	            {% if field["field_type"] == "number" %}
+	            <input name="custom_field_{{ field['id'] }}" type="number" step="0.01" value="{{ field['value'] or '' }}" {% if field["is_required"] %}required{% endif %}>
+	            {% elif field["field_type"] == "date" %}
+	            <input name="custom_field_{{ field['id'] }}" type="date" value="{{ field['value'] or '' }}" {% if field["is_required"] %}required{% endif %}>
+	            {% else %}
+	            <input name="custom_field_{{ field['id'] }}" type="text" value="{{ field['value'] or '' }}" {% if field["is_required"] %}required{% endif %}>
+	            {% endif %}
+	        </div>
+	        {% endfor %}
+	    </div>
+	</div>
+	{% endif %}
+
+	<button type="submit">💾 Сохранить изменения</button>
 
 </form>
 </div>

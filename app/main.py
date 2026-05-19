@@ -3113,6 +3113,59 @@ async def edit_client(request: Request, client_id: int):
         company_id
     ))
 
+    custom_fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+      AND entity_type='client'
+      AND active=1
+    ORDER BY sort_order, id
+    """, (company_id,)).fetchall()
+
+    for custom_field in custom_fields:
+        field_name = f"custom_field_{custom_field['id']}"
+        custom_value = (form.get(field_name) or "").strip()
+        existing_value = c.execute("""
+        SELECT *
+        FROM custom_field_values
+        WHERE company_id=?
+          AND field_id=?
+          AND entity_type='client'
+          AND entity_id=?
+        """, (company_id, custom_field["id"], client_id)).fetchone()
+
+        if custom_value:
+            if existing_value:
+                c.execute("""
+                UPDATE custom_field_values
+                SET value=?
+                WHERE id=?
+                """, (custom_value, existing_value["id"]))
+            else:
+                c.execute("""
+                INSERT INTO custom_field_values (
+                    company_id,
+                    field_id,
+                    entity_type,
+                    entity_id,
+                    value,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    company_id,
+                    custom_field["id"],
+                    "client",
+                    client_id,
+                    custom_value,
+                    datetime.now().strftime("%Y-%m-%d %H:%M")
+                ))
+        elif existing_value and not custom_field["is_required"]:
+            c.execute("""
+            DELETE FROM custom_field_values
+            WHERE id=?
+            """, (existing_value["id"],))
+
     linked_tasks = c.execute("""
     SELECT id
     FROM tasks

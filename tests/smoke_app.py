@@ -682,6 +682,43 @@ async def assert_client_custom_fields():
     assert "Industry" in detail_html
     assert "Beauty" in detail_html
 
+    original_send_message = crm.send_message
+    crm.send_message = lambda text: True
+
+    try:
+        edit_response = await crm.edit_client(
+            make_form_request(
+                "owner2",
+                f"/clients/{value['client_id']}/edit",
+                {
+                    "name": "Custom Field Client Company",
+                    "phone": "+70000000002",
+                    "email": "custom-client@example.com",
+                    "address": "Client Address",
+                    "notes": "Client note",
+                    f"custom_field_{field_id}": "Auto service",
+                },
+            ),
+            value["client_id"],
+        )
+    finally:
+        crm.send_message = original_send_message
+    assert edit_response.status_code == 302
+    assert edit_response.headers["location"] == f"/clients/{value['client_id']}?updated=1"
+
+    conn = connect()
+    c = conn.cursor()
+    updated_value = c.execute("""
+    SELECT value
+    FROM custom_field_values
+    WHERE field_id=?
+      AND entity_type='client'
+      AND entity_id=?
+    """, (field_id, value["client_id"])).fetchone()
+    conn.close()
+
+    assert updated_value["value"] == "Auto service"
+
 
 async def assert_task_custom_fields():
     conn = connect()
