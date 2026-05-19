@@ -279,6 +279,7 @@ def init_db():
     add_column_if_missing(c, "custom_fields", "is_required", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "custom_fields", "active", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "custom_fields", "sort_order", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "custom_fields", "group_name", "TEXT")
     add_column_if_missing(c, "custom_field_values", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "custom_field_values", "field_id", "INTEGER")
     add_column_if_missing(c, "custom_field_values", "entity_type", "TEXT")
