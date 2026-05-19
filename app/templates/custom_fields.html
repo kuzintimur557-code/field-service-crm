@@ -51,6 +51,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 	<div class="notice ok">✅ Порядок поля обновлён</div>
 	{% endif %}
 
+	{% if request.query_params.get("updated") == "1" %}
+	<div class="notice ok">✅ Поле обновлено</div>
+	{% endif %}
+
 	{% if request.query_params.get("error") == "empty" %}
 	<div class="notice err">❌ Название поля обязательно</div>
 	{% endif %}
@@ -108,6 +112,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 <div class="field">
     <div>
         <div class="title">{{ field["label"] }}</div>
+			{% if field["group_name"] %}
+			<div class="meta">Группа: {{ field["group_name"] }}</div>
+			{% endif %}
         <div class="meta">
             {% if field["entity_type"] == "client" %}
             {{ settings["client_label"] or "Клиент" }}
