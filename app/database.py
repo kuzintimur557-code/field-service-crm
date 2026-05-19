@@ -58,6 +58,11 @@ def init_db():
         tax_number TEXT,
         bank_details TEXT,
         plan TEXT DEFAULT 'basic',
+        industry TEXT DEFAULT 'field_service',
+        task_label TEXT DEFAULT 'Заявка',
+        worker_label TEXT DEFAULT 'Исполнитель',
+        client_label TEXT DEFAULT 'Клиент',
+        service_label TEXT DEFAULT 'Услуга',
         one_c_enabled INTEGER DEFAULT 0,
         calls_enabled INTEGER DEFAULT 0,
         ai_calls_enabled INTEGER DEFAULT 0,
@@ -241,6 +246,11 @@ def init_db():
 
     add_column_if_missing(c, "company_settings", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_settings", "plan", "TEXT DEFAULT 'basic'")
+    add_column_if_missing(c, "company_settings", "industry", "TEXT DEFAULT 'field_service'")
+    add_column_if_missing(c, "company_settings", "task_label", "TEXT DEFAULT 'Заявка'")
+    add_column_if_missing(c, "company_settings", "worker_label", "TEXT DEFAULT 'Исполнитель'")
+    add_column_if_missing(c, "company_settings", "client_label", "TEXT DEFAULT 'Клиент'")
+    add_column_if_missing(c, "company_settings", "service_label", "TEXT DEFAULT 'Услуга'")
     add_column_if_missing(c, "company_settings", "one_c_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calls_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "ai_calls_enabled", "INTEGER DEFAULT 0")

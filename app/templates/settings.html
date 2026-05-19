@@ -18,7 +18,7 @@ h2{margin:0 0 16px;font-size:22px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 label{display:block;margin-top:12px;font-weight:900;color:#374151}
 input,textarea,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
-input,textarea{border:1px solid #d1d5db;background:white}
+input,textarea,select{border:1px solid #d1d5db;background:white}
 textarea{height:130px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .notice{margin-bottom:16px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900}
@@ -77,10 +77,45 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <label>VAT / налоговый номер</label>
 <input type="text" name="tax_number" value="{{ settings['tax_number'] or '' }}">
 
-<label>Банковские реквизиты</label>
-<textarea name="bank_details" placeholder="IBAN, банк, получатель...">{{ settings['bank_details'] or '' }}</textarea>
+	<label>Банковские реквизиты</label>
+	<textarea name="bank_details" placeholder="IBAN, банк, получатель...">{{ settings['bank_details'] or '' }}</textarea>
 
-<label>Тариф</label>
+	<h2 style="margin-top:24px">Отрасль и названия</h2>
+
+	<label>Отрасль</label>
+	<select name="industry">
+	    <option value="field_service" {% if settings["industry"] == "field_service" %}selected{% endif %}>Сервис / выездные работы</option>
+	    <option value="beauty" {% if settings["industry"] == "beauty" %}selected{% endif %}>Бьюти</option>
+	    <option value="auto_service" {% if settings["industry"] == "auto_service" %}selected{% endif %}>Автосервис</option>
+	    <option value="logistics" {% if settings["industry"] == "logistics" %}selected{% endif %}>Грузоперевозки</option>
+	    <option value="cleaning" {% if settings["industry"] == "cleaning" %}selected{% endif %}>Клининг</option>
+	    <option value="repair" {% if settings["industry"] == "repair" %}selected{% endif %}>Ремонт техники</option>
+	    <option value="custom" {% if settings["industry"] == "custom" %}selected{% endif %}>Своя сфера</option>
+	</select>
+
+	<div class="grid">
+	    <div>
+	        <label>Как называть заявку</label>
+	        <input type="text" name="task_label" value="{{ settings['task_label'] or 'Заявка' }}">
+	    </div>
+	    <div>
+	        <label>Как называть исполнителя</label>
+	        <input type="text" name="worker_label" value="{{ settings['worker_label'] or 'Исполнитель' }}">
+	    </div>
+	</div>
+
+	<div class="grid">
+	    <div>
+	        <label>Как называть клиента</label>
+	        <input type="text" name="client_label" value="{{ settings['client_label'] or 'Клиент' }}">
+	    </div>
+	    <div>
+	        <label>Как называть услугу</label>
+	        <input type="text" name="service_label" value="{{ settings['service_label'] or 'Услуга' }}">
+	    </div>
+	</div>
+
+	<label>Тариф</label>
 <select name="plan">
     <option value="basic" {% if settings["plan"] == "basic" %}selected{% endif %}>Basic — без 1С</option>
     <option value="team" {% if settings["plan"] == "team" %}selected{% endif %}>Team — без 1С</option>

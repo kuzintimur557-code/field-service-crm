@@ -282,9 +282,11 @@ def get_company_settings(company_id=1):
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
         company_id, company_name, phone, email, address, tax_number, bank_details,
-        plan, one_c_enabled, calls_enabled, ai_calls_enabled, updated_at
+        plan, industry, task_label, worker_label, client_label, service_label,
+        one_c_enabled, calls_enabled, ai_calls_enabled, updated_at
     )
-    VALUES (?, '', '', '', '', '', '', 'basic', 0, 0, 0, '')
+    VALUES (?, '', '', '', '', '', '', 'basic', 'field_service',
+            'Заявка', 'Исполнитель', 'Клиент', 'Услуга', 0, 0, 0, '')
     """, (company_id,))
 
     conn.commit()
@@ -2406,11 +2408,28 @@ async def update_settings(request: Request):
     tax_number = (form.get("tax_number") or "").strip()
     bank_details = (form.get("bank_details") or "").strip()
     plan = (form.get("plan") or "basic").strip()
+    industry = (form.get("industry") or "field_service").strip()
+    task_label = (form.get("task_label") or "Заявка").strip()
+    worker_label = (form.get("worker_label") or "Исполнитель").strip()
+    client_label = (form.get("client_label") or "Клиент").strip()
+    service_label = (form.get("service_label") or "Услуга").strip()
 
     allowed_plans = ["basic", "team", "business", "business_1c", "enterprise_1c"]
+    allowed_industries = [
+        "field_service",
+        "beauty",
+        "auto_service",
+        "logistics",
+        "cleaning",
+        "repair",
+        "custom"
+    ]
 
     if plan not in allowed_plans:
         plan = "basic"
+
+    if industry not in allowed_industries:
+        industry = "field_service"
 
     one_c_enabled = 1 if plan in ("business_1c", "enterprise_1c") else 0
     calls_enabled = 1 if plan in ("business", "business_1c", "enterprise_1c") else 0
@@ -2423,15 +2442,18 @@ async def update_settings(request: Request):
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
         company_id, company_name, phone, email, address, tax_number, bank_details, plan,
+        industry, task_label, worker_label, client_label, service_label,
         one_c_enabled, calls_enabled, ai_calls_enabled, updated_at
     )
-    VALUES (?, '', '', '', '', '', '', 'basic', 0, 0, 0, '')
+    VALUES (?, '', '', '', '', '', '', 'basic', 'field_service',
+            'Заявка', 'Исполнитель', 'Клиент', 'Услуга', 0, 0, 0, '')
     """, (company_id,))
 
     c.execute("""
     UPDATE company_settings
     SET company_name=?, phone=?, email=?, address=?, tax_number=?, bank_details=?,
-        plan=?, one_c_enabled=?, calls_enabled=?, ai_calls_enabled=?, updated_at=?
+        plan=?, industry=?, task_label=?, worker_label=?, client_label=?, service_label=?,
+        one_c_enabled=?, calls_enabled=?, ai_calls_enabled=?, updated_at=?
     WHERE company_id=?
     """, (
         company_name,
@@ -2441,6 +2463,11 @@ async def update_settings(request: Request):
         tax_number,
         bank_details,
         plan,
+        industry,
+        task_label,
+        worker_label,
+        client_label,
+        service_label,
         one_c_enabled,
         calls_enabled,
         ai_calls_enabled,
