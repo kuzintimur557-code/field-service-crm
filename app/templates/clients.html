@@ -88,10 +88,30 @@ h1{font-size:28px;margin-bottom:12px}
     </div>
 </div>
 
-<label>Заметки</label>
-<textarea name="notes" placeholder="Важная информация по клиенту..."></textarea>
+	<label>Заметки</label>
+	<textarea name="notes" placeholder="Важная информация по клиенту..."></textarea>
 
-<button type="submit">➕ Создать клиента</button>
+	{% if custom_fields %}
+	<div style="margin-top:18px;padding:16px;border-radius:18px;background:#f9fafb;border:1px solid #e5e7eb">
+	    <h3 style="margin:0 0 12px">Дополнительные поля</h3>
+	    <div class="grid">
+	        {% for field in custom_fields %}
+	        <div>
+	            <label>{{ field["label"] }}{% if field["is_required"] %} *{% endif %}</label>
+	            {% if field["field_type"] == "number" %}
+	            <input name="custom_field_{{ field['id'] }}" type="number" step="0.01" {% if field["is_required"] %}required{% endif %}>
+	            {% elif field["field_type"] == "date" %}
+	            <input name="custom_field_{{ field['id'] }}" type="date" {% if field["is_required"] %}required{% endif %}>
+	            {% else %}
+	            <input name="custom_field_{{ field['id'] }}" type="text" {% if field["is_required"] %}required{% endif %}>
+	            {% endif %}
+	        </div>
+	        {% endfor %}
+	    </div>
+	</div>
+	{% endif %}
+
+	<button type="submit">➕ Создать клиента</button>
 
 </form>
 </div>

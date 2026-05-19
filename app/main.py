@@ -2851,6 +2851,15 @@ async def clients_page(request: Request):
     ORDER BY id DESC
     """, (company_id,)).fetchall()
 
+    custom_fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+      AND entity_type='client'
+      AND active=1
+    ORDER BY sort_order, id
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -2860,7 +2869,8 @@ async def clients_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "clients": clients
+            "clients": clients,
+            "custom_fields": custom_fields
         }
     )
 
@@ -3180,6 +3190,46 @@ async def create_client(request: Request):
     ))
 
     conn.commit()
+    client_id = c.lastrowid
+
+    custom_fields = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=?
+      AND entity_type='client'
+      AND active=1
+    ORDER BY sort_order, id
+    """, (company_id,)).fetchall()
+
+    for custom_field in custom_fields:
+        field_name = f"custom_field_{custom_field['id']}"
+        custom_value = (form.get(field_name) or "").strip()
+
+        if not custom_value:
+            continue
+
+        c.execute("""
+        INSERT INTO custom_field_values (
+            company_id,
+            field_id,
+            entity_type,
+            entity_id,
+            value,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            custom_field["id"],
+            "client",
+            client_id,
+            custom_value,
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
+
+    if custom_fields:
+        conn.commit()
+
     conn.close()
 
     try:

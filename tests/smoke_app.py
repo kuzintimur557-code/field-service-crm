@@ -606,6 +606,74 @@ async def assert_custom_fields():
     assert toggled["active"] == 0
 
 
+async def assert_client_custom_fields():
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO custom_fields (
+        company_id, entity_type, label, field_type, is_required,
+        active, sort_order, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "client",
+        "Industry",
+        "text",
+        0,
+        1,
+        1,
+        "2026-05-19 11:00",
+    ))
+    field_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    page_response = await crm.clients_page(make_asgi_request("owner2", "/clients"))
+    assert page_response.status_code == 200
+    page_html = page_response.body.decode("utf-8")
+    assert "Industry" in page_html
+    assert f"custom_field_{field_id}" in page_html
+
+    original_send_message = crm.send_message
+    crm.send_message = lambda text: True
+
+    try:
+        response = await crm.create_client(make_form_request(
+            "owner2",
+            "/clients",
+            {
+                "name": "Custom Field Client Company",
+                "phone": "+70000000002",
+                "email": "custom-client@example.com",
+                "address": "Client Address",
+                "notes": "Client note",
+                f"custom_field_{field_id}": "Beauty",
+            },
+        ))
+    finally:
+        crm.send_message = original_send_message
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/clients?created=1"
+
+    conn = connect()
+    c = conn.cursor()
+    value = c.execute("""
+    SELECT custom_field_values.*
+    FROM custom_field_values
+    JOIN clients ON clients.id=custom_field_values.entity_id
+    WHERE custom_field_values.field_id=?
+      AND custom_field_values.entity_type='client'
+      AND custom_field_values.value=?
+      AND clients.name=?
+      AND clients.company_id=?
+    """, (field_id, "Beauty", "Custom Field Client Company", 2)).fetchone()
+    conn.close()
+
+    assert value is not None
+
+
 async def assert_task_custom_fields():
     conn = connect()
     c = conn.cursor()
@@ -794,6 +862,7 @@ def main():
         asyncio.run(assert_overdue_sla(task))
         asyncio.run(assert_recurring_generate(task))
         asyncio.run(assert_custom_fields())
+        asyncio.run(assert_client_custom_fields())
         asyncio.run(assert_task_custom_fields())
         print("Smoke checks passed.")
     finally:
