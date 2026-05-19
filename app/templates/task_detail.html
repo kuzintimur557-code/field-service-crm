@@ -433,7 +433,7 @@ button{
 	<div class="icon">▦</div>
 	<div class="label">{{ field["label"] }}</div>
 	<div class="value">{{ field["value"] }}</div>
-	<div></div>
+	<button class="edit-btn" onclick="openCustomField({{ field['id'] }}, {{ field['label']|tojson }}, {{ field['value']|tojson }}, {{ field['field_type']|tojson }})">✎</button>
 	</div>
 	{% endfor %}
 	{% endif %}
@@ -651,11 +651,29 @@ button{
 
 </form>
 
-</div>
-</div>
+	</div>
+	</div>
 
-<div class="modal" id="dateModal">
-<div class="modal-content">
+	<div class="modal" id="customFieldModal">
+	<div class="modal-content">
+
+	<h3 id="customFieldTitle">Изменить поле</h3>
+
+	<form method="post" action="/task/{{ task['id'] }}/custom-field">
+
+	<input type="hidden" name="field_id" id="customFieldId">
+
+	<input type="text" name="value" id="customFieldValue">
+
+	<button class="btn blue">Сохранить</button>
+
+	</form>
+
+	</div>
+	</div>
+
+	<div class="modal" id="dateModal">
+	<div class="modal-content">
 
 <h3>Изменить дату</h3>
 
@@ -675,6 +693,15 @@ function openEdit(field,value){
 document.getElementById('editModal').style.display='flex'
 document.getElementById('editField').value=field
 document.getElementById('editValue').value=value
+}
+
+function openCustomField(id,label,value,type){
+document.getElementById('customFieldModal').style.display='flex'
+document.getElementById('customFieldTitle').textContent=label
+document.getElementById('customFieldId').value=id
+const input=document.getElementById('customFieldValue')
+input.type=(type==='number'||type==='date') ? type : 'text'
+input.value=value || ''
 }
 
 function openDate(){

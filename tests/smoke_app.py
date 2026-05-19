@@ -691,6 +691,48 @@ async def assert_task_custom_fields():
     assert "Route" in detail_html
     assert "Moscow - Tula" in detail_html
 
+    edit_response = await crm.update_task_custom_field(
+        make_form_request(
+            "owner2",
+            f"/task/{value['task_id']}/custom-field",
+            {
+                "field_id": str(field_id),
+                "value": "Moscow - Kazan",
+            },
+        ),
+        value["task_id"],
+    )
+    assert edit_response.status_code == 302
+    assert edit_response.headers["location"] == f"/task/{value['task_id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    updated_value = c.execute("""
+    SELECT value
+    FROM custom_field_values
+    WHERE field_id=?
+      AND entity_type='task'
+      AND entity_id=?
+    """, (field_id, value["task_id"])).fetchone()
+    activity = c.execute("""
+    SELECT *
+    FROM task_activity
+    WHERE task_id=?
+      AND action='Изменено доп. поле'
+    """, (value["task_id"],)).fetchone()
+    conn.close()
+
+    assert updated_value["value"] == "Moscow - Kazan"
+    assert activity is not None
+
+    updated_detail_response = await crm.task_detail(
+        make_asgi_request("owner2", f"/task/{value['task_id']}"),
+        value["task_id"],
+    )
+    assert updated_detail_response.status_code == 200
+    updated_detail_html = updated_detail_response.body.decode("utf-8")
+    assert "Moscow - Kazan" in updated_detail_html
+
 
 def main():
     try:

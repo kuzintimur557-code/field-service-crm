@@ -4257,7 +4257,7 @@ async def task_detail(request: Request, task_id: int):
     estimate_profit = sum(item["profit"] for item in task_items)
     task_workers = get_task_worker_names(task)
     task_custom_fields = c.execute("""
-    SELECT custom_fields.label, custom_fields.field_type, custom_field_values.value
+    SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_field_values.value
     FROM custom_field_values
     JOIN custom_fields ON custom_fields.id=custom_field_values.field_id
     WHERE custom_field_values.company_id=?
@@ -4877,6 +4877,126 @@ async def edit_task_field(request: Request, task_id: int):
         role,
         "Изменено поле",
         f"{field}: {value}",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
+@app.post("/task/{task_id}/custom-field")
+async def update_task_custom_field(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    field_id_raw = (form.get("field_id") or "").strip()
+    value = (form.get("value") or "").strip()
+
+    try:
+        field_id = int(field_id_raw)
+    except ValueError:
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+
+    custom_field = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE id=?
+      AND company_id=?
+      AND entity_type='task'
+      AND active=1
+    """, (field_id, company_id)).fetchone()
+
+    if not custom_field:
+        conn.close()
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    existing_value = c.execute("""
+    SELECT *
+    FROM custom_field_values
+    WHERE company_id=?
+      AND field_id=?
+      AND entity_type='task'
+      AND entity_id=?
+    """, (company_id, field_id, task_id)).fetchone()
+
+    if value:
+        if existing_value:
+            c.execute("""
+            UPDATE custom_field_values
+            SET value=?
+            WHERE id=?
+            """, (value, existing_value["id"]))
+        else:
+            c.execute("""
+            INSERT INTO custom_field_values (
+                company_id,
+                field_id,
+                entity_type,
+                entity_id,
+                value,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                field_id,
+                "task",
+                task_id,
+                value,
+                datetime.now().strftime("%Y-%m-%d %H:%M")
+            ))
+    elif existing_value and not custom_field["is_required"]:
+        c.execute("""
+        DELETE FROM custom_field_values
+        WHERE id=?
+        """, (existing_value["id"],))
+
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Изменено доп. поле",
+        f"{custom_field['label']}: {value}",
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
