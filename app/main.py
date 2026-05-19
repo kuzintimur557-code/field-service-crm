@@ -2552,6 +2552,7 @@ async def create_custom_field(request: Request):
     form = await request.form()
     entity_type = (form.get("entity_type") or "task").strip()
     label = (form.get("label") or "").strip()
+    group_name = (form.get("group_name") or "").strip()
     field_type = (form.get("field_type") or "text").strip()
     options = (form.get("options") or "").strip()
     is_required = 1 if form.get("is_required") else 0
@@ -2599,6 +2600,7 @@ async def create_custom_field(request: Request):
         company_id,
         entity_type,
         label,
+        group_name,
         field_type,
         options,
         is_required,
@@ -2611,6 +2613,7 @@ async def create_custom_field(request: Request):
         company_id,
         entity_type,
         label,
+        group_name,
         field_type,
         options,
         is_required,
