@@ -86,14 +86,21 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	{% if client_custom_fields %}
 	<div style="margin-top:18px">
 	    <h2>Дополнительные поля</h2>
-	    <div class="grid">
-	        {% for field in client_custom_fields %}
-	        <div>
-	            <div class="label">{{ field["label"] }}</div>
-	            <div class="value">{{ field["value"] if field["value"] else "Не заполнено" }}</div>
-	        </div>
-	        {% endfor %}
+
+	    {% set current_group = namespace(name="") %}
+	    {% for field in client_custom_fields %}
+	    {% set group_name = field["group_name"] or "Дополнительные поля" %}
+
+	    {% if current_group.name != group_name %}
+	    {% set current_group.name = group_name %}
+	    <h3 style="margin:18px 0 10px;color:#2563eb">▦ {{ group_name }}</h3>
+	    {% endif %}
+
+	    <div style="margin-bottom:12px">
+	        <div class="label">{{ field["label"] }}</div>
+	        <div class="value">{{ field["value"] if field["value"] else "Не заполнено" }}</div>
 	    </div>
+	    {% endfor %}
 	</div>
 	{% endif %}
 
