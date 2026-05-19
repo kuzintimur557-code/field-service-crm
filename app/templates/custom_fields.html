@@ -51,9 +51,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 	<div class="notice ok">✅ Порядок поля обновлён</div>
 	{% endif %}
 
-{% if request.query_params.get("error") == "empty" %}
-<div class="notice err">❌ Название поля обязательно</div>
-{% endif %}
+	{% if request.query_params.get("error") == "empty" %}
+	<div class="notice err">❌ Название поля обязательно</div>
+	{% endif %}
+
+	{% if request.query_params.get("error") == "options" %}
+	<div class="notice err">❌ Для списка добавьте хотя бы один вариант</div>
+	{% endif %}
 
 <div class="card">
 <h2>Добавить поле</h2>
@@ -84,6 +88,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 	<label>Порядок</label>
 	<input name="sort_order" type="number" placeholder="Например: 10">
 
+	<label>Варианты для списка</label>
+	<textarea name="options" placeholder="Каждый вариант с новой строки" style="width:100%;min-height:90px;padding:14px;border-radius:14px;border:1px solid #d1d5db;font-size:16px"></textarea>
+
 	<label style="display:flex;align-items:center;gap:10px">
     <input type="checkbox" name="is_required" style="width:auto">
     Обязательное поле
@@ -109,11 +116,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
             {% endif %}
         </div>
     </div>
-    <div>
-        <span class="badge">{{ field["field_type"] }}</span>
-        {% if field["is_required"] %}
-        <span class="badge">Обязательное</span>
-        {% endif %}
+	    <div>
+	        <span class="badge">{{ field["field_type"] }}</span>
+	        {% if field["is_required"] %}
+	        <span class="badge">Обязательное</span>
+	        {% endif %}
+	        {% if field["field_type"] == "select" and field["options"] %}
+	        <div class="meta" style="margin-top:8px;white-space:pre-wrap">{{ field["options"] }}</div>
+	        {% endif %}
 	    </div>
 	    <div>
 	        <div class="meta">Порядок: {{ field["sort_order"] }}</div>

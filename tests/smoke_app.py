@@ -570,6 +570,33 @@ async def assert_custom_fields():
     assert response.status_code == 302
     assert response.headers["location"] == "/custom-fields?created=1"
 
+    select_response = await crm.create_custom_field(make_form_request(
+        "owner2",
+        "/custom-fields",
+        {
+            "entity_type": "client",
+            "field_type": "select",
+            "label": "Client segment",
+            "options": "Beauty\nAuto service\nLogistics",
+            "sort_order": "8",
+        },
+    ))
+    assert select_response.status_code == 302
+    assert select_response.headers["location"] == "/custom-fields?created=1"
+
+    empty_select_response = await crm.create_custom_field(make_form_request(
+        "owner2",
+        "/custom-fields",
+        {
+            "entity_type": "client",
+            "field_type": "select",
+            "label": "Empty select",
+            "options": "",
+        },
+    ))
+    assert empty_select_response.status_code == 302
+    assert empty_select_response.headers["location"] == "/custom-fields?error=options"
+
     conn = connect()
     c = conn.cursor()
     field = c.execute("""
@@ -577,12 +604,20 @@ async def assert_custom_fields():
     FROM custom_fields
     WHERE company_id=2 AND label='VIN'
     """).fetchone()
+    select_field = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE company_id=2 AND label='Client segment'
+    """).fetchone()
     conn.close()
 
     assert field is not None
     assert field["entity_type"] == "task"
     assert field["is_required"] == 1
     assert field["sort_order"] == 7
+    assert select_field is not None
+    assert select_field["field_type"] == "select"
+    assert select_field["options"] == "Beauty\nAuto service\nLogistics"
 
     page_response = await crm.custom_fields_page(
         make_asgi_request("owner2", "/custom-fields")

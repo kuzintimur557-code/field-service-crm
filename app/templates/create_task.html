@@ -108,6 +108,13 @@ button:hover{background:#1d4ed8}
 	            <input name="custom_field_{{ field['id'] }}" type="number" step="0.01" {% if field["is_required"] %}required{% endif %}>
 	            {% elif field["field_type"] == "date" %}
 	            <input name="custom_field_{{ field['id'] }}" type="date" {% if field["is_required"] %}required{% endif %}>
+	            {% elif field["field_type"] == "select" %}
+	            <select name="custom_field_{{ field['id'] }}" {% if field["is_required"] %}required{% endif %}>
+	                <option value="">Выберите вариант</option>
+	                {% for option in (field["options"] or "").splitlines() %}
+	                <option value="{{ option }}">{{ option }}</option>
+	                {% endfor %}
+	            </select>
 	            {% else %}
 	            <input name="custom_field_{{ field['id'] }}" type="text" {% if field["is_required"] %}required{% endif %}>
 	            {% endif %}

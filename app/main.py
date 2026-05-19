@@ -2553,6 +2553,7 @@ async def create_custom_field(request: Request):
     entity_type = (form.get("entity_type") or "task").strip()
     label = (form.get("label") or "").strip()
     field_type = (form.get("field_type") or "text").strip()
+    options = (form.get("options") or "").strip()
     is_required = 1 if form.get("is_required") else 0
     sort_order_raw = (form.get("sort_order") or "").strip()
 
@@ -2564,6 +2565,18 @@ async def create_custom_field(request: Request):
 
     if not label:
         return RedirectResponse("/custom-fields?error=empty", status_code=302)
+
+    if field_type == "select":
+        options = "\n".join(
+            option.strip()
+            for option in options.splitlines()
+            if option.strip()
+        )
+
+        if not options:
+            return RedirectResponse("/custom-fields?error=options", status_code=302)
+    else:
+        options = ""
 
     company_id = get_user_company_id(username)
 
@@ -2587,17 +2600,19 @@ async def create_custom_field(request: Request):
         entity_type,
         label,
         field_type,
+        options,
         is_required,
         active,
         sort_order,
         created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         entity_type,
         label,
         field_type,
+        options,
         is_required,
         1,
         sort_order_value,
@@ -2994,7 +3009,7 @@ async def client_detail(request: Request, client_id: int):
     """, (client_id, company_id)).fetchall()
 
     client_custom_fields = c.execute("""
-    SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_field_values.value
+    SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_fields.options, custom_field_values.value
     FROM custom_fields
     LEFT JOIN custom_field_values
       ON custom_field_values.field_id=custom_fields.id

@@ -194,6 +194,7 @@ def init_db():
         entity_type TEXT,
         label TEXT,
         field_type TEXT,
+        options TEXT,
         is_required INTEGER DEFAULT 0,
         active INTEGER DEFAULT 1,
         sort_order INTEGER DEFAULT 0,
@@ -274,6 +275,7 @@ def init_db():
     add_column_if_missing(c, "custom_fields", "entity_type", "TEXT")
     add_column_if_missing(c, "custom_fields", "label", "TEXT")
     add_column_if_missing(c, "custom_fields", "field_type", "TEXT DEFAULT 'text'")
+    add_column_if_missing(c, "custom_fields", "options", "TEXT")
     add_column_if_missing(c, "custom_fields", "is_required", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "custom_fields", "active", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "custom_fields", "sort_order", "INTEGER DEFAULT 0")
