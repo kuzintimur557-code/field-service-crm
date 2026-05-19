@@ -2949,6 +2949,20 @@ async def client_detail(request: Request, client_id: int):
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
 
+    client_custom_fields = c.execute("""
+    SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_field_values.value
+    FROM custom_fields
+    LEFT JOIN custom_field_values
+      ON custom_field_values.field_id=custom_fields.id
+      AND custom_field_values.company_id=custom_fields.company_id
+      AND custom_field_values.entity_type='client'
+      AND custom_field_values.entity_id=?
+    WHERE custom_fields.company_id=?
+      AND custom_fields.entity_type='client'
+      AND custom_fields.active=1
+    ORDER BY custom_fields.sort_order, custom_fields.id
+    """, (client_id, company_id)).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -2965,7 +2979,8 @@ async def client_detail(request: Request, client_id: int):
             "client_active_tasks": client_active_tasks,
             "client_completed_tasks": client_completed_tasks,
             "client_overdue_tasks": client_overdue_tasks,
-            "client_revenue": client_revenue
+            "client_revenue": client_revenue,
+            "client_custom_fields": client_custom_fields
         }
     )
 

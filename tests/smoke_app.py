@@ -660,7 +660,7 @@ async def assert_client_custom_fields():
     conn = connect()
     c = conn.cursor()
     value = c.execute("""
-    SELECT custom_field_values.*
+    SELECT custom_field_values.*, clients.id AS client_id
     FROM custom_field_values
     JOIN clients ON clients.id=custom_field_values.entity_id
     WHERE custom_field_values.field_id=?
@@ -672,6 +672,15 @@ async def assert_client_custom_fields():
     conn.close()
 
     assert value is not None
+
+    detail_response = await crm.client_detail(
+        make_asgi_request("owner2", f"/clients/{value['client_id']}"),
+        value["client_id"],
+    )
+    assert detail_response.status_code == 200
+    detail_html = detail_response.body.decode("utf-8")
+    assert "Industry" in detail_html
+    assert "Beauty" in detail_html
 
 
 async def assert_task_custom_fields():

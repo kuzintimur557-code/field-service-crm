@@ -76,12 +76,26 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <div>
         <div class="label">Создан</div>
         <div class="value">{{ client["created_at"] }}</div>
-    </div>
-</div>
+	    </div>
+	</div>
 
-{% if client["notes"] %}
-<div style="margin-top:18px">
-    <div class="label">Заметки</div>
+	{% if client_custom_fields %}
+	<div style="margin-top:18px">
+	    <h2>Дополнительные поля</h2>
+	    <div class="grid">
+	        {% for field in client_custom_fields %}
+	        <div>
+	            <div class="label">{{ field["label"] }}</div>
+	            <div class="value">{{ field["value"] if field["value"] else "Не заполнено" }}</div>
+	        </div>
+	        {% endfor %}
+	    </div>
+	</div>
+	{% endif %}
+
+	{% if client["notes"] %}
+	<div style="margin-top:18px">
+	    <div class="label">Заметки</div>
     <div class="value">{{ client["notes"] }}</div>
 </div>
 	{% endif %}
