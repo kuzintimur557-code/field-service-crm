@@ -1010,6 +1010,8 @@ async def assert_task_custom_fields():
     assert "уже есть активные заявки" in page_html
     assert "Альтернатива: free2" in page_html
     assert "free2 свободен" in page_html
+    assert "Выбрать альтернативу" in page_html
+    assert "/create-task?task_date=2026-05-17&amp;worker=free2&amp;return_to=calendar" in page_html
 
     original_send_message = crm.send_message
     original_send_message_to_chat = crm.send_message_to_chat

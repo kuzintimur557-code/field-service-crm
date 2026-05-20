@@ -4625,6 +4625,17 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
                 alternatives.sort(key=lambda item: (item["active_count"], item["username"]))
                 recommended_worker = alternatives[0] if alternatives else None
 
+                if recommended_worker:
+                    switch_params = {
+                        "task_date": selected_task_date,
+                        "worker": recommended_worker["username"]
+                    }
+
+                    if selected_return_to:
+                        switch_params["return_to"] = selected_return_to
+
+                    recommended_worker["switch_url"] = f"/create-task?{urlencode(switch_params)}"
+
     clients = c.execute("""
     SELECT *
     FROM clients
