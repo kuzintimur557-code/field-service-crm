@@ -460,10 +460,11 @@ async def assert_overdue_sla(task):
 
     reminder_response = await crm.create_sla_reminders(make_request("owner2"))
     assert reminder_response.status_code == 302
-    assert reminder_response.headers["location"] == "/sla?reminders=1&filter=overdue"
+    assert reminder_response.headers["location"] == "/sla?reminders=1&created=2&filter=overdue"
 
     duplicate_reminder_response = await crm.create_sla_reminders(make_request("owner2"))
     assert duplicate_reminder_response.status_code == 302
+    assert duplicate_reminder_response.headers["location"] == "/sla?reminders=1&created=0&filter=overdue"
 
     conn = connect()
     c = conn.cursor()

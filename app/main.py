@@ -1436,6 +1436,8 @@ async def create_sla_reminders(request: Request):
       AND role IN ('boss', 'manager')
     """, (company_id,)).fetchall()
 
+    created_count = 0
+
     for task in tasks:
         for user in users:
             existing_notification = c.execute("""
@@ -1474,11 +1476,12 @@ async def create_sla_reminders(request: Request):
                 f"/task/{task['id']}",
                 datetime.now().strftime("%Y-%m-%d %H:%M")
             ))
+            created_count += 1
 
     conn.commit()
     conn.close()
 
-    return RedirectResponse("/sla?reminders=1&filter=overdue", status_code=302)
+    return RedirectResponse(f"/sla?reminders=1&created={created_count}&filter=overdue", status_code=302)
 
 
 @app.get("/sla", response_class=HTMLResponse)
