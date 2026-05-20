@@ -1058,7 +1058,8 @@ async def home(
         revenue = 0
 
     today = datetime.now().strftime("%Y-%m-%d")
-    sla_cutoff = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    sla_soon_value = (datetime.now() + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
 
     today_tasks = c.execute("""
     SELECT COUNT(*)
@@ -1085,10 +1086,22 @@ async def home(
     WHERE archived=0
       AND company_id=?
       AND status NOT IN ('Завершено', 'Отменено')
-      AND task_date IS NOT NULL
-      AND task_date!=''
-      AND task_date < ?
-    """, (company_id, sla_cutoff)).fetchone()[0]
+      AND deadline_at IS NOT NULL
+      AND deadline_at!=''
+      AND deadline_at < ?
+    """, (company_id, now_value)).fetchone()[0]
+
+    sla_due_soon_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND deadline_at IS NOT NULL
+      AND deadline_at!=''
+      AND deadline_at >= ?
+      AND deadline_at <= ?
+    """, (company_id, now_value, sla_soon_value)).fetchone()[0]
 
     active_workers = c.execute("""
     SELECT COUNT(DISTINCT worker)
@@ -1161,6 +1174,7 @@ async def home(
             "today_tasks": today_tasks,
             "overdue_tasks": overdue_tasks,
             "sla_breached_tasks": sla_breached_tasks,
+            "sla_due_soon_tasks": sla_due_soon_tasks,
             "active_workers": active_workers,
             "workers": workers,
             "worker_stats": worker_stats,
@@ -1398,6 +1412,7 @@ async def create_sla_reminders(request: Request):
 
     company_id = get_user_company_id(username)
     now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    soon_value = (datetime.now() + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
 
     conn = connect()
     c = conn.cursor()
@@ -1463,6 +1478,7 @@ async def sla_page(request: Request, filter: str = ""):
 
     company_id = get_user_company_id(username)
     now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    soon_value = (datetime.now() + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
 
     conn = connect()
     c = conn.cursor()
@@ -1491,6 +1507,13 @@ async def sla_page(request: Request, filter: str = ""):
             and t["deadline_at"] >= now_value
         ]
 
+    elif filter == "soon":
+        tasks = [
+            t for t in tasks
+            if t["status"] != "Завершено"
+            and now_value <= t["deadline_at"] <= soon_value
+        ]
+
     elif filter == "done":
         tasks = [
             t for t in tasks
@@ -1508,6 +1531,7 @@ async def sla_page(request: Request, filter: str = ""):
             "role": role,
             "tasks": tasks,
             "now_value": now_value,
+            "soon_value": soon_value,
             "selected_filter": filter
         }
     )

@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlencode
@@ -471,6 +472,27 @@ async def assert_overdue_sla(task):
     conn.close()
 
     assert notification is not None
+
+    soon_deadline = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE tasks
+    SET deadline_at=?
+    WHERE id=?
+    """, (soon_deadline, task["id"]))
+    conn.commit()
+    conn.close()
+
+    soon_response = await crm.sla_page(
+        make_asgi_request("owner2", "/sla"),
+        filter="soon",
+    )
+    assert soon_response.status_code == 200
+    soon_html = soon_response.body.decode("utf-8")
+    assert "Горит" in soon_html
+    assert "Горит SLA" in soon_html
+    assert f"#{task['id']}" in soon_html
 
 
 async def assert_recurring_generate(task):

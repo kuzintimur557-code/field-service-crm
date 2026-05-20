@@ -94,6 +94,15 @@ h1{font-size:30px}
 </div>
 {% endif %}
 
+{% if sla_due_soon_tasks and sla_due_soon_tasks > 0 %}
+<div style="background:#fef3c7;color:#92400e;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
+    🟡 Горит SLA в ближайшие 24 часа: {{ sla_due_soon_tasks }}
+    <a href="/sla?filter=soon" style="display:inline-block;margin-left:12px;color:#92400e;text-decoration:underline">
+        Открыть
+    </a>
+</div>
+{% endif %}
+
 {% if overdue_tasks and overdue_tasks > 0 %}
 <div style="background:#fee2e2;color:#991b1b;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
     ⚠️ Есть просроченные заявки: {{ overdue_tasks }}
@@ -127,6 +136,11 @@ h1{font-size:30px}
     <a href="/sla" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">SLA просрочено</div>
         <div class="stat-value">{{ sla_breached_tasks }}</div>
+    </a>
+
+    <a href="/sla?filter=soon" class="stat" style="text-decoration:none;color:inherit">
+        <div class="stat-title">SLA горит</div>
+        <div class="stat-value">{{ sla_due_soon_tasks }}</div>
     </a>
 
     <a href="/workload" class="stat" style="text-decoration:none;color:inherit">
