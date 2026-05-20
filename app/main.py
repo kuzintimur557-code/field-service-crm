@@ -4581,6 +4581,7 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
     selected_worker = str(worker or "").strip()
     selected_return_to = "calendar" if return_to == "calendar" else ""
     selected_worker_active_count = 0
+    recommended_worker = None
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
@@ -4595,6 +4596,34 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
               AND status NOT IN ('Завершено', 'Отменено')
               AND {worker_task_condition()}
             """, [company_id, f"{selected_task_date}%", *worker_task_params(selected_worker)]).fetchone()[0]
+
+            if selected_worker_active_count > 0:
+                daily_counts = {worker_name: 0 for worker_name in worker_names}
+                daily_rows = c.execute("""
+                SELECT worker, workers
+                FROM tasks
+                WHERE archived=0
+                  AND company_id=?
+                  AND task_date LIKE ?
+                  AND status NOT IN ('Завершено', 'Отменено')
+                """, (company_id, f"{selected_task_date}%")).fetchall()
+
+                for daily_task in daily_rows:
+                    for worker_name in get_task_worker_names(daily_task):
+                        if worker_name in daily_counts:
+                            daily_counts[worker_name] += 1
+
+                alternatives = [
+                    {
+                        "username": worker_name,
+                        "active_count": active_count
+                    }
+                    for worker_name, active_count in daily_counts.items()
+                    if worker_name != selected_worker
+                ]
+
+                alternatives.sort(key=lambda item: (item["active_count"], item["username"]))
+                recommended_worker = alternatives[0] if alternatives else None
 
     clients = c.execute("""
     SELECT *
@@ -4625,7 +4654,8 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
             "selected_task_date": selected_task_date,
             "selected_workers": selected_workers,
             "selected_return_to": selected_return_to,
-            "selected_worker_active_count": selected_worker_active_count
+            "selected_worker_active_count": selected_worker_active_count,
+            "recommended_worker": recommended_worker
         }
     )
 
