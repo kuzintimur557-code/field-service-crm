@@ -1484,6 +1484,92 @@ async def create_sla_reminders(request: Request):
     return RedirectResponse(f"/sla?reminders=1&created={created_count}&filter=overdue", status_code=302)
 
 
+@app.post("/sla/escalations")
+async def create_sla_escalations(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    escalation_cutoff = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status!='Завершено'
+      AND deadline_at IS NOT NULL
+      AND deadline_at!=''
+      AND deadline_at < ?
+    ORDER BY deadline_at ASC
+    """, (company_id, escalation_cutoff)).fetchall()
+
+    bosses = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=?
+      AND role='boss'
+    """, (company_id,)).fetchall()
+
+    created_count = 0
+
+    for task in tasks:
+        for boss in bosses:
+            existing_notification = c.execute("""
+            SELECT id
+            FROM notifications
+            WHERE company_id=?
+              AND username=?
+              AND title=?
+              AND link=?
+              AND is_read=0
+            """, (
+                company_id,
+                boss["username"],
+                "🚨 SLA эскалация",
+                f"/task/{task['id']}"
+            )).fetchone()
+
+            if existing_notification:
+                continue
+
+            c.execute("""
+            INSERT INTO notifications (
+                company_id,
+                username,
+                title,
+                message,
+                link,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                boss["username"],
+                "🚨 SLA эскалация",
+                f"Заявка #{task['id']} просрочила SLA больше чем на 24 часа",
+                f"/task/{task['id']}",
+                datetime.now().strftime("%Y-%m-%d %H:%M")
+            ))
+            created_count += 1
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/sla?escalations=1&created={created_count}&filter=overdue", status_code=302)
+
+
 @app.get("/sla", response_class=HTMLResponse)
 async def sla_page(request: Request, filter: str = ""):
 

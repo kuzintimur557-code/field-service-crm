@@ -480,6 +480,29 @@ async def assert_overdue_sla(task):
 
     assert notification_count == 2
 
+    escalation_response = await crm.create_sla_escalations(make_request("manager2"))
+    assert escalation_response.status_code == 302
+    assert escalation_response.headers["location"] == "/sla?escalations=1&created=1&filter=overdue"
+
+    duplicate_escalation_response = await crm.create_sla_escalations(make_request("manager2"))
+    assert duplicate_escalation_response.status_code == 302
+    assert duplicate_escalation_response.headers["location"] == "/sla?escalations=1&created=0&filter=overdue"
+
+    conn = connect()
+    c = conn.cursor()
+    escalation_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=?
+      AND title='🚨 SLA эскалация'
+      AND link=?
+      AND username=?
+      AND is_read=0
+    """, (2, f"/task/{task['id']}", "owner2")).fetchone()[0]
+    conn.close()
+
+    assert escalation_count == 1
+
     soon_deadline = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
     conn = connect()
     c = conn.cursor()
