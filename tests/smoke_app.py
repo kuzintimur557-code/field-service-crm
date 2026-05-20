@@ -434,7 +434,7 @@ async def assert_overdue_sla(task):
     c = conn.cursor()
     c.execute("""
     UPDATE tasks
-    SET archived=0, status='Новая', task_date='2000-01-01'
+    SET archived=0, status='Новая', task_date='2000-01-01', deadline_at='2000-01-01T10:00'
     WHERE id=?
     """, (task["id"],))
     conn.commit()
@@ -445,6 +445,32 @@ async def assert_overdue_sla(task):
     html = response.body.decode("utf-8")
     assert "Нарушен SLA" in html
     assert f"#{task['id']}" in html
+
+    sla_response = await crm.sla_page(
+        make_asgi_request("owner2", "/sla"),
+        filter="overdue",
+    )
+    assert sla_response.status_code == 200
+    sla_html = sla_response.body.decode("utf-8")
+    assert "Просроченные" in sla_html
+    assert f"#{task['id']}" in sla_html
+
+    reminder_response = await crm.create_sla_reminders(make_request("owner2"))
+    assert reminder_response.status_code == 302
+    assert reminder_response.headers["location"] == "/sla?reminders=1&filter=overdue"
+
+    conn = connect()
+    c = conn.cursor()
+    notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=?
+      AND title='🔴 Просрочен SLA'
+      AND link=?
+    """, (2, f"/task/{task['id']}")).fetchone()
+    conn.close()
+
+    assert notification is not None
 
 
 async def assert_recurring_generate(task):

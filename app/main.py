@@ -1383,8 +1383,73 @@ async def workload_page(request: Request):
     )
 
 
+@app.post("/sla/reminders")
+async def create_sla_reminders(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status!='Завершено'
+      AND deadline_at IS NOT NULL
+      AND deadline_at!=''
+      AND deadline_at < ?
+    ORDER BY deadline_at ASC
+    """, (company_id, now_value)).fetchall()
+
+    users = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=?
+      AND role IN ('boss', 'manager')
+    """, (company_id,)).fetchall()
+
+    for task in tasks:
+        for user in users:
+            c.execute("""
+            INSERT INTO notifications (
+                company_id,
+                username,
+                title,
+                message,
+                link,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                user["username"],
+                "🔴 Просрочен SLA",
+                f"Заявка #{task['id']} просрочила deadline",
+                f"/task/{task['id']}",
+                datetime.now().strftime("%Y-%m-%d %H:%M")
+            ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/sla?reminders=1&filter=overdue", status_code=302)
+
+
 @app.get("/sla", response_class=HTMLResponse)
-async def sla_page(request: Request):
+async def sla_page(request: Request, filter: str = ""):
 
     username = get_user(request)
 
@@ -1412,6 +1477,26 @@ async def sla_page(request: Request):
     ORDER BY deadline_at ASC
     """, (company_id,)).fetchall()
 
+    if filter == "overdue":
+        tasks = [
+            t for t in tasks
+            if t["status"] != "Завершено"
+            and t["deadline_at"] < now_value
+        ]
+
+    elif filter == "active":
+        tasks = [
+            t for t in tasks
+            if t["status"] != "Завершено"
+            and t["deadline_at"] >= now_value
+        ]
+
+    elif filter == "done":
+        tasks = [
+            t for t in tasks
+            if t["status"] == "Завершено"
+        ]
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -1422,7 +1507,8 @@ async def sla_page(request: Request):
             "username": username,
             "role": role,
             "tasks": tasks,
-            "now_value": now_value
+            "now_value": now_value,
+            "selected_filter": filter
         }
     )
 
@@ -5332,6 +5418,34 @@ async def update_task_deadline(request: Request, task_id: int):
         deadline_at or "Deadline очищен",
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
+
+    owners = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=?
+      AND role IN ('boss', 'manager')
+    """, (company_id,)).fetchall()
+
+    for owner in owners:
+        if owner["username"] != username:
+            c.execute("""
+            INSERT INTO notifications (
+                company_id,
+                username,
+                title,
+                message,
+                link,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                owner["username"],
+                "⏰ Изменён deadline",
+                f"{username} изменил deadline заявки #{task_id}",
+                f"/task/{task_id}",
+                datetime.now().strftime("%Y-%m-%d %H:%M")
+            ))
 
     conn.commit()
     conn.close()

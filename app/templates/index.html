@@ -85,19 +85,19 @@ h1{font-size:30px}
     </div>
 </div>
 
-{% if overdue_tasks and overdue_tasks > 0 %}
+{% if sla_breached_tasks and sla_breached_tasks > 0 %}
 <div style="background:#fee2e2;color:#991b1b;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
-    ⚠️ Есть просроченные заявки: {{ overdue_tasks }}
-    <a href="/overdue" style="display:inline-block;margin-left:12px;color:#991b1b;text-decoration:underline">
+    🔴 Есть просроченные SLA: {{ sla_breached_tasks }}
+    <a href="/sla?filter=overdue" style="display:inline-block;margin-left:12px;color:#991b1b;text-decoration:underline">
         Открыть
     </a>
 </div>
 {% endif %}
 
-{% if sla_breached_tasks and sla_breached_tasks > 0 %}
-<div style="background:#7f1d1d;color:white;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
-    ⏱ SLA нарушен: {{ sla_breached_tasks }}
-    <a href="/overdue" style="display:inline-block;margin-left:12px;color:white;text-decoration:underline">
+{% if overdue_tasks and overdue_tasks > 0 %}
+<div style="background:#fee2e2;color:#991b1b;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
+    ⚠️ Есть просроченные заявки: {{ overdue_tasks }}
+    <a href="/overdue" style="display:inline-block;margin-left:12px;color:#991b1b;text-decoration:underline">
         Открыть
     </a>
 </div>
@@ -124,8 +124,8 @@ h1{font-size:30px}
         <div class="stat-value">{{ overdue_tasks }}</div>
     </a>
 
-    <a href="/overdue" class="stat" style="text-decoration:none;color:inherit">
-        <div class="stat-title">SLA нарушен</div>
+    <a href="/sla" class="stat" style="text-decoration:none;color:inherit">
+        <div class="stat-title">SLA просрочено</div>
         <div class="stat-value">{{ sla_breached_tasks }}</div>
     </a>
 

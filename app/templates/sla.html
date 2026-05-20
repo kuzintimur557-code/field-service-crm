@@ -23,7 +23,10 @@ h1{margin:0 0 8px;font-size:34px}
 .yellow{background:#fef3c7;color:#92400e}
 .green{background:#dcfce7;color:#166534}
 .btn{display:inline-block;margin-top:12px;padding:12px 16px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
-@media(max-width:700px){.container{padding:14px}h1{font-size:28px}}
+.sla-filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.sla-filters a{padding:11px 14px;border-radius:999px;background:white;color:#374151;text-decoration:none;font-weight:900;box-shadow:0 6px 16px rgba(0,0,0,.05)}
+.sla-filters a.active{background:#2563eb;color:white}
+@media(max-width:700px){.container{padding:14px}h1{font-size:28px}.sla-filters a{flex:1;text-align:center}}
 </style>
 </head>
 
@@ -35,6 +38,25 @@ h1{margin:0 0 8px;font-size:34px}
 <div class="card">
 <h1>⏰ SLA контроль</h1>
 <div class="meta">Заявки с установленным deadline</div>
+
+{% if request.query_params.get("reminders") == "1" %}
+<div style="margin-top:14px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900">
+✅ SLA-напоминания созданы
+</div>
+{% endif %}
+
+<form method="post" action="/sla/reminders" style="margin-top:16px">
+    <button type="submit" style="padding:12px 16px;border:0;border-radius:14px;background:#991b1b;color:white;font-weight:900;cursor:pointer">
+        🔴 Создать SLA-напоминания
+    </button>
+</form>
+</div>
+
+<div class="sla-filters">
+<a href="/sla" class="{% if not selected_filter %}active{% endif %}">Все</a>
+<a href="/sla?filter=overdue" class="{% if selected_filter == 'overdue' %}active{% endif %}">Просроченные</a>
+<a href="/sla?filter=active" class="{% if selected_filter == 'active' %}active{% endif %}">Активные</a>
+<a href="/sla?filter=done" class="{% if selected_filter == 'done' %}active{% endif %}">Выполненные</a>
 </div>
 
 <div class="card">
