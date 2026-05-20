@@ -4542,7 +4542,7 @@ async def logout():
 
 
 @app.get("/create-task", response_class=HTMLResponse)
-async def create_task_page(request: Request, task_date: str = ""):
+async def create_task_page(request: Request, task_date: str = "", worker: str = ""):
 
     username = get_user(request)
 
@@ -4575,6 +4575,12 @@ async def create_task_page(request: Request, task_date: str = ""):
     WHERE role='worker' AND company_id=?
     ORDER BY username
     """, (company_id,)).fetchall()
+    worker_names = [row["username"] for row in workers]
+    selected_workers = []
+    selected_worker = str(worker or "").strip()
+
+    if selected_worker in worker_names:
+        selected_workers.append(selected_worker)
 
     clients = c.execute("""
     SELECT *
@@ -4602,7 +4608,8 @@ async def create_task_page(request: Request, task_date: str = ""):
             "workers": workers,
             "clients": clients,
             "custom_fields": custom_fields,
-            "selected_task_date": selected_task_date
+            "selected_task_date": selected_task_date,
+            "selected_workers": selected_workers
         }
     )
 

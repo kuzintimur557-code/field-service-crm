@@ -76,7 +76,7 @@ button:hover{background:#1d4ed8}
     <div style="display:grid;gap:10px;margin-top:12px">
         {% for worker in workers %}
         <label style="display:flex;align-items:center;gap:10px;font-weight:800">
-            <input type="checkbox" name="workers" value="{{ worker[0] }}" style="width:auto">
+            <input type="checkbox" name="workers" value="{{ worker[0] }}" style="width:auto" {% if worker[0] in selected_workers %}checked{% endif %}>
             {{ worker[0] }}
         </label>
         {% endfor %}

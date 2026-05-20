@@ -47,6 +47,7 @@ h1{font-size:32px;margin:0}
 	.availability-name{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:900;margin-bottom:6px}
 	.recommended{padding:4px 7px;border-radius:999px;background:#2563eb;color:white;font-size:11px;font-weight:900;white-space:nowrap}
 	.availability-status{font-size:13px;font-weight:900;color:#374151}
+	.worker-task-link{display:inline-flex;margin-top:10px;padding:8px 10px;border-radius:12px;background:#111827;color:white;text-decoration:none;font-size:13px;font-weight:900}
 	.load-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
 	.load-card{background:white;border-radius:18px;padding:16px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
 	.load-name{font-weight:900;margin-bottom:6px}
@@ -130,6 +131,7 @@ h1{font-size:32px;margin:0}
 		                    Занят: {{ worker["active_count"] }} активных заявок
 		                {% endif %}
 		            </div>
+		            <a class="worker-task-link" href="/create-task?task_date={{ availability_date }}&worker={{ worker['username'] }}">Создать</a>
 		        </div>
 		    {% endfor %}
 		    </div>
