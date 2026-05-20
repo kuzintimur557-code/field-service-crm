@@ -260,6 +260,7 @@ async def assert_calendar_access():
     assert "load-card" in manager_html
     assert "Все статусы" in manager_html
     assert "day-count" in manager_html
+    assert "day-statuses" in manager_html
 
     invalid_worker_response = await crm.calendar_page(
         make_asgi_request("owner2"),

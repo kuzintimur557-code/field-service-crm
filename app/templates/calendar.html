@@ -20,8 +20,10 @@ h1{font-size:32px;margin:0}
 	.task{padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px;border-left:6px solid #2563eb}
 	.task a{text-decoration:none;color:#111827;font-weight:900}
 	.meta{margin-top:6px;color:#4b5563}
-	.badge{display:inline-block;margin-top:8px;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800}
-	.empty{background:white;padding:24px;border-radius:24px;color:#6b7280}
+		.badge{display:inline-block;margin-top:8px;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800}
+		.day-statuses{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+		.day-status{padding:7px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:900}
+		.empty{background:white;padding:24px;border-radius:24px;color:#6b7280}
 	.filters{background:white;border-radius:20px;padding:16px;margin-bottom:18px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
 	.filters form{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
 	.filters label{display:block;font-size:13px;font-weight:900;color:#6b7280;margin-bottom:6px}
@@ -97,12 +99,17 @@ h1{font-size:32px;margin:0}
 		{% if calendar_days %}
 		{% for day in calendar_days %}
 		<div class="day">
-		    <div class="date">
-		        <span>{{ day["date"] }}</span>
-		        <span class="day-count">{{ day["tasks"]|length }} заявок</span>
-		    </div>
+			    <div class="date">
+			        <span>{{ day["date"] }}</span>
+			        <span class="day-count">{{ day["tasks"]|length }} заявок</span>
+			    </div>
+			    <div class="day-statuses">
+			        <span class="day-status">Новые: {{ day["status_counts"]["Новая"] }}</span>
+			        <span class="day-status">В работе: {{ day["status_counts"]["В работе"] }}</span>
+			        <span class="day-status">Завершено: {{ day["status_counts"]["Завершено"] }}</span>
+			    </div>
 
-	    {% for entry in day["tasks"] %}
+		    {% for entry in day["tasks"] %}
 	    {% set task = entry["task"] %}
 	    <div class="task">
 	        <a href="/task/{{ task['id'] }}">

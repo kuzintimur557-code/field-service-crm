@@ -1931,8 +1931,19 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
         if not calendar_days or calendar_days[-1]["date"] != day_label:
             calendar_days.append({
                 "date": day_label,
+                "status_counts": {
+                    "Новая": 0,
+                    "В работе": 0,
+                    "Завершено": 0,
+                    "Отменено": 0
+                },
                 "tasks": []
             })
+
+        task_status = task["status"] or ""
+
+        if task_status in calendar_days[-1]["status_counts"]:
+            calendar_days[-1]["status_counts"][task_status] += 1
 
         calendar_days[-1]["tasks"].append({
             "task": task,
