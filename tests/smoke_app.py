@@ -1192,6 +1192,8 @@ async def assert_required_custom_fields():
                 "address": "",
                 "description": "",
                 "task_date": "2026-05-20",
+                "workers": ["worker2"],
+                "return_to": "calendar",
                 "priority": "Обычный",
                 "price": "0",
             },
@@ -1199,7 +1201,7 @@ async def assert_required_custom_fields():
         photo=None,
     )
     assert task_response.status_code == 302
-    assert task_response.headers["location"] == "/create-task?error=custom_required"
+    assert task_response.headers["location"] == "/create-task?error=custom_required&task_date=2026-05-20&worker=worker2&return_to=calendar"
 
     edit_client_response = await crm.edit_client(
         make_form_request(

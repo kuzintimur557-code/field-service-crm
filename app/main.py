@@ -9,6 +9,7 @@ from app.telegram_utils import send_message, send_photo, send_message_to_chat
 from datetime import datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
+from urllib.parse import urlencode
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
@@ -4666,7 +4667,28 @@ async def create_task(
 
         if custom_field["is_required"] and not custom_value:
             conn.close()
-            return RedirectResponse("/create-task?error=custom_required", status_code=302)
+            error_params = {"error": "custom_required"}
+            selected_task_date = str(task_date or "")[:10]
+
+            try:
+                if selected_task_date:
+                    datetime.strptime(selected_task_date, "%Y-%m-%d")
+                    error_params["task_date"] = selected_task_date
+            except Exception:
+                pass
+
+            selected_worker = next(
+                (worker_name.strip() for worker_name in selected_workers if worker_name.strip()),
+                ""
+            )
+
+            if selected_worker:
+                error_params["worker"] = selected_worker
+
+            if return_to == "calendar":
+                error_params["return_to"] = "calendar"
+
+            return RedirectResponse(f"/create-task?{urlencode(error_params)}", status_code=302)
 
     if client_id:
         existing_client = c.execute("""
