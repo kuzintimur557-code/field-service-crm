@@ -27,6 +27,8 @@ h2{margin:0 0 16px;font-size:22px}
 .latest-meta{color:#4b5563;font-weight:800;line-height:1.45}
 .task{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
 .btn{display:inline-block;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
+.contact-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.contact-actions .btn{background:#111827}
 .task-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .task-filters a{padding:8px 10px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
 .task-filters a.active{background:#111827;color:white}
@@ -92,6 +94,17 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="value">{{ client["created_at"] }}</div>
 	    </div>
 	</div>
+
+	{% if client["phone"] or client["email"] %}
+	<div class="contact-actions">
+	    {% if client["phone"] %}
+	    <a class="btn" href="tel:{{ client['phone'] }}">Позвонить</a>
+	    {% endif %}
+	    {% if client["email"] %}
+	    <a class="btn" href="mailto:{{ client['email'] }}">Написать email</a>
+	    {% endif %}
+	</div>
+	{% endif %}
 
 	{% if client_custom_fields %}
 	<div style="margin-top:18px">

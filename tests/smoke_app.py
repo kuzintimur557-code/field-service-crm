@@ -539,6 +539,8 @@ async def assert_client_card(task):
     assert "task_filter=overdue" in html
     assert "Последняя заявка" in html
     assert "latest-task" in html
+    assert 'href="tel:+70000000000"' in html
+    assert 'href="mailto:client@example.com"' in html
     assert "Лента активности" in html
     assert "Smoke client timeline" in html
     assert "Timeline details" in html
