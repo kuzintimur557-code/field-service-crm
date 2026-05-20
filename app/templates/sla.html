@@ -91,6 +91,22 @@ h1{margin:0 0 8px;font-size:34px}
     </a>
 </div>
 
+<form method="get" action="/sla" class="card">
+    <input type="hidden" name="filter" value="{{ selected_filter }}">
+    <label style="display:block;font-weight:900;margin-bottom:8px">Исполнитель</label>
+    <select name="worker" style="width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db">
+        <option value="">Все исполнители</option>
+        {% for worker in workers %}
+        <option value="{{ worker['username'] }}" {% if selected_worker == worker["username"] %}selected{% endif %}>
+            {{ worker["username"] }}
+        </option>
+        {% endfor %}
+    </select>
+    <button type="submit" style="margin-top:12px;padding:12px 16px;border:0;border-radius:14px;background:#2563eb;color:white;font-weight:900;cursor:pointer">
+        Применить
+    </button>
+</form>
+
 <div class="sla-filters">
 <a href="/sla" class="{% if not selected_filter %}active{% endif %}">Все</a>
 <a href="/sla?filter=overdue" class="{% if selected_filter == 'overdue' %}active{% endif %}">Просроченные</a>

@@ -1571,7 +1571,7 @@ async def create_sla_escalations(request: Request):
 
 
 @app.get("/sla", response_class=HTMLResponse)
-async def sla_page(request: Request, filter: str = ""):
+async def sla_page(request: Request, filter: str = "", worker: str = ""):
 
     username = get_user(request)
 
@@ -1599,6 +1599,15 @@ async def sla_page(request: Request, filter: str = ""):
       AND deadline_at!=''
     ORDER BY deadline_at ASC
     """, (company_id,)).fetchall()
+
+    workers = c.execute("""
+    SELECT username
+    FROM users
+    WHERE role='worker'
+      AND company_id=?
+    ORDER BY username
+    """, (company_id,)).fetchall()
+    worker_names = [w["username"] for w in workers]
 
     all_sla_tasks = list(tasks)
     sla_overdue_count = len([
@@ -1655,6 +1664,14 @@ async def sla_page(request: Request, filter: str = ""):
             if t["status"] == "Завершено"
         ]
 
+    if worker and worker in worker_names:
+        tasks = [
+            t for t in tasks
+            if can_access_task(worker, "worker", t)
+        ]
+    elif worker:
+        tasks = []
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -1666,9 +1683,11 @@ async def sla_page(request: Request, filter: str = ""):
             "role": role,
             "tasks": tasks,
             "sla_stats": sla_stats,
+            "workers": workers,
             "now_value": now_value,
             "soon_value": soon_value,
-            "selected_filter": filter
+            "selected_filter": filter,
+            "selected_worker": worker
         }
     )
 

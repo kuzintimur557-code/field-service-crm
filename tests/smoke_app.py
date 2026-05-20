@@ -456,7 +456,26 @@ async def assert_overdue_sla(task):
     assert "Всего SLA" in sla_html
     assert "Просрочено" in sla_html
     assert "Просроченные" in sla_html
+    assert "Все исполнители" in sla_html
     assert f"#{task['id']}" in sla_html
+
+    worker_sla_response = await crm.sla_page(
+        make_asgi_request("owner2", "/sla"),
+        filter="overdue",
+        worker="helper2",
+    )
+    assert worker_sla_response.status_code == 200
+    worker_sla_html = worker_sla_response.body.decode("utf-8")
+    assert f"#{task['id']}" in worker_sla_html
+
+    outsider_sla_response = await crm.sla_page(
+        make_asgi_request("owner2", "/sla"),
+        filter="overdue",
+        worker="outsider_worker",
+    )
+    assert outsider_sla_response.status_code == 200
+    outsider_sla_html = outsider_sla_response.body.decode("utf-8")
+    assert task["client"] not in outsider_sla_html
 
     reminder_response = await crm.create_sla_reminders(make_request("owner2"))
     assert reminder_response.status_code == 302
