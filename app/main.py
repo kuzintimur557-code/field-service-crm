@@ -3389,7 +3389,7 @@ async def clients_page(request: Request):
 
 
 @app.get("/clients/{client_id}", response_class=HTMLResponse)
-async def client_detail(request: Request, client_id: int, task_filter: str = ""):
+async def client_detail(request: Request, client_id: int, task_filter: str = "", task_search: str = ""):
 
     username = get_user(request)
 
@@ -3423,6 +3423,8 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "")
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
     selected_task_filter = task_filter if task_filter in ("active", "completed", "overdue") else ""
+    selected_task_search = str(task_search or "").strip()
+    search_value = selected_task_search.lower()
     latest_task = tasks[0] if tasks else None
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -3479,6 +3481,19 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "")
         if selected_task_filter == "overdue" and not is_overdue:
             continue
 
+        if search_value:
+            search_text = " ".join([
+                str(task["id"] or ""),
+                str(task["description"] or ""),
+                str(task["address"] or ""),
+                str(task["worker"] or ""),
+                str(task["workers"] or ""),
+                str(task_status or "")
+            ]).lower()
+
+            if search_value not in search_text:
+                continue
+
         filtered_tasks.append(task)
 
     client_notes = c.execute("""
@@ -3528,6 +3543,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "")
             "tasks": filtered_tasks,
             "latest_task": latest_task,
             "selected_task_filter": selected_task_filter,
+            "selected_task_search": selected_task_search,
             "client_notes": client_notes,
             "client_total_tasks": client_total_tasks,
             "client_active_tasks": client_active_tasks,
