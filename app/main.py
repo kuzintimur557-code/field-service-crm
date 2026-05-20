@@ -3423,6 +3423,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "")
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
     selected_task_filter = task_filter if task_filter in ("active", "completed", "overdue") else ""
+    latest_task = tasks[0] if tasks else None
 
     today = datetime.now().strftime("%Y-%m-%d")
     client_total_tasks = len(tasks)
@@ -3525,6 +3526,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "")
             "role": role,
             "client": client,
             "tasks": filtered_tasks,
+            "latest_task": latest_task,
             "selected_task_filter": selected_task_filter,
             "client_notes": client_notes,
             "client_total_tasks": client_total_tasks,

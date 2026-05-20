@@ -19,9 +19,12 @@ h2{margin:0 0 16px;font-size:22px}
 	.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:20px}
 	.stat{background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px}
 	.stat-num{font-size:24px;font-weight:900}
-	.stat-label{margin-top:4px;color:#6b7280;font-size:13px;font-weight:900}
+.stat-label{margin-top:4px;color:#6b7280;font-size:13px;font-weight:900}
 	.label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:5px}
 .value{font-size:18px;font-weight:900;word-break:break-word}
+.latest-task{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#eff6ff;border:1px solid #bfdbfe;border-radius:18px;padding:16px;margin-top:18px}
+.latest-title{font-weight:900;margin-bottom:6px}
+.latest-meta{color:#4b5563;font-weight:800;line-height:1.45}
 .task{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
 .btn{display:inline-block;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
 .task-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
@@ -44,7 +47,7 @@ input,textarea,button{width:100%;padding:15px;border-radius:14px;font-size:16px;
 input,textarea{border:1px solid #d1d5db;background:white}
 textarea{height:110px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
-@media(max-width:800px){.container{padding:16px}.grid,.task,.timeline-item{grid-template-columns:1fr}h1{font-size:28px}.btn{display:block;text-align:center}}
+@media(max-width:800px){.container{padding:16px}.grid,.task,.timeline-item,.latest-task{grid-template-columns:1fr}h1{font-size:28px}.btn{display:block;text-align:center}}
 </style>
 </head>
 
@@ -143,6 +146,17 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	<div style="margin-top:18px">
 	    <a class="btn" href="/create-task?client_id={{ client['id'] }}&return_to=client">Создать заявку клиенту</a>
 	</div>
+	{% if latest_task %}
+	<div class="latest-task">
+	    <div>
+	        <div class="latest-title">Последняя заявка #{{ latest_task["id"] }}</div>
+	        <div class="latest-meta">
+	            {{ latest_task["task_date"] or "Без даты" }} / {{ latest_task["status"] }} / {{ latest_task["worker"] or "Не назначен" }}
+	        </div>
+	    </div>
+	    <a class="btn" href="/task/{{ latest_task['id'] }}">Открыть</a>
+	</div>
+	{% endif %}
 	</div>
 
 <div class="card">
