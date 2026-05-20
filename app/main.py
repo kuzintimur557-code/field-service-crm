@@ -5693,6 +5693,7 @@ async def update_task_date(request: Request, task_id: int):
 
     form = await request.form()
     new_date = (form.get("task_date") or "").strip()
+    return_to = (form.get("return_to") or "").strip()
 
     conn = connect()
     c = conn.cursor()
@@ -5750,6 +5751,9 @@ async def update_task_date(request: Request, task_id: int):
             send_message_to_chat(worker_chat_id, date_text)
     except Exception:
         pass
+
+    if return_to.startswith("/calendar"):
+        return RedirectResponse(return_to, status_code=302)
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 

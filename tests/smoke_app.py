@@ -261,6 +261,40 @@ async def assert_calendar_access():
     assert "Все статусы" in manager_html
     assert "day-count" in manager_html
     assert "day-statuses" in manager_html
+    assert "reschedule" in manager_html
+
+    conn = connect()
+    c = conn.cursor()
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=? AND client=?
+    """, (2, "Client 2")).fetchone()
+    conn.close()
+
+    original_send_message = crm.send_message
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message = lambda text: True
+    crm.send_message_to_chat = lambda chat_id, text: True
+
+    try:
+        reschedule_response = await crm.update_task_date(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/date",
+                {
+                    "task_date": "2026-05-21",
+                    "return_to": "/calendar?month=2026-05&worker=helper2&status=Новая",
+                },
+            ),
+            task["id"],
+        )
+    finally:
+        crm.send_message = original_send_message
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert reschedule_response.status_code == 302
+    assert reschedule_response.headers["location"].startswith("/calendar?month=2026-05&worker=helper2")
 
     invalid_worker_response = await crm.calendar_page(
         make_asgi_request("owner2"),

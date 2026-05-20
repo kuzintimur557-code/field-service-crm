@@ -17,9 +17,12 @@ h1{font-size:32px;margin:0}
 	.day{background:white;border-radius:24px;padding:22px;margin-bottom:18px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
 		.date{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:22px;font-weight:900;margin-bottom:14px;color:#111827}
 		.day-count{font-size:14px;padding:7px 11px;border-radius:999px;background:#dbeafe;color:#1d4ed8;white-space:nowrap}
-	.task{padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px;border-left:6px solid #2563eb}
-	.task a{text-decoration:none;color:#111827;font-weight:900}
-	.meta{margin-top:6px;color:#4b5563}
+		.task{padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px;border-left:6px solid #2563eb}
+		.task a{text-decoration:none;color:#111827;font-weight:900}
+		.reschedule{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+		.reschedule input{padding:9px;border-radius:12px;border:1px solid #d1d5db}
+		.reschedule button{padding:9px 12px;border:0;border-radius:12px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+		.meta{margin-top:6px;color:#4b5563}
 		.badge{display:inline-block;margin-top:8px;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800}
 		.day-statuses{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 		.day-status{padding:7px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:900}
@@ -116,10 +119,17 @@ h1{font-size:32px;margin:0}
 	            #{{ task["id"] }} — {{ task["client"] }}
 	        </a>
 
-	        <div class="meta">📍 {{ task["address"] }}</div>
-	        <div class="meta">👷 {{ entry["workers"] }}</div>
-	        <div class="badge">{{ task["status"] }}</div>
-	    </div>
+		        <div class="meta">📍 {{ task["address"] }}</div>
+		        <div class="meta">👷 {{ entry["workers"] }}</div>
+		        <div class="badge">{{ task["status"] }}</div>
+		        {% if role in ("boss", "manager") %}
+		        <form class="reschedule" method="post" action="/task/{{ task['id'] }}/date">
+		            <input type="date" name="task_date" value="{{ task['task_date'][:10] if task['task_date'] else '' }}">
+		            <input type="hidden" name="return_to" value="/calendar?month={{ selected_month }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">
+		            <button type="submit">Перенести</button>
+		        </form>
+		        {% endif %}
+		    </div>
 	    {% endfor %}
 	</div>
 	{% endfor %}
