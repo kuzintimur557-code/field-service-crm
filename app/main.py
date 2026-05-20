@@ -1841,6 +1841,11 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
     workers = []
     worker_loads = []
     worker_availability = []
+    availability_summary = {
+        "total": 0,
+        "free": 0,
+        "busy": 0
+    }
     selected_date = str(date or "").strip()
 
     try:
@@ -1955,6 +1960,12 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
 
         for item in worker_availability:
             item["is_recommended"] = recommended_count is not None and item["active_count"] == recommended_count
+
+        availability_summary = {
+            "total": len(worker_availability),
+            "free": sum(1 for item in worker_availability if item["is_free"]),
+            "busy": sum(1 for item in worker_availability if not item["is_free"])
+        }
     else:
         worker = ""
         query += f" AND {worker_task_condition()}"
@@ -2007,6 +2018,7 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             "workers": workers,
             "worker_loads": worker_loads,
             "worker_availability": worker_availability,
+            "availability_summary": availability_summary,
             "selected_worker": worker,
             "selected_month": month,
             "selected_status": status,
