@@ -3462,6 +3462,19 @@ async def client_detail(request: Request, client_id: int):
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
 
+    client_timeline = c.execute("""
+    SELECT
+        task_activity.*,
+        tasks.id AS task_id,
+        tasks.status AS task_status
+    FROM task_activity
+    JOIN tasks ON tasks.id=task_activity.task_id
+    WHERE tasks.client_id=?
+      AND tasks.company_id=?
+    ORDER BY task_activity.id DESC
+    LIMIT 20
+    """, (client_id, company_id)).fetchall()
+
     client_custom_fields = c.execute("""
     SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_fields.options, custom_field_values.value
     FROM custom_fields
@@ -3493,6 +3506,7 @@ async def client_detail(request: Request, client_id: int):
             "client_completed_tasks": client_completed_tasks,
             "client_overdue_tasks": client_overdue_tasks,
             "client_revenue": client_revenue,
+            "client_timeline": client_timeline,
             "client_custom_fields": client_custom_fields
         }
     )

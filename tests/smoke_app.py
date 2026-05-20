@@ -517,6 +517,14 @@ async def assert_notifications(task):
 
 
 async def assert_client_card(task):
+    crm.log_task_activity(
+        task["id"],
+        "owner2",
+        "boss",
+        "Smoke client timeline",
+        "Timeline details",
+    )
+
     response = await crm.client_detail(
         make_asgi_request("owner2", f"/clients/{task['client_id']}"),
         task["client_id"],
@@ -526,6 +534,9 @@ async def assert_client_card(task):
     assert "Всего заявок" in html
     assert "Активные" in html
     assert "Выручка" in html
+    assert "Лента активности" in html
+    assert "Smoke client timeline" in html
+    assert "Timeline details" in html
     assert f"#{task['id']}" in html
 
 
