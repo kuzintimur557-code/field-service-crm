@@ -24,6 +24,9 @@ h2{margin:0 0 16px;font-size:22px}
 .value{font-size:18px;font-weight:900;word-break:break-word}
 .task{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
 .btn{display:inline-block;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
+.task-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.task-filters a{padding:8px 10px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.task-filters a.active{background:#111827;color:white}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
 .empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
 .note-item{background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:14px;margin-bottom:12px}
@@ -261,6 +264,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
 <div class="card">
 <h2>Заявки клиента</h2>
+
+<div class="task-filters">
+    <a href="/clients/{{ client['id'] }}" class="{% if not selected_task_filter %}active{% endif %}">Все</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=active" class="{% if selected_task_filter == 'active' %}active{% endif %}">Активные</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=completed" class="{% if selected_task_filter == 'completed' %}active{% endif %}">Завершённые</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=overdue" class="{% if selected_task_filter == 'overdue' %}active{% endif %}">Просроченные</a>
+</div>
 
 {% if tasks %}
 {% for task in tasks %}

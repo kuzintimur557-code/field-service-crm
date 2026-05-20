@@ -534,6 +534,9 @@ async def assert_client_card(task):
     assert "Всего заявок" in html
     assert "Активные" in html
     assert "Выручка" in html
+    assert "task_filter=active" in html
+    assert "task_filter=completed" in html
+    assert "task_filter=overdue" in html
     assert "Лента активности" in html
     assert "Smoke client timeline" in html
     assert "Timeline details" in html
@@ -583,6 +586,16 @@ async def assert_client_card(task):
 
     assert task_response.status_code == 302
     assert task_response.headers["location"] == f"/clients/{task['client_id']}"
+
+    active_response = await crm.client_detail(
+        make_asgi_request("owner2", f"/clients/{task['client_id']}"),
+        task["client_id"],
+        task_filter="active",
+    )
+    assert active_response.status_code == 200
+    active_html = active_response.body.decode("utf-8")
+    assert "task-filters" in active_html
+    assert "Created from client card" not in active_html
 
 
 async def assert_overdue_sla(task):

@@ -3389,7 +3389,7 @@ async def clients_page(request: Request):
 
 
 @app.get("/clients/{client_id}", response_class=HTMLResponse)
-async def client_detail(request: Request, client_id: int):
+async def client_detail(request: Request, client_id: int, task_filter: str = ""):
 
     username = get_user(request)
 
@@ -3422,6 +3422,7 @@ async def client_detail(request: Request, client_id: int):
     WHERE client_id=? AND company_id=?
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
+    selected_task_filter = task_filter if task_filter in ("active", "completed", "overdue") else ""
 
     today = datetime.now().strftime("%Y-%m-%d")
     client_total_tasks = len(tasks)
@@ -3454,6 +3455,30 @@ async def client_detail(request: Request, client_id: int):
             and task_status not in ("Завершено", "Отменено")
         ):
             client_overdue_tasks += 1
+
+    filtered_tasks = []
+
+    for task in tasks:
+        task_status = task["status"] or ""
+        is_archived = "archived" in task.keys() and task["archived"] == 1
+        task_date = str(task["task_date"] or "")[:10]
+        is_overdue = (
+            not is_archived
+            and task_date
+            and task_date < today
+            and task_status not in ("Завершено", "Отменено")
+        )
+
+        if selected_task_filter == "active" and (is_archived or task_status not in ("Новая", "В работе")):
+            continue
+
+        if selected_task_filter == "completed" and task_status != "Завершено":
+            continue
+
+        if selected_task_filter == "overdue" and not is_overdue:
+            continue
+
+        filtered_tasks.append(task)
 
     client_notes = c.execute("""
     SELECT *
@@ -3499,7 +3524,8 @@ async def client_detail(request: Request, client_id: int):
             "username": username,
             "role": role,
             "client": client,
-            "tasks": tasks,
+            "tasks": filtered_tasks,
+            "selected_task_filter": selected_task_filter,
             "client_notes": client_notes,
             "client_total_tasks": client_total_tasks,
             "client_active_tasks": client_active_tasks,
