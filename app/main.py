@@ -4623,7 +4623,7 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
     worker_names = [row["username"] for row in workers]
     selected_workers = []
     selected_worker = str(worker or "").strip()
-    selected_return_to = "calendar" if return_to == "calendar" else ""
+    selected_return_to = return_to if return_to in ("calendar", "client") else ""
     selected_worker_active_count = 0
     selected_worker_active_tasks = []
     recommended_worker = None
@@ -4798,6 +4798,9 @@ async def create_task(
 
             if return_to == "calendar":
                 error_params["return_to"] = "calendar"
+            elif return_to == "client" and client_id:
+                error_params["return_to"] = "client"
+                error_params["client_id"] = client_id
 
             return RedirectResponse(f"/create-task?{urlencode(error_params)}", status_code=302)
 
@@ -4977,6 +4980,9 @@ async def create_task(
             calendar_url += f"&worker={worker}"
 
         return RedirectResponse(calendar_url, status_code=302)
+
+    if return_to == "client" and client_id:
+        return RedirectResponse(f"/clients/{client_id}", status_code=302)
 
     return RedirectResponse("/", status_code=302)
 

@@ -537,19 +537,52 @@ async def assert_client_card(task):
     assert "Лента активности" in html
     assert "Smoke client timeline" in html
     assert "Timeline details" in html
-    assert f"/create-task?client_id={task['client_id']}" in html
+    assert f"/create-task?client_id={task['client_id']}&return_to=client" in html
     assert f"#{task['id']}" in html
 
     create_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),
         client_id=task["client_id"],
+        return_to="client",
     )
     assert create_response.status_code == 200
     create_html = create_response.body.decode("utf-8")
     assert f'name="client_id" value="{task["client_id"]}"' in create_html
+    assert 'name="return_to" value="client"' in create_html
     assert 'name="client" placeholder="Имя клиента" value="Client 2"' in create_html
     assert 'name="phone" placeholder="+1 555 000 0000" value="+70000000000"' in create_html
     assert 'name="address" placeholder="Адрес объекта" value="Company 2 address"' in create_html
+
+    original_send_message = crm.send_message
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message = lambda text: True
+    crm.send_message_to_chat = lambda chat_id, text: True
+
+    try:
+        task_response = await crm.create_task(
+            make_multipart_request(
+                "owner2",
+                "/create-task",
+                {
+                    "client_id": str(task["client_id"]),
+                    "client": "Client 2",
+                    "phone": "+70000000000",
+                    "address": "Company 2 address",
+                    "description": "Created from client card",
+                    "task_date": "2026-05-22",
+                    "return_to": "client",
+                    "priority": "Обычный",
+                    "price": "0",
+                },
+            ),
+            photo=None,
+        )
+    finally:
+        crm.send_message = original_send_message
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert task_response.status_code == 302
+    assert task_response.headers["location"] == f"/clients/{task['client_id']}"
 
 
 async def assert_overdue_sla(task):
