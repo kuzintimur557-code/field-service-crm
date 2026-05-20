@@ -4580,9 +4580,21 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
     selected_workers = []
     selected_worker = str(worker or "").strip()
     selected_return_to = "calendar" if return_to == "calendar" else ""
+    selected_worker_active_count = 0
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
+
+        if selected_task_date:
+            selected_worker_active_count = c.execute(f"""
+            SELECT COUNT(*)
+            FROM tasks
+            WHERE archived=0
+              AND company_id=?
+              AND task_date LIKE ?
+              AND status NOT IN ('Завершено', 'Отменено')
+              AND {worker_task_condition()}
+            """, [company_id, f"{selected_task_date}%", *worker_task_params(selected_worker)]).fetchone()[0]
 
     clients = c.execute("""
     SELECT *
@@ -4612,7 +4624,8 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
             "custom_fields": custom_fields,
             "selected_task_date": selected_task_date,
             "selected_workers": selected_workers,
-            "selected_return_to": selected_return_to
+            "selected_return_to": selected_return_to,
+            "selected_worker_active_count": selected_worker_active_count
         }
     )
 

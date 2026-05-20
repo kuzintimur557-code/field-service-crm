@@ -996,7 +996,7 @@ async def assert_task_custom_fields():
 
     page_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),
-        task_date="2026-05-20",
+        task_date="2026-05-17",
         worker="worker2",
         return_to="calendar",
     )
@@ -1004,9 +1004,10 @@ async def assert_task_custom_fields():
     page_html = page_response.body.decode("utf-8")
     assert "Route" in page_html
     assert f"custom_field_{field_id}" in page_html
-    assert 'name="task_date" type="date" value="2026-05-20"' in page_html
+    assert 'name="task_date" type="date" value="2026-05-17"' in page_html
     assert 'value="worker2" style="width:auto" checked' in page_html
     assert 'name="return_to" value="calendar"' in page_html
+    assert "уже есть активные заявки" in page_html
 
     original_send_message = crm.send_message
     original_send_message_to_chat = crm.send_message_to_chat

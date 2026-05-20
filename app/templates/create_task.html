@@ -44,6 +44,12 @@ button:hover{background:#1d4ed8}
 	</div>
 	{% endif %}
 
+	{% if selected_worker_active_count %}
+	<div class="note" style="background:#fff7ed;color:#9a3412">
+	У выбранного исполнителя уже есть активные заявки на эту дату: {{ selected_worker_active_count }}.
+	</div>
+	{% endif %}
+
 	<form method="post" action="/create-task" enctype="multipart/form-data">
 {% if selected_return_to %}
 <input type="hidden" name="return_to" value="{{ selected_return_to }}">
