@@ -268,6 +268,7 @@ async def assert_calendar_access():
     assert "free2" in manager_html
     assert "Свободен" in manager_html
     assert "Занят: 1 активных заявок" in manager_html
+    assert "Рекомендован" in manager_html
 
     conn = connect()
     c = conn.cursor()

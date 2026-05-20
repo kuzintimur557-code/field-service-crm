@@ -39,7 +39,8 @@ h1{font-size:32px;margin:0}
 	.availability-card{padding:12px;border-radius:16px;background:#f9fafb;border:1px solid #e5e7eb}
 	.availability-card.free{background:#ecfdf5;border-color:#bbf7d0}
 	.availability-card.busy{background:#fff7ed;border-color:#fed7aa}
-	.availability-name{font-weight:900;margin-bottom:6px}
+	.availability-name{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:900;margin-bottom:6px}
+	.recommended{padding:4px 7px;border-radius:999px;background:#2563eb;color:white;font-size:11px;font-weight:900;white-space:nowrap}
 	.availability-status{font-size:13px;font-weight:900;color:#374151}
 	.load-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
 	.load-card{background:white;border-radius:18px;padding:16px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
@@ -106,7 +107,12 @@ h1{font-size:32px;margin:0}
 		    <div class="availability-grid">
 		    {% for worker in worker_availability %}
 		        <div class="availability-card {% if worker['is_free'] %}free{% else %}busy{% endif %}">
-		            <div class="availability-name">{{ worker["username"] }}</div>
+		            <div class="availability-name">
+		                <span>{{ worker["username"] }}</span>
+		                {% if worker["is_recommended"] %}
+		                <span class="recommended">Рекомендован</span>
+		                {% endif %}
+		            </div>
 		            <div class="availability-status">
 		                {% if worker["is_free"] %}
 		                    Свободен

@@ -1944,8 +1944,17 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             worker_availability.append({
                 "username": worker_name,
                 "active_count": active_count,
-                "is_free": active_count == 0
+                "is_free": active_count == 0,
+                "is_recommended": False
             })
+
+        recommended_count = min(
+            [item["active_count"] for item in worker_availability],
+            default=None
+        )
+
+        for item in worker_availability:
+            item["is_recommended"] = recommended_count is not None and item["active_count"] == recommended_count
     else:
         worker = ""
         query += f" AND {worker_task_condition()}"
