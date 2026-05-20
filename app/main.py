@@ -1438,6 +1438,24 @@ async def create_sla_reminders(request: Request):
 
     for task in tasks:
         for user in users:
+            existing_notification = c.execute("""
+            SELECT id
+            FROM notifications
+            WHERE company_id=?
+              AND username=?
+              AND title=?
+              AND link=?
+              AND is_read=0
+            """, (
+                company_id,
+                user["username"],
+                "🔴 Просрочен SLA",
+                f"/task/{task['id']}"
+            )).fetchone()
+
+            if existing_notification:
+                continue
+
             c.execute("""
             INSERT INTO notifications (
                 company_id,

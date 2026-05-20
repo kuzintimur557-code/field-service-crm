@@ -462,18 +462,22 @@ async def assert_overdue_sla(task):
     assert reminder_response.status_code == 302
     assert reminder_response.headers["location"] == "/sla?reminders=1&filter=overdue"
 
+    duplicate_reminder_response = await crm.create_sla_reminders(make_request("owner2"))
+    assert duplicate_reminder_response.status_code == 302
+
     conn = connect()
     c = conn.cursor()
-    notification = c.execute("""
-    SELECT *
+    notification_count = c.execute("""
+    SELECT COUNT(*)
     FROM notifications
     WHERE company_id=?
       AND title='🔴 Просрочен SLA'
       AND link=?
-    """, (2, f"/task/{task['id']}")).fetchone()
+      AND is_read=0
+    """, (2, f"/task/{task['id']}")).fetchone()[0]
     conn.close()
 
-    assert notification is not None
+    assert notification_count == 2
 
     soon_deadline = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
     conn = connect()
