@@ -37,6 +37,8 @@ h1{font-size:32px;margin:0}
 	.availability{background:white;border-radius:20px;padding:16px;margin-bottom:18px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
 	.availability-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;font-weight:900}
 	.availability-action{padding:8px 10px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
+	.day-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+	.day-nav a{padding:8px 10px;border-radius:12px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-size:13px;font-weight:900}
 	.availability-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 	.availability-pill{padding:7px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:900}
 	.availability-pill.free{background:#dcfce7;color:#166534}
@@ -110,6 +112,11 @@ h1{font-size:32px;margin:0}
 		    <div class="availability-title">
 		        <span>Свободные окна</span>
 		        <a class="availability-action" href="/create-task?task_date={{ availability_date }}&return_to=calendar">Создать на {{ availability_date }}</a>
+		    </div>
+		    <div class="day-nav">
+		        <a href="{{ previous_day_url }}">Предыдущий день</a>
+		        <a href="{{ today_day_url }}">Сегодня</a>
+		        <a href="{{ next_day_url }}">Следующий день</a>
 		    </div>
 		    <div class="availability-summary">
 		        <span class="availability-pill">Всего: {{ availability_summary["total"] }}</span>

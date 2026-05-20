@@ -1976,6 +1976,23 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
         query += " AND status=?"
         params.append(status)
 
+    current_calendar_day = datetime.strptime(availability_date, "%Y-%m-%d").date()
+
+    def calendar_day_url(day):
+        day_params = {"date": day.strftime("%Y-%m-%d")}
+
+        if worker:
+            day_params["worker"] = worker
+
+        if status in ("Новая", "В работе", "Завершено", "Отменено"):
+            day_params["status"] = status
+
+        return f"/calendar?{urlencode(day_params)}"
+
+    previous_day_url = calendar_day_url(current_calendar_day - timedelta(days=1))
+    today_day_url = calendar_day_url(datetime.now().date())
+    next_day_url = calendar_day_url(current_calendar_day + timedelta(days=1))
+
     query += " ORDER BY task_date ASC, id DESC"
 
     tasks = c.execute(query, params).fetchall()
@@ -2025,6 +2042,9 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             "selected_status": status,
             "selected_date": selected_date,
             "availability_date": availability_date,
+            "previous_day_url": previous_day_url,
+            "today_day_url": today_day_url,
+            "next_day_url": next_day_url,
             "username": username,
             "role": role
         }

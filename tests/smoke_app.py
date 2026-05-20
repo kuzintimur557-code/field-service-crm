@@ -266,6 +266,10 @@ async def assert_calendar_access():
     assert "reschedule" in manager_html
     assert "quick-status" in manager_html
     assert "Свободные окна" in manager_html
+    assert "Предыдущий день" in manager_html
+    assert "Следующий день" in manager_html
+    assert "/calendar?date=2026-05-16&amp;worker=helper2&amp;status=" in manager_html
+    assert "/calendar?date=2026-05-18&amp;worker=helper2&amp;status=" in manager_html
     assert "Всего: 3" in manager_html
     assert "Свободно: 1" in manager_html
     assert "Занято: 2" in manager_html
