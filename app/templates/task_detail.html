@@ -434,7 +434,18 @@ button{
 	</div>
 
 	{% if task_custom_fields %}
+	{% set current_group = namespace(name="") %}
 	{% for field in task_custom_fields %}
+	{% set group_name = field["group_name"] or "Дополнительные поля" %}
+	{% if current_group.name != group_name %}
+	{% set current_group.name = group_name %}
+	<div class="info-row">
+	<div class="icon">▦</div>
+	<div class="label">{{ group_name }}</div>
+	<div class="value"></div>
+	<div></div>
+	</div>
+	{% endif %}
 	<div class="info-row">
 	<div class="icon">▦</div>
 	<div class="label">{{ field["label"] }}</div>

@@ -4461,7 +4461,7 @@ async def task_detail(request: Request, task_id: int):
     estimate_profit = sum(item["profit"] for item in task_items)
     task_workers = get_task_worker_names(task)
     task_custom_fields = c.execute("""
-    SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_field_values.value
+    SELECT custom_fields.id, custom_fields.label, custom_fields.group_name, custom_fields.field_type, custom_field_values.value
     FROM custom_fields
     LEFT JOIN custom_field_values
       ON custom_field_values.field_id=custom_fields.id

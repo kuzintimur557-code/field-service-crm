@@ -790,6 +790,11 @@ async def assert_task_custom_fields():
     ))
     field_id = c.lastrowid
     c.execute("""
+    UPDATE custom_fields
+    SET group_name=?
+    WHERE id=?
+    """, ("Маршрут", field_id))
+    c.execute("""
     INSERT INTO custom_fields (
         company_id, entity_type, label, field_type, is_required,
         active, sort_order, created_at
@@ -868,6 +873,7 @@ async def assert_task_custom_fields():
     )
     assert detail_response.status_code == 200
     detail_html = detail_response.body.decode("utf-8")
+    assert "Маршрут" in detail_html
     assert "Route" in detail_html
     assert "Moscow - Tula" in detail_html
     assert "Gate code" in detail_html
