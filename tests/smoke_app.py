@@ -544,6 +544,7 @@ async def assert_client_card(task):
     assert "Лента активности" in html
     assert "Smoke client timeline" in html
     assert "Timeline details" in html
+    assert "/calendar?date=2026-05-21" in html
     assert f"/create-task?client_id={task['client_id']}&return_to=client" in html
     assert f"#{task['id']}" in html
 
