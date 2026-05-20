@@ -1820,7 +1820,7 @@ async def overdue_page(request: Request):
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-async def calendar_page(request: Request, worker: str = "", month: str = ""):
+async def calendar_page(request: Request, worker: str = "", month: str = "", status: str = ""):
 
     username = get_user(request)
 
@@ -1858,10 +1858,13 @@ async def calendar_page(request: Request, worker: str = "", month: str = ""):
         WHERE role='worker' AND company_id=?
         ORDER BY username
         """, (company_id,)).fetchall()
+        worker_names = [w["username"] for w in workers]
 
-        if worker:
+        if worker and worker in worker_names:
             query += f" AND {worker_task_condition()}"
             params += worker_task_params(worker)
+        elif worker:
+            query += " AND 1=0"
 
         for worker_row in workers:
             worker_name = worker_row["username"]
@@ -1909,6 +1912,10 @@ async def calendar_page(request: Request, worker: str = "", month: str = ""):
         query += f" AND {worker_task_condition()}"
         params += worker_task_params(username)
 
+    if status in ("Новая", "В работе", "Завершено", "Отменено"):
+        query += " AND status=?"
+        params.append(status)
+
     query += " ORDER BY task_date ASC, id DESC"
 
     tasks = c.execute(query, params).fetchall()
@@ -1942,6 +1949,7 @@ async def calendar_page(request: Request, worker: str = "", month: str = ""):
             "worker_loads": worker_loads,
             "selected_worker": worker,
             "selected_month": month,
+            "selected_status": status,
             "username": username,
             "role": role
         }

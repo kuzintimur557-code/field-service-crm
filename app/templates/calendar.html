@@ -63,6 +63,16 @@ h1{font-size:32px;margin:0}
 	            {% endfor %}
 		        </select>
 		    </div>
+		    <div>
+		        <label>Статус</label>
+		        <select name="status">
+		            <option value="">Все статусы</option>
+		            <option value="Новая" {% if selected_status == "Новая" %}selected{% endif %}>Новая</option>
+		            <option value="В работе" {% if selected_status == "В работе" %}selected{% endif %}>В работе</option>
+		            <option value="Завершено" {% if selected_status == "Завершено" %}selected{% endif %}>Завершено</option>
+		            <option value="Отменено" {% if selected_status == "Отменено" %}selected{% endif %}>Отменено</option>
+		        </select>
+		    </div>
 		    <button type="submit">Показать</button>
 		    <a class="reset" href="/calendar">Сбросить</a>
 		</form>

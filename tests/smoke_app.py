@@ -251,12 +251,23 @@ async def assert_calendar_access():
         make_asgi_request("owner2"),
         worker="helper2",
         month="2026-05",
+        status="Новая",
     )
     assert manager_response.status_code == 200
     manager_html = manager_response.body.decode("utf-8")
     assert "Client 2" in manager_html
     assert "helper2" in manager_html
     assert "load-card" in manager_html
+    assert "Все статусы" in manager_html
+
+    invalid_worker_response = await crm.calendar_page(
+        make_asgi_request("owner2"),
+        worker="outsider_worker",
+        month="2026-05",
+        status="Новая",
+    )
+    assert invalid_worker_response.status_code == 200
+    assert "Client 2" not in invalid_worker_response.body.decode("utf-8")
 
     worker_response = await crm.calendar_page(
         make_asgi_request("helper2"),
