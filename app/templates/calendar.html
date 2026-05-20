@@ -43,6 +43,9 @@ h1{font-size:32px;margin:0}
 	.availability-pill{padding:7px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:900}
 	.availability-pill.free{background:#dcfce7;color:#166534}
 	.availability-pill.busy{background:#ffedd5;color:#9a3412}
+	.availability-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+	.availability-filter a{padding:8px 10px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+	.availability-filter a.active{background:#111827;color:white}
 	.availability-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 	.availability-card{padding:12px;border-radius:16px;background:#f9fafb;border:1px solid #e5e7eb}
 	.availability-card.free{background:#ecfdf5;border-color:#bbf7d0}
@@ -123,6 +126,11 @@ h1{font-size:32px;margin:0}
 		        <span class="availability-pill free">Свободно: {{ availability_summary["free"] }}</span>
 		        <span class="availability-pill busy">Занято: {{ availability_summary["busy"] }}</span>
 		    </div>
+		    <div class="availability-filter">
+		        <a href="/calendar?date={{ availability_date }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if not selected_availability %}active{% endif %}">Все</a>
+		        <a href="/calendar?date={{ availability_date }}&availability=free{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if selected_availability == 'free' %}active{% endif %}">Свободные</a>
+		        <a href="/calendar?date={{ availability_date }}&availability=busy{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if selected_availability == 'busy' %}active{% endif %}">Занятые</a>
+		    </div>
 		    <div class="availability-grid">
 		    {% for worker in worker_availability %}
 		        <div class="availability-card {% if worker['is_free'] %}free{% else %}busy{% endif %}">
@@ -186,7 +194,7 @@ h1{font-size:32px;margin:0}
 		        {% if role in ("boss", "manager") %}
 		        <form class="reschedule" method="post" action="/task/{{ task['id'] }}/date">
 		            <input type="date" name="task_date" value="{{ task['task_date'][:10] if task['task_date'] else '' }}">
-		            <input type="hidden" name="return_to" value="/calendar?month={{ selected_month }}{% if selected_date %}&date={{ selected_date }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">
+		            <input type="hidden" name="return_to" value="/calendar?month={{ selected_month }}{% if selected_date %}&date={{ selected_date }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_availability %}&availability={{ selected_availability }}{% endif %}">
 		            <button type="submit">Перенести</button>
 		        </form>
 		        <form class="reschedule quick-status" method="post" action="/task/{{ task['id'] }}/status">
@@ -196,7 +204,7 @@ h1{font-size:32px;margin:0}
 		                <option value="Завершено" {% if task["status"] == "Завершено" %}selected{% endif %}>Завершено</option>
 		                <option value="Отменено" {% if task["status"] == "Отменено" %}selected{% endif %}>Отменено</option>
 		            </select>
-		            <input type="hidden" name="return_to" value="/calendar?month={{ selected_month }}{% if selected_date %}&date={{ selected_date }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">
+		            <input type="hidden" name="return_to" value="/calendar?month={{ selected_month }}{% if selected_date %}&date={{ selected_date }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_availability %}&availability={{ selected_availability }}{% endif %}">
 		            <button type="submit">Статус</button>
 		        </form>
 		        {% endif %}

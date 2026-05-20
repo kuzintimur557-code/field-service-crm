@@ -1821,7 +1821,7 @@ async def overdue_page(request: Request):
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-async def calendar_page(request: Request, worker: str = "", month: str = "", status: str = "", date: str = ""):
+async def calendar_page(request: Request, worker: str = "", month: str = "", status: str = "", date: str = "", availability: str = ""):
 
     username = get_user(request)
 
@@ -1847,6 +1847,7 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
         "free": 0,
         "busy": 0
     }
+    selected_availability = availability if availability in ("free", "busy") else ""
     selected_date = str(date or "").strip()
 
     try:
@@ -1967,6 +1968,11 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             "free": sum(1 for item in worker_availability if item["is_free"]),
             "busy": sum(1 for item in worker_availability if not item["is_free"])
         }
+
+        if selected_availability == "free":
+            worker_availability = [item for item in worker_availability if item["is_free"]]
+        elif selected_availability == "busy":
+            worker_availability = [item for item in worker_availability if not item["is_free"]]
     else:
         worker = ""
         query += f" AND {worker_task_condition()}"
@@ -1986,6 +1992,9 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
 
         if status in ("Новая", "В работе", "Завершено", "Отменено"):
             day_params["status"] = status
+
+        if selected_availability:
+            day_params["availability"] = selected_availability
 
         return f"/calendar?{urlencode(day_params)}"
 
@@ -2040,6 +2049,7 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             "selected_worker": worker,
             "selected_month": month,
             "selected_status": status,
+            "selected_availability": selected_availability,
             "selected_date": selected_date,
             "availability_date": availability_date,
             "previous_day_url": previous_day_url,

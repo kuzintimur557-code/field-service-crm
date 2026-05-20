@@ -266,6 +266,9 @@ async def assert_calendar_access():
     assert "reschedule" in manager_html
     assert "quick-status" in manager_html
     assert "Свободные окна" in manager_html
+    assert "availability-filter" in manager_html
+    assert "Свободные" in manager_html
+    assert "Занятые" in manager_html
     assert "Предыдущий день" in manager_html
     assert "Следующий день" in manager_html
     assert "/calendar?date=2026-05-16&amp;worker=helper2&amp;status=" in manager_html
@@ -279,6 +282,17 @@ async def assert_calendar_access():
     assert "Свободен" in manager_html
     assert "Занят: 1 активных заявок" in manager_html
     assert "Рекомендован" in manager_html
+
+    free_response = await crm.calendar_page(
+        make_asgi_request("owner2"),
+        date="2026-05-17",
+        availability="free",
+    )
+    assert free_response.status_code == 200
+    free_html = free_response.body.decode("utf-8")
+    assert "free2" in free_html
+    assert "Занят: 1 активных заявок" not in free_html
+    assert "/calendar?date=2026-05-18&amp;availability=free" in free_html
 
     conn = connect()
     c = conn.cursor()
