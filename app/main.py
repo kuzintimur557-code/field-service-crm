@@ -4587,7 +4587,7 @@ async def logout():
 
 
 @app.get("/create-task", response_class=HTMLResponse)
-async def create_task_page(request: Request, task_date: str = "", worker: str = "", return_to: str = ""):
+async def create_task_page(request: Request, task_date: str = "", worker: str = "", return_to: str = "", client_id: int = 0):
 
     username = get_user(request)
 
@@ -4627,6 +4627,7 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
     selected_worker_active_count = 0
     selected_worker_active_tasks = []
     recommended_worker = None
+    selected_client = None
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
@@ -4690,6 +4691,13 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
     ORDER BY name
     """, (company_id,)).fetchall()
 
+    if client_id:
+        selected_client = c.execute("""
+        SELECT *
+        FROM clients
+        WHERE id=? AND company_id=?
+        """, (client_id, company_id)).fetchone()
+
     custom_fields = c.execute("""
     SELECT *
     FROM custom_fields
@@ -4709,6 +4717,7 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
             "workers": workers,
             "clients": clients,
             "custom_fields": custom_fields,
+            "selected_client": selected_client,
             "selected_task_date": selected_task_date,
             "selected_workers": selected_workers,
             "selected_return_to": selected_return_to,

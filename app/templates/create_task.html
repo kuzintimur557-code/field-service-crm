@@ -65,14 +65,17 @@ button:hover{background:#1d4ed8}
 {% if selected_return_to %}
 <input type="hidden" name="return_to" value="{{ selected_return_to }}">
 {% endif %}
+{% if selected_client %}
+<input type="hidden" name="client_id" value="{{ selected_client['id'] }}">
+{% endif %}
 
 <label>Клиент</label>
-<input name="client" placeholder="Имя клиента" required>
+<input name="client" placeholder="Имя клиента" value="{{ selected_client['name'] if selected_client else '' }}" required>
 
 <div class="grid">
 <div>
 <label>Телефон</label>
-<input name="phone" placeholder="+1 555 000 0000">
+<input name="phone" placeholder="+1 555 000 0000" value="{{ selected_client['phone'] if selected_client else '' }}">
 </div>
 
 <div>
@@ -82,7 +85,7 @@ button:hover{background:#1d4ed8}
 </div>
 
 <label>Адрес</label>
-<input name="address" placeholder="Адрес объекта">
+<input name="address" placeholder="Адрес объекта" value="{{ selected_client['address'] if selected_client else '' }}">
 
 <label>Описание</label>
 <textarea name="description" placeholder="Что нужно сделать"></textarea>

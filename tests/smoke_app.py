@@ -537,7 +537,19 @@ async def assert_client_card(task):
     assert "Лента активности" in html
     assert "Smoke client timeline" in html
     assert "Timeline details" in html
+    assert f"/create-task?client_id={task['client_id']}" in html
     assert f"#{task['id']}" in html
+
+    create_response = await crm.create_task_page(
+        make_asgi_request("owner2", "/create-task"),
+        client_id=task["client_id"],
+    )
+    assert create_response.status_code == 200
+    create_html = create_response.body.decode("utf-8")
+    assert f'name="client_id" value="{task["client_id"]}"' in create_html
+    assert 'name="client" placeholder="Имя клиента" value="Client 2"' in create_html
+    assert 'name="phone" placeholder="+1 555 000 0000" value="+70000000000"' in create_html
+    assert 'name="address" placeholder="Адрес объекта" value="Company 2 address"' in create_html
 
 
 async def assert_overdue_sla(task):
