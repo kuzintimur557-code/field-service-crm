@@ -1493,6 +1493,34 @@ async def sla_page(request: Request, filter: str = ""):
     ORDER BY deadline_at ASC
     """, (company_id,)).fetchall()
 
+    all_sla_tasks = list(tasks)
+    sla_overdue_count = len([
+        t for t in all_sla_tasks
+        if t["status"] != "Завершено"
+        and t["deadline_at"] < now_value
+    ])
+    sla_due_soon_count = len([
+        t for t in all_sla_tasks
+        if t["status"] != "Завершено"
+        and now_value <= t["deadline_at"] <= soon_value
+    ])
+    sla_done_count = len([
+        t for t in all_sla_tasks
+        if t["status"] == "Завершено"
+    ])
+    sla_active_count = len([
+        t for t in all_sla_tasks
+        if t["status"] != "Завершено"
+        and t["deadline_at"] >= now_value
+    ])
+    sla_stats = {
+        "total": len(all_sla_tasks),
+        "overdue": sla_overdue_count,
+        "soon": sla_due_soon_count,
+        "active": sla_active_count,
+        "done": sla_done_count
+    }
+
     if filter == "overdue":
         tasks = [
             t for t in tasks
@@ -1530,6 +1558,7 @@ async def sla_page(request: Request, filter: str = ""):
             "username": username,
             "role": role,
             "tasks": tasks,
+            "sla_stats": sla_stats,
             "now_value": now_value,
             "soon_value": soon_value,
             "selected_filter": filter

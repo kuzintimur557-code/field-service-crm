@@ -453,6 +453,8 @@ async def assert_overdue_sla(task):
     )
     assert sla_response.status_code == 200
     sla_html = sla_response.body.decode("utf-8")
+    assert "Всего SLA" in sla_html
+    assert "Просрочено" in sla_html
     assert "Просроченные" in sla_html
     assert f"#{task['id']}" in sla_html
 
