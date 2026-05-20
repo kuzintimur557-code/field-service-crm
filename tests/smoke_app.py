@@ -125,6 +125,7 @@ def seed_data():
         ("manager2", "x", "manager", 2, ""),
         ("worker2", "x", "worker", 2, "chat-worker2"),
         ("helper2", "x", "worker", 2, "chat-helper2"),
+        ("free2", "x", "worker", 2, ""),
         ("outsider_worker", "x", "worker", 1, "chat-outsider"),
     ]
 
@@ -251,6 +252,7 @@ async def assert_calendar_access():
         make_asgi_request("owner2"),
         worker="helper2",
         month="2026-05",
+        date="2026-05-17",
         status="Новая",
     )
     assert manager_response.status_code == 200
@@ -262,6 +264,10 @@ async def assert_calendar_access():
     assert "day-count" in manager_html
     assert "day-statuses" in manager_html
     assert "reschedule" in manager_html
+    assert "Свободные окна" in manager_html
+    assert "free2" in manager_html
+    assert "Свободен" in manager_html
+    assert "Занят: 1 активных заявок" in manager_html
 
     conn = connect()
     c = conn.cursor()

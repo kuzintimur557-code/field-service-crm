@@ -1820,7 +1820,7 @@ async def overdue_page(request: Request):
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-async def calendar_page(request: Request, worker: str = "", month: str = "", status: str = ""):
+async def calendar_page(request: Request, worker: str = "", month: str = "", status: str = "", date: str = ""):
 
     username = get_user(request)
 
@@ -1840,6 +1840,17 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
 
     workers = []
     worker_loads = []
+    worker_availability = []
+    selected_date = str(date or "").strip()
+
+    try:
+        if selected_date:
+            datetime.strptime(selected_date, "%Y-%m-%d")
+    except Exception:
+        selected_date = ""
+
+    availability_date = selected_date or datetime.now().strftime("%Y-%m-%d")
+
     query = """
     SELECT *
     FROM tasks
@@ -1850,6 +1861,10 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
     if month:
         query += " AND task_date LIKE ?"
         params.append(f"{month}%")
+
+    if selected_date:
+        query += " AND task_date LIKE ?"
+        params.append(f"{selected_date}%")
 
     if role in ("boss", "manager"):
         workers = c.execute("""
@@ -1907,6 +1922,30 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
                 "active": active,
                 "completed": completed
             })
+
+        worker_name_set = set(worker_names)
+        busy_counts = {worker_name: 0 for worker_name in worker_names}
+        availability_rows = c.execute("""
+        SELECT worker, workers
+        FROM tasks
+        WHERE archived=0
+          AND company_id=?
+          AND task_date LIKE ?
+          AND status NOT IN ('Завершено', 'Отменено')
+        """, (company_id, f"{availability_date}%")).fetchall()
+
+        for availability_task in availability_rows:
+            for worker_name in get_task_worker_names(availability_task):
+                if worker_name in worker_name_set:
+                    busy_counts[worker_name] += 1
+
+        for worker_name in worker_names:
+            active_count = busy_counts.get(worker_name, 0)
+            worker_availability.append({
+                "username": worker_name,
+                "active_count": active_count,
+                "is_free": active_count == 0
+            })
     else:
         worker = ""
         query += f" AND {worker_task_condition()}"
@@ -1958,9 +1997,12 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             "calendar_days": calendar_days,
             "workers": workers,
             "worker_loads": worker_loads,
+            "worker_availability": worker_availability,
             "selected_worker": worker,
             "selected_month": month,
             "selected_status": status,
+            "selected_date": selected_date,
+            "availability_date": availability_date,
             "username": username,
             "role": role
         }
