@@ -2608,7 +2608,7 @@ async def create_custom_field(request: Request):
         sort_order,
         created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         entity_type,
