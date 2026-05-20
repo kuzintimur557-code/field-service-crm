@@ -1026,6 +1026,8 @@ async def assert_task_custom_fields():
     assert 'value="worker2" style="width:auto" checked' in page_html
     assert 'name="return_to" value="calendar"' in page_html
     assert "уже есть активные заявки" in page_html
+    assert "/task/" in page_html
+    assert "Client 2 / Новая" in page_html
     assert "Альтернатива: free2" in page_html
     assert "free2 свободен" in page_html
     assert "Выбрать альтернативу" in page_html
