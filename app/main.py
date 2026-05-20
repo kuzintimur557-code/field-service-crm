@@ -1383,6 +1383,50 @@ async def workload_page(request: Request):
     )
 
 
+@app.get("/sla", response_class=HTMLResponse)
+async def sla_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND deadline_at IS NOT NULL
+      AND deadline_at!=''
+    ORDER BY deadline_at ASC
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "sla.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "tasks": tasks,
+            "now_value": now_value
+        }
+    )
+
+
 @app.get("/today", response_class=HTMLResponse)
 async def today_page(request: Request):
 
@@ -1828,9 +1872,10 @@ async def generate_recurring_task(request: Request, job_id: int):
         status,
         report,
         after_photo,
-        created_at
+        created_at,
+        deadline_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         job["client_id"],
@@ -1847,7 +1892,8 @@ async def generate_recurring_task(request: Request, job_id: int):
         "Новая",
         "",
         "",
-        datetime.now().strftime("%Y-%m-%d %H:%M")
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ""
     ))
 
     task_id = c.lastrowid
@@ -4204,6 +4250,7 @@ async def create_task(
     address = form.get("address")
     description = form.get("description")
     task_date = form.get("task_date")
+    deadline_at = (form.get("deadline_at") or "").strip()
     selected_workers = form.getlist("workers")
     priority = form.get("priority")
     price = form.get("price")
@@ -4459,6 +4506,18 @@ async def task_detail(request: Request, task_id: int):
 
     estimate_total = sum(item["total"] for item in task_items)
     estimate_profit = sum(item["profit"] for item in task_items)
+
+    sla_status = "none"
+
+    if task["deadline_at"]:
+        now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+
+        if task["status"] != "Завершено" and task["deadline_at"] < now_value:
+            sla_status = "overdue"
+        elif task["status"] != "Завершено":
+            sla_status = "active"
+        else:
+            sla_status = "done"
     task_workers = get_task_worker_names(task)
     task_custom_fields = c.execute("""
     SELECT custom_fields.id, custom_fields.label, custom_fields.group_name, custom_fields.field_type, custom_field_values.value
@@ -4486,13 +4545,15 @@ async def task_detail(request: Request, task_id: int):
             "role": role,
             "comments": comments,
             "activity": activity,
+            "activities": activity,
             "linked_client": linked_client,
             "task_items": task_items,
             "catalog_items": catalog_items,
             "estimate_total": estimate_total,
             "estimate_profit": estimate_profit,
             "task_workers": task_workers,
-            "task_custom_fields": task_custom_fields
+            "task_custom_fields": task_custom_fields,
+            "sla_status": sla_status
         }
     )
 
@@ -5207,6 +5268,68 @@ async def update_task_custom_field(request: Request, task_id: int):
         role,
         "Изменено доп. поле",
         f"{custom_field['label']}: {value}",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
+@app.post("/task/{task_id}/deadline")
+async def update_task_deadline(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    form = await request.form()
+    deadline_at = (form.get("deadline_at") or "").strip()
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=? AND company_id=?
+    """, (task_id, company_id)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    c.execute("""
+    UPDATE tasks
+    SET deadline_at=?
+    WHERE id=? AND company_id=?
+    """, (deadline_at, task_id, company_id))
+
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Изменён deadline",
+        deadline_at or "Deadline очищен",
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
