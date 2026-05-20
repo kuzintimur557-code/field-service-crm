@@ -20,8 +20,9 @@ h1{font-size:32px;margin:0}
 		.task{padding:14px;border-radius:16px;background:#f9fafb;margin-bottom:10px;border-left:6px solid #2563eb}
 		.task a{text-decoration:none;color:#111827;font-weight:900}
 		.reschedule{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-		.reschedule input{padding:9px;border-radius:12px;border:1px solid #d1d5db}
+		.reschedule input,.reschedule select{padding:9px;border-radius:12px;border:1px solid #d1d5db;background:white}
 		.reschedule button{padding:9px 12px;border:0;border-radius:12px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+		.quick-status button{background:#111827}
 		.meta{margin-top:6px;color:#4b5563}
 		.badge{display:inline-block;margin-top:8px;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800}
 		.day-statuses{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
@@ -180,6 +181,16 @@ h1{font-size:32px;margin:0}
 		            <input type="date" name="task_date" value="{{ task['task_date'][:10] if task['task_date'] else '' }}">
 		            <input type="hidden" name="return_to" value="/calendar?month={{ selected_month }}{% if selected_date %}&date={{ selected_date }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">
 		            <button type="submit">Перенести</button>
+		        </form>
+		        <form class="reschedule quick-status" method="post" action="/task/{{ task['id'] }}/status">
+		            <select name="status">
+		                <option value="Новая" {% if task["status"] == "Новая" %}selected{% endif %}>Новая</option>
+		                <option value="В работе" {% if task["status"] == "В работе" %}selected{% endif %}>В работе</option>
+		                <option value="Завершено" {% if task["status"] == "Завершено" %}selected{% endif %}>Завершено</option>
+		                <option value="Отменено" {% if task["status"] == "Отменено" %}selected{% endif %}>Отменено</option>
+		            </select>
+		            <input type="hidden" name="return_to" value="/calendar?month={{ selected_month }}{% if selected_date %}&date={{ selected_date }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">
+		            <button type="submit">Статус</button>
 		        </form>
 		        {% endif %}
 		    </div>

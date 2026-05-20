@@ -5887,7 +5887,16 @@ async def update_task_status(request: Request, task_id: int):
     role = get_role(username)
 
     form = await request.form()
-    new_status = form.get("status")
+    new_status = (form.get("status") or "").strip()
+    return_to = (form.get("return_to") or "").strip()
+
+    allowed_statuses = ("Новая", "В работе", "Завершено", "Отменено")
+
+    if new_status not in allowed_statuses:
+        if return_to.startswith("/calendar"):
+            return RedirectResponse(return_to, status_code=302)
+
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
 
     conn = connect()
     c = conn.cursor()
@@ -5952,6 +5961,9 @@ async def update_task_status(request: Request, task_id: int):
             )
         except Exception:
             pass
+
+    if return_to.startswith("/calendar"):
+        return RedirectResponse(return_to, status_code=302)
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
