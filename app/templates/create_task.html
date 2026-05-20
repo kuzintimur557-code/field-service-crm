@@ -45,6 +45,9 @@ button:hover{background:#1d4ed8}
 	{% endif %}
 
 	<form method="post" action="/create-task" enctype="multipart/form-data">
+{% if selected_return_to %}
+<input type="hidden" name="return_to" value="{{ selected_return_to }}">
+{% endif %}
 
 <label>Клиент</label>
 <input name="client" placeholder="Имя клиента" required>

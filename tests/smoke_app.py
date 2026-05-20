@@ -268,7 +268,7 @@ async def assert_calendar_access():
     assert "Всего: 3" in manager_html
     assert "Свободно: 1" in manager_html
     assert "Занято: 2" in manager_html
-    assert "/create-task?task_date=2026-05-17" in manager_html
+    assert "/create-task?task_date=2026-05-17&return_to=calendar" in manager_html
     assert "/create-task?task_date=2026-05-17&worker=free2" in manager_html
     assert "free2" in manager_html
     assert "Свободен" in manager_html
@@ -976,6 +976,7 @@ async def assert_task_custom_fields():
         make_asgi_request("owner2", "/create-task"),
         task_date="2026-05-20",
         worker="worker2",
+        return_to="calendar",
     )
     assert page_response.status_code == 200
     page_html = page_response.body.decode("utf-8")
@@ -983,6 +984,7 @@ async def assert_task_custom_fields():
     assert f"custom_field_{field_id}" in page_html
     assert 'name="task_date" type="date" value="2026-05-20"' in page_html
     assert 'value="worker2" style="width:auto" checked' in page_html
+    assert 'name="return_to" value="calendar"' in page_html
 
     original_send_message = crm.send_message
     original_send_message_to_chat = crm.send_message_to_chat
@@ -1001,6 +1003,7 @@ async def assert_task_custom_fields():
                     "description": "Custom task",
                     "task_date": "2026-05-20",
                     "workers": ["worker2"],
+                    "return_to": "calendar",
                     "priority": "Обычный",
                     "price": "500",
                     f"custom_field_{field_id}": "Moscow - Tula",
@@ -1013,7 +1016,7 @@ async def assert_task_custom_fields():
         crm.send_message_to_chat = original_send_message_to_chat
 
     assert response.status_code == 302
-    assert response.headers["location"] == "/"
+    assert response.headers["location"] == "/calendar?date=2026-05-20&worker=worker2"
 
     conn = connect()
     c = conn.cursor()

@@ -4542,7 +4542,7 @@ async def logout():
 
 
 @app.get("/create-task", response_class=HTMLResponse)
-async def create_task_page(request: Request, task_date: str = "", worker: str = ""):
+async def create_task_page(request: Request, task_date: str = "", worker: str = "", return_to: str = ""):
 
     username = get_user(request)
 
@@ -4578,6 +4578,7 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
     worker_names = [row["username"] for row in workers]
     selected_workers = []
     selected_worker = str(worker or "").strip()
+    selected_return_to = "calendar" if return_to == "calendar" else ""
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
@@ -4609,7 +4610,8 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
             "clients": clients,
             "custom_fields": custom_fields,
             "selected_task_date": selected_task_date,
-            "selected_workers": selected_workers
+            "selected_workers": selected_workers,
+            "selected_return_to": selected_return_to
         }
     )
 
@@ -4641,6 +4643,7 @@ async def create_task(
     task_date = form.get("task_date")
     deadline_at = (form.get("deadline_at") or "").strip()
     selected_workers = form.getlist("workers")
+    return_to = (form.get("return_to") or "").strip()
     priority = form.get("priority")
     price = form.get("price")
     company_id = get_user_company_id(username)
@@ -4826,6 +4829,21 @@ async def create_task(
             )
     except Exception as e:
         print("Telegram notification error:", e)
+
+    if return_to == "calendar":
+        calendar_date = str(task_date or "")[:10]
+
+        try:
+            datetime.strptime(calendar_date, "%Y-%m-%d")
+        except Exception:
+            calendar_date = datetime.now().strftime("%Y-%m-%d")
+
+        calendar_url = f"/calendar?date={calendar_date}"
+
+        if worker:
+            calendar_url += f"&worker={worker}"
+
+        return RedirectResponse(calendar_url, status_code=302)
 
     return RedirectResponse("/", status_code=302)
 

@@ -108,7 +108,7 @@ h1{font-size:32px;margin:0}
 		<div class="availability">
 		    <div class="availability-title">
 		        <span>Свободные окна</span>
-		        <a class="availability-action" href="/create-task?task_date={{ availability_date }}">Создать на {{ availability_date }}</a>
+		        <a class="availability-action" href="/create-task?task_date={{ availability_date }}&return_to=calendar">Создать на {{ availability_date }}</a>
 		    </div>
 		    <div class="availability-summary">
 		        <span class="availability-pill">Всего: {{ availability_summary["total"] }}</span>
@@ -131,7 +131,7 @@ h1{font-size:32px;margin:0}
 		                    Занят: {{ worker["active_count"] }} активных заявок
 		                {% endif %}
 		            </div>
-		            <a class="worker-task-link" href="/create-task?task_date={{ availability_date }}&worker={{ worker['username'] }}">Создать</a>
+		            <a class="worker-task-link" href="/create-task?task_date={{ availability_date }}&worker={{ worker['username'] }}&return_to=calendar">Создать</a>
 		        </div>
 		    {% endfor %}
 		    </div>
