@@ -35,6 +35,7 @@ h1{font-size:32px;margin:0}
 	.reset{display:inline-flex;align-items:center;padding:12px 14px;border-radius:14px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-weight:900}
 	.availability{background:white;border-radius:20px;padding:16px;margin-bottom:18px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
 	.availability-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;font-weight:900}
+	.availability-action{padding:8px 10px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
 	.availability-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 	.availability-pill{padding:7px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:900}
 	.availability-pill.free{background:#dcfce7;color:#166534}
@@ -106,7 +107,7 @@ h1{font-size:32px;margin:0}
 		<div class="availability">
 		    <div class="availability-title">
 		        <span>Свободные окна</span>
-		        <span>{{ availability_date }}</span>
+		        <a class="availability-action" href="/create-task?task_date={{ availability_date }}">Создать на {{ availability_date }}</a>
 		    </div>
 		    <div class="availability-summary">
 		        <span class="availability-pill">Всего: {{ availability_summary["total"] }}</span>

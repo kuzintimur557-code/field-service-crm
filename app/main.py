@@ -4542,7 +4542,7 @@ async def logout():
 
 
 @app.get("/create-task", response_class=HTMLResponse)
-async def create_task_page(request: Request):
+async def create_task_page(request: Request, task_date: str = ""):
 
     username = get_user(request)
 
@@ -4559,6 +4559,13 @@ async def create_task_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    selected_task_date = str(task_date or "").strip()
+
+    try:
+        if selected_task_date:
+            datetime.strptime(selected_task_date, "%Y-%m-%d")
+    except Exception:
+        selected_task_date = ""
 
     conn = connect()
     c = conn.cursor()
@@ -4594,7 +4601,8 @@ async def create_task_page(request: Request):
             "username": username,
             "workers": workers,
             "clients": clients,
-            "custom_fields": custom_fields
+            "custom_fields": custom_fields,
+            "selected_task_date": selected_task_date
         }
     )
 
