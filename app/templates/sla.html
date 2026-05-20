@@ -16,6 +16,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 h1{margin:0 0 8px;font-size:34px}
 .meta{color:#6b7280;font-weight:800}
 .task{background:#f9fafb;padding:18px;border-radius:20px;margin-bottom:12px}
+.worker-row{display:grid;grid-template-columns:1.2fr repeat(4,.7fr);gap:10px;align-items:center;background:#f9fafb;padding:14px;border-radius:16px;margin-bottom:10px;font-weight:900}
 .title{font-size:22px;font-weight:900}
 .info{margin-top:10px;color:#374151;font-weight:800;line-height:1.5}
 .badge{display:inline-block;margin-top:8px;padding:8px 12px;border-radius:999px;font-weight:900}
@@ -88,10 +89,27 @@ h1{margin:0 0 8px;font-size:34px}
     <a href="/sla?filter=done" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">Выполненные</div>
         <div class="stat-value">{{ sla_stats["done"] }}</div>
-    </a>
-</div>
+	    </a>
+	</div>
 
-<form method="get" action="/sla" class="card">
+	<div class="card">
+	<h2 style="margin:0 0 14px">SLA по исполнителям</h2>
+	{% if worker_sla_stats %}
+	{% for row in worker_sla_stats %}
+	<div class="worker-row">
+	    <div>{{ row["username"] }}</div>
+	    <div>Всего: {{ row["total"] }}</div>
+	    <div>Просрочено: {{ row["overdue"] }}</div>
+	    <div>Горит: {{ row["soon"] }}</div>
+	    <div>Выполнено: {{ row["done"] }}</div>
+	</div>
+	{% endfor %}
+	{% else %}
+	<div class="meta">Исполнителей пока нет</div>
+	{% endif %}
+	</div>
+
+	<form method="get" action="/sla" class="card">
     <input type="hidden" name="filter" value="{{ selected_filter }}">
     <label style="display:block;font-weight:900;margin-bottom:8px">Исполнитель</label>
     <select name="worker" style="width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db">

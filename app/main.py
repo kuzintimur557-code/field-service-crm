@@ -1636,6 +1636,32 @@ async def sla_page(request: Request, filter: str = "", worker: str = ""):
         "active": sla_active_count,
         "done": sla_done_count
     }
+    worker_sla_stats = []
+
+    for worker_row in workers:
+        worker_name = worker_row["username"]
+        worker_tasks = [
+            t for t in all_sla_tasks
+            if can_access_task(worker_name, "worker", t)
+        ]
+        worker_sla_stats.append({
+            "username": worker_name,
+            "total": len(worker_tasks),
+            "overdue": len([
+                t for t in worker_tasks
+                if t["status"] != "Завершено"
+                and t["deadline_at"] < now_value
+            ]),
+            "soon": len([
+                t for t in worker_tasks
+                if t["status"] != "Завершено"
+                and now_value <= t["deadline_at"] <= soon_value
+            ]),
+            "done": len([
+                t for t in worker_tasks
+                if t["status"] == "Завершено"
+            ])
+        })
 
     if filter == "overdue":
         tasks = [
@@ -1683,6 +1709,7 @@ async def sla_page(request: Request, filter: str = "", worker: str = ""):
             "role": role,
             "tasks": tasks,
             "sla_stats": sla_stats,
+            "worker_sla_stats": worker_sla_stats,
             "workers": workers,
             "now_value": now_value,
             "soon_value": soon_value,

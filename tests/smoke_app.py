@@ -457,6 +457,8 @@ async def assert_overdue_sla(task):
     assert "Просрочено" in sla_html
     assert "Просроченные" in sla_html
     assert "Все исполнители" in sla_html
+    assert "SLA по исполнителям" in sla_html
+    assert "helper2" in sla_html
     assert f"#{task['id']}" in sla_html
 
     worker_sla_response = await crm.sla_page(
