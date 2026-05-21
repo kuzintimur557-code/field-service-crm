@@ -555,6 +555,8 @@ async def assert_finance_margin(task):
     assert "Осталось выплатить" in payroll_html
     assert "Не выплачено" in payroll_html
     assert "Выплатил" in payroll_html
+    assert "Журнал выплат" in payroll_html
+    assert "За месяц выплат ещё нет" in payroll_html
     assert 'name="amount" min="0" step="0.1" value="79.0"' in payroll_html
     assert "payout_filter=paid" in payroll_html
     assert "payout_filter=unpaid" in payroll_html
@@ -605,6 +607,8 @@ async def assert_finance_margin(task):
     assert "Выплачено" in paid_payroll_html
     assert "Сумма: 70.0 ₽" in paid_payroll_html
     assert "Кем: owner2" in paid_payroll_html
+    assert "Журнал выплат" in paid_payroll_html
+    assert "70.0 ₽" in paid_payroll_html
     assert "Отменить" in paid_payroll_html
 
     paid_filter_response = await crm.payroll_page(
@@ -625,7 +629,7 @@ async def assert_finance_margin(task):
     )
     assert unpaid_after_paid_response.status_code == 200
     unpaid_after_paid_html = unpaid_after_paid_response.body.decode("utf-8")
-    assert "helper2" not in unpaid_after_paid_html
+    assert "Нет исполнителей" in unpaid_after_paid_html
 
     payroll_export_response = await crm.payroll_export(
         make_request("owner2"),

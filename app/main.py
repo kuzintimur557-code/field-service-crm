@@ -2834,6 +2834,30 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         payout["worker_id"]: payout
         for payout in paid_payouts
     }
+    payout_history_rows = c.execute("""
+    SELECT
+        p.worker_id,
+        p.amount,
+        p.paid_at,
+        p.paid_by,
+        u.username,
+        u.full_name
+    FROM payroll_payouts p
+    JOIN users u ON u.id=p.worker_id
+    WHERE p.company_id=? AND p.month=? AND p.status='paid'
+    ORDER BY p.paid_at DESC
+    """, (company_id, month)).fetchall()
+    payout_history = [
+        {
+            "worker_id": row["worker_id"],
+            "worker_name": row["full_name"] or row["username"],
+            "worker_username": row["username"],
+            "amount": round(float(row["amount"] or 0), 1),
+            "paid_at": row["paid_at"],
+            "paid_by": row["paid_by"]
+        }
+        for row in payout_history_rows
+    ]
 
     payroll_rows = {
         worker["username"]: {
@@ -2934,7 +2958,8 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
             "total_payout": total_payout,
             "total_paid": total_paid,
             "total_due": total_due,
-            "total_profit": total_profit
+            "total_profit": total_profit,
+            "payout_history": payout_history
         }
     )
 
