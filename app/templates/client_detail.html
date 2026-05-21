@@ -194,7 +194,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	            {{ latest_task["task_date"] or "Без даты" }} / {{ latest_task["status"] }} / {{ latest_task["worker"] or "Не назначен" }}
 	        </div>
 	    </div>
-	    <a class="btn" href="/task/{{ latest_task['id'] }}">Открыть</a>
+	    <div class="task-actions">
+	        <a class="btn" href="/task/{{ latest_task['id'] }}">Открыть</a>
+	        <a class="btn" style="background:#111827" href="/create-task?client_id={{ client['id'] }}&source_task_id={{ latest_task['id'] }}&return_to=client">Повторить</a>
+	    </div>
 	</div>
 	{% endif %}
 

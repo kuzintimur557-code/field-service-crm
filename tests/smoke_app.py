@@ -581,6 +581,7 @@ async def assert_client_card(task):
     assert "Timeline details" in html
     assert "/calendar?date=2026-05-21" in html
     assert f"/create-task?client_id={task['client_id']}&return_to=client" in html
+    assert f"/create-task?client_id={task['client_id']}&source_task_id={task['id']}&return_to=client" in html
     assert f"#{task['id']}" in html
 
     create_response = await crm.create_task_page(
@@ -595,6 +596,18 @@ async def assert_client_card(task):
     assert 'name="client" placeholder="Имя клиента" value="Client 2"' in create_html
     assert 'name="phone" placeholder="+1 555 000 0000" value="+70000000000"' in create_html
     assert 'name="address" placeholder="Адрес объекта" value="Company 2 address"' in create_html
+
+    repeat_response = await crm.create_task_page(
+        make_asgi_request("owner2", "/create-task"),
+        client_id=task["client_id"],
+        source_task_id=task["id"],
+        return_to="client",
+    )
+    assert repeat_response.status_code == 200
+    repeat_html = repeat_response.body.decode("utf-8")
+    assert f'name="source_task_id" value="{task["id"]}"' in repeat_html
+    assert "Smoke task</textarea>" in repeat_html
+    assert 'value="worker2" style="width:auto" checked' in repeat_html
 
     conn = connect()
     c = conn.cursor()

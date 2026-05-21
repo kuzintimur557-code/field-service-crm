@@ -4728,7 +4728,8 @@ async def create_task_page(
     worker: str = "",
     return_to: str = "",
     client_id: int = 0,
-    note_id: int = 0
+    note_id: int = 0,
+    source_task_id: int = 0
 ):
 
     username = get_user(request)
@@ -4770,8 +4771,10 @@ async def create_task_page(
     selected_worker_active_tasks = []
     recommended_worker = None
     selected_client = None
+    selected_address = ""
     selected_description = ""
     selected_note_id = 0
+    selected_source_task_id = 0
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
@@ -4826,6 +4829,12 @@ async def create_task_page(
                     if selected_return_to:
                         switch_params["return_to"] = selected_return_to
 
+                    if client_id:
+                        switch_params["client_id"] = client_id
+
+                    if source_task_id:
+                        switch_params["source_task_id"] = source_task_id
+
                     recommended_worker["switch_url"] = f"/create-task?{urlencode(switch_params)}"
 
     clients = c.execute("""
@@ -4841,6 +4850,29 @@ async def create_task_page(
         FROM clients
         WHERE id=? AND company_id=?
         """, (client_id, company_id)).fetchone()
+
+        if selected_client:
+            selected_address = selected_client["address"] or ""
+
+        if selected_client and source_task_id:
+            source_task = c.execute("""
+            SELECT *
+            FROM tasks
+            WHERE id=?
+              AND client_id=?
+              AND company_id=?
+            """, (source_task_id, client_id, company_id)).fetchone()
+
+            if source_task:
+                selected_address = source_task["address"] or selected_address
+                selected_description = source_task["description"] or ""
+                selected_source_task_id = source_task_id
+
+                if not selected_workers:
+                    selected_workers = [
+                        worker_name for worker_name in get_task_worker_names(source_task)
+                        if worker_name in worker_names
+                    ]
 
         if selected_client and note_id:
             selected_note = c.execute("""
@@ -4875,8 +4907,10 @@ async def create_task_page(
             "clients": clients,
             "custom_fields": custom_fields,
             "selected_client": selected_client,
+            "selected_address": selected_address,
             "selected_description": selected_description,
             "selected_note_id": selected_note_id,
+            "selected_source_task_id": selected_source_task_id,
             "selected_task_date": selected_task_date,
             "selected_workers": selected_workers,
             "selected_return_to": selected_return_to,
@@ -4916,6 +4950,7 @@ async def create_task(
     selected_workers = form.getlist("workers")
     return_to = (form.get("return_to") or "").strip()
     note_id = (form.get("note_id") or "").strip()
+    source_task_id = (form.get("source_task_id") or "").strip()
     priority = form.get("priority")
     price = form.get("price")
     company_id = get_user_company_id(username)
@@ -4973,10 +5008,23 @@ async def create_task(
                     if note:
                         error_params["note_id"] = note_id
 
+                if source_task_id.isdigit():
+                    source_task = c.execute("""
+                    SELECT id
+                    FROM tasks
+                    WHERE id=?
+                      AND client_id=?
+                      AND company_id=?
+                    """, (int(source_task_id), client_id, company_id)).fetchone()
+
+                    if source_task:
+                        error_params["source_task_id"] = source_task_id
+
             conn.close()
             return RedirectResponse(f"/create-task?{urlencode(error_params)}", status_code=302)
 
     if client_id:
+        submitted_address = (address or "").strip()
         existing_client = c.execute("""
         SELECT *
         FROM clients
@@ -4986,7 +5034,7 @@ async def create_task(
         if existing_client:
             client = existing_client["name"]
             phone = existing_client["phone"]
-            address = existing_client["address"]
+            address = submitted_address or existing_client["address"]
 
     valid_workers = []
     worker_chat_ids = []

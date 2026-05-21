@@ -71,6 +71,9 @@ button:hover{background:#1d4ed8}
 {% if selected_note_id %}
 <input type="hidden" name="note_id" value="{{ selected_note_id }}">
 {% endif %}
+{% if selected_source_task_id %}
+<input type="hidden" name="source_task_id" value="{{ selected_source_task_id }}">
+{% endif %}
 
 <label>Клиент</label>
 <input name="client" placeholder="Имя клиента" value="{{ selected_client['name'] if selected_client else '' }}" required>
@@ -88,7 +91,7 @@ button:hover{background:#1d4ed8}
 </div>
 
 <label>Адрес</label>
-<input name="address" placeholder="Адрес объекта" value="{{ selected_client['address'] if selected_client else '' }}">
+<input name="address" placeholder="Адрес объекта" value="{{ selected_address if selected_client else '' }}">
 
 <label>Описание</label>
 <textarea name="description" placeholder="Что нужно сделать">{{ selected_description or "" }}</textarea>
