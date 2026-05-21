@@ -682,6 +682,7 @@ async def assert_finance_margin(task):
     assert worker_detail_response.status_code == 200
     worker_detail_html = worker_detail_response.body.decode("utf-8")
     assert "Финансы за месяц" in worker_detail_html
+    assert "/finance?month=2026-05&worker=helper2" in worker_detail_html
     assert "700.0 ₽" in worker_detail_html
     assert "70.0 ₽" in worker_detail_html
 
