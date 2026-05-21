@@ -634,6 +634,27 @@ async def assert_finance_margin(task):
     assert "79.0" in payroll_csv
     assert "Статус выплаты" in payroll_csv
     assert "Выплачено" in payroll_csv
+
+    mark_unpaid_response = await crm.mark_payroll_unpaid(
+        make_form_request(
+            "owner2",
+            f"/payroll/{helper['id']}/mark-unpaid",
+            {"month": "2026-05"},
+        ),
+        helper["id"],
+    )
+    assert mark_unpaid_response.status_code == 302
+    assert mark_unpaid_response.headers["location"] == "/payroll?month=2026-05&payout_unpaid=1"
+
+    unpaid_again_response = await crm.payroll_page(
+        make_asgi_request("owner2", "/payroll"),
+        month="2026-05",
+        payout_filter="unpaid",
+    )
+    assert unpaid_again_response.status_code == 200
+    unpaid_again_html = unpaid_again_response.body.decode("utf-8")
+    assert "helper2" in unpaid_again_html
+    assert "Выплатил" in unpaid_again_html
     assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html
     assert "payment_filter=partial" in finance_html
