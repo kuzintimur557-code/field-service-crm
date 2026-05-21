@@ -280,6 +280,8 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить</a>
 </form>
 
+<div class="task-count">Заметок: {{ shown_note_count }} из {{ client_note_count }}</div>
+
 <div style="margin-top:18px">
 {% if client_notes %}
 {% for note in client_notes %}

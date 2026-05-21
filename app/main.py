@@ -3522,6 +3522,7 @@ async def client_detail(
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
     latest_client_note = client_notes[0] if client_notes else None
+    client_note_count = len(client_notes)
 
     if note_search_value:
         client_notes = [
@@ -3595,6 +3596,8 @@ async def client_detail(
             "selected_note_search": selected_note_search,
             "client_notes": client_notes,
             "latest_client_note": latest_client_note,
+            "shown_note_count": len(client_notes),
+            "client_note_count": client_note_count,
             "shown_activity_count": len(client_timeline),
             "client_total_tasks": client_total_tasks,
             "client_active_tasks": client_active_tasks,

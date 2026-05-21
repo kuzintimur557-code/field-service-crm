@@ -566,6 +566,7 @@ async def assert_client_card(task):
     assert "Smoke latest client note" in html
     assert "Поиск по заметкам" in html
     assert "note_search" in html
+    assert "Заметок:" in html
     assert 'href="tel:+70000000000"' in html
     assert 'href="mailto:client@example.com"' in html
     assert "Лента активности" in html
