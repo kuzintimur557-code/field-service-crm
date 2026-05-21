@@ -21,8 +21,8 @@ h2{margin:0 0 16px;font-size:22px}
 .label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
 .value{font-size:22px;font-weight:900}
 form{display:flex;gap:12px;align-items:end}
-input,button{padding:14px;border-radius:14px;font-size:16px}
-input{border:1px solid #d1d5db;background:white}
+input,select,button{padding:14px;border-radius:14px;font-size:16px}
+input,select{border:1px solid #d1d5db;background:white}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .table{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:.6fr 1.4fr 1fr 1fr 1fr 1fr .7fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px}
@@ -42,7 +42,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 h1{font-size:28px;margin-bottom:12px}
 .stats{grid-template-columns:1fr}
 form{display:block}
-input,button{width:100%;margin-top:8px}
+input,select,button{width:100%;margin-top:8px}
 .row{grid-template-columns:1fr}
 .head{display:none}
 }
@@ -71,17 +71,26 @@ input,button{width:100%;margin-top:8px}
     {% if selected_payment_filter %}
     <input type="hidden" name="payment_filter" value="{{ selected_payment_filter }}">
     {% endif %}
+    <div>
+        <div class="label">Исполнитель</div>
+        <select name="worker">
+            <option value="">Все исполнители</option>
+            {% for worker in workers %}
+            <option value="{{ worker['username'] }}" {% if selected_worker == worker["username"] %}selected{% endif %}>{{ worker["username"] }}</option>
+            {% endfor %}
+        </select>
+    </div>
     <button type="submit">Показать</button>
 </form>
 
 <div class="filters">
-    <a href="/finance?month={{ month }}" class="{% if not selected_payment_filter %}active{% endif %}">Все</a>
-    <a href="/finance?month={{ month }}&payment_filter=paid" class="{% if selected_payment_filter == 'paid' %}active{% endif %}">Оплачено</a>
-    <a href="/finance?month={{ month }}&payment_filter=partial" class="{% if selected_payment_filter == 'partial' %}active{% endif %}">Частично</a>
-    <a href="/finance?month={{ month }}&payment_filter=unpaid" class="{% if selected_payment_filter == 'unpaid' %}active{% endif %}">Не оплачено</a>
+    <a href="/finance?month={{ month }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if not selected_payment_filter %}active{% endif %}">Все</a>
+    <a href="/finance?month={{ month }}&payment_filter=paid{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if selected_payment_filter == 'paid' %}active{% endif %}">Оплачено</a>
+    <a href="/finance?month={{ month }}&payment_filter=partial{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if selected_payment_filter == 'partial' %}active{% endif %}">Частично</a>
+    <a href="/finance?month={{ month }}&payment_filter=unpaid{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if selected_payment_filter == 'unpaid' %}active{% endif %}">Не оплачено</a>
 </div>
 
-<a href="/finance/export?month={{ month }}{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}" style="display:inline-block;margin-top:14px;padding:14px 18px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
+<a href="/finance/export?month={{ month }}{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" style="display:inline-block;margin-top:14px;padding:14px 18px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
 ⬇️ Скачать CSV
 </a>
 </div>

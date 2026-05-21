@@ -2428,7 +2428,12 @@ async def update_recurring_job_date(request: Request, job_id: int):
 
 
 @app.get("/finance/export")
-async def finance_export(request: Request, month: str = "", payment_filter: str = ""):
+async def finance_export(
+    request: Request,
+    month: str = "",
+    payment_filter: str = "",
+    worker: str = ""
+):
 
     username = get_user(request)
 
@@ -2443,6 +2448,7 @@ async def finance_export(request: Request, month: str = "", payment_filter: str 
     if not month:
         month = datetime.now().strftime("%Y-%m")
     selected_payment_filter = payment_filter if payment_filter in ("paid", "partial", "unpaid") else ""
+    selected_worker = str(worker or "").strip()
 
     conn = connect()
     c = conn.cursor()
@@ -2477,6 +2483,9 @@ async def finance_export(request: Request, month: str = "", payment_filter: str 
     ])
 
     for task in tasks:
+        if selected_worker and selected_worker not in get_task_worker_names(task):
+            continue
+
         items = c.execute("""
         SELECT *
         FROM task_items
@@ -2532,7 +2541,12 @@ async def finance_export(request: Request, month: str = "", payment_filter: str 
 
 
 @app.get("/finance", response_class=HTMLResponse)
-async def finance_page(request: Request, month: str = "", payment_filter: str = ""):
+async def finance_page(
+    request: Request,
+    month: str = "",
+    payment_filter: str = "",
+    worker: str = ""
+):
 
     username = get_user(request)
 
@@ -2552,6 +2566,7 @@ async def finance_page(request: Request, month: str = "", payment_filter: str = 
     if not month:
         month = datetime.now().strftime("%Y-%m")
     selected_payment_filter = payment_filter if payment_filter in ("paid", "partial", "unpaid") else ""
+    selected_worker = str(worker or "").strip()
 
     conn = connect()
     c = conn.cursor()
@@ -2563,6 +2578,17 @@ async def finance_page(request: Request, month: str = "", payment_filter: str = 
     ORDER BY task_date DESC
     """, (company_id, f"{month}%")).fetchall()
 
+    workers = c.execute("""
+    SELECT username
+    FROM users
+    WHERE role='worker' AND company_id=?
+    ORDER BY username
+    """, (company_id,)).fetchall()
+    worker_names = [row["username"] for row in workers]
+
+    if selected_worker not in worker_names:
+        selected_worker = ""
+
     total_estimate = 0
     total_profit = 0
     paid_total = 0
@@ -2572,6 +2598,9 @@ async def finance_page(request: Request, month: str = "", payment_filter: str = 
     rows = []
 
     for task in tasks:
+        if selected_worker and selected_worker not in get_task_worker_names(task):
+            continue
+
         items = c.execute("""
         SELECT *
         FROM task_items
@@ -2632,6 +2661,8 @@ async def finance_page(request: Request, month: str = "", payment_filter: str = 
             "role": role,
             "month": month,
             "selected_payment_filter": selected_payment_filter,
+            "selected_worker": selected_worker,
+            "workers": workers,
             "rows": rows,
             "total_estimate": total_estimate,
             "total_profit": total_profit,

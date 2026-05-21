@@ -485,6 +485,7 @@ async def assert_finance_margin(task):
     assert "Маржа" in finance_html
     assert "70.0%" in finance_html
     assert "worker2, helper2" in finance_html
+    assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html
     assert "payment_filter=partial" in finance_html
     assert "payment_filter=unpaid" in finance_html
@@ -499,10 +500,21 @@ async def assert_finance_margin(task):
     assert 'name="payment_filter" value="unpaid"' in unpaid_html
     assert "70.0%" in unpaid_html
 
+    worker_response = await crm.finance_page(
+        make_asgi_request("owner2", "/finance"),
+        month="2026-05",
+        worker="helper2",
+    )
+    assert worker_response.status_code == 200
+    worker_html = worker_response.body.decode("utf-8")
+    assert '<option value="helper2" selected' in worker_html
+    assert "70.0%" in worker_html
+
     export_response = await crm.finance_export(
         make_request("owner2"),
         month="2026-05",
         payment_filter="unpaid",
+        worker="helper2",
     )
     assert export_response.status_code == 200
     export_csv = export_response.body.decode("utf-8")
