@@ -4685,7 +4685,14 @@ async def logout():
 
 
 @app.get("/create-task", response_class=HTMLResponse)
-async def create_task_page(request: Request, task_date: str = "", worker: str = "", return_to: str = "", client_id: int = 0):
+async def create_task_page(
+    request: Request,
+    task_date: str = "",
+    worker: str = "",
+    return_to: str = "",
+    client_id: int = 0,
+    note_id: int = 0
+):
 
     username = get_user(request)
 
@@ -4726,6 +4733,7 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
     selected_worker_active_tasks = []
     recommended_worker = None
     selected_client = None
+    selected_description = ""
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
@@ -4796,6 +4804,18 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
         WHERE id=? AND company_id=?
         """, (client_id, company_id)).fetchone()
 
+        if selected_client and note_id:
+            selected_note = c.execute("""
+            SELECT note
+            FROM client_notes
+            WHERE id=?
+              AND client_id=?
+              AND company_id=?
+            """, (note_id, client_id, company_id)).fetchone()
+
+            if selected_note:
+                selected_description = selected_note["note"] or ""
+
     custom_fields = c.execute("""
     SELECT *
     FROM custom_fields
@@ -4816,6 +4836,7 @@ async def create_task_page(request: Request, task_date: str = "", worker: str = 
             "clients": clients,
             "custom_fields": custom_fields,
             "selected_client": selected_client,
+            "selected_description": selected_description,
             "selected_task_date": selected_task_date,
             "selected_workers": selected_workers,
             "selected_return_to": selected_return_to,

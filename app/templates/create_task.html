@@ -88,7 +88,7 @@ button:hover{background:#1d4ed8}
 <input name="address" placeholder="Адрес объекта" value="{{ selected_client['address'] if selected_client else '' }}">
 
 <label>Описание</label>
-<textarea name="description" placeholder="Что нужно сделать"></textarea>
+<textarea name="description" placeholder="Что нужно сделать">{{ selected_description or "" }}</textarea>
 
 <div class="grid">
 <div>

@@ -567,6 +567,7 @@ async def assert_client_card(task):
     assert "Поиск по заметкам" in html
     assert "note_search" in html
     assert "Заметок:" in html
+    assert "Создать заявку из заметки" in html
     assert 'href="tel:+70000000000"' in html
     assert 'href="mailto:client@example.com"' in html
     assert "Лента активности" in html
@@ -592,6 +593,26 @@ async def assert_client_card(task):
     assert 'name="client" placeholder="Имя клиента" value="Client 2"' in create_html
     assert 'name="phone" placeholder="+1 555 000 0000" value="+70000000000"' in create_html
     assert 'name="address" placeholder="Адрес объекта" value="Company 2 address"' in create_html
+
+    conn = connect()
+    c = conn.cursor()
+    latest_note = c.execute("""
+    SELECT id
+    FROM client_notes
+    WHERE client_id=?
+    ORDER BY id DESC
+    """, (task["client_id"],)).fetchone()
+    conn.close()
+
+    note_task_response = await crm.create_task_page(
+        make_asgi_request("owner2", "/create-task"),
+        client_id=task["client_id"],
+        note_id=latest_note["id"],
+        return_to="client",
+    )
+    assert note_task_response.status_code == 200
+    note_task_html = note_task_response.body.decode("utf-8")
+    assert "Smoke latest client note</textarea>" in note_task_html
 
     original_send_message = crm.send_message
     original_send_message_to_chat = crm.send_message_to_chat
