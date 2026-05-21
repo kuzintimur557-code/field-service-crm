@@ -584,7 +584,7 @@ async def assert_finance_margin(task):
         make_form_request(
             "owner2",
             f"/payroll/{helper['id']}/mark-paid",
-            {"month": "2026-05", "amount": "79.0"},
+            {"month": "2026-05", "amount": "70.0"},
         ),
         helper["id"],
     )
@@ -600,6 +600,7 @@ async def assert_finance_margin(task):
     paid_payroll_html = paid_payroll_response.body.decode("utf-8")
     assert "Уже выплачено" in paid_payroll_html
     assert "Выплачено" in paid_payroll_html
+    assert "Сумма: 70.0 ₽" in paid_payroll_html
     assert "Отменить" in paid_payroll_html
 
     paid_filter_response = await crm.payroll_page(
@@ -632,6 +633,8 @@ async def assert_finance_margin(task):
     assert "Итого выплаты" in payroll_csv
     assert "helper2" in payroll_csv
     assert "79.0" in payroll_csv
+    assert "Фактически выплачено" in payroll_csv
+    assert "70.0" in payroll_csv
     assert "Статус выплаты" in payroll_csv
     assert "Выплачено" in payroll_csv
 

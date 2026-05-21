@@ -2902,6 +2902,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         paid_payout = paid_payout_map.get(row["id"])
         row["payout_paid"] = bool(paid_payout)
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
+        row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
         rows.append(row)
 
     if selected_payout_filter == "positive":
@@ -2913,7 +2914,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
 
     rows.sort(key=lambda row: row["payout"], reverse=True)
     total_payout = round(sum(row["payout"] for row in rows), 1)
-    total_paid = round(sum(row["payout"] for row in rows if row["payout_paid"]), 1)
+    total_paid = round(sum(row["paid_amount"] for row in rows if row["payout_paid"]), 1)
     total_due = round(total_payout - total_paid, 1)
     total_profit = round(sum(row["profit"] for row in rows), 1)
 
@@ -3053,6 +3054,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         paid_payout = paid_payout_map.get(row["id"])
         row["payout_paid"] = bool(paid_payout)
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
+        row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
         rows.append(row)
 
     if selected_payout_filter == "positive":
@@ -3078,6 +3080,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         "Прибыль",
         "Процент",
         "Выплата",
+        "Фактически выплачено",
         "Статус выплаты",
         "Дата выплаты"
     ])
@@ -3091,6 +3094,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
             row["profit"],
             row["commission_percent"],
             row["payout"],
+            row["paid_amount"],
             "Выплачено" if row["payout_paid"] else "Не выплачено",
             row["paid_at"]
         ])
