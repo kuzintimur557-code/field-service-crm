@@ -552,10 +552,28 @@ async def assert_finance_margin(task):
     assert "Смета" in task_html
     assert "Smoke service" in task_html
     assert "Добавить в смету" in task_html
+    assert "Обновить цену по смете" in task_html
     assert "1400.0 ₽ / 70.0%" in task_html
     assert "Статус оплаты" in task_html
     assert "Сохранить оплату" in task_html
     assert '<option value="Оплачено" selected' in task_html
+
+    apply_response = await crm.apply_task_estimate_total(
+        make_request("owner2"),
+        task["id"],
+    )
+    assert apply_response.status_code == 302
+    assert apply_response.headers["location"] == f"/task/{task['id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    updated_task = c.execute("""
+    SELECT price
+    FROM tasks
+    WHERE id=?
+    """, (task["id"],)).fetchone()
+    conn.close()
+    assert updated_task["price"] == "2000.0"
 
 
 async def assert_notifications(task):

@@ -549,6 +549,11 @@ button{
 </div>
 
 {% if task_items %}
+{% if role in ["boss", "manager"] %}
+<form method="post" action="/task/{{ task['id'] }}/estimate/apply" style="margin-top:16px">
+    <button class="btn blue" type="submit">Обновить цену по смете</button>
+</form>
+{% endif %}
 <div style="margin-top:16px">
 {% for item in task_items %}
 <div class="estimate-item">

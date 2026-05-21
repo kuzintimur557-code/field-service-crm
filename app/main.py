@@ -5861,6 +5861,63 @@ async def delete_task_item(request: Request, task_id: int, item_id: int):
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
+@app.post("/task/{task_id}/estimate/apply")
+async def apply_task_estimate_total(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    estimate_total = c.execute("""
+    SELECT SUM(total)
+    FROM task_items
+    WHERE task_id=? AND company_id=?
+    """, (task_id, company_id)).fetchone()[0] or 0
+
+    c.execute("""
+    UPDATE tasks
+    SET price=?
+    WHERE id=? AND company_id=?
+    """, (str(estimate_total), task_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Цена обновлена по смете",
+        f"Новая цена: {estimate_total}"
+    )
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
 @app.post("/task/{task_id}/comment")
 async def add_task_comment(request: Request, task_id: int):
 
