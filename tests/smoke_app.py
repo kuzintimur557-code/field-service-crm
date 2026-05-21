@@ -548,9 +548,20 @@ async def assert_finance_margin(task):
     payroll_html = payroll_response.body.decode("utf-8")
     assert "Зарплаты" in payroll_html
     assert "Прибыль к распределению" in payroll_html
+    assert "payout_filter=positive" in payroll_html
     assert "79.0 ₽" in payroll_html
     assert "helper2" in payroll_html
     assert f"/workers/{helper['id']}?month=2026-05" in payroll_html
+
+    positive_payroll_response = await crm.payroll_page(
+        make_asgi_request("owner2", "/payroll"),
+        month="2026-05",
+        payout_filter="positive",
+    )
+    assert positive_payroll_response.status_code == 200
+    positive_payroll_html = positive_payroll_response.body.decode("utf-8")
+    assert 'name="payout_filter" value="positive"' in positive_payroll_html
+    assert "helper2" in positive_payroll_html
     assert "/payroll/export?month=2026-05" in payroll_html
 
     payroll_export_response = await crm.payroll_export(

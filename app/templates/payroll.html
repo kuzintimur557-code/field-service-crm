@@ -24,6 +24,9 @@ form{display:flex;gap:12px;align-items:end}
 input,button{padding:14px;border-radius:14px;font-size:16px}
 input{border:1px solid #d1d5db;background:white}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.filters a{padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filters a.active{background:#111827;color:white}
 .row{display:grid;grid-template-columns:1.5fr .7fr 1fr 1fr 1fr 1fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px;margin-bottom:10px}
 .head{background:#e5e7eb;font-weight:900}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:26px}
@@ -50,8 +53,16 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="label">Месяц</div>
         <input type="month" name="month" value="{{ month }}">
     </div>
+    {% if selected_payout_filter %}
+    <input type="hidden" name="payout_filter" value="{{ selected_payout_filter }}">
+    {% endif %}
     <button type="submit">Показать</button>
 </form>
+
+<div class="filters">
+    <a href="/payroll?month={{ month }}" class="{% if not selected_payout_filter %}active{% endif %}">Все</a>
+    <a href="/payroll?month={{ month }}&payout_filter=positive" class="{% if selected_payout_filter == 'positive' %}active{% endif %}">С выплатами</a>
+</div>
 
 {% if role == "boss" %}
 <a href="/payroll/export?month={{ month }}" style="display:inline-block;margin-top:14px;padding:14px 18px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
