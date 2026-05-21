@@ -2509,7 +2509,7 @@ async def finance_export(request: Request, month: str = "", payment_filter: str 
             task["client"],
             task["phone"],
             task["address"],
-            task["worker"],
+            format_task_workers(task),
             task["status"],
             payment_status,
             task_total,
@@ -2611,7 +2611,7 @@ async def finance_page(request: Request, month: str = "", payment_filter: str = 
         rows.append({
             "id": task["id"],
             "client": task["client"],
-            "worker": task["worker"],
+            "worker": format_task_workers(task),
             "task_date": task["task_date"],
             "status": task["status"],
             "payment_status": payment_status,

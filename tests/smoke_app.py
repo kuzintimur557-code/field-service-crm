@@ -484,6 +484,7 @@ async def assert_finance_margin(task):
     finance_html = finance_response.body.decode("utf-8")
     assert "Маржа" in finance_html
     assert "70.0%" in finance_html
+    assert "worker2, helper2" in finance_html
     assert "payment_filter=paid" in finance_html
     assert "payment_filter=partial" in finance_html
     assert "payment_filter=unpaid" in finance_html
@@ -507,6 +508,7 @@ async def assert_finance_margin(task):
     export_csv = export_response.body.decode("utf-8")
     assert "Маржа %" in export_csv
     assert "70.0" in export_csv
+    assert "worker2, helper2" in export_csv
 
 
 async def assert_notifications(task):
