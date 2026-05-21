@@ -553,6 +553,18 @@ async def assert_client_card(task):
 
     assert note_response.status_code == 302
 
+    upload = crm.UploadFile(
+        file=crm.io.BytesIO(b"client file"),
+        filename="client-contract.txt",
+    )
+    file_response = await crm.upload_client_file(
+        make_request("owner2"),
+        task["client_id"],
+        upload=upload,
+    )
+    assert file_response.status_code == 302
+    assert file_response.headers["location"] == f"/clients/{task['client_id']}?file_uploaded=1"
+
     response = await crm.client_detail(
         make_asgi_request("owner2", f"/clients/{task['client_id']}"),
         task["client_id"],
@@ -582,6 +594,9 @@ async def assert_client_card(task):
     assert "note_search" in html
     assert "Заметок:" in html
     assert "Создать заявку из заметки" in html
+    assert "Файлы клиента" in html
+    assert "client-contract.txt" in html
+    assert "Загрузить файл" in html
     assert 'href="tel:+70000000000"' in html
     assert 'href="mailto:client@example.com"' in html
     assert "Лента активности" in html
@@ -625,6 +640,12 @@ async def assert_client_card(task):
 
     conn = connect()
     c = conn.cursor()
+    client_file = c.execute("""
+    SELECT id
+    FROM client_files
+    WHERE client_id=?
+    ORDER BY id DESC
+    """, (task["client_id"],)).fetchone()
     latest_note = c.execute("""
     SELECT id
     FROM client_notes
@@ -632,6 +653,20 @@ async def assert_client_card(task):
     ORDER BY id DESC
     """, (task["client_id"],)).fetchone()
     conn.close()
+
+    file_download_response = await crm.download_client_file(
+        make_request("owner2"),
+        task["client_id"],
+        client_file["id"],
+    )
+    assert file_download_response.status_code == 200
+
+    outsider_file_response = await crm.download_client_file(
+        make_request("manager1"),
+        task["client_id"],
+        client_file["id"],
+    )
+    assert outsider_file_response.status_code == 404
 
     note_task_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),

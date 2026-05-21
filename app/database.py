@@ -94,6 +94,19 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS client_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        client_id INTEGER,
+        username TEXT,
+        original_filename TEXT,
+        stored_filename TEXT,
+        content_type TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS catalog_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item_type TEXT,

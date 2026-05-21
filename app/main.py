@@ -53,10 +53,16 @@ templates = Jinja2Templates(directory="app/templates")
 DATA_DIR = Path(os.getenv("DATA_DIR", "."))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DOCS_DIR = UPLOAD_DIR / "docs"
+CLIENT_FILES_DIR = UPLOAD_DIR / "client_files"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 DOCS_DIR.mkdir(parents=True, exist_ok=True)
+CLIENT_FILES_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
+ALLOWED_CLIENT_FILE_EXTENSIONS = {
+    ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx",
+    ".xls", ".xlsx", ".csv", ".txt"
+}
 PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
@@ -81,6 +87,16 @@ def save_upload_file(upload_file, task_id, prefix):
         shutil.copyfileobj(upload_file.file, buffer)
 
     return filename
+
+
+def safe_client_file_filename(client_id, original_filename):
+    original = Path(original_filename or "file").name
+    extension = Path(original).suffix.lower()
+
+    if extension not in ALLOWED_CLIENT_FILE_EXTENSIONS:
+        extension = ".bin"
+
+    return f"client_{client_id}_{uuid4().hex}{extension}"
 
 
 def get_task_worker_names(task):
@@ -3599,6 +3615,13 @@ async def client_detail(
 
         client_timeline = filtered_timeline
 
+    client_files = c.execute("""
+    SELECT *
+    FROM client_files
+    WHERE client_id=? AND company_id=?
+    ORDER BY id DESC
+    """, (client_id, company_id)).fetchall()
+
     client_custom_fields = c.execute("""
     SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_fields.options, custom_field_values.value
     FROM custom_fields
@@ -3634,6 +3657,7 @@ async def client_detail(
             "selected_activity_filter": selected_activity_filter,
             "selected_note_search": selected_note_search,
             "client_notes": client_notes,
+            "client_files": client_files,
             "latest_client_note": latest_client_note,
             "last_contact": last_contact,
             "shown_note_count": len(client_notes),
@@ -3723,6 +3747,119 @@ async def add_client_note(request: Request, client_id: int):
         pass
 
     return RedirectResponse(f"/clients/{client_id}?note_created=1", status_code=302)
+
+
+@app.post("/clients/{client_id}/files")
+async def upload_client_file(
+    request: Request,
+    client_id: int,
+    upload: UploadFile = File(None)
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    client = c.execute("""
+    SELECT id
+    FROM clients
+    WHERE id=? AND company_id=?
+    """, (client_id, company_id)).fetchone()
+
+    if not client:
+        conn.close()
+        return RedirectResponse("/clients", status_code=302)
+
+    if not upload or not upload.filename:
+        conn.close()
+        return RedirectResponse(f"/clients/{client_id}?file_error=empty", status_code=302)
+
+    original_filename = Path(upload.filename).name
+    stored_filename = safe_client_file_filename(client_id, original_filename)
+    file_path = CLIENT_FILES_DIR / stored_filename
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(upload.file, buffer)
+
+    c.execute("""
+    INSERT INTO client_files (
+        company_id,
+        client_id,
+        username,
+        original_filename,
+        stored_filename,
+        content_type,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        client_id,
+        username,
+        original_filename,
+        stored_filename,
+        upload.content_type or "",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/clients/{client_id}?file_uploaded=1", status_code=302)
+
+
+@app.get("/clients/{client_id}/files/{file_id}")
+async def download_client_file(request: Request, client_id: int, file_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return Response(status_code=404)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return Response(status_code=404)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    client_file = c.execute("""
+    SELECT *
+    FROM client_files
+    WHERE id=?
+      AND client_id=?
+      AND company_id=?
+    """, (file_id, client_id, company_id)).fetchone()
+
+    conn.close()
+
+    if not client_file:
+        return Response(status_code=404)
+
+    stored_filename = Path(client_file["stored_filename"] or "").name
+    file_path = CLIENT_FILES_DIR / stored_filename
+
+    if not stored_filename or not file_path.is_file():
+        return Response(status_code=404)
+
+    return FileResponse(
+        str(file_path),
+        filename=client_file["original_filename"] or stored_filename
+    )
 
 
 @app.post("/clients/{client_id}/edit")
