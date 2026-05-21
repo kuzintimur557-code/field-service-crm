@@ -3508,6 +3508,35 @@ async def client_detail(
             key=lambda item: (str(item["task_date"] or ""), item["id"] or 0)
         )[0]
 
+    client_next_action = {
+        "title": "Активных работ нет",
+        "text": "Можно создать новую заявку или добавить заметку по клиенту.",
+        "link": f"/create-task?client_id={client_id}&return_to=client",
+        "link_text": "Создать заявку"
+    }
+
+    if client_overdue_tasks:
+        client_next_action = {
+            "title": "Есть просроченные заявки",
+            "text": "Проверьте просрочки клиента и перенесите дату или закройте работу.",
+            "link": f"/clients/{client_id}?task_filter=overdue",
+            "link_text": "Открыть просрочки"
+        }
+    elif upcoming_task:
+        client_next_action = {
+            "title": f"Ближайшая заявка #{upcoming_task['id']}",
+            "text": f"{upcoming_task['task_date'] or 'Без даты'} / {upcoming_task['status']}",
+            "link": f"/task/{upcoming_task['id']}",
+            "link_text": "Открыть заявку"
+        }
+    elif client_active_tasks:
+        client_next_action = {
+            "title": "Есть активные заявки",
+            "text": "У клиента есть работы без будущей даты. Проверьте список активных заявок.",
+            "link": f"/clients/{client_id}?task_filter=active",
+            "link_text": "Показать активные"
+        }
+
     filtered_tasks = []
 
     for task in tasks:
@@ -3675,6 +3704,7 @@ async def client_detail(
             "client_files": client_files,
             "latest_client_note": latest_client_note,
             "last_contact": last_contact,
+            "client_next_action": client_next_action,
             "shown_note_count": len(client_notes),
             "client_note_count": client_note_count,
             "shown_file_count": len(client_files),

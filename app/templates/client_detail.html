@@ -28,6 +28,7 @@ h2{margin:0 0 16px;font-size:22px}
 .latest-note{background:#fff7ed;border:1px solid #fed7aa;border-radius:18px;padding:16px;margin-top:18px}
 .latest-note-text{white-space:pre-wrap;line-height:1.45;font-weight:800;color:#4b5563}
 .last-contact{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:18px;padding:16px;margin-top:18px}
+.next-action{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#f8fafc;border:1px solid #cbd5e1;border-radius:18px;padding:16px;margin-top:18px}
 .task{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
 .task-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .btn{display:inline-block;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
@@ -68,7 +69,7 @@ input,textarea,button{width:100%;padding:15px;border-radius:14px;font-size:16px;
 input,textarea{border:1px solid #d1d5db;background:white}
 textarea{height:110px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
-@media(max-width:800px){.container{padding:16px}.grid,.task,.timeline-item,.latest-task,.file-item{grid-template-columns:1fr}.task-actions{justify-content:stretch}.task-actions .btn{flex:1}h1{font-size:28px}.btn{display:block;text-align:center}}
+@media(max-width:800px){.container{padding:16px}.grid,.task,.timeline-item,.latest-task,.file-item,.next-action{grid-template-columns:1fr}.task-actions{justify-content:stretch}.task-actions .btn{flex:1}h1{font-size:28px}.btn{display:block;text-align:center}}
 </style>
 </head>
 
@@ -168,6 +169,15 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	    <div class="latest-note-text">{{ latest_client_note["note"] }}</div>
 	</div>
 	{% endif %}
+
+	<div class="next-action">
+	    <div>
+	        <div class="latest-title">Следующее действие</div>
+	        <div class="latest-meta">{{ client_next_action["title"] }}</div>
+	        <div class="latest-note-text">{{ client_next_action["text"] }}</div>
+	    </div>
+	    <a class="btn" href="{{ client_next_action['link'] }}">{{ client_next_action["link_text"] }}</a>
+	</div>
 
 	<div class="stats">
 	    <div class="stat">
