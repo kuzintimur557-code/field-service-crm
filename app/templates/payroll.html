@@ -28,7 +28,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .filters a{padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
 .filters a.active{background:#111827;color:white}
 .row{display:grid;grid-template-columns:1.4fr .6fr .9fr .9fr .8fr .9fr 1fr 1fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px;margin-bottom:10px}
-.history-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px;margin-bottom:10px}
+.history-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 1.2fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px;margin-bottom:10px}
 .head{background:#e5e7eb;font-weight:900}
 .paid-status{display:inline-block;padding:8px 10px;border-radius:12px;background:#dcfce7;color:#166534;font-size:13px;font-weight:900}
 .partial-status{display:inline-block;padding:8px 10px;border-radius:12px;background:#fef3c7;color:#92400e;font-size:13px;font-weight:900}
@@ -38,6 +38,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .payroll-actions form{display:inline}
 .payroll-actions button{padding:9px 12px;border-radius:12px;font-size:13px}
 .payroll-actions input{width:92px;padding:9px 10px;border-radius:12px;font-size:13px;margin-right:6px}
+.payroll-actions input[name="note"]{width:130px}
 .payroll-actions .secondary{background:#6b7280}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:26px}
 @media(max-width:800px){.container{padding:16px}.header{display:block}.stats,.row,.history-row{grid-template-columns:1fr}form{display:block}input,button{width:100%;margin-top:8px}.head{display:none}h1{font-size:28px;margin-bottom:12px}}
@@ -144,6 +145,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="label">Остаток: {{ row.due_amount }} ₽</div>
         <div class="label">{{ row.paid_at }}</div>
         <div class="label">Кем: {{ row.paid_by }}</div>
+        {% if row.payout_note %}
+        <div class="label">Комментарий: {{ row.payout_note }}</div>
+        {% endif %}
         {% else %}
         <span class="due-status">Не выплачено</span>
         {% endif %}
@@ -159,6 +163,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
             <form method="post" action="/payroll/{{ row.id }}/mark-paid">
                 <input type="hidden" name="month" value="{{ month }}">
                 <input type="number" name="amount" min="0" step="0.1" value="{{ row.payout }}">
+                <input type="text" name="note" placeholder="Комментарий">
                 <button type="submit">Выплатил</button>
             </form>
             {% endif %}
@@ -180,6 +185,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <div>Сумма</div>
     <div>Дата</div>
     <div>Кем</div>
+    <div>Комментарий</div>
 </div>
 
 {% for payout in payout_history %}
@@ -191,6 +197,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <div><b>{{ payout.amount }} ₽</b></div>
     <div>{{ payout.paid_at }}</div>
     <div>{{ payout.paid_by }}</div>
+    <div>{{ payout.note or "-" }}</div>
 </div>
 {% endfor %}
 {% else %}

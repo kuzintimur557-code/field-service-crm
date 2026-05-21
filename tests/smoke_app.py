@@ -558,6 +558,7 @@ async def assert_finance_margin(task):
     assert "Журнал выплат" in payroll_html
     assert "За месяц выплат ещё нет" in payroll_html
     assert 'name="amount" min="0" step="0.1" value="79.0"' in payroll_html
+    assert 'name="note" placeholder="Комментарий"' in payroll_html
     assert "payout_filter=paid" in payroll_html
     assert "payout_filter=partial" in payroll_html
     assert "payout_filter=unpaid" in payroll_html
@@ -589,7 +590,7 @@ async def assert_finance_margin(task):
         make_form_request(
             "owner2",
             f"/payroll/{helper['id']}/mark-paid",
-            {"month": "2026-05", "amount": "70.0"},
+            {"month": "2026-05", "amount": "70.0", "note": "аванс на карту"},
         ),
         helper["id"],
     )
@@ -609,8 +610,10 @@ async def assert_finance_margin(task):
     assert "Сумма: 70.0 ₽" in paid_payroll_html
     assert "Остаток: 9.0 ₽" in paid_payroll_html
     assert "Кем: owner2" in paid_payroll_html
+    assert "Комментарий: аванс на карту" in paid_payroll_html
     assert "Журнал выплат" in paid_payroll_html
     assert "70.0 ₽" in paid_payroll_html
+    assert "аванс на карту" in paid_payroll_html
     assert "Отменить" in paid_payroll_html
 
     paid_filter_response = await crm.payroll_page(
@@ -661,7 +664,9 @@ async def assert_finance_margin(task):
     assert "9.0" in payroll_csv
     assert "Статус выплаты" in payroll_csv
     assert "Кем выплачено" in payroll_csv
+    assert "Комментарий" in payroll_csv
     assert "owner2" in payroll_csv
+    assert "аванс на карту" in payroll_csv
     assert "Частично" in payroll_csv
     assert "Итого выплачено" in payroll_csv
     assert "Итого осталось" in payroll_csv

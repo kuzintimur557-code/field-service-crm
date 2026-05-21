@@ -2826,7 +2826,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
     """, (company_id, f"{month}%")).fetchall()
 
     paid_payouts = c.execute("""
-    SELECT worker_id, amount, paid_at, paid_by
+    SELECT worker_id, amount, paid_at, paid_by, note
     FROM payroll_payouts
     WHERE company_id=? AND month=? AND status='paid'
     """, (company_id, month)).fetchall()
@@ -2840,6 +2840,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         p.amount,
         p.paid_at,
         p.paid_by,
+        p.note,
         u.username,
         u.full_name
     FROM payroll_payouts p
@@ -2854,7 +2855,8 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
             "worker_username": row["username"],
             "amount": round(float(row["amount"] or 0), 1),
             "paid_at": row["paid_at"],
-            "paid_by": row["paid_by"]
+            "paid_by": row["paid_by"],
+            "note": row["note"] or ""
         }
         for row in payout_history_rows
     ]
@@ -2927,6 +2929,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         row["payout_paid"] = bool(paid_payout)
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
         row["paid_by"] = paid_payout["paid_by"] if paid_payout else ""
+        row["payout_note"] = paid_payout["note"] if paid_payout else ""
         row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
         row["due_amount"] = round(max(row["payout"] - row["paid_amount"], 0), 1)
         row["payout_status"] = "Не выплачено"
@@ -3010,7 +3013,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
     """, (company_id, f"{month}%")).fetchall()
 
     paid_payouts = c.execute("""
-    SELECT worker_id, amount, paid_at, paid_by
+    SELECT worker_id, amount, paid_at, paid_by, note
     FROM payroll_payouts
     WHERE company_id=? AND month=? AND status='paid'
     """, (company_id, month)).fetchall()
@@ -3087,6 +3090,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         row["payout_paid"] = bool(paid_payout)
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
         row["paid_by"] = paid_payout["paid_by"] if paid_payout else ""
+        row["payout_note"] = paid_payout["note"] if paid_payout else ""
         row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
         row["due_amount"] = round(max(row["payout"] - row["paid_amount"], 0), 1)
         row["payout_status"] = "Не выплачено"
@@ -3125,7 +3129,8 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         "Осталось выплатить",
         "Статус выплаты",
         "Дата выплаты",
-        "Кем выплачено"
+        "Кем выплачено",
+        "Комментарий"
     ])
 
     for row in rows:
@@ -3141,7 +3146,8 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
             row["due_amount"],
             row["payout_status"],
             row["paid_at"],
-            row["paid_by"]
+            row["paid_by"],
+            row["payout_note"]
         ])
 
     writer.writerow([])
@@ -3179,6 +3185,7 @@ async def mark_payroll_paid(request: Request, worker_id: int):
     form = await request.form()
     month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
     amount = form.get("amount") or "0"
+    note = (form.get("note") or "").strip()
 
     try:
         amount = float(str(amount).replace(",", "."))
@@ -3211,16 +3218,18 @@ async def mark_payroll_paid(request: Request, worker_id: int):
         amount,
         status,
         paid_at,
-        paid_by
+        paid_by,
+        note
     )
-    VALUES (?, ?, ?, ?, 'paid', ?, ?)
+    VALUES (?, ?, ?, ?, 'paid', ?, ?, ?)
     ON CONFLICT(company_id, worker_id, month)
     DO UPDATE SET
         amount=excluded.amount,
         status='paid',
         paid_at=excluded.paid_at,
-        paid_by=excluded.paid_by
-    """, (company_id, worker_id, month, amount, paid_at, username))
+        paid_by=excluded.paid_by,
+        note=excluded.note
+    """, (company_id, worker_id, month, amount, paid_at, username, note))
 
     conn.commit()
     conn.close()

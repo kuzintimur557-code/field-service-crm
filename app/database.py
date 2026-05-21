@@ -281,9 +281,12 @@ def init_db():
         amount REAL DEFAULT 0,
         status TEXT DEFAULT 'paid',
         paid_at TEXT,
-        paid_by TEXT
+        paid_by TEXT,
+        note TEXT
     )
     """)
+
+    add_column_if_missing(c, "payroll_payouts", "note", "TEXT")
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "full_name", "TEXT")
