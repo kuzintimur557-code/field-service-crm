@@ -65,7 +65,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 </div>
 
 {% if role == "boss" %}
-<a href="/payroll/export?month={{ month }}" style="display:inline-block;margin-top:14px;padding:14px 18px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
+<a href="/payroll/export?month={{ month }}{% if selected_payout_filter %}&payout_filter={{ selected_payout_filter }}{% endif %}" style="display:inline-block;margin-top:14px;padding:14px 18px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
     Скачать CSV
 </a>
 {% endif %}

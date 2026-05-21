@@ -2917,7 +2917,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
 
 
 @app.get("/payroll/export")
-async def payroll_export(request: Request, month: str = ""):
+async def payroll_export(request: Request, month: str = "", payout_filter: str = ""):
 
     username = get_user(request)
 
@@ -2931,6 +2931,7 @@ async def payroll_export(request: Request, month: str = ""):
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
+    selected_payout_filter = payout_filter if payout_filter == "positive" else ""
 
     company_id = get_user_company_id(username)
 
@@ -3019,6 +3020,9 @@ async def payroll_export(request: Request, month: str = ""):
         row["profit"] = round(row["profit"], 1)
         row["payout"] = round(row["profit"] * row["commission_percent"] / 100, 1)
         rows.append(row)
+
+    if selected_payout_filter == "positive":
+        rows = [row for row in rows if row["payout"] > 0]
 
     rows.sort(key=lambda row: row["payout"], reverse=True)
     total_payout = round(sum(row["payout"] for row in rows), 1)

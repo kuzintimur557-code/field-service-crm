@@ -563,10 +563,12 @@ async def assert_finance_margin(task):
     assert 'name="payout_filter" value="positive"' in positive_payroll_html
     assert "helper2" in positive_payroll_html
     assert "/payroll/export?month=2026-05" in payroll_html
+    assert "/payroll/export?month=2026-05&payout_filter=positive" in positive_payroll_html
 
     payroll_export_response = await crm.payroll_export(
         make_request("owner2"),
         month="2026-05",
+        payout_filter="positive",
     )
     assert payroll_export_response.status_code == 200
     payroll_csv = payroll_export_response.body.decode("utf-8")
