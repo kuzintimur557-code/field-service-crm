@@ -86,7 +86,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
 {% for row in rows %}
 <div class="row">
-    <div><b>{{ row.name }}</b><div class="label">{{ row.username }}</div></div>
+    <div>
+        <a href="/workers/{{ row.id }}?month={{ month }}" style="color:#111827;text-decoration:none;font-weight:900">{{ row.name }}</a>
+        <div class="label">{{ row.username }}</div>
+    </div>
     <div>{{ row.tasks }}</div>
     <div>{{ row.total }} ₽</div>
     <div>{{ row.profit }} ₽</div>

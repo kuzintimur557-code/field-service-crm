@@ -2808,7 +2808,7 @@ async def payroll_page(request: Request, month: str = ""):
     c = conn.cursor()
 
     workers = c.execute("""
-    SELECT username, full_name, commission_percent
+    SELECT id, username, full_name, commission_percent
     FROM users
     WHERE role='worker' AND company_id=?
     ORDER BY username
@@ -2826,6 +2826,7 @@ async def payroll_page(request: Request, month: str = ""):
 
     payroll_rows = {
         worker["username"]: {
+            "id": worker["id"],
             "username": worker["username"],
             "name": worker["full_name"] or worker["username"],
             "commission_percent": float(worker["commission_percent"] or 0),
@@ -2932,7 +2933,7 @@ async def payroll_export(request: Request, month: str = ""):
     c = conn.cursor()
 
     workers = c.execute("""
-    SELECT username, full_name, commission_percent
+    SELECT id, username, full_name, commission_percent
     FROM users
     WHERE role='worker' AND company_id=?
     ORDER BY username
@@ -2950,6 +2951,7 @@ async def payroll_export(request: Request, month: str = ""):
 
     payroll_rows = {
         worker["username"]: {
+            "id": worker["id"],
             "username": worker["username"],
             "name": worker["full_name"] or worker["username"],
             "commission_percent": float(worker["commission_percent"] or 0),
