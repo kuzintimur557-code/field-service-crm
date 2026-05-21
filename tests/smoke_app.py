@@ -452,6 +452,49 @@ async def assert_catalog_create():
     assert item is not None
 
 
+async def assert_finance_margin(task):
+    conn = connect()
+    c = conn.cursor()
+    item = c.execute("""
+    SELECT *
+    FROM catalog_items
+    WHERE company_id=2 AND name='Smoke service'
+    """).fetchone()
+    conn.close()
+
+    item_response = await crm.add_task_item(
+        make_form_request(
+            "owner2",
+            f"/task/{task['id']}/items",
+            {
+                "catalog_item_id": str(item["id"]),
+                "qty": "2",
+            },
+        ),
+        task["id"],
+    )
+    assert item_response.status_code == 302
+    assert item_response.headers["location"] == f"/task/{task['id']}"
+
+    finance_response = await crm.finance_page(
+        make_asgi_request("owner2", "/finance"),
+        month="2026-05",
+    )
+    assert finance_response.status_code == 200
+    finance_html = finance_response.body.decode("utf-8")
+    assert "Маржа" in finance_html
+    assert "70.0%" in finance_html
+
+    export_response = await crm.finance_export(
+        make_request("owner2"),
+        month="2026-05",
+    )
+    assert export_response.status_code == 200
+    export_csv = export_response.body.decode("utf-8")
+    assert "Маржа %" in export_csv
+    assert "70.0" in export_csv
+
+
 async def assert_notifications(task):
     crm.create_notification(
         2,
@@ -1617,6 +1660,7 @@ def main():
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())
+        asyncio.run(assert_finance_margin(task))
         asyncio.run(assert_notifications(task))
         asyncio.run(assert_client_card(task))
         asyncio.run(assert_overdue_sla(task))

@@ -2471,7 +2471,8 @@ async def finance_export(request: Request, month: str = ""):
         "Статус заявки",
         "Статус оплаты",
         "Сумма",
-        "Прибыль"
+        "Прибыль",
+        "Маржа %"
     ])
 
     for task in tasks:
@@ -2492,6 +2493,7 @@ async def finance_export(request: Request, month: str = ""):
             task_profit = 0
 
         payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
+        task_margin = round((task_profit / task_total) * 100, 1) if task_total else 0
 
         writer.writerow([
             task["id"],
@@ -2503,7 +2505,8 @@ async def finance_export(request: Request, month: str = ""):
             task["status"],
             payment_status,
             task_total,
-            task_profit
+            task_profit,
+            task_margin
         ])
 
     conn.close()
@@ -2577,6 +2580,7 @@ async def finance_page(request: Request, month: str = ""):
             task_profit = 0
 
         payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
+        task_margin = round((task_profit / task_total) * 100, 1) if task_total else 0
 
         total_estimate += task_total
         total_profit += task_profit
@@ -2596,10 +2600,12 @@ async def finance_page(request: Request, month: str = ""):
             "status": task["status"],
             "payment_status": payment_status,
             "total": task_total,
-            "profit": task_profit
+            "profit": task_profit,
+            "margin": task_margin
         })
 
     conn.close()
+    total_margin = round((total_profit / total_estimate) * 100, 1) if total_estimate else 0
 
     return templates.TemplateResponse(
         request,
@@ -2612,6 +2618,7 @@ async def finance_page(request: Request, month: str = ""):
             "rows": rows,
             "total_estimate": total_estimate,
             "total_profit": total_profit,
+            "total_margin": total_margin,
             "paid_total": paid_total,
             "partial_total": partial_total,
             "unpaid_total": unpaid_total
