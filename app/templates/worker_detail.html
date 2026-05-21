@@ -60,6 +60,43 @@ h1{margin:0 0 10px;font-size:34px}
 </div>
 </div>
 
+<div class="card">
+<h2>Финансы за месяц</h2>
+
+<form method="get" action="/workers/{{ worker['id'] }}" style="margin-bottom:16px">
+    <div class="label">Месяц</div>
+    <input type="month" name="month" value="{{ month }}" style="width:100%;padding:13px;border-radius:14px;border:1px solid #d1d5db;font-size:16px">
+    <button type="submit" style="margin-top:10px;width:100%;padding:13px;border:0;border-radius:14px;background:#2563eb;color:white;font-weight:900">Показать</button>
+</form>
+
+<div class="grid">
+    <div class="stat">
+        <div class="label">Выручка</div>
+        <div class="value">{{ finance_total }} ₽</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Расходы</div>
+        <div class="value">{{ finance_expenses }} ₽</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Прибыль</div>
+        <div class="value">{{ finance_profit }} ₽</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Маржа</div>
+        <div class="value">{{ finance_margin }}%</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Выплата</div>
+        <div class="value">{{ finance_payout }} ₽</div>
+    </div>
+</div>
+</div>
+
 </div>
 {% include 'mobile_nav.html' %}
 </body>

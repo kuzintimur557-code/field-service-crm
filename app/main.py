@@ -4640,7 +4640,7 @@ async def workers_page(request: Request):
 
 
 @app.get("/workers/{worker_id}", response_class=HTMLResponse)
-async def worker_detail(request: Request, worker_id: int):
+async def worker_detail(request: Request, worker_id: int, month: str = ""):
 
     username = get_user(request)
 
@@ -4653,6 +4653,9 @@ async def worker_detail(request: Request, worker_id: int):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
 
     conn = connect()
     c = conn.cursor()
@@ -4688,6 +4691,61 @@ async def worker_detail(request: Request, worker_id: int):
     WHERE company_id=? AND {worker_condition} AND status='Завершено'
     """, [company_id] + worker_params).fetchone()[0] or 0
 
+    month_tasks = c.execute(f"""
+    SELECT *
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND {worker_condition}
+      AND task_date LIKE ?
+    """, [company_id] + worker_params + [f"{month}%"]).fetchall()
+
+    finance_total = 0
+    finance_profit = 0
+    finance_expenses = 0
+
+    for task in month_tasks:
+        items = c.execute("""
+        SELECT *
+        FROM task_items
+        WHERE task_id=?
+        """, (task["id"],)).fetchall()
+        expenses = c.execute("""
+        SELECT *
+        FROM task_expenses
+        WHERE task_id=?
+        """, (task["id"],)).fetchall()
+
+        task_total = sum(item["total"] for item in items)
+        task_profit = sum(item["profit"] for item in items)
+        discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
+        task_expenses_total = sum(expense["amount"] for expense in expenses)
+
+        if not items:
+            try:
+                task_total = float(task["price"] or 0)
+            except Exception:
+                task_total = 0
+            task_profit = 0
+
+        if discount_amount < 0:
+            discount_amount = 0
+
+        task_total = max(task_total - discount_amount, 0)
+        task_profit = task_profit - discount_amount - task_expenses_total
+
+        task_worker_count = len(get_task_worker_names(task)) or 1
+        finance_total += task_total / task_worker_count
+        finance_profit += task_profit / task_worker_count
+        finance_expenses += task_expenses_total / task_worker_count
+
+    commission_percent = float(worker["commission_percent"] or 0) if "commission_percent" in worker.keys() else 0
+    finance_total = round(finance_total, 1)
+    finance_profit = round(finance_profit, 1)
+    finance_expenses = round(finance_expenses, 1)
+    finance_payout = round(finance_profit * commission_percent / 100, 1)
+    finance_margin = round((finance_profit / finance_total) * 100, 1) if finance_total else 0
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -4698,9 +4756,15 @@ async def worker_detail(request: Request, worker_id: int):
             "username": username,
             "role": role,
             "worker": worker,
+            "month": month,
             "total_tasks": total_tasks,
             "done_tasks": done_tasks,
-            "income": income
+            "income": income,
+            "finance_total": finance_total,
+            "finance_profit": finance_profit,
+            "finance_expenses": finance_expenses,
+            "finance_payout": finance_payout,
+            "finance_margin": finance_margin
         }
     )
 

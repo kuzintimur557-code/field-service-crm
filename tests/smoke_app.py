@@ -674,6 +674,17 @@ async def assert_finance_margin(task):
     loss_html = loss_response.body.decode("utf-8")
     assert 'name="profit_filter" value="loss"' in loss_html
 
+    worker_detail_response = await crm.worker_detail(
+        make_asgi_request("owner2", f"/workers/{helper['id']}"),
+        helper["id"],
+        month="2026-05",
+    )
+    assert worker_detail_response.status_code == 200
+    worker_detail_html = worker_detail_response.body.decode("utf-8")
+    assert "Финансы за месяц" in worker_detail_html
+    assert "700.0 ₽" in worker_detail_html
+    assert "70.0 ₽" in worker_detail_html
+
     apply_response = await crm.apply_task_estimate_total(
         make_request("owner2"),
         task["id"],
