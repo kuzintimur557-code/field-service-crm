@@ -559,6 +559,7 @@ async def assert_finance_margin(task):
     assert "За месяц выплат ещё нет" in payroll_html
     assert 'name="amount" min="0" step="0.1" value="79.0"' in payroll_html
     assert 'name="note" placeholder="Комментарий"' in payroll_html
+    assert 'name="payout_filter" value=""' in payroll_html
     assert "payout_filter=paid" in payroll_html
     assert "payout_filter=partial" in payroll_html
     assert "payout_filter=unpaid" in payroll_html
@@ -590,12 +591,12 @@ async def assert_finance_margin(task):
         make_form_request(
             "owner2",
             f"/payroll/{helper['id']}/mark-paid",
-            {"month": "2026-05", "amount": "70.0", "note": "аванс на карту"},
+            {"month": "2026-05", "amount": "70.0", "note": "аванс на карту", "payout_filter": "positive"},
         ),
         helper["id"],
     )
     assert mark_paid_response.status_code == 302
-    assert mark_paid_response.headers["location"] == "/payroll?month=2026-05&payout_paid=1"
+    assert mark_paid_response.headers["location"] == "/payroll?month=2026-05&payout_paid=1&payout_filter=positive"
 
     paid_payroll_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll", "payout_paid=1"),
@@ -612,6 +613,7 @@ async def assert_finance_margin(task):
     assert "Кем: owner2" in paid_payroll_html
     assert "Комментарий: аванс на карту" in paid_payroll_html
     assert f'action="/payroll/{helper["id"]}/note"' in paid_payroll_html
+    assert 'name="payout_filter" value="positive"' in paid_payroll_html
     assert "Журнал выплат" in paid_payroll_html
     assert "70.0 ₽" in paid_payroll_html
     assert "аванс на карту" in paid_payroll_html
@@ -621,12 +623,12 @@ async def assert_finance_margin(task):
         make_form_request(
             "owner2",
             f"/payroll/{helper['id']}/note",
-            {"month": "2026-05", "note": "наличными"},
+            {"month": "2026-05", "note": "наличными", "payout_filter": "partial"},
         ),
         helper["id"],
     )
     assert note_response.status_code == 302
-    assert note_response.headers["location"] == "/payroll?month=2026-05&payout_note_updated=1"
+    assert note_response.headers["location"] == "/payroll?month=2026-05&payout_note_updated=1&payout_filter=partial"
 
     note_page_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll", "payout_note_updated=1"),
@@ -697,12 +699,12 @@ async def assert_finance_margin(task):
         make_form_request(
             "owner2",
             f"/payroll/{helper['id']}/mark-unpaid",
-            {"month": "2026-05"},
+            {"month": "2026-05", "payout_filter": "partial"},
         ),
         helper["id"],
     )
     assert mark_unpaid_response.status_code == 302
-    assert mark_unpaid_response.headers["location"] == "/payroll?month=2026-05&payout_unpaid=1"
+    assert mark_unpaid_response.headers["location"] == "/payroll?month=2026-05&payout_unpaid=1&payout_filter=partial"
 
     unpaid_again_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll", "payout_unpaid=1"),

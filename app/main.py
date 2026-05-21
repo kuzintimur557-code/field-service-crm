@@ -3186,6 +3186,8 @@ async def mark_payroll_paid(request: Request, worker_id: int):
     month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
     amount = form.get("amount") or "0"
     note = (form.get("note") or "").strip()
+    payout_filter = form.get("payout_filter") or ""
+    selected_payout_filter = payout_filter if payout_filter in ("positive", "paid", "partial", "unpaid") else ""
 
     try:
         amount = float(str(amount).replace(",", "."))
@@ -3206,7 +3208,10 @@ async def mark_payroll_paid(request: Request, worker_id: int):
 
     if not worker:
         conn.close()
-        return RedirectResponse(f"/payroll?month={month}", status_code=302)
+        redirect_url = f"/payroll?month={month}"
+        if selected_payout_filter:
+            redirect_url += f"&payout_filter={selected_payout_filter}"
+        return RedirectResponse(redirect_url, status_code=302)
 
     paid_at = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -3234,7 +3239,10 @@ async def mark_payroll_paid(request: Request, worker_id: int):
     conn.commit()
     conn.close()
 
-    return RedirectResponse(f"/payroll?month={month}&payout_paid=1", status_code=302)
+    redirect_url = f"/payroll?month={month}&payout_paid=1"
+    if selected_payout_filter:
+        redirect_url += f"&payout_filter={selected_payout_filter}"
+    return RedirectResponse(redirect_url, status_code=302)
 
 
 @app.post("/payroll/{worker_id}/note")
@@ -3254,6 +3262,8 @@ async def update_payroll_payout_note(request: Request, worker_id: int):
     form = await request.form()
     month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
     note = (form.get("note") or "").strip()
+    payout_filter = form.get("payout_filter") or ""
+    selected_payout_filter = payout_filter if payout_filter in ("positive", "paid", "partial", "unpaid") else ""
 
     conn = connect()
     c = conn.cursor()
@@ -3267,7 +3277,10 @@ async def update_payroll_payout_note(request: Request, worker_id: int):
     conn.commit()
     conn.close()
 
-    return RedirectResponse(f"/payroll?month={month}&payout_note_updated=1", status_code=302)
+    redirect_url = f"/payroll?month={month}&payout_note_updated=1"
+    if selected_payout_filter:
+        redirect_url += f"&payout_filter={selected_payout_filter}"
+    return RedirectResponse(redirect_url, status_code=302)
 
 
 @app.post("/payroll/{worker_id}/mark-unpaid")
@@ -3286,6 +3299,8 @@ async def mark_payroll_unpaid(request: Request, worker_id: int):
     company_id = get_user_company_id(username)
     form = await request.form()
     month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
+    payout_filter = form.get("payout_filter") or ""
+    selected_payout_filter = payout_filter if payout_filter in ("positive", "paid", "partial", "unpaid") else ""
 
     conn = connect()
     c = conn.cursor()
@@ -3298,7 +3313,10 @@ async def mark_payroll_unpaid(request: Request, worker_id: int):
     conn.commit()
     conn.close()
 
-    return RedirectResponse(f"/payroll?month={month}&payout_unpaid=1", status_code=302)
+    redirect_url = f"/payroll?month={month}&payout_unpaid=1"
+    if selected_payout_filter:
+        redirect_url += f"&payout_filter={selected_payout_filter}"
+    return RedirectResponse(redirect_url, status_code=302)
 
 
 @app.get("/reports", response_class=HTMLResponse)

@@ -161,16 +161,19 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
             {% if row.payout_paid %}
             <form method="post" action="/payroll/{{ row.id }}/note">
                 <input type="hidden" name="month" value="{{ month }}">
+                <input type="hidden" name="payout_filter" value="{{ selected_payout_filter }}">
                 <input type="text" name="note" value="{{ row.payout_note }}" placeholder="Комментарий">
                 <button type="submit">Сохранить</button>
             </form>
             <form method="post" action="/payroll/{{ row.id }}/mark-unpaid">
                 <input type="hidden" name="month" value="{{ month }}">
+                <input type="hidden" name="payout_filter" value="{{ selected_payout_filter }}">
                 <button type="submit" class="secondary">Отменить</button>
             </form>
             {% else %}
             <form method="post" action="/payroll/{{ row.id }}/mark-paid">
                 <input type="hidden" name="month" value="{{ month }}">
+                <input type="hidden" name="payout_filter" value="{{ selected_payout_filter }}">
                 <input type="number" name="amount" min="0" step="0.1" value="{{ row.payout }}">
                 <input type="text" name="note" placeholder="Комментарий">
                 <button type="submit">Выплатил</button>
