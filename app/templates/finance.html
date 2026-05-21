@@ -26,6 +26,7 @@ input,select{border:1px solid #d1d5db;background:white}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .table{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:.6fr 1.4fr 1fr 1fr 1fr 1fr .7fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px}
+.worker-row{display:grid;grid-template-columns:1.2fr .6fr 1fr 1fr 1fr 1fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px}
 .head{background:#e5e7eb;font-weight:900}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;font-weight:900}
 .paid{background:#dcfce7;color:#166534}
@@ -44,6 +45,7 @@ h1{font-size:28px;margin-bottom:12px}
 form{display:block}
 input,select,button{width:100%;margin-top:8px}
 .row{grid-template-columns:1fr}
+.worker-row{grid-template-columns:1fr}
 .head{display:none}
 }
 </style>
@@ -161,6 +163,36 @@ input,select,button{width:100%;margin-top:8px}
         <div class="value">{{ average_estimate }} ₽</div>
     </div>
 </div>
+</div>
+
+<div class="card">
+<h2>Финансы по исполнителям</h2>
+
+{% if worker_finance_stats %}
+<div class="table">
+    <div class="worker-row head">
+        <div>Исполнитель</div>
+        <div>Заявки</div>
+        <div>Выручка</div>
+        <div>Расходы</div>
+        <div>Прибыль</div>
+        <div>Маржа</div>
+    </div>
+
+    {% for row in worker_finance_stats %}
+    <div class="worker-row">
+        <div><b>{{ row.worker }}</b></div>
+        <div>{{ row.tasks }}</div>
+        <div>{{ row.total }} ₽</div>
+        <div>{{ row.expenses }} ₽</div>
+        <div>{{ row.profit }} ₽</div>
+        <div>{{ row.margin }}%</div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty">Нет данных по исполнителям за выбранный период</div>
+{% endif %}
 </div>
 
 <div class="card">

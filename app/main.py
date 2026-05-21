@@ -2623,6 +2623,7 @@ async def finance_page(
     unpaid_total = 0
 
     rows = []
+    worker_finance = {}
 
     for task in tasks:
         if selected_worker and selected_worker not in get_task_worker_names(task):
@@ -2669,6 +2670,32 @@ async def finance_page(
         if selected_profit_filter == "loss" and task_profit >= 0:
             continue
 
+        task_worker_names = [
+            worker_name for worker_name in get_task_worker_names(task)
+            if worker_name in worker_names
+        ]
+
+        if not task_worker_names:
+            task_worker_names = ["Не назначены"]
+
+        worker_share_count = len(task_worker_names)
+
+        for worker_name in task_worker_names:
+            if worker_name not in worker_finance:
+                worker_finance[worker_name] = {
+                    "worker": worker_name,
+                    "tasks": 0,
+                    "total": 0,
+                    "expenses": 0,
+                    "profit": 0,
+                    "margin": 0
+                }
+
+            worker_finance[worker_name]["tasks"] += 1
+            worker_finance[worker_name]["total"] += task_total / worker_share_count
+            worker_finance[worker_name]["expenses"] += task_expenses_total / worker_share_count
+            worker_finance[worker_name]["profit"] += task_profit / worker_share_count
+
         total_estimate += task_total
         total_profit += task_profit
         total_expenses += task_expenses_total
@@ -2704,6 +2731,17 @@ async def finance_page(
     elif selected_sort == "expenses":
         rows.sort(key=lambda row: row["expenses"], reverse=True)
 
+    worker_finance_stats = []
+
+    for worker_row in worker_finance.values():
+        worker_row["total"] = round(worker_row["total"], 1)
+        worker_row["expenses"] = round(worker_row["expenses"], 1)
+        worker_row["profit"] = round(worker_row["profit"], 1)
+        worker_row["margin"] = round((worker_row["profit"] / worker_row["total"]) * 100, 1) if worker_row["total"] else 0
+        worker_finance_stats.append(worker_row)
+
+    worker_finance_stats.sort(key=lambda row: row["profit"], reverse=True)
+
     conn.close()
     total_margin = round((total_profit / total_estimate) * 100, 1) if total_estimate else 0
     average_estimate = round(total_estimate / len(rows), 1) if rows else 0
@@ -2722,6 +2760,7 @@ async def finance_page(
             "selected_sort": selected_sort,
             "selected_profit_filter": selected_profit_filter,
             "workers": workers,
+            "worker_finance_stats": worker_finance_stats,
             "rows": rows,
             "total_estimate": total_estimate,
             "total_profit": total_profit,
