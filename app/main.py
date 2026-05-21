@@ -3237,6 +3237,39 @@ async def mark_payroll_paid(request: Request, worker_id: int):
     return RedirectResponse(f"/payroll?month={month}&payout_paid=1", status_code=302)
 
 
+@app.post("/payroll/{worker_id}/note")
+async def update_payroll_payout_note(request: Request, worker_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/payroll?error=only_boss", status_code=302)
+
+    company_id = get_user_company_id(username)
+    form = await request.form()
+    month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
+    note = (form.get("note") or "").strip()
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    UPDATE payroll_payouts
+    SET note=?
+    WHERE company_id=? AND worker_id=? AND month=? AND status='paid'
+    """, (note, company_id, worker_id, month))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/payroll?month={month}&payout_note_updated=1", status_code=302)
+
+
 @app.post("/payroll/{worker_id}/mark-unpaid")
 async def mark_payroll_unpaid(request: Request, worker_id: int):
 

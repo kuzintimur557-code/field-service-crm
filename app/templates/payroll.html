@@ -66,6 +66,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">Отметка выплаты снята</div>
 {% endif %}
 
+{% if request.query_params.get("payout_note_updated") == "1" %}
+<div class="notice ok">Комментарий выплаты обновлён</div>
+{% endif %}
+
 <div class="card">
 <form method="get" action="/payroll">
     <div>
@@ -155,6 +159,11 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <div class="payroll-actions">
         {% if role == "boss" and row.payout > 0 %}
             {% if row.payout_paid %}
+            <form method="post" action="/payroll/{{ row.id }}/note">
+                <input type="hidden" name="month" value="{{ month }}">
+                <input type="text" name="note" value="{{ row.payout_note }}" placeholder="Комментарий">
+                <button type="submit">Сохранить</button>
+            </form>
             <form method="post" action="/payroll/{{ row.id }}/mark-unpaid">
                 <input type="hidden" name="month" value="{{ month }}">
                 <button type="submit" class="secondary">Отменить</button>

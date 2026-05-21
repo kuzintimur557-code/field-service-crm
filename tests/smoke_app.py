@@ -611,10 +611,32 @@ async def assert_finance_margin(task):
     assert "Остаток: 9.0 ₽" in paid_payroll_html
     assert "Кем: owner2" in paid_payroll_html
     assert "Комментарий: аванс на карту" in paid_payroll_html
+    assert f'action="/payroll/{helper["id"]}/note"' in paid_payroll_html
     assert "Журнал выплат" in paid_payroll_html
     assert "70.0 ₽" in paid_payroll_html
     assert "аванс на карту" in paid_payroll_html
     assert "Отменить" in paid_payroll_html
+
+    note_response = await crm.update_payroll_payout_note(
+        make_form_request(
+            "owner2",
+            f"/payroll/{helper['id']}/note",
+            {"month": "2026-05", "note": "наличными"},
+        ),
+        helper["id"],
+    )
+    assert note_response.status_code == 302
+    assert note_response.headers["location"] == "/payroll?month=2026-05&payout_note_updated=1"
+
+    note_page_response = await crm.payroll_page(
+        make_asgi_request("owner2", "/payroll", "payout_note_updated=1"),
+        month="2026-05",
+        payout_filter="partial",
+    )
+    assert note_page_response.status_code == 200
+    note_page_html = note_page_response.body.decode("utf-8")
+    assert "Комментарий выплаты обновлён" in note_page_html
+    assert "Комментарий: наличными" in note_page_html
 
     paid_filter_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll"),
@@ -666,7 +688,7 @@ async def assert_finance_margin(task):
     assert "Кем выплачено" in payroll_csv
     assert "Комментарий" in payroll_csv
     assert "owner2" in payroll_csv
-    assert "аванс на карту" in payroll_csv
+    assert "наличными" in payroll_csv
     assert "Частично" in payroll_csv
     assert "Итого выплачено" in payroll_csv
     assert "Итого осталось" in payroll_csv
