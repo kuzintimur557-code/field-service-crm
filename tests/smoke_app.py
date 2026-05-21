@@ -612,6 +612,7 @@ async def assert_client_card(task):
     )
     assert note_task_response.status_code == 200
     note_task_html = note_task_response.body.decode("utf-8")
+    assert f'name="note_id" value="{latest_note["id"]}"' in note_task_html
     assert "Smoke latest client note</textarea>" in note_task_html
 
     original_send_message = crm.send_message
@@ -1415,6 +1416,38 @@ async def assert_required_custom_fields():
     )
     assert task_response.status_code == 302
     assert task_response.headers["location"] == "/create-task?error=custom_required&task_date=2026-05-20&worker=worker2&return_to=calendar"
+
+    conn = connect()
+    c = conn.cursor()
+    client_note = c.execute("""
+    SELECT id
+    FROM client_notes
+    WHERE client_id=?
+    ORDER BY id DESC
+    """, (client["id"],)).fetchone()
+    conn.close()
+
+    task_note_response = await crm.create_task(
+        make_multipart_request(
+            "owner2",
+            "/create-task",
+            {
+                "client_id": str(client["id"]),
+                "note_id": str(client_note["id"]),
+                "client": client["name"],
+                "phone": client["phone"] or "",
+                "address": client["address"] or "",
+                "description": "Missing required from note",
+                "task_date": "2026-05-20",
+                "return_to": "client",
+                "priority": "Обычный",
+                "price": "0",
+            },
+        ),
+        photo=None,
+    )
+    assert task_note_response.status_code == 302
+    assert task_note_response.headers["location"] == f"/create-task?error=custom_required&task_date=2026-05-20&return_to=client&client_id={client['id']}&note_id={client_note['id']}"
 
     edit_client_response = await crm.edit_client(
         make_form_request(

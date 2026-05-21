@@ -4734,6 +4734,7 @@ async def create_task_page(
     recommended_worker = None
     selected_client = None
     selected_description = ""
+    selected_note_id = 0
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
@@ -4815,6 +4816,7 @@ async def create_task_page(
 
             if selected_note:
                 selected_description = selected_note["note"] or ""
+                selected_note_id = note_id
 
     custom_fields = c.execute("""
     SELECT *
@@ -4837,6 +4839,7 @@ async def create_task_page(
             "custom_fields": custom_fields,
             "selected_client": selected_client,
             "selected_description": selected_description,
+            "selected_note_id": selected_note_id,
             "selected_task_date": selected_task_date,
             "selected_workers": selected_workers,
             "selected_return_to": selected_return_to,
@@ -4875,6 +4878,7 @@ async def create_task(
     deadline_at = (form.get("deadline_at") or "").strip()
     selected_workers = form.getlist("workers")
     return_to = (form.get("return_to") or "").strip()
+    note_id = (form.get("note_id") or "").strip()
     priority = form.get("priority")
     price = form.get("price")
     company_id = get_user_company_id(username)
@@ -4896,7 +4900,6 @@ async def create_task(
         custom_value = (form.get(field_name) or "").strip()
 
         if custom_field["is_required"] and not custom_value:
-            conn.close()
             error_params = {"error": "custom_required"}
             selected_task_date = str(task_date or "")[:10]
 
@@ -4921,6 +4924,19 @@ async def create_task(
                 error_params["return_to"] = "client"
                 error_params["client_id"] = client_id
 
+                if note_id.isdigit():
+                    note = c.execute("""
+                    SELECT id
+                    FROM client_notes
+                    WHERE id=?
+                      AND client_id=?
+                      AND company_id=?
+                    """, (int(note_id), client_id, company_id)).fetchone()
+
+                    if note:
+                        error_params["note_id"] = note_id
+
+            conn.close()
             return RedirectResponse(f"/create-task?{urlencode(error_params)}", status_code=302)
 
     if client_id:

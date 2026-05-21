@@ -68,6 +68,9 @@ button:hover{background:#1d4ed8}
 {% if selected_client %}
 <input type="hidden" name="client_id" value="{{ selected_client['id'] }}">
 {% endif %}
+{% if selected_note_id %}
+<input type="hidden" name="note_id" value="{{ selected_note_id }}">
+{% endif %}
 
 <label>Клиент</label>
 <input name="client" placeholder="Имя клиента" value="{{ selected_client['name'] if selected_client else '' }}" required>
