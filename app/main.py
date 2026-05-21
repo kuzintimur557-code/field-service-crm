@@ -2651,6 +2651,7 @@ async def finance_page(
 
     conn.close()
     total_margin = round((total_profit / total_estimate) * 100, 1) if total_estimate else 0
+    average_estimate = round(total_estimate / len(rows), 1) if rows else 0
 
     return templates.TemplateResponse(
         request,
@@ -2667,6 +2668,7 @@ async def finance_page(
             "total_estimate": total_estimate,
             "total_profit": total_profit,
             "total_margin": total_margin,
+            "average_estimate": average_estimate,
             "paid_total": paid_total,
             "partial_total": partial_total,
             "unpaid_total": unpaid_total
