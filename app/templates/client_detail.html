@@ -197,6 +197,18 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	    <a class="btn" href="/task/{{ latest_task['id'] }}">Открыть</a>
 	</div>
 	{% endif %}
+
+	{% if upcoming_task %}
+	<div class="latest-task">
+	    <div>
+	        <div class="latest-title">Ближайшая заявка #{{ upcoming_task["id"] }}</div>
+	        <div class="latest-meta">
+	            {{ upcoming_task["task_date"] or "Без даты" }} / {{ upcoming_task["status"] }} / {{ upcoming_task["worker"] or "Не назначен" }}
+	        </div>
+	    </div>
+	    <a class="btn" href="/task/{{ upcoming_task['id'] }}">Открыть</a>
+	</div>
+	{% endif %}
 	</div>
 
 <div class="card">

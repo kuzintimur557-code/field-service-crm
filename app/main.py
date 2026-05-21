@@ -3445,13 +3445,23 @@ async def client_detail(
     client_completed_tasks = 0
     client_overdue_tasks = 0
     client_revenue = 0
+    upcoming_tasks = []
 
     for task in tasks:
         task_status = task["status"] or ""
         is_archived = "archived" in task.keys() and task["archived"] == 1
+        task_date = str(task["task_date"] or "")[:10]
 
         if not is_archived and task_status in ("Новая", "В работе"):
             client_active_tasks += 1
+
+        if (
+            not is_archived
+            and task_date
+            and task_date >= today
+            and task_status not in ("Завершено", "Отменено")
+        ):
+            upcoming_tasks.append(task)
 
         if task_status == "Завершено":
             client_completed_tasks += 1
@@ -3461,8 +3471,6 @@ async def client_detail(
             except Exception:
                 pass
 
-        task_date = str(task["task_date"] or "")[:10]
-
         if (
             not is_archived
             and task_date
@@ -3470,6 +3478,14 @@ async def client_detail(
             and task_status not in ("Завершено", "Отменено")
         ):
             client_overdue_tasks += 1
+
+    upcoming_task = None
+
+    if upcoming_tasks:
+        upcoming_task = sorted(
+            upcoming_tasks,
+            key=lambda item: (str(item["task_date"] or ""), item["id"] or 0)
+        )[0]
 
     filtered_tasks = []
 
@@ -3607,6 +3623,7 @@ async def client_detail(
             "client": client,
             "tasks": filtered_tasks,
             "latest_task": latest_task,
+            "upcoming_task": upcoming_task,
             "shown_task_count": len(filtered_tasks),
             "selected_task_filter": selected_task_filter,
             "selected_task_search": selected_task_search,
