@@ -597,6 +597,7 @@ async def assert_client_card(task):
     assert "Файлы клиента" in html
     assert "client-contract.txt" in html
     assert "Загрузить файл" in html
+    assert "Удалить" in html
     assert 'href="tel:+70000000000"' in html
     assert 'href="mailto:client@example.com"' in html
     assert "Лента активности" in html
@@ -667,6 +668,24 @@ async def assert_client_card(task):
         client_file["id"],
     )
     assert outsider_file_response.status_code == 404
+
+    delete_file_response = await crm.delete_client_file(
+        make_request("owner2"),
+        task["client_id"],
+        client_file["id"],
+    )
+    assert delete_file_response.status_code == 302
+    assert delete_file_response.headers["location"] == f"/clients/{task['client_id']}?file_deleted=1"
+
+    conn = connect()
+    c = conn.cursor()
+    deleted_file_count = c.execute("""
+    SELECT COUNT(*)
+    FROM client_files
+    WHERE id=?
+    """, (client_file["id"],)).fetchone()[0]
+    conn.close()
+    assert deleted_file_count == 0
 
     note_task_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),

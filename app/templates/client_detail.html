@@ -50,6 +50,9 @@ h2{margin:0 0 16px;font-size:22px}
 .note-text{font-size:16px;line-height:1.45;white-space:pre-wrap}
 .file-item{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:14px;margin-bottom:10px}
 .file-meta{margin-top:5px;color:#6b7280;font-size:13px;font-weight:800}
+.file-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.file-actions form{margin:0}
+.file-actions button{margin:0;background:#dc2626;padding:11px 15px;font-size:16px}
 .timeline-item{display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:14px;margin-bottom:10px}
 .timeline-date{font-size:13px;color:#6b7280;font-weight:900}
 .timeline-action{font-weight:900;margin-bottom:5px}
@@ -342,6 +345,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice err">❌ Выберите файл для загрузки</div>
 {% endif %}
 
+{% if request.query_params.get("file_deleted") == "1" %}
+<div class="notice ok">✅ Файл удалён</div>
+{% endif %}
+
 <form method="post" action="/clients/{{ client['id'] }}/files" enctype="multipart/form-data">
     <label>Новый файл</label>
     <input type="file" name="upload">
@@ -356,7 +363,12 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="value">{{ file["original_filename"] }}</div>
         <div class="file-meta">{{ file["created_at"] }} / {{ file["username"] }}</div>
     </div>
-    <a class="btn" href="/clients/{{ client['id'] }}/files/{{ file['id'] }}">Открыть</a>
+    <div class="file-actions">
+        <a class="btn" href="/clients/{{ client['id'] }}/files/{{ file['id'] }}">Открыть</a>
+        <form method="post" action="/clients/{{ client['id'] }}/files/{{ file['id'] }}/delete">
+            <button type="submit">Удалить</button>
+        </form>
+    </div>
 </div>
 {% endfor %}
 {% else %}

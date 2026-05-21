@@ -3862,6 +3862,55 @@ async def download_client_file(request: Request, client_id: int, file_id: int):
     )
 
 
+@app.post("/clients/{client_id}/files/{file_id}/delete")
+async def delete_client_file(request: Request, client_id: int, file_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    client_file = c.execute("""
+    SELECT *
+    FROM client_files
+    WHERE id=?
+      AND client_id=?
+      AND company_id=?
+    """, (file_id, client_id, company_id)).fetchone()
+
+    if not client_file:
+        conn.close()
+        return RedirectResponse(f"/clients/{client_id}", status_code=302)
+
+    stored_filename = Path(client_file["stored_filename"] or "").name
+    file_path = CLIENT_FILES_DIR / stored_filename
+
+    c.execute("""
+    DELETE FROM client_files
+    WHERE id=? AND client_id=? AND company_id=?
+    """, (file_id, client_id, company_id))
+    conn.commit()
+    conn.close()
+
+    if stored_filename and file_path.is_file():
+        try:
+            file_path.unlink()
+        except Exception:
+            pass
+
+    return RedirectResponse(f"/clients/{client_id}?file_deleted=1", status_code=302)
+
+
 @app.post("/clients/{client_id}/edit")
 async def edit_client(request: Request, client_id: int):
 
