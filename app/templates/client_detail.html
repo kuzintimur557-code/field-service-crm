@@ -355,6 +355,17 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <button type="submit">Загрузить файл</button>
 </form>
 
+<form class="task-search" method="get" action="/clients/{{ client['id'] }}" style="margin-top:16px">
+    <div>
+        <label>Поиск по файлам</label>
+        <input type="text" name="file_search" value="{{ selected_file_search }}" placeholder="Название файла или автор">
+    </div>
+    <button type="submit">Найти</button>
+    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить</a>
+</form>
+
+<div class="task-count">Файлов: {{ shown_file_count }} из {{ client_file_count }}</div>
+
 <div style="margin-top:18px">
 {% if client_files %}
 {% for file in client_files %}

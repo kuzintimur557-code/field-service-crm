@@ -3412,7 +3412,8 @@ async def client_detail(
     task_search: str = "",
     task_sort: str = "",
     activity_filter: str = "",
-    note_search: str = ""
+    note_search: str = "",
+    file_search: str = ""
 ):
 
     username = get_user(request)
@@ -3451,8 +3452,10 @@ async def client_detail(
     selected_task_sort = task_sort if task_sort in ("oldest", "date_asc", "date_desc") else "newest"
     selected_activity_filter = activity_filter if activity_filter in ("status", "date", "comment") else ""
     selected_note_search = str(note_search or "").strip()
+    selected_file_search = str(file_search or "").strip()
     search_value = selected_task_search.lower()
     note_search_value = selected_note_search.lower()
+    file_search_value = selected_file_search.lower()
     latest_task = tasks[0] if tasks else None
     client_task_workers = {task["id"]: format_task_workers(task) for task in tasks}
 
@@ -3621,6 +3624,17 @@ async def client_detail(
     WHERE client_id=? AND company_id=?
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
+    client_file_count = len(client_files)
+
+    if file_search_value:
+        client_files = [
+            client_file for client_file in client_files
+            if file_search_value in " ".join([
+                str(client_file["original_filename"] or ""),
+                str(client_file["username"] or ""),
+                str(client_file["content_type"] or "")
+            ]).lower()
+        ]
 
     client_custom_fields = c.execute("""
     SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_fields.options, custom_field_values.value
@@ -3656,12 +3670,15 @@ async def client_detail(
             "selected_task_sort": selected_task_sort,
             "selected_activity_filter": selected_activity_filter,
             "selected_note_search": selected_note_search,
+            "selected_file_search": selected_file_search,
             "client_notes": client_notes,
             "client_files": client_files,
             "latest_client_note": latest_client_note,
             "last_contact": last_contact,
             "shown_note_count": len(client_notes),
             "client_note_count": client_note_count,
+            "shown_file_count": len(client_files),
+            "client_file_count": client_file_count,
             "shown_activity_count": len(client_timeline),
             "client_total_tasks": client_total_tasks,
             "client_now_value": client_now_value,

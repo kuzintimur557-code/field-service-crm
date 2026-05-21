@@ -597,6 +597,9 @@ async def assert_client_card(task):
     assert "Файлы клиента" in html
     assert "client-contract.txt" in html
     assert "Загрузить файл" in html
+    assert "Поиск по файлам" in html
+    assert "file_search" in html
+    assert "Файлов:" in html
     assert "Удалить" in html
     assert 'href="tel:+70000000000"' in html
     assert 'href="mailto:client@example.com"' in html
@@ -661,6 +664,16 @@ async def assert_client_card(task):
         client_file["id"],
     )
     assert file_download_response.status_code == 200
+
+    file_search_response = await crm.client_detail(
+        make_asgi_request("owner2", f"/clients/{task['client_id']}"),
+        task["client_id"],
+        file_search="contract",
+    )
+    assert file_search_response.status_code == 200
+    file_search_html = file_search_response.body.decode("utf-8")
+    assert 'name="file_search" value="contract"' in file_search_html
+    assert "client-contract.txt" in file_search_html
 
     outsider_file_response = await crm.download_client_file(
         make_request("manager1"),
