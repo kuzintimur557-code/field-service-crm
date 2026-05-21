@@ -3510,6 +3510,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "",
     WHERE client_id=? AND company_id=?
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
+    latest_client_note = client_notes[0] if client_notes else None
 
     client_timeline = c.execute("""
     SELECT
@@ -3555,6 +3556,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "",
             "selected_task_search": selected_task_search,
             "selected_task_sort": selected_task_sort,
             "client_notes": client_notes,
+            "latest_client_note": latest_client_note,
             "client_total_tasks": client_total_tasks,
             "client_active_tasks": client_active_tasks,
             "client_completed_tasks": client_completed_tasks,

@@ -525,6 +525,23 @@ async def assert_client_card(task):
         "Timeline details",
     )
 
+    original_send_message = crm.send_message
+    crm.send_message = lambda text: True
+
+    try:
+        note_response = await crm.add_client_note(
+            make_form_request(
+                "owner2",
+                f"/clients/{task['client_id']}/notes",
+                {"note": "Smoke latest client note"},
+            ),
+            task["client_id"],
+        )
+    finally:
+        crm.send_message = original_send_message
+
+    assert note_response.status_code == 302
+
     response = await crm.client_detail(
         make_asgi_request("owner2", f"/clients/{task['client_id']}"),
         task["client_id"],
@@ -545,6 +562,8 @@ async def assert_client_card(task):
     assert "Показано:" in html
     assert "Последняя заявка" in html
     assert "latest-task" in html
+    assert "Последняя заметка" in html
+    assert "Smoke latest client note" in html
     assert 'href="tel:+70000000000"' in html
     assert 'href="mailto:client@example.com"' in html
     assert "Лента активности" in html

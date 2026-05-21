@@ -25,6 +25,8 @@ h2{margin:0 0 16px;font-size:22px}
 .latest-task{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#eff6ff;border:1px solid #bfdbfe;border-radius:18px;padding:16px;margin-top:18px}
 .latest-title{font-weight:900;margin-bottom:6px}
 .latest-meta{color:#4b5563;font-weight:800;line-height:1.45}
+.latest-note{background:#fff7ed;border:1px solid #fed7aa;border-radius:18px;padding:16px;margin-top:18px}
+.latest-note-text{white-space:pre-wrap;line-height:1.45;font-weight:800;color:#4b5563}
 .task{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
 .task-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .btn{display:inline-block;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
@@ -140,6 +142,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	    <div class="label">Заметки</div>
     <div class="value">{{ client["notes"] }}</div>
 </div>
+	{% endif %}
+
+	{% if latest_client_note %}
+	<div class="latest-note">
+	    <div class="latest-title">Последняя заметка</div>
+	    <div class="latest-meta">{{ latest_client_note["created_at"] }} / {{ latest_client_note["username"] }}</div>
+	    <div class="latest-note-text">{{ latest_client_note["note"] }}</div>
+	</div>
 	{% endif %}
 
 	<div class="stats">
