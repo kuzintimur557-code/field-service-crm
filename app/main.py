@@ -3389,7 +3389,7 @@ async def clients_page(request: Request):
 
 
 @app.get("/clients/{client_id}", response_class=HTMLResponse)
-async def client_detail(request: Request, client_id: int, task_filter: str = "", task_search: str = ""):
+async def client_detail(request: Request, client_id: int, task_filter: str = "", task_search: str = "", task_sort: str = ""):
 
     username = get_user(request)
 
@@ -3424,6 +3424,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "",
     """, (client_id, company_id)).fetchall()
     selected_task_filter = task_filter if task_filter in ("active", "completed", "overdue") else ""
     selected_task_search = str(task_search or "").strip()
+    selected_task_sort = task_sort if task_sort in ("oldest", "date_asc", "date_desc") else "newest"
     search_value = selected_task_search.lower()
     latest_task = tasks[0] if tasks else None
 
@@ -3496,6 +3497,13 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "",
 
         filtered_tasks.append(task)
 
+    if selected_task_sort == "oldest":
+        filtered_tasks.sort(key=lambda item: item["id"] or 0)
+    elif selected_task_sort == "date_asc":
+        filtered_tasks.sort(key=lambda item: (str(item["task_date"] or ""), item["id"] or 0))
+    elif selected_task_sort == "date_desc":
+        filtered_tasks.sort(key=lambda item: (str(item["task_date"] or ""), item["id"] or 0), reverse=True)
+
     client_notes = c.execute("""
     SELECT *
     FROM client_notes
@@ -3545,6 +3553,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "",
             "shown_task_count": len(filtered_tasks),
             "selected_task_filter": selected_task_filter,
             "selected_task_search": selected_task_search,
+            "selected_task_sort": selected_task_sort,
             "client_notes": client_notes,
             "client_total_tasks": client_total_tasks,
             "client_active_tasks": client_active_tasks,

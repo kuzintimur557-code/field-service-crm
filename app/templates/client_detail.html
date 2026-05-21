@@ -31,6 +31,7 @@ h2{margin:0 0 16px;font-size:22px}
 .task-search{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
 .task-search div{flex:1;min-width:220px}
 .task-search input{margin-top:6px}
+.task-search select{width:100%;padding:15px;border-radius:14px;border:1px solid #d1d5db;background:white;font-size:16px;margin-top:6px}
 .task-search button{width:auto;margin-top:0;padding:12px 15px}
 .task-count{margin-bottom:12px;color:#6b7280;font-size:13px;font-weight:900}
 .contact-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
@@ -306,14 +307,23 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <label>Поиск по заявкам</label>
         <input type="text" name="task_search" value="{{ selected_task_search }}" placeholder="Адрес, описание, исполнитель, #ID">
     </div>
+    <div>
+        <label>Сортировка</label>
+        <select name="task_sort">
+            <option value="newest" {% if selected_task_sort == "newest" %}selected{% endif %}>Сначала новые</option>
+            <option value="oldest" {% if selected_task_sort == "oldest" %}selected{% endif %}>Сначала старые</option>
+            <option value="date_desc" {% if selected_task_sort == "date_desc" %}selected{% endif %}>Дата по убыванию</option>
+            <option value="date_asc" {% if selected_task_sort == "date_asc" %}selected{% endif %}>Дата по возрастанию</option>
+        </select>
+    </div>
     <button type="submit">Найти</button>
 </form>
 
 <div class="task-filters">
-    <a href="/clients/{{ client['id'] }}{% if selected_task_search %}?task_search={{ selected_task_search }}{% endif %}" class="{% if not selected_task_filter %}active{% endif %}">Все</a>
-    <a href="/clients/{{ client['id'] }}?task_filter=active{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'active' %}active{% endif %}">Активные</a>
-    <a href="/clients/{{ client['id'] }}?task_filter=completed{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'completed' %}active{% endif %}">Завершённые</a>
-    <a href="/clients/{{ client['id'] }}?task_filter=overdue{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'overdue' %}active{% endif %}">Просроченные</a>
+    <a href="/clients/{{ client['id'] }}?task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if not selected_task_filter %}active{% endif %}">Все</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=active&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'active' %}active{% endif %}">Активные</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=completed&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'completed' %}active{% endif %}">Завершённые</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=overdue&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'overdue' %}active{% endif %}">Просроченные</a>
 </div>
 
 <div class="task-count">Показано: {{ shown_task_count }} из {{ client_total_tasks }}</div>

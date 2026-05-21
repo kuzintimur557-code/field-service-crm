@@ -539,6 +539,8 @@ async def assert_client_card(task):
     assert "task_filter=overdue" in html
     assert "Поиск по заявкам" in html
     assert "task_search" in html
+    assert "Сортировка" in html
+    assert 'name="task_sort"' in html
     assert "Показано:" in html
     assert "Последняя заявка" in html
     assert "latest-task" in html
@@ -614,6 +616,15 @@ async def assert_client_card(task):
     search_html = search_response.body.decode("utf-8")
     assert 'name="task_search" value="Company 2 address"' in search_html
     assert f"#{task['id']}" in search_html
+
+    sorted_response = await crm.client_detail(
+        make_asgi_request("owner2", f"/clients/{task['client_id']}"),
+        task["client_id"],
+        task_sort="oldest",
+    )
+    assert sorted_response.status_code == 200
+    sorted_html = sorted_response.body.decode("utf-8")
+    assert '<option value="oldest" selected>Сначала старые</option>' in sorted_html
 
 
 async def assert_overdue_sla(task):
