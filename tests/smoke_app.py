@@ -555,6 +555,7 @@ async def assert_finance_margin(task):
     assert "Осталось выплатить" in payroll_html
     assert "Не выплачено" in payroll_html
     assert "Выплатил" in payroll_html
+    assert 'name="amount" min="0" step="0.1" value="79.0"' in payroll_html
     assert "payout_filter=paid" in payroll_html
     assert "payout_filter=unpaid" in payroll_html
     assert f"/workers/{helper['id']}?month=2026-05" in payroll_html
