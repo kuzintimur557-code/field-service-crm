@@ -32,6 +32,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .search-row div{flex:1;min-width:220px}
 .search-row button{width:auto}
 .reset-link{display:inline-block;padding:13px 15px;border-radius:14px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-weight:900}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.filters a{padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filters a.active{background:#111827;color:white}
 .empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
 .notice{margin-top:16px;padding:14px;border-radius:16px;font-weight:900}
 .notice.ok{background:#dcfce7;color:#166534}
@@ -137,7 +140,17 @@ h1{font-size:28px;margin-bottom:12px}
 <div class="card">
 <h2>Список клиентов</h2>
 
+<div class="filters">
+    <a href="/clients{% if selected_search %}?search={{ selected_search }}{% endif %}" class="{% if not selected_client_filter %}active{% endif %}">Все</a>
+    <a href="/clients?client_filter=active{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'active' %}active{% endif %}">Активные</a>
+    <a href="/clients?client_filter=overdue{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'overdue' %}active{% endif %}">С просрочками</a>
+    <a href="/clients?client_filter=empty{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'empty' %}active{% endif %}">Без заявок</a>
+</div>
+
 <form class="search-row" method="get" action="/clients">
+    {% if selected_client_filter %}
+    <input type="hidden" name="client_filter" value="{{ selected_client_filter }}">
+    {% endif %}
     <div>
         <label>Поиск клиентов</label>
         <input type="text" name="search" value="{{ selected_search }}" placeholder="Имя, телефон, email, адрес">

@@ -3350,7 +3350,7 @@ async def toggle_catalog_item(request: Request, item_id: int):
 
 
 @app.get("/clients", response_class=HTMLResponse)
-async def clients_page(request: Request, search: str = ""):
+async def clients_page(request: Request, search: str = "", client_filter: str = ""):
 
     username = get_user(request)
 
@@ -3374,6 +3374,7 @@ async def clients_page(request: Request, search: str = ""):
     company_id = get_user_company_id(username)
     today = datetime.now().strftime("%Y-%m-%d")
     selected_search = str(search or "").strip()
+    selected_client_filter = client_filter if client_filter in ("active", "overdue", "empty") else ""
     search_value = f"%{selected_search.lower()}%"
 
     search_condition = ""
@@ -3417,6 +3418,13 @@ async def clients_page(request: Request, search: str = ""):
     ORDER BY clients.id DESC
     """, params).fetchall()
 
+    if selected_client_filter == "active":
+        clients = [client for client in clients if client["active_task_count"]]
+    elif selected_client_filter == "overdue":
+        clients = [client for client in clients if client["overdue_task_count"]]
+    elif selected_client_filter == "empty":
+        clients = [client for client in clients if not client["task_count"]]
+
     custom_fields = c.execute("""
     SELECT *
     FROM custom_fields
@@ -3437,6 +3445,7 @@ async def clients_page(request: Request, search: str = ""):
             "role": role,
             "clients": clients,
             "selected_search": selected_search,
+            "selected_client_filter": selected_client_filter,
             "custom_fields": custom_fields
         }
     )

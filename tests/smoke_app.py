@@ -1149,6 +1149,9 @@ async def assert_client_custom_fields():
     assert "Заявок:" in page_html
     assert "Активных:" in page_html
     assert "Поиск клиентов" in page_html
+    assert "client_filter=active" in page_html
+    assert "client_filter=overdue" in page_html
+    assert "client_filter=empty" in page_html
 
     search_response = await crm.clients_page(
         make_asgi_request("owner2", "/clients"),
@@ -1158,6 +1161,14 @@ async def assert_client_custom_fields():
     search_html = search_response.body.decode("utf-8")
     assert 'name="search" value="Client 2"' in search_html
     assert "Client 2" in search_html
+
+    filtered_response = await crm.clients_page(
+        make_asgi_request("owner2", "/clients"),
+        client_filter="active",
+    )
+    assert filtered_response.status_code == 200
+    filtered_html = filtered_response.body.decode("utf-8")
+    assert 'name="client_filter" value="active"' in filtered_html
 
     original_send_message = crm.send_message
     crm.send_message = lambda text: True
