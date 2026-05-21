@@ -2937,7 +2937,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
     if selected_payout_filter == "positive":
         rows = [row for row in rows if row["payout"] > 0]
     if selected_payout_filter == "paid":
-        rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"]]
+        rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"] and row["paid_amount"] >= row["payout"]]
     if selected_payout_filter == "partial":
         rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"] and row["paid_amount"] < row["payout"]]
     if selected_payout_filter == "unpaid":
@@ -3097,7 +3097,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
     if selected_payout_filter == "positive":
         rows = [row for row in rows if row["payout"] > 0]
     if selected_payout_filter == "paid":
-        rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"]]
+        rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"] and row["paid_amount"] >= row["payout"]]
     if selected_payout_filter == "partial":
         rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"] and row["paid_amount"] < row["payout"]]
     if selected_payout_filter == "unpaid":
