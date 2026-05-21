@@ -695,6 +695,17 @@ async def assert_finance_margin(task):
     assert "Итого выплачено" in payroll_csv
     assert "Итого осталось" in payroll_csv
 
+    paid_worker_detail_response = await crm.worker_detail(
+        make_asgi_request("owner2", f"/workers/{helper['id']}"),
+        helper["id"],
+        month="2026-05",
+    )
+    assert paid_worker_detail_response.status_code == 200
+    paid_worker_detail_html = paid_worker_detail_response.body.decode("utf-8")
+    assert "/payroll?month=2026-05&payout_filter=partial" in paid_worker_detail_html
+    assert "Частично" in paid_worker_detail_html
+    assert "Комментарий выплаты: наличными" in paid_worker_detail_html
+
     mark_unpaid_response = await crm.mark_payroll_unpaid(
         make_form_request(
             "owner2",
