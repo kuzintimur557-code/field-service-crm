@@ -3350,7 +3350,12 @@ async def toggle_catalog_item(request: Request, item_id: int):
 
 
 @app.get("/clients", response_class=HTMLResponse)
-async def clients_page(request: Request, search: str = "", client_filter: str = ""):
+async def clients_page(
+    request: Request,
+    search: str = "",
+    client_filter: str = "",
+    client_sort: str = ""
+):
 
     username = get_user(request)
 
@@ -3375,6 +3380,7 @@ async def clients_page(request: Request, search: str = "", client_filter: str = 
     today = datetime.now().strftime("%Y-%m-%d")
     selected_search = str(search or "").strip()
     selected_client_filter = client_filter if client_filter in ("active", "overdue", "empty") else ""
+    selected_client_sort = client_sort if client_sort in ("name", "tasks", "active", "overdue") else "newest"
     search_value = f"%{selected_search.lower()}%"
 
     search_condition = ""
@@ -3425,6 +3431,15 @@ async def clients_page(request: Request, search: str = "", client_filter: str = 
     elif selected_client_filter == "empty":
         clients = [client for client in clients if not client["task_count"]]
 
+    if selected_client_sort == "name":
+        clients = sorted(clients, key=lambda client: str(client["name"] or "").lower())
+    elif selected_client_sort == "tasks":
+        clients = sorted(clients, key=lambda client: client["task_count"] or 0, reverse=True)
+    elif selected_client_sort == "active":
+        clients = sorted(clients, key=lambda client: client["active_task_count"] or 0, reverse=True)
+    elif selected_client_sort == "overdue":
+        clients = sorted(clients, key=lambda client: client["overdue_task_count"] or 0, reverse=True)
+
     custom_fields = c.execute("""
     SELECT *
     FROM custom_fields
@@ -3446,6 +3461,7 @@ async def clients_page(request: Request, search: str = "", client_filter: str = 
             "clients": clients,
             "selected_search": selected_search,
             "selected_client_filter": selected_client_filter,
+            "selected_client_sort": selected_client_sort,
             "custom_fields": custom_fields
         }
     )

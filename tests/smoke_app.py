@@ -1152,14 +1152,17 @@ async def assert_client_custom_fields():
     assert "client_filter=active" in page_html
     assert "client_filter=overdue" in page_html
     assert "client_filter=empty" in page_html
+    assert 'name="client_sort"' in page_html
 
     search_response = await crm.clients_page(
         make_asgi_request("owner2", "/clients"),
         search="Client 2",
+        client_sort="name",
     )
     assert search_response.status_code == 200
     search_html = search_response.body.decode("utf-8")
     assert 'name="search" value="Client 2"' in search_html
+    assert '<option value="name" selected' in search_html
     assert "Client 2" in search_html
 
     filtered_response = await crm.clients_page(
