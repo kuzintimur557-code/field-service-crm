@@ -486,6 +486,7 @@ async def assert_finance_margin(task):
     assert "70.0%" in finance_html
     assert "Средний чек" in finance_html
     assert "2000.0 ₽" in finance_html
+    assert "К оплате" in finance_html
     assert "worker2, helper2" in finance_html
     assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html
