@@ -2783,6 +2783,133 @@ async def finance_page(
     )
 
 
+@app.get("/payroll", response_class=HTMLResponse)
+async def payroll_page(request: Request, month: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    conn = connect()
+    c = conn.cursor()
+
+    workers = c.execute("""
+    SELECT username, full_name, commission_percent
+    FROM users
+    WHERE role='worker' AND company_id=?
+    ORDER BY username
+    """, (company_id,)).fetchall()
+    worker_map = {
+        worker["username"]: worker
+        for worker in workers
+    }
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0 AND company_id=? AND task_date LIKE ?
+    """, (company_id, f"{month}%")).fetchall()
+
+    payroll_rows = {
+        worker["username"]: {
+            "username": worker["username"],
+            "name": worker["full_name"] or worker["username"],
+            "commission_percent": float(worker["commission_percent"] or 0),
+            "tasks": 0,
+            "total": 0,
+            "profit": 0,
+            "payout": 0
+        }
+        for worker in workers
+    }
+
+    for task in tasks:
+        task_worker_names = [
+            worker_name for worker_name in get_task_worker_names(task)
+            if worker_name in worker_map
+        ]
+
+        if not task_worker_names:
+            continue
+
+        items = c.execute("""
+        SELECT *
+        FROM task_items
+        WHERE task_id=?
+        """, (task["id"],)).fetchall()
+        expenses = c.execute("""
+        SELECT *
+        FROM task_expenses
+        WHERE task_id=?
+        """, (task["id"],)).fetchall()
+
+        task_total = sum(item["total"] for item in items)
+        task_profit = sum(item["profit"] for item in items)
+        discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
+        task_expenses_total = sum(expense["amount"] for expense in expenses)
+
+        if not items:
+            try:
+                task_total = float(task["price"] or 0)
+            except Exception:
+                task_total = 0
+            task_profit = 0
+
+        if discount_amount < 0:
+            discount_amount = 0
+
+        task_total = max(task_total - discount_amount, 0)
+        task_profit = task_profit - discount_amount - task_expenses_total
+        share_count = len(task_worker_names)
+
+        for worker_name in task_worker_names:
+            payroll_rows[worker_name]["tasks"] += 1
+            payroll_rows[worker_name]["total"] += task_total / share_count
+            payroll_rows[worker_name]["profit"] += task_profit / share_count
+
+    rows = []
+
+    for row in payroll_rows.values():
+        row["total"] = round(row["total"], 1)
+        row["profit"] = round(row["profit"], 1)
+        row["payout"] = round(row["profit"] * row["commission_percent"] / 100, 1)
+        rows.append(row)
+
+    rows.sort(key=lambda row: row["payout"], reverse=True)
+    total_payout = round(sum(row["payout"] for row in rows), 1)
+    total_profit = round(sum(row["profit"] for row in rows), 1)
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "payroll.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "month": month,
+            "rows": rows,
+            "total_payout": total_payout,
+            "total_profit": total_profit
+        }
+    )
+
+
 @app.get("/reports", response_class=HTMLResponse)
 async def reports_page(request: Request, month: str = ""):
 

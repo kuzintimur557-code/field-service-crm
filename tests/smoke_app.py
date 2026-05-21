@@ -538,6 +538,17 @@ async def assert_finance_margin(task):
     assert "Выплата" in finance_html
     assert "79.0 ₽ / 10.0%" in finance_html
     assert "worker2, helper2" in finance_html
+
+    payroll_response = await crm.payroll_page(
+        make_asgi_request("owner2", "/payroll"),
+        month="2026-05",
+    )
+    assert payroll_response.status_code == 200
+    payroll_html = payroll_response.body.decode("utf-8")
+    assert "Зарплаты" in payroll_html
+    assert "Прибыль к распределению" in payroll_html
+    assert "79.0 ₽" in payroll_html
+    assert "helper2" in payroll_html
     assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html
     assert "payment_filter=partial" in finance_html
