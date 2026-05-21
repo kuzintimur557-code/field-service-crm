@@ -5637,6 +5637,7 @@ async def task_detail(request: Request, task_id: int):
 
     estimate_total = sum(item["total"] for item in task_items)
     estimate_profit = sum(item["profit"] for item in task_items)
+    estimate_margin = round((estimate_profit / estimate_total) * 100, 1) if estimate_total else 0
 
     sla_status = "none"
 
@@ -5682,6 +5683,7 @@ async def task_detail(request: Request, task_id: int):
             "catalog_items": catalog_items,
             "estimate_total": estimate_total,
             "estimate_profit": estimate_profit,
+            "estimate_margin": estimate_margin,
             "task_workers": task_workers,
             "task_custom_fields": task_custom_fields,
             "sla_status": sla_status

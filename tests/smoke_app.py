@@ -549,6 +549,10 @@ async def assert_finance_margin(task):
     )
     assert task_response.status_code == 200
     task_html = task_response.body.decode("utf-8")
+    assert "Смета" in task_html
+    assert "Smoke service" in task_html
+    assert "Добавить в смету" in task_html
+    assert "1400.0 ₽ / 70.0%" in task_html
     assert "Статус оплаты" in task_html
     assert "Сохранить оплату" in task_html
     assert '<option value="Оплачено" selected' in task_html

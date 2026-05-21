@@ -202,6 +202,24 @@ body{
     font-weight:700;
 }
 
+.estimate-item{
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:12px;
+    align-items:center;
+    padding:14px;
+    border-radius:18px;
+    background:#f9fafb;
+    margin-bottom:10px;
+}
+
+.estimate-meta{
+    color:#6b7280;
+    font-size:14px;
+    font-weight:800;
+    margin-top:6px;
+}
+
 textarea,input,select{
     width:100%;
     padding:14px;
@@ -324,7 +342,8 @@ button{
 
 .photo-grid,
 .quick,
-.grid2{
+.grid2,
+.estimate-item{
     grid-template-columns:1fr;
 }
 
@@ -513,6 +532,57 @@ button{
 
 </div>
 {% endif %}
+
+<div class="card">
+
+<div class="section-title">Смета</div>
+
+<div class="grid2">
+<div class="mini">
+<div class="mini-label">Итого</div>
+<div class="mini-value">{{ estimate_total }} ₽</div>
+</div>
+<div class="mini">
+<div class="mini-label">Прибыль / маржа</div>
+<div class="mini-value">{{ estimate_profit }} ₽ / {{ estimate_margin }}%</div>
+</div>
+</div>
+
+{% if task_items %}
+<div style="margin-top:16px">
+{% for item in task_items %}
+<div class="estimate-item">
+    <div>
+        <div class="value">{{ item["item_name"] }}</div>
+        <div class="estimate-meta">{{ item["qty"] }} {{ item["unit"] }} × {{ item["price"] }} ₽ / прибыль {{ item["profit"] }} ₽</div>
+    </div>
+    {% if role in ["boss", "manager"] %}
+    <form method="post" action="/task/{{ task['id'] }}/items/{{ item['id'] }}/delete">
+        <button class="btn red" type="submit">Удалить</button>
+    </form>
+    {% endif %}
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if role in ["boss", "manager"] and catalog_items %}
+<form method="post" action="/task/{{ task['id'] }}/items" style="margin-top:16px">
+    <label>Добавить позицию</label>
+    <select name="catalog_item_id" required>
+        {% for item in catalog_items %}
+        <option value="{{ item['id'] }}">{{ item["name"] }} / {{ item["price"] }} ₽</option>
+        {% endfor %}
+    </select>
+    <label>Количество</label>
+    <input type="number" name="qty" min="0.01" step="0.01" value="1">
+    <button class="btn green" type="submit">Добавить в смету</button>
+</form>
+{% elif role in ["boss", "manager"] %}
+<div class="comment">Каталог пуст. Сначала добавьте услуги или материалы в каталоге.</div>
+{% endif %}
+
+</div>
 
 <div class="card">
 
