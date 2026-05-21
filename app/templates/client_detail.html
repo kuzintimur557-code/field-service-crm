@@ -33,6 +33,7 @@ h2{margin:0 0 16px;font-size:22px}
 .task-search input{margin-top:6px}
 .task-search select{width:100%;padding:15px;border-radius:14px;border:1px solid #d1d5db;background:white;font-size:16px;margin-top:6px}
 .task-search button{width:auto;margin-top:0;padding:12px 15px}
+.task-search .reset-link{padding:12px 15px;border-radius:14px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-weight:900}
 .task-count{margin-bottom:12px;color:#6b7280;font-size:13px;font-weight:900}
 .contact-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .contact-actions .btn{background:#111827}
@@ -317,6 +318,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         </select>
     </div>
     <button type="submit">Найти</button>
+    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить</a>
 </form>
 
 <div class="task-filters">
