@@ -272,6 +272,19 @@ def init_db():
     )
     """)
 
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS payroll_payouts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        worker_id INTEGER,
+        month TEXT,
+        amount REAL DEFAULT 0,
+        status TEXT DEFAULT 'paid',
+        paid_at TEXT,
+        paid_by TEXT
+    )
+    """)
+
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "full_name", "TEXT")
     add_column_if_missing(c, "users", "position", "TEXT")
@@ -405,6 +418,11 @@ def init_db():
     c.execute("""
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username
     ON users(username)
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_payroll_payouts_company_worker_month
+    ON payroll_payouts(company_id, worker_id, month)
     """)
 
     if os.getenv("ENV") != "production":

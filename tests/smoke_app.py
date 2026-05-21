@@ -551,6 +551,9 @@ async def assert_finance_margin(task):
     assert "payout_filter=positive" in payroll_html
     assert "79.0 ₽" in payroll_html
     assert "helper2" in payroll_html
+    assert "Осталось выплатить" in payroll_html
+    assert "Не выплачено" in payroll_html
+    assert "Выплатил" in payroll_html
     assert f"/workers/{helper['id']}?month=2026-05" in payroll_html
 
     positive_payroll_response = await crm.payroll_page(
@@ -565,6 +568,28 @@ async def assert_finance_margin(task):
     assert "/payroll/export?month=2026-05" in payroll_html
     assert "/payroll/export?month=2026-05&payout_filter=positive" in positive_payroll_html
 
+    mark_paid_response = await crm.mark_payroll_paid(
+        make_form_request(
+            "owner2",
+            f"/payroll/{helper['id']}/mark-paid",
+            {"month": "2026-05", "amount": "79.0"},
+        ),
+        helper["id"],
+    )
+    assert mark_paid_response.status_code == 302
+    assert mark_paid_response.headers["location"] == "/payroll?month=2026-05&payout_paid=1"
+
+    paid_payroll_response = await crm.payroll_page(
+        make_asgi_request("owner2", "/payroll"),
+        month="2026-05",
+        payout_filter="positive",
+    )
+    assert paid_payroll_response.status_code == 200
+    paid_payroll_html = paid_payroll_response.body.decode("utf-8")
+    assert "Уже выплачено" in paid_payroll_html
+    assert "Выплачено" in paid_payroll_html
+    assert "Отменить" in paid_payroll_html
+
     payroll_export_response = await crm.payroll_export(
         make_request("owner2"),
         month="2026-05",
@@ -575,6 +600,8 @@ async def assert_finance_margin(task):
     assert "Итого выплаты" in payroll_csv
     assert "helper2" in payroll_csv
     assert "79.0" in payroll_csv
+    assert "Статус выплаты" in payroll_csv
+    assert "Выплачено" in payroll_csv
     assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html
     assert "payment_filter=partial" in finance_html

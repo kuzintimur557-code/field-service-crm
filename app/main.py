@@ -2825,6 +2825,16 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
     WHERE archived=0 AND company_id=? AND task_date LIKE ?
     """, (company_id, f"{month}%")).fetchall()
 
+    paid_payouts = c.execute("""
+    SELECT worker_id, amount, paid_at
+    FROM payroll_payouts
+    WHERE company_id=? AND month=? AND status='paid'
+    """, (company_id, month)).fetchall()
+    paid_payout_map = {
+        payout["worker_id"]: payout
+        for payout in paid_payouts
+    }
+
     payroll_rows = {
         worker["username"]: {
             "id": worker["id"],
@@ -2889,6 +2899,9 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         row["total"] = round(row["total"], 1)
         row["profit"] = round(row["profit"], 1)
         row["payout"] = round(row["profit"] * row["commission_percent"] / 100, 1)
+        paid_payout = paid_payout_map.get(row["id"])
+        row["payout_paid"] = bool(paid_payout)
+        row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
         rows.append(row)
 
     if selected_payout_filter == "positive":
@@ -2896,6 +2909,8 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
 
     rows.sort(key=lambda row: row["payout"], reverse=True)
     total_payout = round(sum(row["payout"] for row in rows), 1)
+    total_paid = round(sum(row["payout"] for row in rows if row["payout_paid"]), 1)
+    total_due = round(total_payout - total_paid, 1)
     total_profit = round(sum(row["profit"] for row in rows), 1)
 
     conn.close()
@@ -2911,6 +2926,8 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
             "selected_payout_filter": selected_payout_filter,
             "rows": rows,
             "total_payout": total_payout,
+            "total_paid": total_paid,
+            "total_due": total_due,
             "total_profit": total_profit
         }
     )
@@ -2955,6 +2972,16 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
     WHERE archived=0 AND company_id=? AND task_date LIKE ?
     """, (company_id, f"{month}%")).fetchall()
 
+    paid_payouts = c.execute("""
+    SELECT worker_id, amount, paid_at
+    FROM payroll_payouts
+    WHERE company_id=? AND month=? AND status='paid'
+    """, (company_id, month)).fetchall()
+    paid_payout_map = {
+        payout["worker_id"]: payout
+        for payout in paid_payouts
+    }
+
     payroll_rows = {
         worker["username"]: {
             "id": worker["id"],
@@ -3019,6 +3046,9 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         row["total"] = round(row["total"], 1)
         row["profit"] = round(row["profit"], 1)
         row["payout"] = round(row["profit"] * row["commission_percent"] / 100, 1)
+        paid_payout = paid_payout_map.get(row["id"])
+        row["payout_paid"] = bool(paid_payout)
+        row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
         rows.append(row)
 
     if selected_payout_filter == "positive":
@@ -3039,7 +3069,9 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         "Выручка",
         "Прибыль",
         "Процент",
-        "Выплата"
+        "Выплата",
+        "Статус выплаты",
+        "Дата выплаты"
     ])
 
     for row in rows:
@@ -3050,7 +3082,9 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
             row["total"],
             row["profit"],
             row["commission_percent"],
-            row["payout"]
+            row["payout"],
+            "Выплачено" if row["payout_paid"] else "Не выплачено",
+            row["paid_at"]
         ])
 
     writer.writerow([])
@@ -3067,6 +3101,103 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
             "Content-Disposition": f"attachment; filename=payroll_{month}.csv"
         }
     )
+
+
+@app.post("/payroll/{worker_id}/mark-paid")
+async def mark_payroll_paid(request: Request, worker_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/payroll?error=only_boss", status_code=302)
+
+    company_id = get_user_company_id(username)
+    form = await request.form()
+    month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
+    amount = form.get("amount") or "0"
+
+    try:
+        amount = float(str(amount).replace(",", "."))
+    except Exception:
+        amount = 0
+
+    if amount < 0:
+        amount = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    worker = c.execute("""
+    SELECT *
+    FROM users
+    WHERE id=? AND company_id=? AND role='worker'
+    """, (worker_id, company_id)).fetchone()
+
+    if not worker:
+        conn.close()
+        return RedirectResponse(f"/payroll?month={month}", status_code=302)
+
+    paid_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    c.execute("""
+    INSERT INTO payroll_payouts (
+        company_id,
+        worker_id,
+        month,
+        amount,
+        status,
+        paid_at,
+        paid_by
+    )
+    VALUES (?, ?, ?, ?, 'paid', ?, ?)
+    ON CONFLICT(company_id, worker_id, month)
+    DO UPDATE SET
+        amount=excluded.amount,
+        status='paid',
+        paid_at=excluded.paid_at,
+        paid_by=excluded.paid_by
+    """, (company_id, worker_id, month, amount, paid_at, username))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/payroll?month={month}&payout_paid=1", status_code=302)
+
+
+@app.post("/payroll/{worker_id}/mark-unpaid")
+async def mark_payroll_unpaid(request: Request, worker_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/payroll?error=only_boss", status_code=302)
+
+    company_id = get_user_company_id(username)
+    form = await request.form()
+    month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    DELETE FROM payroll_payouts
+    WHERE company_id=? AND worker_id=? AND month=?
+    """, (company_id, worker_id, month))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/payroll?month={month}&payout_unpaid=1", status_code=302)
 
 
 @app.get("/reports", response_class=HTMLResponse)
