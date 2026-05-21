@@ -3404,6 +3404,11 @@ async def clients_page(
         COUNT(tasks.id) AS task_count,
         MAX(tasks.task_date) AS last_task_date,
         SUM(CASE
+            WHEN tasks.status='Завершено'
+            THEN CAST(REPLACE(COALESCE(tasks.price, '0'), ',', '.') AS REAL)
+            ELSE 0
+        END) AS completed_revenue,
+        SUM(CASE
             WHEN tasks.archived=0
              AND tasks.status IN ('Новая', 'В работе')
             THEN 1 ELSE 0

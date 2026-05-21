@@ -1149,6 +1149,7 @@ async def assert_client_custom_fields():
     assert "Заявок:" in page_html
     assert "Активных:" in page_html
     assert "Последняя заявка:" in page_html
+    assert "Выручка:" in page_html
     assert "Поиск клиентов" in page_html
     assert "client_filter=active" in page_html
     assert "client_filter=overdue" in page_html
