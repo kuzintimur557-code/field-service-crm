@@ -2428,7 +2428,7 @@ async def update_recurring_job_date(request: Request, job_id: int):
 
 
 @app.get("/finance/export")
-async def finance_export(request: Request, month: str = ""):
+async def finance_export(request: Request, month: str = "", payment_filter: str = ""):
 
     username = get_user(request)
 
@@ -2442,6 +2442,7 @@ async def finance_export(request: Request, month: str = ""):
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
+    selected_payment_filter = payment_filter if payment_filter in ("paid", "partial", "unpaid") else ""
 
     conn = connect()
     c = conn.cursor()
@@ -2495,6 +2496,13 @@ async def finance_export(request: Request, month: str = ""):
         payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
         task_margin = round((task_profit / task_total) * 100, 1) if task_total else 0
 
+        if selected_payment_filter == "paid" and payment_status != "Оплачено":
+            continue
+        if selected_payment_filter == "partial" and payment_status != "Частично оплачено":
+            continue
+        if selected_payment_filter == "unpaid" and payment_status != "Не оплачено":
+            continue
+
         writer.writerow([
             task["id"],
             task["task_date"],
@@ -2524,7 +2532,7 @@ async def finance_export(request: Request, month: str = ""):
 
 
 @app.get("/finance", response_class=HTMLResponse)
-async def finance_page(request: Request, month: str = ""):
+async def finance_page(request: Request, month: str = "", payment_filter: str = ""):
 
     username = get_user(request)
 
@@ -2543,6 +2551,7 @@ async def finance_page(request: Request, month: str = ""):
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
+    selected_payment_filter = payment_filter if payment_filter in ("paid", "partial", "unpaid") else ""
 
     conn = connect()
     c = conn.cursor()
@@ -2582,6 +2591,13 @@ async def finance_page(request: Request, month: str = ""):
         payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
         task_margin = round((task_profit / task_total) * 100, 1) if task_total else 0
 
+        if selected_payment_filter == "paid" and payment_status != "Оплачено":
+            continue
+        if selected_payment_filter == "partial" and payment_status != "Частично оплачено":
+            continue
+        if selected_payment_filter == "unpaid" and payment_status != "Не оплачено":
+            continue
+
         total_estimate += task_total
         total_profit += task_profit
 
@@ -2615,6 +2631,7 @@ async def finance_page(request: Request, month: str = ""):
             "username": username,
             "role": role,
             "month": month,
+            "selected_payment_filter": selected_payment_filter,
             "rows": rows,
             "total_estimate": total_estimate,
             "total_profit": total_profit,
