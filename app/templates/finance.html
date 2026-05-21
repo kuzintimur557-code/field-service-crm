@@ -26,7 +26,7 @@ input,select{border:1px solid #d1d5db;background:white}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .table{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:.6fr 1.4fr 1fr 1fr 1fr 1fr .7fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px}
-.worker-row{display:grid;grid-template-columns:1.2fr .6fr 1fr 1fr 1fr 1fr 1fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px}
+.worker-row{display:grid;grid-template-columns:1.1fr .5fr .9fr .9fr .9fr .8fr .9fr 1fr 1fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px}
 .head{background:#e5e7eb;font-weight:900}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;font-weight:900}
 .paid{background:#dcfce7;color:#166534}
@@ -181,6 +181,8 @@ input,select,button{width:100%;margin-top:8px}
         <div>Прибыль</div>
         <div>Маржа</div>
         <div>Выплата</div>
+        <div>Payroll</div>
+        <div>Остаток</div>
     </div>
 
     {% for row in worker_finance_stats %}
@@ -192,6 +194,13 @@ input,select,button{width:100%;margin-top:8px}
         <div>{{ row.profit }} ₽</div>
         <div>{{ row.margin }}%</div>
         <div>{{ row.payout }} ₽ / {{ row.commission_percent }}%</div>
+        <div>
+            <span class="badge {% if row.payout_status == 'Выплачено' %}paid{% elif row.payout_status == 'Частично' %}partial{% else %}unpaid{% endif %}">
+                {{ row.payout_status }}
+            </span>
+            <div class="label">{{ row.paid_amount }} ₽</div>
+        </div>
+        <div>{{ row.due_amount }} ₽</div>
     </div>
     {% endfor %}
 </div>

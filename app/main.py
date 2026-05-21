@@ -2604,15 +2604,28 @@ async def finance_page(
     """, (company_id, f"{month}%")).fetchall()
 
     workers = c.execute("""
-    SELECT username, commission_percent
+    SELECT id, username, commission_percent
     FROM users
     WHERE role='worker' AND company_id=?
     ORDER BY username
     """, (company_id,)).fetchall()
     worker_names = [row["username"] for row in workers]
+    worker_ids = {
+        row["username"]: row["id"]
+        for row in workers
+    }
     worker_commissions = {
         row["username"]: float(row["commission_percent"] or 0)
         for row in workers
+    }
+    payroll_payouts = c.execute("""
+    SELECT worker_id, amount
+    FROM payroll_payouts
+    WHERE company_id=? AND month=? AND status='paid'
+    """, (company_id, month)).fetchall()
+    payroll_payout_map = {
+        row["worker_id"]: round(float(row["amount"] or 0), 1)
+        for row in payroll_payouts
     }
 
     if selected_worker not in worker_names:
@@ -2687,6 +2700,7 @@ async def finance_page(
         for worker_name in task_worker_names:
             if worker_name not in worker_finance:
                 worker_finance[worker_name] = {
+                    "worker_id": worker_ids.get(worker_name),
                     "worker": worker_name,
                     "commission_percent": worker_commissions.get(worker_name, 0),
                     "tasks": 0,
@@ -2744,6 +2758,11 @@ async def finance_page(
         worker_row["expenses"] = round(worker_row["expenses"], 1)
         worker_row["profit"] = round(worker_row["profit"], 1)
         worker_row["payout"] = round(worker_row["profit"] * worker_row["commission_percent"] / 100, 1)
+        worker_row["paid_amount"] = payroll_payout_map.get(worker_row["worker_id"], 0)
+        worker_row["due_amount"] = round(max(worker_row["payout"] - worker_row["paid_amount"], 0), 1)
+        worker_row["payout_status"] = "Не выплачено"
+        if worker_row["paid_amount"] > 0:
+            worker_row["payout_status"] = "Выплачено" if worker_row["paid_amount"] >= worker_row["payout"] else "Частично"
         worker_row["margin"] = round((worker_row["profit"] / worker_row["total"]) * 100, 1) if worker_row["total"] else 0
         worker_finance_stats.append(worker_row)
 
