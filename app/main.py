@@ -3585,6 +3585,7 @@ async def client_detail(
             "selected_activity_filter": selected_activity_filter,
             "client_notes": client_notes,
             "latest_client_note": latest_client_note,
+            "shown_activity_count": len(client_timeline),
             "client_total_tasks": client_total_tasks,
             "client_active_tasks": client_active_tasks,
             "client_completed_tasks": client_completed_tasks,

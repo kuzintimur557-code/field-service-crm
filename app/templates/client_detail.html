@@ -298,6 +298,8 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <a href="/clients/{{ client['id'] }}?activity_filter=comment" class="{% if selected_activity_filter == 'comment' %}active{% endif %}">Комментарии</a>
 </div>
 
+<div class="task-count">Событий: {{ shown_activity_count }}</div>
+
 {% if client_timeline %}
 {% for item in client_timeline %}
 <div class="timeline-item">

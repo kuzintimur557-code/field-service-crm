@@ -570,6 +570,7 @@ async def assert_client_card(task):
     assert "activity_filter=status" in html
     assert "activity_filter=date" in html
     assert "activity_filter=comment" in html
+    assert "Событий:" in html
     assert "Smoke client timeline" in html
     assert "Timeline details" in html
     assert "/calendar?date=2026-05-21" in html
