@@ -562,6 +562,7 @@ async def assert_client_card(task):
     assert "Показано:" in html
     assert "Последняя заявка" in html
     assert "latest-task" in html
+    assert "Последний контакт" in html
     assert "Последняя заметка" in html
     assert "Smoke latest client note" in html
     assert "Поиск по заметкам" in html

@@ -3542,6 +3542,25 @@ async def client_detail(
     ORDER BY task_activity.id DESC
     LIMIT 20
     """, (client_id, company_id)).fetchall()
+    latest_activity = client_timeline[0] if client_timeline else None
+    last_contact = None
+
+    if latest_client_note:
+        last_contact = {
+            "type": "Заметка",
+            "date": latest_client_note["created_at"],
+            "text": latest_client_note["note"]
+        }
+
+    if latest_activity and (
+        not last_contact
+        or str(latest_activity["created_at"] or "") > str(last_contact["date"] or "")
+    ):
+        last_contact = {
+            "type": latest_activity["action"],
+            "date": latest_activity["created_at"],
+            "text": latest_activity["details"]
+        }
 
     if selected_activity_filter:
         filtered_timeline = []
@@ -3596,6 +3615,7 @@ async def client_detail(
             "selected_note_search": selected_note_search,
             "client_notes": client_notes,
             "latest_client_note": latest_client_note,
+            "last_contact": last_contact,
             "shown_note_count": len(client_notes),
             "client_note_count": client_note_count,
             "shown_activity_count": len(client_timeline),
