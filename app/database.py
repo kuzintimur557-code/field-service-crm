@@ -280,6 +280,7 @@ def init_db():
     add_column_if_missing(c, "tasks", "archived", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "tasks", "payment_status", "TEXT DEFAULT 'Не оплачено'")
     add_column_if_missing(c, "tasks", "deadline_at", "TEXT")
+    add_column_if_missing(c, "tasks", "discount_amount", "REAL DEFAULT 0")
 
     add_column_if_missing(c, "recurring_jobs", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "recurring_jobs", "client_id", "INTEGER")

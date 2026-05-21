@@ -2494,6 +2494,7 @@ async def finance_export(
 
         task_total = sum(item["total"] for item in items)
         task_profit = sum(item["profit"] for item in items)
+        discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
 
         if not items:
             try:
@@ -2501,6 +2502,12 @@ async def finance_export(
             except Exception:
                 task_total = 0
             task_profit = 0
+
+        if discount_amount < 0:
+            discount_amount = 0
+
+        task_total = max(task_total - discount_amount, 0)
+        task_profit = task_profit - discount_amount
 
         payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
         task_margin = round((task_profit / task_total) * 100, 1) if task_total else 0
@@ -2609,6 +2616,7 @@ async def finance_page(
 
         task_total = sum(item["total"] for item in items)
         task_profit = sum(item["profit"] for item in items)
+        discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
 
         if not items:
             try:
@@ -2616,6 +2624,12 @@ async def finance_page(
             except Exception:
                 task_total = 0
             task_profit = 0
+
+        if discount_amount < 0:
+            discount_amount = 0
+
+        task_total = max(task_total - discount_amount, 0)
+        task_profit = task_profit - discount_amount
 
         payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
         task_margin = round((task_profit / task_total) * 100, 1) if task_total else 0
@@ -5637,7 +5651,14 @@ async def task_detail(request: Request, task_id: int):
 
     estimate_total = sum(item["total"] for item in task_items)
     estimate_profit = sum(item["profit"] for item in task_items)
-    estimate_margin = round((estimate_profit / estimate_total) * 100, 1) if estimate_total else 0
+    discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
+
+    if discount_amount < 0:
+        discount_amount = 0
+
+    estimate_final_total = max(estimate_total - discount_amount, 0)
+    estimate_final_profit = estimate_profit - discount_amount
+    estimate_margin = round((estimate_final_profit / estimate_final_total) * 100, 1) if estimate_final_total else 0
 
     sla_status = "none"
 
@@ -5683,6 +5704,9 @@ async def task_detail(request: Request, task_id: int):
             "catalog_items": catalog_items,
             "estimate_total": estimate_total,
             "estimate_profit": estimate_profit,
+            "discount_amount": discount_amount,
+            "estimate_final_total": estimate_final_total,
+            "estimate_final_profit": estimate_final_profit,
             "estimate_margin": estimate_margin,
             "task_workers": task_workers,
             "task_custom_fields": task_custom_fields,
@@ -6011,12 +6035,18 @@ async def apply_task_estimate_total(request: Request, task_id: int):
     FROM task_items
     WHERE task_id=? AND company_id=?
     """, (task_id, company_id)).fetchone()[0] or 0
+    discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
+
+    if discount_amount < 0:
+        discount_amount = 0
+
+    final_total = max(estimate_total - discount_amount, 0)
 
     c.execute("""
     UPDATE tasks
     SET price=?
     WHERE id=? AND company_id=?
-    """, (str(estimate_total), task_id, company_id))
+    """, (str(final_total), task_id, company_id))
 
     conn.commit()
     conn.close()
@@ -6026,7 +6056,71 @@ async def apply_task_estimate_total(request: Request, task_id: int):
         username,
         role,
         "Цена обновлена по смете",
-        f"Новая цена: {estimate_total}"
+        f"Новая цена: {final_total}"
+    )
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
+@app.post("/task/{task_id}/discount")
+async def update_task_discount(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    discount_amount = form.get("discount_amount") or "0"
+
+    try:
+        discount_amount = float(str(discount_amount).replace(",", "."))
+    except Exception:
+        discount_amount = 0
+
+    if discount_amount < 0:
+        discount_amount = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    old_discount = task["discount_amount"] if "discount_amount" in task.keys() else 0
+
+    c.execute("""
+    UPDATE tasks
+    SET discount_amount=?
+    WHERE id=? AND company_id=?
+    """, (discount_amount, task_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Изменена скидка",
+        f"{old_discount} → {discount_amount}"
     )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)

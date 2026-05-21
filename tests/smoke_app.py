@@ -574,9 +574,40 @@ async def assert_finance_margin(task):
     assert "Добавить ручную позицию" in task_html
     assert "Обновить цену по смете" in task_html
     assert "1580.0 ₽ / 68.7%" in task_html
+    assert "Сохранить скидку" in task_html
     assert "Статус оплаты" in task_html
     assert "Сохранить оплату" in task_html
     assert '<option value="Оплачено" selected' in task_html
+
+    discount_response = await crm.update_task_discount(
+        make_form_request(
+            "owner2",
+            f"/task/{task['id']}/discount",
+            {"discount_amount": "100"},
+        ),
+        task["id"],
+    )
+    assert discount_response.status_code == 302
+    assert discount_response.headers["location"] == f"/task/{task['id']}"
+
+    discounted_task_response = await crm.task_detail(
+        make_asgi_request("owner2", f"/task/{task['id']}"),
+        task["id"],
+    )
+    assert discounted_task_response.status_code == 200
+    discounted_task_html = discounted_task_response.body.decode("utf-8")
+    assert "100.0 ₽" in discounted_task_html
+    assert "2200.0 ₽" in discounted_task_html
+    assert "1480.0 ₽ / 67.3%" in discounted_task_html
+
+    discounted_finance_response = await crm.finance_page(
+        make_asgi_request("owner2", "/finance"),
+        month="2026-05",
+    )
+    assert discounted_finance_response.status_code == 200
+    discounted_finance_html = discounted_finance_response.body.decode("utf-8")
+    assert "2200.0 ₽" in discounted_finance_html
+    assert "67.3%" in discounted_finance_html
 
     apply_response = await crm.apply_task_estimate_total(
         make_request("owner2"),
@@ -593,7 +624,7 @@ async def assert_finance_margin(task):
     WHERE id=?
     """, (task["id"],)).fetchone()
     conn.close()
-    assert updated_task["price"] == "2300.0"
+    assert updated_task["price"] == "2200.0"
 
 
 async def assert_notifications(task):
