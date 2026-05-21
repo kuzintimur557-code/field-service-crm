@@ -494,6 +494,16 @@ async def assert_finance_margin(task):
     assert manual_item_response.status_code == 302
     assert manual_item_response.headers["location"] == f"/task/{task['id']}"
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE users
+    SET commission_percent=10
+    WHERE company_id=2 AND username='helper2'
+    """)
+    conn.commit()
+    conn.close()
+
     finance_response = await crm.finance_page(
         make_asgi_request("owner2", "/finance"),
         month="2026-05",
@@ -509,6 +519,8 @@ async def assert_finance_margin(task):
     assert 'name="sort"' in finance_html
     assert "Финансы по исполнителям" in finance_html
     assert "790.0 ₽" in finance_html
+    assert "Выплата" in finance_html
+    assert "79.0 ₽ / 10.0%" in finance_html
     assert "worker2, helper2" in finance_html
     assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html

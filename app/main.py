@@ -2604,12 +2604,16 @@ async def finance_page(
     """, (company_id, f"{month}%")).fetchall()
 
     workers = c.execute("""
-    SELECT username
+    SELECT username, commission_percent
     FROM users
     WHERE role='worker' AND company_id=?
     ORDER BY username
     """, (company_id,)).fetchall()
     worker_names = [row["username"] for row in workers]
+    worker_commissions = {
+        row["username"]: float(row["commission_percent"] or 0)
+        for row in workers
+    }
 
     if selected_worker not in worker_names:
         selected_worker = ""
@@ -2684,10 +2688,12 @@ async def finance_page(
             if worker_name not in worker_finance:
                 worker_finance[worker_name] = {
                     "worker": worker_name,
+                    "commission_percent": worker_commissions.get(worker_name, 0),
                     "tasks": 0,
                     "total": 0,
                     "expenses": 0,
                     "profit": 0,
+                    "payout": 0,
                     "margin": 0
                 }
 
@@ -2737,6 +2743,7 @@ async def finance_page(
         worker_row["total"] = round(worker_row["total"], 1)
         worker_row["expenses"] = round(worker_row["expenses"], 1)
         worker_row["profit"] = round(worker_row["profit"], 1)
+        worker_row["payout"] = round(worker_row["profit"] * worker_row["commission_percent"] / 100, 1)
         worker_row["margin"] = round((worker_row["profit"] / worker_row["total"]) * 100, 1) if worker_row["total"] else 0
         worker_finance_stats.append(worker_row)
 
@@ -4725,6 +4732,15 @@ async def create_worker(request: Request):
     phone = (form.get("phone") or "").strip()
     email = (form.get("email") or "").strip()
     telegram_chat_id = (form.get("telegram_chat_id") or "").strip()
+    commission_percent = form.get("commission_percent") or "0"
+
+    try:
+        commission_percent = float(str(commission_percent).replace(",", "."))
+    except Exception:
+        commission_percent = 0
+
+    if commission_percent < 0:
+        commission_percent = 0
 
     conn = connect()
     c = conn.cursor()
@@ -4750,9 +4766,10 @@ async def create_worker(request: Request):
         phone,
         email,
         telegram_chat_id,
+        commission_percent,
         last_seen
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         worker_username,
         hash_password(worker_password),
@@ -4763,6 +4780,7 @@ async def create_worker(request: Request):
         phone,
         email,
         telegram_chat_id,
+        commission_percent,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
