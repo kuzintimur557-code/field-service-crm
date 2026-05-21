@@ -5797,6 +5797,120 @@ async def add_task_item(request: Request, task_id: int):
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
+@app.post("/task/{task_id}/items/manual")
+async def add_manual_task_item(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    item_name = (form.get("item_name") or "").strip()
+    item_type = form.get("item_type") if form.get("item_type") in ("service", "material") else "service"
+    unit = (form.get("unit") or "шт").strip()
+    qty = form.get("qty") or "1"
+    price = form.get("price") or "0"
+    cost = form.get("cost") or "0"
+
+    try:
+        qty = float(str(qty).replace(",", "."))
+    except Exception:
+        qty = 1
+
+    try:
+        price = float(str(price).replace(",", "."))
+    except Exception:
+        price = 0
+
+    try:
+        cost = float(str(cost).replace(",", "."))
+    except Exception:
+        cost = 0
+
+    if not item_name:
+        return RedirectResponse(f"/task/{task_id}?error=manual_item_empty", status_code=302)
+
+    if qty <= 0:
+        qty = 1
+
+    if price < 0:
+        price = 0
+
+    if cost < 0:
+        cost = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    total = price * qty
+    profit = (price - cost) * qty
+
+    c.execute("""
+    INSERT INTO task_items (
+        company_id,
+        task_id,
+        catalog_item_id,
+        item_name,
+        item_type,
+        unit,
+        qty,
+        price,
+        cost,
+        total,
+        profit,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        task_id,
+        None,
+        item_name,
+        item_type,
+        unit,
+        qty,
+        price,
+        cost,
+        total,
+        profit,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Добавлена ручная позиция в смету",
+        f"{item_name} × {qty}"
+    )
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
 @app.post("/task/{task_id}/items/{item_id}/delete")
 async def delete_task_item(request: Request, task_id: int, item_id: int):
 

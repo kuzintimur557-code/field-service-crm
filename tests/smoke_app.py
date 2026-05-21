@@ -476,6 +476,24 @@ async def assert_finance_margin(task):
     assert item_response.status_code == 302
     assert item_response.headers["location"] == f"/task/{task['id']}"
 
+    manual_item_response = await crm.add_manual_task_item(
+        make_form_request(
+            "owner2",
+            f"/task/{task['id']}/items/manual",
+            {
+                "item_name": "Manual smoke item",
+                "item_type": "material",
+                "unit": "шт",
+                "qty": "3",
+                "price": "100",
+                "cost": "40",
+            },
+        ),
+        task["id"],
+    )
+    assert manual_item_response.status_code == 302
+    assert manual_item_response.headers["location"] == f"/task/{task['id']}"
+
     finance_response = await crm.finance_page(
         make_asgi_request("owner2", "/finance"),
         month="2026-05",
@@ -483,9 +501,9 @@ async def assert_finance_margin(task):
     assert finance_response.status_code == 200
     finance_html = finance_response.body.decode("utf-8")
     assert "Маржа" in finance_html
-    assert "70.0%" in finance_html
+    assert "68.7%" in finance_html
     assert "Средний чек" in finance_html
-    assert "2000.0 ₽" in finance_html
+    assert "2300.0 ₽" in finance_html
     assert "К оплате" in finance_html
     assert "worker2, helper2" in finance_html
     assert "Все исполнители" in finance_html
@@ -501,7 +519,7 @@ async def assert_finance_margin(task):
     assert unpaid_response.status_code == 200
     unpaid_html = unpaid_response.body.decode("utf-8")
     assert 'name="payment_filter" value="unpaid"' in unpaid_html
-    assert "70.0%" in unpaid_html
+    assert "68.7%" in unpaid_html
 
     worker_response = await crm.finance_page(
         make_asgi_request("owner2", "/finance"),
@@ -511,7 +529,7 @@ async def assert_finance_margin(task):
     assert worker_response.status_code == 200
     worker_html = worker_response.body.decode("utf-8")
     assert '<option value="helper2" selected' in worker_html
-    assert "70.0%" in worker_html
+    assert "68.7%" in worker_html
 
     export_response = await crm.finance_export(
         make_request("owner2"),
@@ -522,7 +540,7 @@ async def assert_finance_margin(task):
     assert export_response.status_code == 200
     export_csv = export_response.body.decode("utf-8")
     assert "Маржа %" in export_csv
-    assert "70.0" in export_csv
+    assert "68.7" in export_csv
     assert "worker2, helper2" in export_csv
 
     original_send_message = crm.send_message
@@ -551,9 +569,11 @@ async def assert_finance_margin(task):
     task_html = task_response.body.decode("utf-8")
     assert "Смета" in task_html
     assert "Smoke service" in task_html
+    assert "Manual smoke item" in task_html
     assert "Добавить в смету" in task_html
+    assert "Добавить ручную позицию" in task_html
     assert "Обновить цену по смете" in task_html
-    assert "1400.0 ₽ / 70.0%" in task_html
+    assert "1580.0 ₽ / 68.7%" in task_html
     assert "Статус оплаты" in task_html
     assert "Сохранить оплату" in task_html
     assert '<option value="Оплачено" selected' in task_html
@@ -573,7 +593,7 @@ async def assert_finance_margin(task):
     WHERE id=?
     """, (task["id"],)).fetchone()
     conn.close()
-    assert updated_task["price"] == "2000.0"
+    assert updated_task["price"] == "2300.0"
 
 
 async def assert_notifications(task):

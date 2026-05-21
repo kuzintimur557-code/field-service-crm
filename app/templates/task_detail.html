@@ -382,6 +382,11 @@ button{
 	Заполните обязательные дополнительные поля.
 	</div>
 	{% endif %}
+	{% if request.query_params.get("error") == "manual_item_empty" %}
+	<div style="margin-top:14px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
+	Укажите название ручной позиции сметы.
+	</div>
+	{% endif %}
 	</div>
 
 </div>
@@ -585,6 +590,41 @@ button{
 </form>
 {% elif role in ["boss", "manager"] %}
 <div class="comment">Каталог пуст. Сначала добавьте услуги или материалы в каталоге.</div>
+{% endif %}
+
+{% if role in ["boss", "manager"] %}
+<form method="post" action="/task/{{ task['id'] }}/items/manual" style="margin-top:18px">
+    <label>Ручная позиция</label>
+    <input type="text" name="item_name" placeholder="Например: нестандартная работа">
+
+    <div class="grid2" style="margin-top:12px">
+        <div>
+            <label>Тип</label>
+            <select name="item_type">
+                <option value="service">Услуга</option>
+                <option value="material">Материал</option>
+            </select>
+        </div>
+        <div>
+            <label>Ед.</label>
+            <input type="text" name="unit" value="шт">
+        </div>
+        <div>
+            <label>Количество</label>
+            <input type="number" name="qty" min="0.01" step="0.01" value="1">
+        </div>
+        <div>
+            <label>Цена</label>
+            <input type="number" name="price" min="0" step="0.01" value="0">
+        </div>
+        <div>
+            <label>Себестоимость</label>
+            <input type="number" name="cost" min="0" step="0.01" value="0">
+        </div>
+    </div>
+
+    <button class="btn green" type="submit">Добавить ручную позицию</button>
+</form>
 {% endif %}
 
 </div>
