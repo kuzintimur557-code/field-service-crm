@@ -31,15 +31,16 @@ def make_request(username=None, cookies=None):
     return SimpleNamespace(cookies=request_cookies, headers={}, client=None)
 
 
-def make_asgi_request(username, path="/calendar"):
+def make_asgi_request(username, path="/calendar", query_string=""):
     cookie = f"{crm.SESSION_COOKIE_NAME}={crm.sign_session_value(username)}"
+    query_bytes = query_string.encode("utf-8") if isinstance(query_string, str) else query_string
 
     return Request({
         "type": "http",
         "method": "GET",
         "path": path,
         "headers": [(b"cookie", cookie.encode("utf-8"))],
-        "query_string": b"",
+        "query_string": query_bytes,
         "scheme": "http",
         "client": ("127.0.0.1", 50000),
         "server": ("testserver", 80),
@@ -592,13 +593,14 @@ async def assert_finance_margin(task):
     assert mark_paid_response.headers["location"] == "/payroll?month=2026-05&payout_paid=1"
 
     paid_payroll_response = await crm.payroll_page(
-        make_asgi_request("owner2", "/payroll"),
+        make_asgi_request("owner2", "/payroll", "payout_paid=1"),
         month="2026-05",
         payout_filter="positive",
     )
     assert paid_payroll_response.status_code == 200
     paid_payroll_html = paid_payroll_response.body.decode("utf-8")
     assert "Уже выплачено" in paid_payroll_html
+    assert "Выплата отмечена" in paid_payroll_html
     assert "Выплачено" in paid_payroll_html
     assert "Сумма: 70.0 ₽" in paid_payroll_html
     assert "Отменить" in paid_payroll_html
@@ -650,12 +652,13 @@ async def assert_finance_margin(task):
     assert mark_unpaid_response.headers["location"] == "/payroll?month=2026-05&payout_unpaid=1"
 
     unpaid_again_response = await crm.payroll_page(
-        make_asgi_request("owner2", "/payroll"),
+        make_asgi_request("owner2", "/payroll", "payout_unpaid=1"),
         month="2026-05",
         payout_filter="unpaid",
     )
     assert unpaid_again_response.status_code == 200
     unpaid_again_html = unpaid_again_response.body.decode("utf-8")
+    assert "Отметка выплаты снята" in unpaid_again_html
     assert "helper2" in unpaid_again_html
     assert "Выплатил" in unpaid_again_html
     assert "Все исполнители" in finance_html

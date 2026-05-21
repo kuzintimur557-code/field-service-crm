@@ -31,6 +31,8 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .head{background:#e5e7eb;font-weight:900}
 .paid-status{display:inline-block;padding:8px 10px;border-radius:12px;background:#dcfce7;color:#166534;font-size:13px;font-weight:900}
 .due-status{display:inline-block;padding:8px 10px;border-radius:12px;background:#fee2e2;color:#991b1b;font-size:13px;font-weight:900}
+.notice{margin-bottom:16px;padding:14px;border-radius:16px;font-weight:900}
+.notice.ok{background:#dcfce7;color:#166534}
 .payroll-actions form{display:inline}
 .payroll-actions button{padding:9px 12px;border-radius:12px;font-size:13px}
 .payroll-actions .secondary{background:#6b7280}
@@ -51,6 +53,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     </div>
     <a href="/" class="back">← Назад</a>
 </div>
+
+{% if request.query_params.get("payout_paid") == "1" %}
+<div class="notice ok">Выплата отмечена</div>
+{% endif %}
+
+{% if request.query_params.get("payout_unpaid") == "1" %}
+<div class="notice ok">Отметка выплаты снята</div>
+{% endif %}
 
 <div class="card">
 <form method="get" action="/payroll">
