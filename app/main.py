@@ -3402,6 +3402,7 @@ async def clients_page(
     SELECT
         clients.*,
         COUNT(tasks.id) AS task_count,
+        MAX(tasks.task_date) AS last_task_date,
         SUM(CASE
             WHEN tasks.archived=0
              AND tasks.status IN ('Новая', 'В работе')

@@ -194,6 +194,7 @@ h1{font-size:28px;margin-bottom:12px}
             <span class="client-stat warn">Просрочено: {{ client["overdue_task_count"] }}</span>
             {% endif %}
         </div>
+        <div class="meta">Последняя заявка: {{ client["last_task_date"] or "нет" }}</div>
         <div style="margin-top:10px">
             <a href="/clients/{{ client['id'] }}" style="display:inline-block;padding:10px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900">Открыть клиента</a>
         </div>
