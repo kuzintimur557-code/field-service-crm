@@ -81,6 +81,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <a href="/payroll?month={{ month }}" class="{% if not selected_payout_filter %}active{% endif %}">Все</a>
     <a href="/payroll?month={{ month }}&payout_filter=positive" class="{% if selected_payout_filter == 'positive' %}active{% endif %}">С выплатами</a>
     <a href="/payroll?month={{ month }}&payout_filter=paid" class="{% if selected_payout_filter == 'paid' %}active{% endif %}">Выплачено</a>
+    <a href="/payroll?month={{ month }}&payout_filter=partial" class="{% if selected_payout_filter == 'partial' %}active{% endif %}">Частично</a>
     <a href="/payroll?month={{ month }}&payout_filter=unpaid" class="{% if selected_payout_filter == 'unpaid' %}active{% endif %}">Не выплачено</a>
 </div>
 

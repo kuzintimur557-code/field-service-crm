@@ -2803,7 +2803,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
-    selected_payout_filter = payout_filter if payout_filter in ("positive", "paid", "unpaid") else ""
+    selected_payout_filter = payout_filter if payout_filter in ("positive", "paid", "partial", "unpaid") else ""
 
     conn = connect()
     c = conn.cursor()
@@ -2937,6 +2937,8 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         rows = [row for row in rows if row["payout"] > 0]
     if selected_payout_filter == "paid":
         rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"]]
+    if selected_payout_filter == "partial":
+        rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"] and row["paid_amount"] < row["payout"]]
     if selected_payout_filter == "unpaid":
         rows = [row for row in rows if row["payout"] > 0 and not row["payout_paid"]]
 
@@ -2982,7 +2984,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
-    selected_payout_filter = payout_filter if payout_filter in ("positive", "paid", "unpaid") else ""
+    selected_payout_filter = payout_filter if payout_filter in ("positive", "paid", "partial", "unpaid") else ""
 
     company_id = get_user_company_id(username)
 
@@ -3094,6 +3096,8 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         rows = [row for row in rows if row["payout"] > 0]
     if selected_payout_filter == "paid":
         rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"]]
+    if selected_payout_filter == "partial":
+        rows = [row for row in rows if row["payout"] > 0 and row["payout_paid"] and row["paid_amount"] < row["payout"]]
     if selected_payout_filter == "unpaid":
         rows = [row for row in rows if row["payout"] > 0 and not row["payout_paid"]]
 
