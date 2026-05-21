@@ -3105,6 +3105,8 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
 
     rows.sort(key=lambda row: row["payout"], reverse=True)
     total_payout = round(sum(row["payout"] for row in rows), 1)
+    total_paid = round(sum(row["paid_amount"] for row in rows if row["payout_paid"]), 1)
+    total_due = round(sum(row["due_amount"] for row in rows), 1)
     total_profit = round(sum(row["profit"] for row in rows), 1)
 
     conn.close()
@@ -3145,6 +3147,8 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
     writer.writerow([])
     writer.writerow(["Итого прибыль", total_profit])
     writer.writerow(["Итого выплаты", total_payout])
+    writer.writerow(["Итого выплачено", total_paid])
+    writer.writerow(["Итого осталось", total_due])
 
     content = output.getvalue()
     output.close()

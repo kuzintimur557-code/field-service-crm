@@ -663,6 +663,8 @@ async def assert_finance_margin(task):
     assert "Кем выплачено" in payroll_csv
     assert "owner2" in payroll_csv
     assert "Частично" in payroll_csv
+    assert "Итого выплачено" in payroll_csv
+    assert "Итого осталось" in payroll_csv
 
     mark_unpaid_response = await crm.mark_payroll_unpaid(
         make_form_request(
