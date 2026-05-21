@@ -585,6 +585,22 @@ button{
 
 </div>
 
+{% if role in ["boss", "manager"] %}
+<div class="card">
+<div class="section-title">Оплата</div>
+
+<form method="post" action="/task/{{ task['id'] }}/payment">
+    <label>Статус оплаты</label>
+    <select name="payment_status">
+        <option value="Не оплачено" {% if task["payment_status"] == "Не оплачено" %}selected{% endif %}>Не оплачено</option>
+        <option value="Частично оплачено" {% if task["payment_status"] == "Частично оплачено" %}selected{% endif %}>Частично оплачено</option>
+        <option value="Оплачено" {% if task["payment_status"] == "Оплачено" %}selected{% endif %}>Оплачено</option>
+    </select>
+    <button class="btn green" type="submit">Сохранить оплату</button>
+</form>
+</div>
+{% endif %}
+
 <div class="card">
 
 <div class="section-title">История изменений</div>

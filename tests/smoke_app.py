@@ -525,6 +525,34 @@ async def assert_finance_margin(task):
     assert "70.0" in export_csv
     assert "worker2, helper2" in export_csv
 
+    original_send_message = crm.send_message
+    crm.send_message = lambda text: True
+
+    try:
+        payment_response = await crm.update_payment_status(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/payment",
+                {"payment_status": "Оплачено"},
+            ),
+            task["id"],
+        )
+    finally:
+        crm.send_message = original_send_message
+
+    assert payment_response.status_code == 302
+    assert payment_response.headers["location"] == f"/task/{task['id']}"
+
+    task_response = await crm.task_detail(
+        make_asgi_request("owner2", f"/task/{task['id']}"),
+        task["id"],
+    )
+    assert task_response.status_code == 200
+    task_html = task_response.body.decode("utf-8")
+    assert "Статус оплаты" in task_html
+    assert "Сохранить оплату" in task_html
+    assert '<option value="Оплачено" selected' in task_html
+
 
 async def assert_notifications(task):
     crm.create_notification(
