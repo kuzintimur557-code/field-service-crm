@@ -52,6 +52,9 @@ h2{margin:0 0 16px;font-size:22px}
 .timeline-date{font-size:13px;color:#6b7280;font-weight:900}
 .timeline-action{font-weight:900;margin-bottom:5px}
 .timeline-details{color:#4b5563;line-height:1.4;white-space:pre-wrap}
+.sla-line{margin-top:8px;font-size:13px;font-weight:900;color:#1d4ed8}
+.sla-line.overdue{color:#991b1b}
+.sla-line.done{color:#166534}
 .notice{margin-bottom:16px;padding:14px;border-radius:16px;font-weight:900}
 .notice.ok{background:#dcfce7;color:#166534}
 .notice.err{background:#fee2e2;color:#991b1b}
@@ -393,6 +396,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <div>
         <div class="label">Заявка</div>
         <div class="value">#{{ task["id"] }} — {{ task["task_date"] }}</div>
+        {% if task["deadline_at"] %}
+        {% set sla_class = "done" if task["status"] == "Завершено" else ("overdue" if task["deadline_at"] < client_now_value else "active") %}
+        <div class="sla-line {{ sla_class }}">
+            SLA: {{ task["deadline_at"] }}
+            {% if sla_class == "overdue" %}/ просрочен{% elif sla_class == "done" %}/ выполнен{% else %}/ активен{% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <div>

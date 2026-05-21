@@ -3440,6 +3440,7 @@ async def client_detail(
     latest_task = tasks[0] if tasks else None
 
     today = datetime.now().strftime("%Y-%m-%d")
+    client_now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
     client_total_tasks = len(tasks)
     client_active_tasks = 0
     client_completed_tasks = 0
@@ -3637,6 +3638,7 @@ async def client_detail(
             "client_note_count": client_note_count,
             "shown_activity_count": len(client_timeline),
             "client_total_tasks": client_total_tasks,
+            "client_now_value": client_now_value,
             "client_active_tasks": client_active_tasks,
             "client_completed_tasks": client_completed_tasks,
             "client_overdue_tasks": client_overdue_tasks,

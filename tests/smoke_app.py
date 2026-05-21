@@ -524,6 +524,17 @@ async def assert_client_card(task):
         "Smoke client timeline",
         "Timeline details",
     )
+    active_deadline = (datetime.now() + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE tasks
+    SET deadline_at=?
+    WHERE id=?
+    """, (active_deadline, task["id"]))
+    conn.commit()
+    conn.close()
 
     original_send_message = crm.send_message
     crm.send_message = lambda text: True
@@ -579,6 +590,8 @@ async def assert_client_card(task):
     assert "Событий:" in html
     assert "Smoke client timeline" in html
     assert "Timeline details" in html
+    assert "SLA:" in html
+    assert "активен" in html
     assert "/calendar?date=2026-05-21" in html
     assert f"/create-task?client_id={task['client_id']}&return_to=client" in html
     assert f"/create-task?client_id={task['client_id']}&source_task_id={task['id']}&return_to=client" in html
