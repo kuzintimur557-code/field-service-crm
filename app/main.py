@@ -2477,6 +2477,7 @@ async def finance_export(
         "Исполнитель",
         "Статус заявки",
         "Статус оплаты",
+        "Скидка",
         "Сумма",
         "Расходы",
         "Прибыль",
@@ -2535,6 +2536,7 @@ async def finance_export(
             format_task_workers(task),
             task["status"],
             payment_status,
+            discount_amount,
             task_total,
             task_expenses_total,
             task_profit,
@@ -2607,6 +2609,7 @@ async def finance_page(
     total_estimate = 0
     total_profit = 0
     total_expenses = 0
+    total_discounts = 0
     paid_total = 0
     partial_total = 0
     unpaid_total = 0
@@ -2659,6 +2662,7 @@ async def finance_page(
         total_estimate += task_total
         total_profit += task_profit
         total_expenses += task_expenses_total
+        total_discounts += discount_amount
 
         if payment_status == "Оплачено":
             paid_total += task_total
@@ -2674,6 +2678,7 @@ async def finance_page(
             "task_date": task["task_date"],
             "status": task["status"],
             "payment_status": payment_status,
+            "discount": discount_amount,
             "total": task_total,
             "expenses": task_expenses_total,
             "profit": task_profit,
@@ -2700,6 +2705,7 @@ async def finance_page(
             "total_estimate": total_estimate,
             "total_profit": total_profit,
             "total_expenses": total_expenses,
+            "total_discounts": total_discounts,
             "total_margin": total_margin,
             "average_estimate": average_estimate,
             "outstanding_total": outstanding_total,

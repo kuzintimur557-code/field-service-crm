@@ -505,6 +505,7 @@ async def assert_finance_margin(task):
     assert "Средний чек" in finance_html
     assert "2300.0 ₽" in finance_html
     assert "К оплате" in finance_html
+    assert "Скидки" in finance_html
     assert "worker2, helper2" in finance_html
     assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html
@@ -540,6 +541,7 @@ async def assert_finance_margin(task):
     assert export_response.status_code == 200
     export_csv = export_response.body.decode("utf-8")
     assert "Маржа %" in export_csv
+    assert "Скидка" in export_csv
     assert "68.7" in export_csv
     assert "worker2, helper2" in export_csv
 
@@ -624,6 +626,7 @@ async def assert_finance_margin(task):
     assert discounted_finance_response.status_code == 200
     discounted_finance_html = discounted_finance_response.body.decode("utf-8")
     assert "2200.0 ₽" in discounted_finance_html
+    assert "Скидка: 100.0 ₽" in discounted_finance_html
     assert "Расходы" in discounted_finance_html
     assert "80.0 ₽" in discounted_finance_html
     assert "63.6%" in discounted_finance_html
