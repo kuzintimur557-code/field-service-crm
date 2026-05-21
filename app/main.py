@@ -3395,7 +3395,8 @@ async def client_detail(
     task_filter: str = "",
     task_search: str = "",
     task_sort: str = "",
-    activity_filter: str = ""
+    activity_filter: str = "",
+    note_search: str = ""
 ):
 
     username = get_user(request)
@@ -3433,7 +3434,9 @@ async def client_detail(
     selected_task_search = str(task_search or "").strip()
     selected_task_sort = task_sort if task_sort in ("oldest", "date_asc", "date_desc") else "newest"
     selected_activity_filter = activity_filter if activity_filter in ("status", "date", "comment") else ""
+    selected_note_search = str(note_search or "").strip()
     search_value = selected_task_search.lower()
+    note_search_value = selected_note_search.lower()
     latest_task = tasks[0] if tasks else None
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -3520,6 +3523,12 @@ async def client_detail(
     """, (client_id, company_id)).fetchall()
     latest_client_note = client_notes[0] if client_notes else None
 
+    if note_search_value:
+        client_notes = [
+            note for note in client_notes
+            if note_search_value in str(note["note"] or "").lower()
+        ]
+
     client_timeline = c.execute("""
     SELECT
         task_activity.*,
@@ -3583,6 +3592,7 @@ async def client_detail(
             "selected_task_search": selected_task_search,
             "selected_task_sort": selected_task_sort,
             "selected_activity_filter": selected_activity_filter,
+            "selected_note_search": selected_note_search,
             "client_notes": client_notes,
             "latest_client_note": latest_client_note,
             "shown_activity_count": len(client_timeline),

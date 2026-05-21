@@ -564,6 +564,8 @@ async def assert_client_card(task):
     assert "latest-task" in html
     assert "Последняя заметка" in html
     assert "Smoke latest client note" in html
+    assert "Поиск по заметкам" in html
+    assert "note_search" in html
     assert 'href="tel:+70000000000"' in html
     assert 'href="mailto:client@example.com"' in html
     assert "Лента активности" in html
@@ -659,6 +661,16 @@ async def assert_client_card(task):
     activity_html = activity_response.body.decode("utf-8")
     assert "Все события" in activity_html
     assert "Smoke client timeline" not in activity_html
+
+    note_search_response = await crm.client_detail(
+        make_asgi_request("owner2", f"/clients/{task['client_id']}"),
+        task["client_id"],
+        note_search="latest",
+    )
+    assert note_search_response.status_code == 200
+    note_search_html = note_search_response.body.decode("utf-8")
+    assert 'name="note_search" value="latest"' in note_search_html
+    assert "Smoke latest client note" in note_search_html
 
 
 async def assert_overdue_sla(task):

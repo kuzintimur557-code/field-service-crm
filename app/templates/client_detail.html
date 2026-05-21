@@ -271,6 +271,15 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <button type="submit">📝 Добавить заметку</button>
 </form>
 
+<form class="task-search" method="get" action="/clients/{{ client['id'] }}" style="margin-top:16px">
+    <div>
+        <label>Поиск по заметкам</label>
+        <input type="text" name="note_search" value="{{ selected_note_search }}" placeholder="Текст заметки">
+    </div>
+    <button type="submit">Найти</button>
+    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить</a>
+</form>
+
 <div style="margin-top:18px">
 {% if client_notes %}
 {% for note in client_notes %}
