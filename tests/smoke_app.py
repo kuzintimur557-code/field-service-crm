@@ -590,15 +590,32 @@ async def assert_finance_margin(task):
     assert discount_response.status_code == 302
     assert discount_response.headers["location"] == f"/task/{task['id']}"
 
+    expense_response = await crm.add_task_expense(
+        make_form_request(
+            "owner2",
+            f"/task/{task['id']}/expenses",
+            {
+                "title": "Fuel smoke expense",
+                "amount": "80",
+            },
+        ),
+        task["id"],
+    )
+    assert expense_response.status_code == 302
+    assert expense_response.headers["location"] == f"/task/{task['id']}"
+
     discounted_task_response = await crm.task_detail(
         make_asgi_request("owner2", f"/task/{task['id']}"),
         task["id"],
     )
     assert discounted_task_response.status_code == 200
     discounted_task_html = discounted_task_response.body.decode("utf-8")
+    assert "Fuel smoke expense" in discounted_task_html
+    assert "Добавить расход" in discounted_task_html
     assert "100.0 ₽" in discounted_task_html
+    assert "80.0 ₽" in discounted_task_html
     assert "2200.0 ₽" in discounted_task_html
-    assert "1480.0 ₽ / 67.3%" in discounted_task_html
+    assert "1400.0 ₽ / 63.6%" in discounted_task_html
 
     discounted_finance_response = await crm.finance_page(
         make_asgi_request("owner2", "/finance"),
@@ -607,7 +624,9 @@ async def assert_finance_margin(task):
     assert discounted_finance_response.status_code == 200
     discounted_finance_html = discounted_finance_response.body.decode("utf-8")
     assert "2200.0 ₽" in discounted_finance_html
-    assert "67.3%" in discounted_finance_html
+    assert "Расходы" in discounted_finance_html
+    assert "80.0 ₽" in discounted_finance_html
+    assert "63.6%" in discounted_finance_html
 
     apply_response = await crm.apply_task_estimate_total(
         make_request("owner2"),

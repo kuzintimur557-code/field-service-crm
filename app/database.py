@@ -159,6 +159,17 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS task_expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        task_id INTEGER,
+        title TEXT,
+        amount REAL DEFAULT 0,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS task_activity (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER,

@@ -2478,6 +2478,7 @@ async def finance_export(
         "Статус заявки",
         "Статус оплаты",
         "Сумма",
+        "Расходы",
         "Прибыль",
         "Маржа %"
     ])
@@ -2491,10 +2492,16 @@ async def finance_export(
         FROM task_items
         WHERE task_id=?
         """, (task["id"],)).fetchall()
+        expenses = c.execute("""
+        SELECT *
+        FROM task_expenses
+        WHERE task_id=?
+        """, (task["id"],)).fetchall()
 
         task_total = sum(item["total"] for item in items)
         task_profit = sum(item["profit"] for item in items)
         discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
+        task_expenses_total = sum(expense["amount"] for expense in expenses)
 
         if not items:
             try:
@@ -2507,7 +2514,7 @@ async def finance_export(
             discount_amount = 0
 
         task_total = max(task_total - discount_amount, 0)
-        task_profit = task_profit - discount_amount
+        task_profit = task_profit - discount_amount - task_expenses_total
 
         payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
         task_margin = round((task_profit / task_total) * 100, 1) if task_total else 0
@@ -2529,6 +2536,7 @@ async def finance_export(
             task["status"],
             payment_status,
             task_total,
+            task_expenses_total,
             task_profit,
             task_margin
         ])
@@ -2598,6 +2606,7 @@ async def finance_page(
 
     total_estimate = 0
     total_profit = 0
+    total_expenses = 0
     paid_total = 0
     partial_total = 0
     unpaid_total = 0
@@ -2613,10 +2622,16 @@ async def finance_page(
         FROM task_items
         WHERE task_id=?
         """, (task["id"],)).fetchall()
+        expenses = c.execute("""
+        SELECT *
+        FROM task_expenses
+        WHERE task_id=?
+        """, (task["id"],)).fetchall()
 
         task_total = sum(item["total"] for item in items)
         task_profit = sum(item["profit"] for item in items)
         discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
+        task_expenses_total = sum(expense["amount"] for expense in expenses)
 
         if not items:
             try:
@@ -2629,7 +2644,7 @@ async def finance_page(
             discount_amount = 0
 
         task_total = max(task_total - discount_amount, 0)
-        task_profit = task_profit - discount_amount
+        task_profit = task_profit - discount_amount - task_expenses_total
 
         payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
         task_margin = round((task_profit / task_total) * 100, 1) if task_total else 0
@@ -2643,6 +2658,7 @@ async def finance_page(
 
         total_estimate += task_total
         total_profit += task_profit
+        total_expenses += task_expenses_total
 
         if payment_status == "Оплачено":
             paid_total += task_total
@@ -2659,6 +2675,7 @@ async def finance_page(
             "status": task["status"],
             "payment_status": payment_status,
             "total": task_total,
+            "expenses": task_expenses_total,
             "profit": task_profit,
             "margin": task_margin
         })
@@ -2682,6 +2699,7 @@ async def finance_page(
             "rows": rows,
             "total_estimate": total_estimate,
             "total_profit": total_profit,
+            "total_expenses": total_expenses,
             "total_margin": total_margin,
             "average_estimate": average_estimate,
             "outstanding_total": outstanding_total,
@@ -5642,6 +5660,13 @@ async def task_detail(request: Request, task_id: int):
     ORDER BY id DESC
     """, (task_id,)).fetchall()
 
+    task_expenses = c.execute("""
+    SELECT *
+    FROM task_expenses
+    WHERE task_id=?
+    ORDER BY id DESC
+    """, (task_id,)).fetchall()
+
     catalog_items = c.execute("""
     SELECT *
     FROM catalog_items
@@ -5651,13 +5676,14 @@ async def task_detail(request: Request, task_id: int):
 
     estimate_total = sum(item["total"] for item in task_items)
     estimate_profit = sum(item["profit"] for item in task_items)
+    expenses_total = sum(expense["amount"] for expense in task_expenses)
     discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
 
     if discount_amount < 0:
         discount_amount = 0
 
     estimate_final_total = max(estimate_total - discount_amount, 0)
-    estimate_final_profit = estimate_profit - discount_amount
+    estimate_final_profit = estimate_profit - discount_amount - expenses_total
     estimate_margin = round((estimate_final_profit / estimate_final_total) * 100, 1) if estimate_final_total else 0
 
     sla_status = "none"
@@ -5701,9 +5727,11 @@ async def task_detail(request: Request, task_id: int):
             "activities": activity,
             "linked_client": linked_client,
             "task_items": task_items,
+            "task_expenses": task_expenses,
             "catalog_items": catalog_items,
             "estimate_total": estimate_total,
             "estimate_profit": estimate_profit,
+            "expenses_total": expenses_total,
             "discount_amount": discount_amount,
             "estimate_final_total": estimate_final_total,
             "estimate_final_profit": estimate_final_profit,
@@ -6057,6 +6085,144 @@ async def apply_task_estimate_total(request: Request, task_id: int):
         role,
         "Цена обновлена по смете",
         f"Новая цена: {final_total}"
+    )
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
+@app.post("/task/{task_id}/expenses")
+async def add_task_expense(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    title = (form.get("title") or "").strip()
+    amount = form.get("amount") or "0"
+
+    try:
+        amount = float(str(amount).replace(",", "."))
+    except Exception:
+        amount = 0
+
+    if not title:
+        return RedirectResponse(f"/task/{task_id}?error=expense_empty", status_code=302)
+
+    if amount < 0:
+        amount = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+
+    c.execute("""
+    INSERT INTO task_expenses (
+        company_id,
+        task_id,
+        title,
+        amount,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        task_id,
+        title,
+        amount,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Добавлен расход",
+        f"{title}: {amount}"
+    )
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
+@app.post("/task/{task_id}/expenses/{expense_id}/delete")
+async def delete_task_expense(request: Request, task_id: int, expense_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+    """, (task_id,)).fetchone()
+
+    if not task:
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    if not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    expense = c.execute("""
+    SELECT *
+    FROM task_expenses
+    WHERE id=? AND task_id=? AND company_id=?
+    """, (expense_id, task_id, company_id)).fetchone()
+
+    if not expense:
+        conn.close()
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    c.execute("""
+    DELETE FROM task_expenses
+    WHERE id=? AND task_id=? AND company_id=?
+    """, (expense_id, task_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Удалён расход",
+        f"{expense['title']}: {expense['amount']}"
     )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)

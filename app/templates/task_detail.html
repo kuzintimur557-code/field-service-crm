@@ -387,6 +387,11 @@ button{
 	Укажите название ручной позиции сметы.
 	</div>
 	{% endif %}
+	{% if request.query_params.get("error") == "expense_empty" %}
+	<div style="margin-top:14px;padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900">
+	Укажите название расхода.
+	</div>
+	{% endif %}
 	</div>
 
 </div>
@@ -552,6 +557,10 @@ button{
 <div class="mini-value">{{ discount_amount }} ₽</div>
 </div>
 <div class="mini">
+<div class="mini-label">Расходы</div>
+<div class="mini-value">{{ expenses_total }} ₽</div>
+</div>
+<div class="mini">
 <div class="mini-label">К оплате</div>
 <div class="mini-value">{{ estimate_final_total }} ₽</div>
 </div>
@@ -606,6 +615,34 @@ button{
 </form>
 {% elif role in ["boss", "manager"] %}
 <div class="comment">Каталог пуст. Сначала добавьте услуги или материалы в каталоге.</div>
+{% endif %}
+
+{% if task_expenses %}
+<div style="margin-top:16px">
+{% for expense in task_expenses %}
+<div class="estimate-item">
+    <div>
+        <div class="value">{{ expense["title"] }}</div>
+        <div class="estimate-meta">Расход: {{ expense["amount"] }} ₽</div>
+    </div>
+    {% if role in ["boss", "manager"] %}
+    <form method="post" action="/task/{{ task['id'] }}/expenses/{{ expense['id'] }}/delete">
+        <button class="btn red" type="submit">Удалить</button>
+    </form>
+    {% endif %}
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if role in ["boss", "manager"] %}
+<form method="post" action="/task/{{ task['id'] }}/expenses" style="margin-top:18px">
+    <label>Расход</label>
+    <input type="text" name="title" placeholder="Например: бензин, парковка, закупка">
+    <label>Сумма расхода</label>
+    <input type="number" name="amount" min="0" step="0.01" value="0">
+    <button class="btn green" type="submit">Добавить расход</button>
+</form>
 {% endif %}
 
 {% if role in ["boss", "manager"] %}
