@@ -2562,7 +2562,8 @@ async def finance_page(
     request: Request,
     month: str = "",
     payment_filter: str = "",
-    worker: str = ""
+    worker: str = "",
+    sort: str = ""
 ):
 
     username = get_user(request)
@@ -2584,6 +2585,7 @@ async def finance_page(
         month = datetime.now().strftime("%Y-%m")
     selected_payment_filter = payment_filter if payment_filter in ("paid", "partial", "unpaid") else ""
     selected_worker = str(worker or "").strip()
+    selected_sort = sort if sort in ("total", "profit", "margin", "expenses") else "date"
 
     conn = connect()
     c = conn.cursor()
@@ -2685,6 +2687,15 @@ async def finance_page(
             "margin": task_margin
         })
 
+    if selected_sort == "total":
+        rows.sort(key=lambda row: row["total"], reverse=True)
+    elif selected_sort == "profit":
+        rows.sort(key=lambda row: row["profit"], reverse=True)
+    elif selected_sort == "margin":
+        rows.sort(key=lambda row: row["margin"], reverse=True)
+    elif selected_sort == "expenses":
+        rows.sort(key=lambda row: row["expenses"], reverse=True)
+
     conn.close()
     total_margin = round((total_profit / total_estimate) * 100, 1) if total_estimate else 0
     average_estimate = round(total_estimate / len(rows), 1) if rows else 0
@@ -2700,6 +2711,7 @@ async def finance_page(
             "month": month,
             "selected_payment_filter": selected_payment_filter,
             "selected_worker": selected_worker,
+            "selected_sort": selected_sort,
             "workers": workers,
             "rows": rows,
             "total_estimate": total_estimate,

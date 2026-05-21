@@ -80,6 +80,16 @@ input,select,button{width:100%;margin-top:8px}
             {% endfor %}
         </select>
     </div>
+    <div>
+        <div class="label">Сортировка</div>
+        <select name="sort">
+            <option value="date" {% if selected_sort == "date" %}selected{% endif %}>По дате</option>
+            <option value="total" {% if selected_sort == "total" %}selected{% endif %}>По сумме</option>
+            <option value="profit" {% if selected_sort == "profit" %}selected{% endif %}>По прибыли</option>
+            <option value="margin" {% if selected_sort == "margin" %}selected{% endif %}>По марже</option>
+            <option value="expenses" {% if selected_sort == "expenses" %}selected{% endif %}>По расходам</option>
+        </select>
+    </div>
     <button type="submit">Показать</button>
 </form>
 

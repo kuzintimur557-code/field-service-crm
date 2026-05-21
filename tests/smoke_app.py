@@ -506,6 +506,7 @@ async def assert_finance_margin(task):
     assert "2300.0 ₽" in finance_html
     assert "К оплате" in finance_html
     assert "Скидки" in finance_html
+    assert 'name="sort"' in finance_html
     assert "worker2, helper2" in finance_html
     assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html
@@ -526,10 +527,12 @@ async def assert_finance_margin(task):
         make_asgi_request("owner2", "/finance"),
         month="2026-05",
         worker="helper2",
+        sort="profit",
     )
     assert worker_response.status_code == 200
     worker_html = worker_response.body.decode("utf-8")
     assert '<option value="helper2" selected' in worker_html
+    assert '<option value="profit" selected' in worker_html
     assert "68.7%" in worker_html
 
     export_response = await crm.finance_export(
