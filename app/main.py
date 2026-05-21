@@ -5282,6 +5282,18 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
     finance_payout = round(finance_profit * commission_percent / 100, 1)
     finance_margin = round((finance_profit / finance_total) * 100, 1) if finance_total else 0
 
+    payroll_payout = c.execute("""
+    SELECT *
+    FROM payroll_payouts
+    WHERE company_id=? AND worker_id=? AND month=? AND status='paid'
+    """, (company_id, worker_id, month)).fetchone()
+    payroll_paid_amount = round(float(payroll_payout["amount"] or 0), 1) if payroll_payout else 0
+    payroll_due_amount = round(max(finance_payout - payroll_paid_amount, 0), 1)
+    payroll_status = "Не выплачено"
+
+    if payroll_payout:
+        payroll_status = "Выплачено" if payroll_paid_amount >= finance_payout else "Частично"
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -5300,7 +5312,11 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             "finance_profit": finance_profit,
             "finance_expenses": finance_expenses,
             "finance_payout": finance_payout,
-            "finance_margin": finance_margin
+            "finance_margin": finance_margin,
+            "payroll_status": payroll_status,
+            "payroll_paid_amount": payroll_paid_amount,
+            "payroll_due_amount": payroll_due_amount,
+            "payroll_note": payroll_payout["note"] if payroll_payout else ""
         }
     )
 
