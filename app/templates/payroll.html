@@ -31,6 +31,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .history-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px;margin-bottom:10px}
 .head{background:#e5e7eb;font-weight:900}
 .paid-status{display:inline-block;padding:8px 10px;border-radius:12px;background:#dcfce7;color:#166534;font-size:13px;font-weight:900}
+.partial-status{display:inline-block;padding:8px 10px;border-radius:12px;background:#fef3c7;color:#92400e;font-size:13px;font-weight:900}
 .due-status{display:inline-block;padding:8px 10px;border-radius:12px;background:#fee2e2;color:#991b1b;font-size:13px;font-weight:900}
 .notice{margin-bottom:16px;padding:14px;border-radius:16px;font-weight:900}
 .notice.ok{background:#dcfce7;color:#166534}
@@ -137,7 +138,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <div><b>{{ row.payout }} ₽</b></div>
     <div>
         {% if row.payout_paid %}
-        <span class="paid-status">Выплачено</span>
+        <span class="{% if row.payout_status == 'Частично' %}partial-status{% else %}paid-status{% endif %}">{{ row.payout_status }}</span>
         <div class="label">Сумма: {{ row.paid_amount }} ₽</div>
         <div class="label">{{ row.paid_at }}</div>
         <div class="label">Кем: {{ row.paid_by }}</div>

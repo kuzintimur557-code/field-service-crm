@@ -2928,6 +2928,9 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
         row["paid_by"] = paid_payout["paid_by"] if paid_payout else ""
         row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
+        row["payout_status"] = "Не выплачено"
+        if row["payout_paid"]:
+            row["payout_status"] = "Выплачено" if row["paid_amount"] >= row["payout"] else "Частично"
         rows.append(row)
 
     if selected_payout_filter == "positive":
@@ -3082,6 +3085,9 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
         row["paid_by"] = paid_payout["paid_by"] if paid_payout else ""
         row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
+        row["payout_status"] = "Не выплачено"
+        if row["payout_paid"]:
+            row["payout_status"] = "Выплачено" if row["paid_amount"] >= row["payout"] else "Частично"
         rows.append(row)
 
     if selected_payout_filter == "positive":
@@ -3123,7 +3129,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
             row["commission_percent"],
             row["payout"],
             row["paid_amount"],
-            "Выплачено" if row["payout_paid"] else "Не выплачено",
+            row["payout_status"],
             row["paid_at"],
             row["paid_by"]
         ])
