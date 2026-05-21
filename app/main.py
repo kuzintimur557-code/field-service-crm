@@ -3389,7 +3389,14 @@ async def clients_page(request: Request):
 
 
 @app.get("/clients/{client_id}", response_class=HTMLResponse)
-async def client_detail(request: Request, client_id: int, task_filter: str = "", task_search: str = "", task_sort: str = ""):
+async def client_detail(
+    request: Request,
+    client_id: int,
+    task_filter: str = "",
+    task_search: str = "",
+    task_sort: str = "",
+    activity_filter: str = ""
+):
 
     username = get_user(request)
 
@@ -3425,6 +3432,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "",
     selected_task_filter = task_filter if task_filter in ("active", "completed", "overdue") else ""
     selected_task_search = str(task_search or "").strip()
     selected_task_sort = task_sort if task_sort in ("oldest", "date_asc", "date_desc") else "newest"
+    selected_activity_filter = activity_filter if activity_filter in ("status", "date", "comment") else ""
     search_value = selected_task_search.lower()
     latest_task = tasks[0] if tasks else None
 
@@ -3525,6 +3533,25 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "",
     LIMIT 20
     """, (client_id, company_id)).fetchall()
 
+    if selected_activity_filter:
+        filtered_timeline = []
+
+        for item in client_timeline:
+            action = str(item["action"] or "").lower()
+
+            if selected_activity_filter == "status" and "статус" not in action:
+                continue
+
+            if selected_activity_filter == "date" and "дат" not in action and "deadline" not in action:
+                continue
+
+            if selected_activity_filter == "comment" and "коммент" not in action:
+                continue
+
+            filtered_timeline.append(item)
+
+        client_timeline = filtered_timeline
+
     client_custom_fields = c.execute("""
     SELECT custom_fields.id, custom_fields.label, custom_fields.field_type, custom_fields.options, custom_field_values.value
     FROM custom_fields
@@ -3555,6 +3582,7 @@ async def client_detail(request: Request, client_id: int, task_filter: str = "",
             "selected_task_filter": selected_task_filter,
             "selected_task_search": selected_task_search,
             "selected_task_sort": selected_task_sort,
+            "selected_activity_filter": selected_activity_filter,
             "client_notes": client_notes,
             "latest_client_note": latest_client_note,
             "client_total_tasks": client_total_tasks,

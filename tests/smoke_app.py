@@ -567,6 +567,9 @@ async def assert_client_card(task):
     assert 'href="tel:+70000000000"' in html
     assert 'href="mailto:client@example.com"' in html
     assert "Лента активности" in html
+    assert "activity_filter=status" in html
+    assert "activity_filter=date" in html
+    assert "activity_filter=comment" in html
     assert "Smoke client timeline" in html
     assert "Timeline details" in html
     assert "/calendar?date=2026-05-21" in html
@@ -645,6 +648,16 @@ async def assert_client_card(task):
     assert sorted_response.status_code == 200
     sorted_html = sorted_response.body.decode("utf-8")
     assert '<option value="oldest" selected>Сначала старые</option>' in sorted_html
+
+    activity_response = await crm.client_detail(
+        make_asgi_request("owner2", f"/clients/{task['client_id']}"),
+        task["client_id"],
+        activity_filter="status",
+    )
+    assert activity_response.status_code == 200
+    activity_html = activity_response.body.decode("utf-8")
+    assert "Все события" in activity_html
+    assert "Smoke client timeline" not in activity_html
 
 
 async def assert_overdue_sla(task):

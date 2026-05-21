@@ -291,6 +291,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="card">
 <h2>Лента активности</h2>
 
+<div class="task-filters">
+    <a href="/clients/{{ client['id'] }}" class="{% if not selected_activity_filter %}active{% endif %}">Все события</a>
+    <a href="/clients/{{ client['id'] }}?activity_filter=status" class="{% if selected_activity_filter == 'status' %}active{% endif %}">Статусы</a>
+    <a href="/clients/{{ client['id'] }}?activity_filter=date" class="{% if selected_activity_filter == 'date' %}active{% endif %}">Даты</a>
+    <a href="/clients/{{ client['id'] }}?activity_filter=comment" class="{% if selected_activity_filter == 'comment' %}active{% endif %}">Комментарии</a>
+</div>
+
 {% if client_timeline %}
 {% for item in client_timeline %}
 <div class="timeline-item">
