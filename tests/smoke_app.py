@@ -549,6 +549,17 @@ async def assert_finance_margin(task):
     assert "Прибыль к распределению" in payroll_html
     assert "79.0 ₽" in payroll_html
     assert "helper2" in payroll_html
+    assert "/payroll/export?month=2026-05" in payroll_html
+
+    payroll_export_response = await crm.payroll_export(
+        make_request("owner2"),
+        month="2026-05",
+    )
+    assert payroll_export_response.status_code == 200
+    payroll_csv = payroll_export_response.body.decode("utf-8")
+    assert "Итого выплаты" in payroll_csv
+    assert "helper2" in payroll_csv
+    assert "79.0" in payroll_csv
     assert "Все исполнители" in finance_html
     assert "payment_filter=paid" in finance_html
     assert "payment_filter=partial" in finance_html
