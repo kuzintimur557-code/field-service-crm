@@ -71,6 +71,9 @@ input,select,button{width:100%;margin-top:8px}
     {% if selected_payment_filter %}
     <input type="hidden" name="payment_filter" value="{{ selected_payment_filter }}">
     {% endif %}
+    {% if selected_profit_filter %}
+    <input type="hidden" name="profit_filter" value="{{ selected_profit_filter }}">
+    {% endif %}
     <div>
         <div class="label">Исполнитель</div>
         <select name="worker">
@@ -94,13 +97,14 @@ input,select,button{width:100%;margin-top:8px}
 </form>
 
 <div class="filters">
-    <a href="/finance?month={{ month }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if not selected_payment_filter %}active{% endif %}">Все</a>
-    <a href="/finance?month={{ month }}&payment_filter=paid{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if selected_payment_filter == 'paid' %}active{% endif %}">Оплачено</a>
-    <a href="/finance?month={{ month }}&payment_filter=partial{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if selected_payment_filter == 'partial' %}active{% endif %}">Частично</a>
-    <a href="/finance?month={{ month }}&payment_filter=unpaid{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if selected_payment_filter == 'unpaid' %}active{% endif %}">Не оплачено</a>
+    <a href="/finance?month={{ month }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_profit_filter %}&profit_filter={{ selected_profit_filter }}{% endif %}" class="{% if not selected_payment_filter %}active{% endif %}">Все</a>
+    <a href="/finance?month={{ month }}&payment_filter=paid{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_profit_filter %}&profit_filter={{ selected_profit_filter }}{% endif %}" class="{% if selected_payment_filter == 'paid' %}active{% endif %}">Оплачено</a>
+    <a href="/finance?month={{ month }}&payment_filter=partial{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_profit_filter %}&profit_filter={{ selected_profit_filter }}{% endif %}" class="{% if selected_payment_filter == 'partial' %}active{% endif %}">Частично</a>
+    <a href="/finance?month={{ month }}&payment_filter=unpaid{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_profit_filter %}&profit_filter={{ selected_profit_filter }}{% endif %}" class="{% if selected_payment_filter == 'unpaid' %}active{% endif %}">Не оплачено</a>
+    <a href="/finance?month={{ month }}&profit_filter=loss{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if selected_profit_filter == 'loss' %}active{% endif %}">Убыточные</a>
 </div>
 
-<a href="/finance/export?month={{ month }}{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" style="display:inline-block;margin-top:14px;padding:14px 18px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
+<a href="/finance/export?month={{ month }}{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_profit_filter %}&profit_filter={{ selected_profit_filter }}{% endif %}" style="display:inline-block;margin-top:14px;padding:14px 18px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
 ⬇️ Скачать CSV
 </a>
 </div>

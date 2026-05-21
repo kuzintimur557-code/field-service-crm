@@ -512,6 +512,7 @@ async def assert_finance_margin(task):
     assert "payment_filter=paid" in finance_html
     assert "payment_filter=partial" in finance_html
     assert "payment_filter=unpaid" in finance_html
+    assert "profit_filter=loss" in finance_html
 
     unpaid_response = await crm.finance_page(
         make_asgi_request("owner2", "/finance"),
@@ -633,6 +634,15 @@ async def assert_finance_margin(task):
     assert "Расходы" in discounted_finance_html
     assert "80.0 ₽" in discounted_finance_html
     assert "63.6%" in discounted_finance_html
+
+    loss_response = await crm.finance_page(
+        make_asgi_request("owner2", "/finance"),
+        month="2026-05",
+        profit_filter="loss",
+    )
+    assert loss_response.status_code == 200
+    loss_html = loss_response.body.decode("utf-8")
+    assert 'name="profit_filter" value="loss"' in loss_html
 
     apply_response = await crm.apply_task_estimate_total(
         make_request("owner2"),

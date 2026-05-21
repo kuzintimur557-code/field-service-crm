@@ -2432,7 +2432,8 @@ async def finance_export(
     request: Request,
     month: str = "",
     payment_filter: str = "",
-    worker: str = ""
+    worker: str = "",
+    profit_filter: str = ""
 ):
 
     username = get_user(request)
@@ -2449,6 +2450,7 @@ async def finance_export(
         month = datetime.now().strftime("%Y-%m")
     selected_payment_filter = payment_filter if payment_filter in ("paid", "partial", "unpaid") else ""
     selected_worker = str(worker or "").strip()
+    selected_profit_filter = profit_filter if profit_filter == "loss" else ""
 
     conn = connect()
     c = conn.cursor()
@@ -2526,6 +2528,8 @@ async def finance_export(
             continue
         if selected_payment_filter == "unpaid" and payment_status != "Не оплачено":
             continue
+        if selected_profit_filter == "loss" and task_profit >= 0:
+            continue
 
         writer.writerow([
             task["id"],
@@ -2563,7 +2567,8 @@ async def finance_page(
     month: str = "",
     payment_filter: str = "",
     worker: str = "",
-    sort: str = ""
+    sort: str = "",
+    profit_filter: str = ""
 ):
 
     username = get_user(request)
@@ -2586,6 +2591,7 @@ async def finance_page(
     selected_payment_filter = payment_filter if payment_filter in ("paid", "partial", "unpaid") else ""
     selected_worker = str(worker or "").strip()
     selected_sort = sort if sort in ("total", "profit", "margin", "expenses") else "date"
+    selected_profit_filter = profit_filter if profit_filter == "loss" else ""
 
     conn = connect()
     c = conn.cursor()
@@ -2660,6 +2666,8 @@ async def finance_page(
             continue
         if selected_payment_filter == "unpaid" and payment_status != "Не оплачено":
             continue
+        if selected_profit_filter == "loss" and task_profit >= 0:
+            continue
 
         total_estimate += task_total
         total_profit += task_profit
@@ -2712,6 +2720,7 @@ async def finance_page(
             "selected_payment_filter": selected_payment_filter,
             "selected_worker": selected_worker,
             "selected_sort": selected_sort,
+            "selected_profit_filter": selected_profit_filter,
             "workers": workers,
             "rows": rows,
             "total_estimate": total_estimate,
