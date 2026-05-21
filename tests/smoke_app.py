@@ -607,6 +607,7 @@ async def assert_finance_margin(task):
     assert "Выплата отмечена" in paid_payroll_html
     assert "Частично" in paid_payroll_html
     assert "Сумма: 70.0 ₽" in paid_payroll_html
+    assert "Остаток: 9.0 ₽" in paid_payroll_html
     assert "Кем: owner2" in paid_payroll_html
     assert "Журнал выплат" in paid_payroll_html
     assert "70.0 ₽" in paid_payroll_html
@@ -656,6 +657,8 @@ async def assert_finance_margin(task):
     assert "79.0" in payroll_csv
     assert "Фактически выплачено" in payroll_csv
     assert "70.0" in payroll_csv
+    assert "Осталось выплатить" in payroll_csv
+    assert "9.0" in payroll_csv
     assert "Статус выплаты" in payroll_csv
     assert "Кем выплачено" in payroll_csv
     assert "owner2" in payroll_csv

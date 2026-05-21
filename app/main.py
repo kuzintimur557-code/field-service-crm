@@ -2928,6 +2928,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
         row["paid_by"] = paid_payout["paid_by"] if paid_payout else ""
         row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
+        row["due_amount"] = round(max(row["payout"] - row["paid_amount"], 0), 1)
         row["payout_status"] = "Не выплачено"
         if row["payout_paid"]:
             row["payout_status"] = "Выплачено" if row["paid_amount"] >= row["payout"] else "Частично"
@@ -2945,7 +2946,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
     rows.sort(key=lambda row: row["payout"], reverse=True)
     total_payout = round(sum(row["payout"] for row in rows), 1)
     total_paid = round(sum(row["paid_amount"] for row in rows if row["payout_paid"]), 1)
-    total_due = round(total_payout - total_paid, 1)
+    total_due = round(sum(row["due_amount"] for row in rows), 1)
     total_profit = round(sum(row["profit"] for row in rows), 1)
 
     conn.close()
@@ -3087,6 +3088,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
         row["paid_by"] = paid_payout["paid_by"] if paid_payout else ""
         row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
+        row["due_amount"] = round(max(row["payout"] - row["paid_amount"], 0), 1)
         row["payout_status"] = "Не выплачено"
         if row["payout_paid"]:
             row["payout_status"] = "Выплачено" if row["paid_amount"] >= row["payout"] else "Частично"
@@ -3118,6 +3120,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         "Процент",
         "Выплата",
         "Фактически выплачено",
+        "Осталось выплатить",
         "Статус выплаты",
         "Дата выплаты",
         "Кем выплачено"
@@ -3133,6 +3136,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
             row["commission_percent"],
             row["payout"],
             row["paid_amount"],
+            row["due_amount"],
             row["payout_status"],
             row["paid_at"],
             row["paid_by"]
