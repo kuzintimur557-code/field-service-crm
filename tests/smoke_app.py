@@ -1148,6 +1148,16 @@ async def assert_client_custom_fields():
     assert f"custom_field_{field_id}" in page_html
     assert "Заявок:" in page_html
     assert "Активных:" in page_html
+    assert "Поиск клиентов" in page_html
+
+    search_response = await crm.clients_page(
+        make_asgi_request("owner2", "/clients"),
+        search="Client 2",
+    )
+    assert search_response.status_code == 200
+    search_html = search_response.body.decode("utf-8")
+    assert 'name="search" value="Client 2"' in search_html
+    assert "Client 2" in search_html
 
     original_send_message = crm.send_message
     crm.send_message = lambda text: True

@@ -3350,7 +3350,7 @@ async def toggle_catalog_item(request: Request, item_id: int):
 
 
 @app.get("/clients", response_class=HTMLResponse)
-async def clients_page(request: Request):
+async def clients_page(request: Request, search: str = ""):
 
     username = get_user(request)
 
@@ -3373,8 +3373,25 @@ async def clients_page(request: Request):
 
     company_id = get_user_company_id(username)
     today = datetime.now().strftime("%Y-%m-%d")
+    selected_search = str(search or "").strip()
+    search_value = f"%{selected_search.lower()}%"
 
-    clients = c.execute("""
+    search_condition = ""
+    params = [today, company_id]
+
+    if selected_search:
+        search_condition = """
+          AND (
+            lower(clients.name) LIKE ?
+            OR lower(clients.phone) LIKE ?
+            OR lower(clients.email) LIKE ?
+            OR lower(clients.address) LIKE ?
+            OR lower(clients.notes) LIKE ?
+          )
+        """
+        params.extend([search_value, search_value, search_value, search_value, search_value])
+
+    clients = c.execute(f"""
     SELECT
         clients.*,
         COUNT(tasks.id) AS task_count,
@@ -3395,9 +3412,10 @@ async def clients_page(request: Request):
       ON tasks.client_id=clients.id
       AND tasks.company_id=clients.company_id
     WHERE clients.company_id=?
+    {search_condition}
     GROUP BY clients.id
     ORDER BY clients.id DESC
-    """, (today, company_id)).fetchall()
+    """, params).fetchall()
 
     custom_fields = c.execute("""
     SELECT *
@@ -3418,6 +3436,7 @@ async def clients_page(request: Request):
             "username": username,
             "role": role,
             "clients": clients,
+            "selected_search": selected_search,
             "custom_fields": custom_fields
         }
     )
