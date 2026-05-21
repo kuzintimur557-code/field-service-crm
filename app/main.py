@@ -3372,13 +3372,32 @@ async def clients_page(request: Request):
         return RedirectResponse("/platform", status_code=302)
 
     company_id = get_user_company_id(username)
+    today = datetime.now().strftime("%Y-%m-%d")
 
     clients = c.execute("""
-    SELECT *
+    SELECT
+        clients.*,
+        COUNT(tasks.id) AS task_count,
+        SUM(CASE
+            WHEN tasks.archived=0
+             AND tasks.status IN ('Новая', 'В работе')
+            THEN 1 ELSE 0
+        END) AS active_task_count,
+        SUM(CASE
+            WHEN tasks.archived=0
+             AND tasks.task_date IS NOT NULL
+             AND substr(tasks.task_date, 1, 10) < ?
+             AND tasks.status NOT IN ('Завершено', 'Отменено')
+            THEN 1 ELSE 0
+        END) AS overdue_task_count
     FROM clients
-    WHERE company_id=?
-    ORDER BY id DESC
-    """, (company_id,)).fetchall()
+    LEFT JOIN tasks
+      ON tasks.client_id=clients.id
+      AND tasks.company_id=clients.company_id
+    WHERE clients.company_id=?
+    GROUP BY clients.id
+    ORDER BY clients.id DESC
+    """, (today, company_id)).fetchall()
 
     custom_fields = c.execute("""
     SELECT *

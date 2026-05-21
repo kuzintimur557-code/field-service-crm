@@ -1146,6 +1146,8 @@ async def assert_client_custom_fields():
     page_html = page_response.body.decode("utf-8")
     assert "Industry" in page_html
     assert f"custom_field_{field_id}" in page_html
+    assert "Заявок:" in page_html
+    assert "Активных:" in page_html
 
     original_send_message = crm.send_message
     crm.send_message = lambda text: True
