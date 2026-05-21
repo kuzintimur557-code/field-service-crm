@@ -496,6 +496,11 @@ async def assert_finance_margin(task):
 
     conn = connect()
     c = conn.cursor()
+    helper = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=2 AND username='helper2'
+    """).fetchone()
     c.execute("""
     UPDATE users
     SET commission_percent=10
@@ -503,6 +508,17 @@ async def assert_finance_margin(task):
     """)
     conn.commit()
     conn.close()
+
+    commission_response = await crm.update_worker_commission(
+        make_form_request(
+            "owner2",
+            f"/workers/{helper['id']}/commission",
+            {"commission_percent": "10"},
+        ),
+        helper["id"],
+    )
+    assert commission_response.status_code == 302
+    assert commission_response.headers["location"] == "/workers?commission_updated=1"
 
     finance_response = await crm.finance_page(
         make_asgi_request("owner2", "/finance"),

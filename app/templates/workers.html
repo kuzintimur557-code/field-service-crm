@@ -48,6 +48,10 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">✅ Пароль обновлён</div>
 {% endif %}
 
+{% if request.query_params.get("commission_updated") == "1" %}
+<div class="notice ok">✅ Процент исполнителя обновлён</div>
+{% endif %}
+
 {% if request.query_params.get("deleted") == "1" %}
 <div class="notice ok">✅ Пользователь удалён</div>
 {% endif %}
@@ -112,6 +116,11 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     <form method="post" action="/workers/{{ worker['id'] }}/password">
         <input type="text" name="password" placeholder="Новый пароль">
         <button class="btn-dark" type="submit">Сменить пароль</button>
+    </form>
+
+    <form method="post" action="/workers/{{ worker['id'] }}/commission">
+        <input type="number" name="commission_percent" min="0" step="0.1" value="{{ worker['commission_percent'] or 0 }}" placeholder="Процент с прибыли">
+        <button class="btn-dark" type="submit">Сохранить процент</button>
     </form>
 
     <form method="post" action="/workers/{{ worker['id'] }}/delete" onsubmit="return confirm('Удалить пользователя?')">

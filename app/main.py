@@ -4841,6 +4841,60 @@ async def change_team_user_password(request: Request, user_id: int):
     return RedirectResponse("/workers?password_changed=1", status_code=302)
 
 
+@app.post("/workers/{user_id}/commission")
+async def update_worker_commission(request: Request, user_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/workers?error=only_boss", status_code=302)
+
+    company_id = get_user_company_id(username)
+    form = await request.form()
+    commission_percent = form.get("commission_percent") or "0"
+
+    try:
+        commission_percent = float(str(commission_percent).replace(",", "."))
+    except Exception:
+        commission_percent = 0
+
+    if commission_percent < 0:
+        commission_percent = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    user = c.execute("""
+    SELECT *
+    FROM users
+    WHERE id=? AND company_id=?
+    """, (user_id, company_id)).fetchone()
+
+    if not user:
+        conn.close()
+        return RedirectResponse("/workers", status_code=302)
+
+    if user["role"] == "boss":
+        conn.close()
+        return RedirectResponse("/workers?error=cannot_change_boss", status_code=302)
+
+    c.execute("""
+    UPDATE users
+    SET commission_percent=?
+    WHERE id=? AND company_id=?
+    """, (commission_percent, user_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/workers?commission_updated=1", status_code=302)
+
+
 @app.post("/workers/{user_id}/delete")
 async def delete_team_user(request: Request, user_id: int):
 
