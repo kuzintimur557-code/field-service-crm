@@ -139,6 +139,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <span class="paid-status">Выплачено</span>
         <div class="label">Сумма: {{ row.paid_amount }} ₽</div>
         <div class="label">{{ row.paid_at }}</div>
+        <div class="label">Кем: {{ row.paid_by }}</div>
         {% else %}
         <span class="due-status">Не выплачено</span>
         {% endif %}

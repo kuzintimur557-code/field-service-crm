@@ -2826,7 +2826,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
     """, (company_id, f"{month}%")).fetchall()
 
     paid_payouts = c.execute("""
-    SELECT worker_id, amount, paid_at
+    SELECT worker_id, amount, paid_at, paid_by
     FROM payroll_payouts
     WHERE company_id=? AND month=? AND status='paid'
     """, (company_id, month)).fetchall()
@@ -2902,6 +2902,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         paid_payout = paid_payout_map.get(row["id"])
         row["payout_paid"] = bool(paid_payout)
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
+        row["paid_by"] = paid_payout["paid_by"] if paid_payout else ""
         row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
         rows.append(row)
 
@@ -2978,7 +2979,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
     """, (company_id, f"{month}%")).fetchall()
 
     paid_payouts = c.execute("""
-    SELECT worker_id, amount, paid_at
+    SELECT worker_id, amount, paid_at, paid_by
     FROM payroll_payouts
     WHERE company_id=? AND month=? AND status='paid'
     """, (company_id, month)).fetchall()
@@ -3054,6 +3055,7 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         paid_payout = paid_payout_map.get(row["id"])
         row["payout_paid"] = bool(paid_payout)
         row["paid_at"] = paid_payout["paid_at"] if paid_payout else ""
+        row["paid_by"] = paid_payout["paid_by"] if paid_payout else ""
         row["paid_amount"] = round(float(paid_payout["amount"] or 0), 1) if paid_payout else 0
         rows.append(row)
 
@@ -3082,7 +3084,8 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
         "Выплата",
         "Фактически выплачено",
         "Статус выплаты",
-        "Дата выплаты"
+        "Дата выплаты",
+        "Кем выплачено"
     ])
 
     for row in rows:
@@ -3096,7 +3099,8 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
             row["payout"],
             row["paid_amount"],
             "Выплачено" if row["payout_paid"] else "Не выплачено",
-            row["paid_at"]
+            row["paid_at"],
+            row["paid_by"]
         ])
 
     writer.writerow([])

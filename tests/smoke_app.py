@@ -604,6 +604,7 @@ async def assert_finance_margin(task):
     assert "Выплата отмечена" in paid_payroll_html
     assert "Выплачено" in paid_payroll_html
     assert "Сумма: 70.0 ₽" in paid_payroll_html
+    assert "Кем: owner2" in paid_payroll_html
     assert "Отменить" in paid_payroll_html
 
     paid_filter_response = await crm.payroll_page(
@@ -639,6 +640,8 @@ async def assert_finance_margin(task):
     assert "Фактически выплачено" in payroll_csv
     assert "70.0" in payroll_csv
     assert "Статус выплаты" in payroll_csv
+    assert "Кем выплачено" in payroll_csv
+    assert "owner2" in payroll_csv
     assert "Выплачено" in payroll_csv
 
     mark_unpaid_response = await crm.mark_payroll_unpaid(
