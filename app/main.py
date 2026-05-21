@@ -2460,6 +2460,31 @@ async def finance_export(
 
     company_id = get_user_company_id(username)
 
+    workers = c.execute("""
+    SELECT id, username, commission_percent
+    FROM users
+    WHERE role='worker' AND company_id=?
+    ORDER BY username
+    """, (company_id,)).fetchall()
+    worker_names = [row["username"] for row in workers]
+    worker_ids = {
+        row["username"]: row["id"]
+        for row in workers
+    }
+    worker_commissions = {
+        row["username"]: float(row["commission_percent"] or 0)
+        for row in workers
+    }
+    payroll_payouts = c.execute("""
+    SELECT worker_id, amount
+    FROM payroll_payouts
+    WHERE company_id=? AND month=? AND status='paid'
+    """, (company_id, month)).fetchall()
+    payroll_payout_map = {
+        row["worker_id"]: round(float(row["amount"] or 0), 1)
+        for row in payroll_payouts
+    }
+
     tasks = c.execute("""
     SELECT *
     FROM tasks
@@ -2469,6 +2494,7 @@ async def finance_export(
 
     output = io.StringIO()
     writer = csv.writer(output)
+    worker_finance = {}
 
     writer.writerow([
         "ID",
@@ -2531,6 +2557,33 @@ async def finance_export(
         if selected_profit_filter == "loss" and task_profit >= 0:
             continue
 
+        task_worker_names = [
+            worker_name for worker_name in get_task_worker_names(task)
+            if worker_name in worker_names
+        ]
+
+        if not task_worker_names:
+            task_worker_names = ["Не назначены"]
+
+        worker_share_count = len(task_worker_names)
+
+        for worker_name in task_worker_names:
+            if worker_name not in worker_finance:
+                worker_finance[worker_name] = {
+                    "worker_id": worker_ids.get(worker_name),
+                    "worker": worker_name,
+                    "commission_percent": worker_commissions.get(worker_name, 0),
+                    "tasks": 0,
+                    "total": 0,
+                    "expenses": 0,
+                    "profit": 0
+                }
+
+            worker_finance[worker_name]["tasks"] += 1
+            worker_finance[worker_name]["total"] += task_total / worker_share_count
+            worker_finance[worker_name]["expenses"] += task_expenses_total / worker_share_count
+            worker_finance[worker_name]["profit"] += task_profit / worker_share_count
+
         writer.writerow([
             task["id"],
             task["task_date"],
@@ -2546,6 +2599,52 @@ async def finance_export(
             task_profit,
             task_margin
         ])
+
+    worker_finance_rows = []
+
+    for worker_row in worker_finance.values():
+        worker_row["total"] = round(worker_row["total"], 1)
+        worker_row["expenses"] = round(worker_row["expenses"], 1)
+        worker_row["profit"] = round(worker_row["profit"], 1)
+        worker_row["payout"] = round(worker_row["profit"] * worker_row["commission_percent"] / 100, 1)
+        worker_row["paid_amount"] = payroll_payout_map.get(worker_row["worker_id"], 0)
+        worker_row["due_amount"] = round(max(worker_row["payout"] - worker_row["paid_amount"], 0), 1)
+        worker_row["payout_status"] = "Не выплачено"
+        if worker_row["paid_amount"] > 0:
+            worker_row["payout_status"] = "Выплачено" if worker_row["paid_amount"] >= worker_row["payout"] else "Частично"
+        worker_finance_rows.append(worker_row)
+
+    worker_finance_rows.sort(key=lambda row: row["profit"], reverse=True)
+
+    if worker_finance_rows:
+        writer.writerow([])
+        writer.writerow(["Финансы по исполнителям"])
+        writer.writerow([
+            "Исполнитель",
+            "Заявки",
+            "Выручка",
+            "Расходы",
+            "Прибыль",
+            "Процент",
+            "Выплата",
+            "Payroll статус",
+            "Выплачено",
+            "Остаток"
+        ])
+
+        for worker_row in worker_finance_rows:
+            writer.writerow([
+                worker_row["worker"],
+                worker_row["tasks"],
+                worker_row["total"],
+                worker_row["expenses"],
+                worker_row["profit"],
+                worker_row["commission_percent"],
+                worker_row["payout"],
+                worker_row["payout_status"],
+                worker_row["paid_amount"],
+                worker_row["due_amount"]
+            ])
 
     conn.close()
 

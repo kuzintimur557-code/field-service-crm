@@ -767,7 +767,10 @@ async def assert_finance_margin(task):
     export_csv = export_response.body.decode("utf-8")
     assert "Маржа %" in export_csv
     assert "Скидка" in export_csv
+    assert "Финансы по исполнителям" in export_csv
+    assert "Payroll статус" in export_csv
     assert "68.7" in export_csv
+    assert "Не выплачено" in export_csv
     assert "worker2, helper2" in export_csv
 
     original_send_message = crm.send_message
