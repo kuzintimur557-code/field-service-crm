@@ -194,7 +194,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	    <div>
 	        <div class="latest-title">Последняя заявка #{{ latest_task["id"] }}</div>
 	        <div class="latest-meta">
-	            {{ latest_task["task_date"] or "Без даты" }} / {{ latest_task["status"] }} / {{ latest_task["worker"] or "Не назначен" }}
+	            {{ latest_task["task_date"] or "Без даты" }} / {{ latest_task["status"] }} / {{ client_task_workers.get(latest_task["id"], "Не назначены") }}
 	        </div>
 	    </div>
 	    <div class="task-actions">
@@ -209,7 +209,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	    <div>
 	        <div class="latest-title">Ближайшая заявка #{{ upcoming_task["id"] }}</div>
 	        <div class="latest-meta">
-	            {{ upcoming_task["task_date"] or "Без даты" }} / {{ upcoming_task["status"] }} / {{ upcoming_task["worker"] or "Не назначен" }}
+	            {{ upcoming_task["task_date"] or "Без даты" }} / {{ upcoming_task["status"] }} / {{ client_task_workers.get(upcoming_task["id"], "Не назначены") }}
 	        </div>
 	    </div>
 	    <a class="btn" href="/task/{{ upcoming_task['id'] }}">Открыть</a>
@@ -407,7 +407,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
     <div>
         <div class="label">Исполнитель</div>
-        <div class="value">{{ task["worker"] }}</div>
+        <div class="value">{{ client_task_workers.get(task["id"], "Не назначены") }}</div>
     </div>
 
     <div>

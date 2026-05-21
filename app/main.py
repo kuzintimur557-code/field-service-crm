@@ -3438,6 +3438,7 @@ async def client_detail(
     search_value = selected_task_search.lower()
     note_search_value = selected_note_search.lower()
     latest_task = tasks[0] if tasks else None
+    client_task_workers = {task["id"]: format_task_workers(task) for task in tasks}
 
     today = datetime.now().strftime("%Y-%m-%d")
     client_now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
@@ -3625,6 +3626,7 @@ async def client_detail(
             "tasks": filtered_tasks,
             "latest_task": latest_task,
             "upcoming_task": upcoming_task,
+            "client_task_workers": client_task_workers,
             "shown_task_count": len(filtered_tasks),
             "selected_task_filter": selected_task_filter,
             "selected_task_search": selected_task_search,
