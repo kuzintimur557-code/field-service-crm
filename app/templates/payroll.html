@@ -136,6 +136,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <div>
         <a href="/workers/{{ row.id }}?month={{ month }}" style="color:#111827;text-decoration:none;font-weight:900">{{ row.name }}</a>
         <div class="label">{{ row.username }}</div>
+        <div class="label"><a href="/finance?month={{ month }}&worker={{ row.username }}" style="color:#2563eb;text-decoration:none">Финансы</a></div>
     </div>
     <div>{{ row.tasks }}</div>
     <div>{{ row.total }} ₽</div>

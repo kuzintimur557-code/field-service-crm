@@ -570,6 +570,7 @@ async def assert_finance_margin(task):
     assert "payout_filter=partial" in payroll_html
     assert "payout_filter=unpaid" in payroll_html
     assert f"/workers/{helper['id']}?month=2026-05" in payroll_html
+    assert "/finance?month=2026-05&worker=helper2" in payroll_html
 
     positive_payroll_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll"),
