@@ -202,7 +202,13 @@ input,select,button{width:100%;margin-top:8px}
 
     {% for row in worker_finance_stats %}
     <div class="worker-row">
-        <div><b>{{ row.worker }}</b></div>
+        <div>
+            {% if row.worker_id %}
+            <a href="/workers/{{ row.worker_id }}?month={{ month }}" style="color:#111827;text-decoration:none;font-weight:900">{{ row.worker }}</a>
+            {% else %}
+            <b>{{ row.worker }}</b>
+            {% endif %}
+        </div>
         <div>{{ row.tasks }}</div>
         <div>{{ row.total }} ₽</div>
         <div>{{ row.expenses }} ₽</div>

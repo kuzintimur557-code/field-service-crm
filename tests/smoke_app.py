@@ -542,6 +542,7 @@ async def assert_finance_margin(task):
     assert "790.0 ₽" in finance_html
     assert "Выплата" in finance_html
     assert "79.0 ₽ / 10.0%" in finance_html
+    assert f"/workers/{helper['id']}?month=2026-05" in finance_html
     assert "Не выплачено" in finance_html
     assert "worker2, helper2" in finance_html
     assert "/payroll?month=2026-05" in finance_html
