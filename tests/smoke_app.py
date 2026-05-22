@@ -533,6 +533,9 @@ async def assert_finance_margin(task):
     assert "2300.0 ₽" in finance_html
     assert "К оплате" in finance_html
     assert "Скидки" in finance_html
+    assert "Начислено ЗП" in finance_html
+    assert "Выплачено ЗП" in finance_html
+    assert "Остаток ЗП" in finance_html
     assert 'name="sort"' in finance_html
     assert "Финансы по исполнителям" in finance_html
     assert "Payroll" in finance_html
@@ -974,14 +977,15 @@ async def assert_client_card(task):
         "Timeline details",
     )
     active_deadline = (datetime.now() + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+    upcoming_task_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
     conn = connect()
     c = conn.cursor()
     c.execute("""
     UPDATE tasks
-    SET deadline_at=?
+    SET deadline_at=?, task_date=?
     WHERE id=?
-    """, (active_deadline, task["id"]))
+    """, (active_deadline, upcoming_task_date, task["id"]))
     conn.commit()
     conn.close()
 
@@ -1063,7 +1067,7 @@ async def assert_client_card(task):
     assert "Timeline details" in html
     assert "SLA:" in html
     assert "активен" in html
-    assert "/calendar?date=2026-05-21" in html
+    assert f"/calendar?date={upcoming_task_date}" in html
     assert f"/create-task?client_id={task['client_id']}&return_to=client" in html
     assert f"/create-task?client_id={task['client_id']}&source_task_id={task['id']}&return_to=client" in html
     assert f"#{task['id']}" in html
