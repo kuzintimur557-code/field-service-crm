@@ -2617,6 +2617,10 @@ async def finance_export(
     worker_finance_rows.sort(key=lambda row: row["profit"], reverse=True)
 
     if worker_finance_rows:
+        total_worker_payout = round(sum(row["payout"] for row in worker_finance_rows), 1)
+        total_worker_paid = round(sum(row["paid_amount"] for row in worker_finance_rows), 1)
+        total_worker_due = round(sum(row["due_amount"] for row in worker_finance_rows), 1)
+
         writer.writerow([])
         writer.writerow(["Финансы по исполнителям"])
         writer.writerow([
@@ -2645,6 +2649,11 @@ async def finance_export(
                 worker_row["paid_amount"],
                 worker_row["due_amount"]
             ])
+
+        writer.writerow([])
+        writer.writerow(["Итого начислено ЗП", total_worker_payout])
+        writer.writerow(["Итого выплачено ЗП", total_worker_paid])
+        writer.writerow(["Итого остаток ЗП", total_worker_due])
 
     conn.close()
 

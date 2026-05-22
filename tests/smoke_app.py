@@ -772,6 +772,9 @@ async def assert_finance_margin(task):
     assert "Скидка" in export_csv
     assert "Финансы по исполнителям" in export_csv
     assert "Payroll статус" in export_csv
+    assert "Итого начислено ЗП" in export_csv
+    assert "Итого выплачено ЗП" in export_csv
+    assert "Итого остаток ЗП" in export_csv
     assert "68.7" in export_csv
     assert "Не выплачено" in export_csv
     assert "worker2, helper2" in export_csv
