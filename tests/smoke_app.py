@@ -562,6 +562,8 @@ async def assert_finance_margin(task):
     assert "Не выплачено" in payroll_html
     assert "Выплатил" in payroll_html
     assert "Журнал выплат" in payroll_html
+    assert 'href="#payout-history"' in payroll_html
+    assert 'id="payout-history"' in payroll_html
     assert "За месяц выплат ещё нет" in payroll_html
     assert 'name="amount" min="0" step="0.1" value="79.0"' in payroll_html
     assert 'name="note" placeholder="Комментарий"' in payroll_html
