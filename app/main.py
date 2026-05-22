@@ -2866,6 +2866,9 @@ async def finance_page(
         worker_finance_stats.append(worker_row)
 
     worker_finance_stats.sort(key=lambda row: row["profit"], reverse=True)
+    total_worker_payout = round(sum(row["payout"] for row in worker_finance_stats), 1)
+    total_worker_paid = round(sum(row["paid_amount"] for row in worker_finance_stats), 1)
+    total_worker_due = round(sum(row["due_amount"] for row in worker_finance_stats), 1)
 
     conn.close()
     total_margin = round((total_profit / total_estimate) * 100, 1) if total_estimate else 0
@@ -2896,7 +2899,10 @@ async def finance_page(
             "outstanding_total": outstanding_total,
             "paid_total": paid_total,
             "partial_total": partial_total,
-            "unpaid_total": unpaid_total
+            "unpaid_total": unpaid_total,
+            "total_worker_payout": total_worker_payout,
+            "total_worker_paid": total_worker_paid,
+            "total_worker_due": total_worker_due
         }
     )
 
