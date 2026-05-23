@@ -2755,6 +2755,87 @@ async def finance_summary_export(request: Request, month: str = ""):
 
 
 
+@app.get("/sla/analytics/export")
+async def sla_analytics_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+    SELECT
+        id,
+        client,
+        workers,
+        task_date,
+        status
+    FROM tasks
+    WHERE company_id=?
+    ORDER BY task_date DESC
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    today = datetime.now().date()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Task ID",
+        "Client",
+        "Workers",
+        "Task Date",
+        "Status",
+        "Is Overdue",
+        "Age Days"
+    ])
+
+    for row in rows:
+        is_overdue = False
+        age_days = 0
+
+        try:
+            task_date_value = datetime.strptime(row["task_date"], "%Y-%m-%d").date()
+            age_days = (today - task_date_value).days
+            is_overdue = row["status"] != "done" and task_date_value < today
+        except Exception:
+            pass
+
+        writer.writerow([
+            row["id"],
+            row["client"] or "Unknown",
+            row["workers"] or "",
+            row["task_date"] or "",
+            row["status"] or "",
+            "yes" if is_overdue else "no",
+            age_days
+        ])
+
+    content = output.getvalue()
+    output.close()
+
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=sla_analytics.csv"
+        }
+    )
+
+
+
 @app.get("/sla/analytics", response_class=HTMLResponse)
 async def sla_analytics_page(request: Request):
 
