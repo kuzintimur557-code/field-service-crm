@@ -1,0 +1,76 @@
+534}
+.orange{color:#b45309}
+.blue{color:#1d4ed8}
+
+@media(max-width:900px){
+    .stats{grid-template-columns:1fr}
+    .container{padding:14px}
+    h1{font-size:28px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<a href="/finance?month={{ month }}" class="back">← Назад к финансам</a>
+
+<div class="card">
+
+<h1>📊 Финансовая сводка</h1>
+
+<div class="meta">
+Главные финансовые показатели компании за месяц
+</div>
+
+<form class="form" method="get" action="/finance/summary">
+
+    <div>
+        <div class="label">Месяц</div>
+        <input type="month" name="month" value="{{ month }}">
+    </div>
+
+    <div style="display:flex;align-items:end">
+        <button type="submit">Показать</button>
+    </div>
+
+</form>
+
+</div>
+
+<div class="stats">
+
+<div class="stat">
+    <div class="label">Выручка</div>
+    <div class="value blue">{{ revenue }} ₽</div>
+</div>
+
+<div class="stat">
+    <div class="label">Расходы</div>
+    <div class="value red">{{ expenses }} ₽</div>
+</div>
+
+<div class="stat">
+    <div class="label">Прибыль</div>
+    <div class="value green">{{ profit }} ₽</div>
+</div>
+
+<div class="stat">
+    <div class="label">Payroll</div>
+    <div class="value orange">{{ payroll_total }} ₽</div>
+</div>
+
+<div class="stat">
+    <div class="label">Чистая прибыль</div>
+    <div class="value green">{{ net_profit }} ₽</div>
+</div>
+
+</div>
+
+</div>
+
+{% include 'mobile_nav.html' %}
+
+</body>
+</html>
