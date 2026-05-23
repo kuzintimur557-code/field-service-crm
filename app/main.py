@@ -2669,6 +2669,83 @@ async def finance_export(
     )
 
 
+@app.get("/finance/summary/export")
+async def finance_summary_export(request: Request, month: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+    SELECT
+        month,
+        client_name,
+        price,
+        expense_total,
+        payroll_total,
+        profit
+    FROM finance_summary
+    WHERE company_id=?
+      AND month=?
+    ORDER BY client_name
+    """, (company_id, month)).fetchall()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Month",
+        "Client",
+        "Revenue",
+        "Expenses",
+        "Payroll",
+        "Profit",
+        "Net Profit"
+    ])
+
+    for row in rows:
+        row_profit = float(row["profit"] or 0)
+        row_payroll = float(row["payroll_total"] or 0)
+
+        writer.writerow([
+            row["month"],
+            row["client_name"] or "Unknown",
+            round(float(row["price"] or 0), 2),
+            round(float(row["expense_total"] or 0), 2),
+            round(row_payroll, 2),
+            round(row_profit, 2),
+            round(row_profit - row_payroll, 2)
+        ])
+
+    conn.close()
+
+    content = output.getvalue()
+    output.close()
+
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=finance_summary_{month}.csv"
+        }
+    )
+
+
+
 @app.get("/finance/summary", response_class=HTMLResponse)
 async def finance_summary_page(request: Request, month: str = ""):
 
