@@ -2754,6 +2754,76 @@ async def finance_summary_export(request: Request, month: str = ""):
 
 
 
+@app.get("/sla/analytics", response_class=HTMLResponse)
+async def sla_analytics_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    total_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0]
+
+    completed_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND status='done'
+    """, (company_id,)).fetchone()[0]
+
+    open_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND status!='done'
+    """, (company_id,)).fetchone()[0]
+
+    overdue_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND status!='done'
+      AND task_date < date('now')
+    """, (company_id,)).fetchone()[0]
+
+    conn.close()
+
+    overdue_rate = round(
+        (overdue_tasks / total_tasks * 100),
+        1
+    ) if total_tasks else 0
+
+    return templates.TemplateResponse(
+        request,
+        "sla_analytics.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "open_tasks": open_tasks,
+            "overdue_tasks": overdue_tasks,
+            "overdue_rate": overdue_rate
+        }
+    )
+
+
+
 @app.get("/owner/dashboard/export")
 async def owner_dashboard_export(request: Request):
 

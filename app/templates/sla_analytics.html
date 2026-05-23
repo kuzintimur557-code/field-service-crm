@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SLA Analytics</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            margin: 0;
+            padding: 24px;
+            color: #111827;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .back {
+            display: inline-block;
+            padding: 12px 16px;
+            background: #111827;
+            color: white;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 800;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+
+        .label {
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .value {
+            font-size: 30px;
+            font-weight: 900;
+        }
+
+        .danger {
+            color: #dc2626;
+        }
+
+        .success {
+            color: #16a34a;
+        }
+
+        .warning {
+            color: #d97706;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <div>
+            <h1>SLA Analytics</h1>
+            <p>Service level and overdue task overview</p>
+        </div>
+
+        <a href="/" class="back">← Dashboard</a>
+    </div>
+
+    <div class="grid">
+
+        <div class="card">
+            <div class="label">Total Tasks</div>
+            <div class="value">{{ total_tasks }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Completed Tasks</div>
+            <div class="value success">{{ completed_tasks }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Open Tasks</div>
+            <div class="value warning">{{ open_tasks }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Overdue Tasks</div>
+            <div class="value danger">{{ overdue_tasks }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Overdue Rate</div>
+            <div class="value danger">{{ "%.1f"|format(overdue_rate or 0) }}%</div>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>
