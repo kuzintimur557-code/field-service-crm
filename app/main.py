@@ -2800,6 +2800,71 @@ async def sla_analytics_page(request: Request):
       AND task_date < date('now')
     """, (company_id,)).fetchone()[0]
 
+    workers = c.execute("""
+    SELECT id, username
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+    ORDER BY username
+    """, (company_id,)).fetchall()
+
+    worker_rows = []
+
+    for worker in workers:
+        username_value = worker["username"]
+
+        total_worker_tasks = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND workers LIKE ?
+        """, (company_id, f"%{username_value}%")).fetchone()[0]
+
+        completed_worker_tasks = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND workers LIKE ?
+          AND status='done'
+        """, (company_id, f"%{username_value}%")).fetchone()[0]
+
+        open_worker_tasks = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND workers LIKE ?
+          AND status!='done'
+        """, (company_id, f"%{username_value}%")).fetchone()[0]
+
+        overdue_worker_tasks = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND workers LIKE ?
+          AND status!='done'
+          AND task_date < date('now')
+        """, (company_id, f"%{username_value}%")).fetchone()[0]
+
+        worker_overdue_rate = round(
+            (overdue_worker_tasks / total_worker_tasks * 100),
+            1
+        ) if total_worker_tasks else 0
+
+        worker_rows.append({
+            "worker": username_value,
+            "total_tasks": total_worker_tasks,
+            "completed_tasks": completed_worker_tasks,
+            "open_tasks": open_worker_tasks,
+            "overdue_tasks": overdue_worker_tasks,
+            "overdue_rate": worker_overdue_rate
+        })
+
+    sla_worker_rows = sorted(
+        worker_rows,
+        key=lambda row: row["overdue_tasks"],
+        reverse=True
+    )
+
     conn.close()
 
     overdue_rate = round(
@@ -2818,7 +2883,8 @@ async def sla_analytics_page(request: Request):
             "completed_tasks": completed_tasks,
             "open_tasks": open_tasks,
             "overdue_tasks": overdue_tasks,
-            "overdue_rate": overdue_rate
+            "overdue_rate": overdue_rate,
+            "sla_worker_rows": sla_worker_rows
         }
     )
 

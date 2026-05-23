@@ -113,6 +113,56 @@
 
     </div>
 
+    <div class="card" style="margin-top:24px;">
+        <h2>SLA by Worker</h2>
+
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Worker</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Total</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Completed</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Open</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Overdue</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Overdue Rate</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for row in sla_worker_rows %}
+                    <tr>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ row.worker }}
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ row.total_tasks }}
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ row.completed_tasks }}
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ row.open_tasks }}
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ row.overdue_tasks }}
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ "%.1f"|format(row.overdue_rate or 0) }}%
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="padding:16px;text-align:center;color:#6b7280;">
+                            No worker SLA data available
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 
 </body>
