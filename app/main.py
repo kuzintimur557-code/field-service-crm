@@ -2896,6 +2896,20 @@ async def owner_dashboard_page(request: Request):
     WHERE company_id=?
     """, (company_id,)).fetchone()[0]
 
+    top_owner_clients = c.execute("""
+    SELECT
+        client_name,
+        SUM(price) as revenue,
+        SUM(profit) as profit,
+        SUM(payroll_total) as payroll,
+        COUNT(task_id) as jobs_count
+    FROM finance_summary
+    WHERE company_id=?
+    GROUP BY client_name
+    ORDER BY profit DESC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
     owner_monthly_metrics = c.execute("""
     SELECT
         month,
@@ -2925,6 +2939,18 @@ async def owner_dashboard_page(request: Request):
     profit_margin = round((net_profit / total_revenue * 100), 1) if total_revenue else 0
     completion_rate = round((total_completed_tasks / total_tasks * 100), 1) if total_tasks else 0
     unpaid_ratio = round((unpaid_total / total_revenue * 100), 1) if total_revenue else 0
+
+    top_owner_clients = [
+        {
+            "client_name": row["client_name"] or "Unknown",
+            "revenue": round(float(row["revenue"] or 0), 1),
+            "profit": round(float(row["profit"] or 0), 1),
+            "payroll": round(float(row["payroll"] or 0), 1),
+            "net_profit": round(float(row["profit"] or 0) - float(row["payroll"] or 0), 1),
+            "jobs_count": int(row["jobs_count"] or 0)
+        }
+        for row in top_owner_clients
+    ]
 
     owner_monthly_metrics = [
         {
@@ -2962,6 +2988,7 @@ async def owner_dashboard_page(request: Request):
             "profit_margin": profit_margin,
             "completion_rate": completion_rate,
             "unpaid_ratio": unpaid_ratio,
+            "top_owner_clients": top_owner_clients,
             "owner_monthly_metrics": owner_monthly_metrics,
             "owner_chart_data": owner_chart_data
         }
