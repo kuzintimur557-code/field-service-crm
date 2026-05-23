@@ -2910,6 +2910,20 @@ async def owner_dashboard_page(request: Request):
     LIMIT 10
     """, (company_id,)).fetchall()
 
+    top_owner_workers = c.execute("""
+    SELECT
+        users.username as worker_name,
+        SUM(payroll_payouts.amount) as total_paid,
+        COUNT(payroll_payouts.id) as payouts_count
+    FROM payroll_payouts
+    JOIN users ON users.id = payroll_payouts.worker_id
+    WHERE payroll_payouts.company_id=?
+      AND payroll_payouts.status='paid'
+    GROUP BY payroll_payouts.worker_id
+    ORDER BY total_paid DESC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
     owner_monthly_metrics = c.execute("""
     SELECT
         month,
@@ -2952,6 +2966,15 @@ async def owner_dashboard_page(request: Request):
         for row in top_owner_clients
     ]
 
+    top_owner_workers = [
+        {
+            "worker_name": row["worker_name"],
+            "total_paid": round(float(row["total_paid"] or 0), 1),
+            "payouts_count": int(row["payouts_count"] or 0)
+        }
+        for row in top_owner_workers
+    ]
+
     owner_monthly_metrics = [
         {
             "month": row["month"],
@@ -2989,6 +3012,7 @@ async def owner_dashboard_page(request: Request):
             "completion_rate": completion_rate,
             "unpaid_ratio": unpaid_ratio,
             "top_owner_clients": top_owner_clients,
+            "top_owner_workers": top_owner_workers,
             "owner_monthly_metrics": owner_monthly_metrics,
             "owner_chart_data": owner_chart_data
         }
