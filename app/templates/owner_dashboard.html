@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1">Owner Analytics Dashboard</h2>
+      <p class="text-muted mb-0">Company-wide business overview</p>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-muted">Total Revenue</div>
+          <h3>${{ "%.2f"|format(total_revenue or 0) }}</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-muted">Total Profit</div>
+          <h3>${{ "%.2f"|format(total_profit or 0) }}</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-muted">Total Payroll</div>
+          <h3>${{ "%.2f"|format(total_payroll or 0) }}</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-muted">Net Profit</div>
+          <h3>${{ "%.2f"|format(net_profit or 0) }}</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-muted">Unpaid Total</div>
+          <h3>${{ "%.2f"|format(unpaid_total or 0) }}</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-muted">Average Job Value</div>
+          <h3>${{ "%.2f"|format(average_job_value or 0) }}</h3>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}

@@ -2746,6 +2746,68 @@ async def finance_summary_export(request: Request, month: str = ""):
 
 
 
+@app.get("/owner/dashboard", response_class=HTMLResponse)
+async def owner_dashboard_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss",):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    total_clients = c.execute("""
+    SELECT COUNT(*)
+    FROM clients
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0]
+
+    total_workers = c.execute("""
+    SELECT COUNT(*)
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+    """, (company_id,)).fetchone()[0]
+
+    total_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0]
+
+    total_completed_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND status='done'
+    """, (company_id,)).fetchone()[0]
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "owner_dashboard.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "total_clients": total_clients,
+            "total_workers": total_workers,
+            "total_tasks": total_tasks,
+            "total_completed_tasks": total_completed_tasks
+        }
+    )
+
+
+
 @app.get("/finance/summary", response_class=HTMLResponse)
 async def finance_summary_page(request: Request, month: str = ""):
 
