@@ -2939,7 +2939,8 @@ async def sla_analytics_page(request: Request):
             "completed_tasks": completed_client_tasks,
             "open_tasks": open_client_tasks,
             "overdue_tasks": overdue_client_tasks,
-            "overdue_rate": client_overdue_rate
+            "overdue_rate": client_overdue_rate,
+            "sla_score": round(100 - client_overdue_rate, 1)
         })
 
     sla_client_rows = sorted(
@@ -3039,7 +3040,8 @@ async def sla_analytics_page(request: Request):
             "completed_tasks": completed_worker_tasks,
             "open_tasks": open_worker_tasks,
             "overdue_tasks": overdue_worker_tasks,
-            "overdue_rate": worker_overdue_rate
+            "overdue_rate": worker_overdue_rate,
+            "sla_score": round(100 - worker_overdue_rate, 1)
         })
 
     sla_worker_rows = sorted(
@@ -3096,6 +3098,8 @@ async def sla_analytics_page(request: Request):
         1
     ) if total_tasks else 0
 
+    overall_sla_score = round(100 - overdue_rate, 1)
+
     return templates.TemplateResponse(
         request,
         "sla_analytics.html",
@@ -3108,6 +3112,7 @@ async def sla_analytics_page(request: Request):
             "open_tasks": open_tasks,
             "overdue_tasks": overdue_tasks,
             "overdue_rate": overdue_rate,
+            "overall_sla_score": overall_sla_score,
             "average_completion_days": average_completion_days,
             "fastest_completion_days": fastest_completion_days,
             "slowest_completion_days": slowest_completion_days,
