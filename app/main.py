@@ -2903,6 +2903,60 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     WHERE company_id=?
     """, (company_id,)).fetchone()[0]
 
+    unpaid_tasks = c.execute("""
+    SELECT
+        id,
+        client_name,
+        task_date,
+        price,
+        paid_amount
+    FROM tasks
+    WHERE company_id=?
+      AND COALESCE(price, 0) > COALESCE(paid_amount, 0)
+    ORDER BY task_date ASC
+    LIMIT 20
+    """, (company_id,)).fetchall()
+
+    unpaid_aging_summary = {
+        "0_7": 0,
+        "8_30": 0,
+        "31_plus": 0
+    }
+
+    unpaid_risk_tasks = []
+
+    today = datetime.now().date()
+
+    for row in unpaid_tasks:
+        unpaid_amount = float(row["price"] or 0) - float(row["paid_amount"] or 0)
+
+        try:
+            task_date = datetime.strptime(row["task_date"], "%Y-%m-%d").date()
+            age_days = (today - task_date).days
+        except Exception:
+            age_days = 0
+
+        if age_days <= 7:
+            unpaid_aging_summary["0_7"] += unpaid_amount
+        elif age_days <= 30:
+            unpaid_aging_summary["8_30"] += unpaid_amount
+        else:
+            unpaid_aging_summary["31_plus"] += unpaid_amount
+
+        unpaid_risk_tasks.append({
+            "id": row["id"],
+            "client_name": row["client_name"] or "Unknown",
+            "task_date": row["task_date"],
+            "unpaid_amount": round(unpaid_amount, 1),
+            "age_days": age_days
+        })
+
+    unpaid_aging_summary = {
+        "0_7": round(unpaid_aging_summary["0_7"], 1),
+        "8_30": round(unpaid_aging_summary["8_30"], 1),
+        "31_plus": round(unpaid_aging_summary["31_plus"], 1)
+    }
+
     repeat_clients_summary = c.execute("""
     SELECT
         COUNT(*) as repeat_clients_count,
@@ -3165,6 +3219,8 @@ async def owner_dashboard_page(request: Request, month: str = ""):
             "profit_margin": profit_margin,
             "completion_rate": completion_rate,
             "unpaid_ratio": unpaid_ratio,
+            "unpaid_aging_summary": unpaid_aging_summary,
+            "unpaid_risk_tasks": unpaid_risk_tasks,
             "repeat_clients_count": repeat_clients_count,
             "repeat_clients_revenue": repeat_clients_revenue,
             "top_repeat_clients": top_repeat_clients,
