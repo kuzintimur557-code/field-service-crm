@@ -3052,6 +3052,41 @@ async def sla_analytics_page(request: Request):
 
     conn.close()
 
+    monthly_task_rows = c.execute("""
+    SELECT
+        substr(task_date, 1, 7) as month,
+        COUNT(*) as total_tasks,
+        SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) as completed_tasks,
+        SUM(CASE WHEN status!='done' AND task_date < date('now') THEN 1 ELSE 0 END) as overdue_tasks
+    FROM tasks
+    WHERE company_id=?
+      AND task_date IS NOT NULL
+      AND task_date!=''
+    GROUP BY substr(task_date, 1, 7)
+    ORDER BY month DESC
+    LIMIT 12
+    """, (company_id,)).fetchall()
+
+    sla_monthly_rows = []
+
+    for row in monthly_task_rows:
+        monthly_total = int(row["total_tasks"] or 0)
+        monthly_overdue = int(row["overdue_tasks"] or 0)
+
+        monthly_overdue_rate = round(
+            (monthly_overdue / monthly_total * 100),
+            1
+        ) if monthly_total else 0
+
+        sla_monthly_rows.append({
+            "month": row["month"],
+            "total_tasks": monthly_total,
+            "completed_tasks": int(row["completed_tasks"] or 0),
+            "overdue_tasks": monthly_overdue,
+            "overdue_rate": monthly_overdue_rate,
+            "sla_score": round(100 - monthly_overdue_rate, 1)
+        })
+
     completed_rows = c.execute("""
     SELECT
         created_at,
@@ -3118,7 +3153,8 @@ async def sla_analytics_page(request: Request):
             "slowest_completion_days": slowest_completion_days,
             "sla_worker_rows": sla_worker_rows,
             "sla_client_rows": sla_client_rows,
-            "sla_overdue_tasks": sla_overdue_tasks
+            "sla_overdue_tasks": sla_overdue_tasks,
+            "sla_monthly_rows": sla_monthly_rows
         }
     )
 
