@@ -2924,6 +2924,36 @@ async def owner_dashboard_page(request: Request):
     LIMIT 10
     """, (company_id,)).fetchall()
 
+    low_margin_clients = c.execute("""
+    SELECT
+        client_name,
+        SUM(price) as revenue,
+        SUM(profit) as profit,
+        SUM(payroll_total) as payroll,
+        COUNT(task_id) as jobs_count
+    FROM finance_summary
+    WHERE company_id=?
+    GROUP BY client_name
+    HAVING revenue > 0
+       AND ((SUM(profit) - SUM(payroll_total)) / SUM(price) * 100) < 15
+    ORDER BY ((SUM(profit) - SUM(payroll_total)) / SUM(price) * 100) ASC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
+    negative_months = c.execute("""
+    SELECT
+        month,
+        SUM(price) as revenue,
+        SUM(profit) as profit,
+        SUM(payroll_total) as payroll
+    FROM finance_summary
+    WHERE company_id=?
+    GROUP BY month
+    HAVING (SUM(profit) - SUM(payroll_total)) < 0
+    ORDER BY month DESC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
     owner_monthly_metrics = c.execute("""
     SELECT
         month,
@@ -2975,6 +3005,30 @@ async def owner_dashboard_page(request: Request):
         for row in top_owner_workers
     ]
 
+    low_margin_clients = [
+        {
+            "client_name": row["client_name"] or "Unknown",
+            "revenue": round(float(row["revenue"] or 0), 1),
+            "profit": round(float(row["profit"] or 0), 1),
+            "payroll": round(float(row["payroll"] or 0), 1),
+            "net_profit": round(float(row["profit"] or 0) - float(row["payroll"] or 0), 1),
+            "margin": round(((float(row["profit"] or 0) - float(row["payroll"] or 0)) / float(row["revenue"] or 1) * 100), 1),
+            "jobs_count": int(row["jobs_count"] or 0)
+        }
+        for row in low_margin_clients
+    ]
+
+    negative_months = [
+        {
+            "month": row["month"],
+            "revenue": round(float(row["revenue"] or 0), 1),
+            "profit": round(float(row["profit"] or 0), 1),
+            "payroll": round(float(row["payroll"] or 0), 1),
+            "net_profit": round(float(row["profit"] or 0) - float(row["payroll"] or 0), 1)
+        }
+        for row in negative_months
+    ]
+
     owner_monthly_metrics = [
         {
             "month": row["month"],
@@ -3013,6 +3067,8 @@ async def owner_dashboard_page(request: Request):
             "unpaid_ratio": unpaid_ratio,
             "top_owner_clients": top_owner_clients,
             "top_owner_workers": top_owner_workers,
+            "low_margin_clients": low_margin_clients,
+            "negative_months": negative_months,
             "owner_monthly_metrics": owner_monthly_metrics,
             "owner_chart_data": owner_chart_data
         }

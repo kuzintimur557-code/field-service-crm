@@ -232,6 +232,92 @@
   <div class="card mt-4">
     <div class="card-body">
 
+      <h3 class="mb-3">Owner Risk Warnings</h3>
+
+      <div class="row g-3">
+
+        <div class="col-md-6">
+          <div class="card border-warning">
+            <div class="card-body">
+              <h5>Low Margin Clients</h5>
+
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Client</th>
+                      <th>Margin</th>
+                      <th>Net Profit</th>
+                      <th>Jobs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for client in low_margin_clients %}
+                    <tr>
+                      <td>{{ client.client_name }}</td>
+                      <td>{{ "%.1f"|format(client.margin or 0) }}%</td>
+                      <td>${{ "%.2f"|format(client.net_profit or 0) }}</td>
+                      <td>{{ client.jobs_count or 0 }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                      <td colspan="4" class="text-muted text-center">
+                        No low margin clients
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card border-danger">
+            <div class="card-body">
+              <h5>Negative Months</h5>
+
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Revenue</th>
+                      <th>Net Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in negative_months %}
+                    <tr>
+                      <td>{{ row.month }}</td>
+                      <td>${{ "%.2f"|format(row.revenue or 0) }}</td>
+                      <td>${{ "%.2f"|format(row.net_profit or 0) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                      <td colspan="3" class="text-muted text-center">
+                        No negative months
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-body">
+
       <h3 class="mb-3">Monthly Owner Metrics</h3>
 
       <div class="table-responsive">
