@@ -2754,6 +2754,7 @@ async def finance_summary_export(request: Request, month: str = ""):
 
 
 
+
 @app.get("/sla/analytics", response_class=HTMLResponse)
 async def sla_analytics_page(request: Request):
 
@@ -2799,6 +2800,72 @@ async def sla_analytics_page(request: Request):
       AND status!='done'
       AND task_date < date('now')
     """, (company_id,)).fetchone()[0]
+
+    clients = c.execute("""
+    SELECT DISTINCT client
+    FROM tasks
+    WHERE company_id=?
+      AND client IS NOT NULL
+      AND client!=''
+    ORDER BY client
+    """, (company_id,)).fetchall()
+
+    client_rows = []
+
+    for client in clients:
+        client_name = client["client"]
+
+        total_client_tasks = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND client=?
+        """, (company_id, client_name)).fetchone()[0]
+
+        completed_client_tasks = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND client=?
+          AND status='done'
+        """, (company_id, client_name)).fetchone()[0]
+
+        open_client_tasks = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND client=?
+          AND status!='done'
+        """, (company_id, client_name)).fetchone()[0]
+
+        overdue_client_tasks = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND client=?
+          AND status!='done'
+          AND task_date < date('now')
+        """, (company_id, client_name)).fetchone()[0]
+
+        client_overdue_rate = round(
+            (overdue_client_tasks / total_client_tasks * 100),
+            1
+        ) if total_client_tasks else 0
+
+        client_rows.append({
+            "client": client_name,
+            "total_tasks": total_client_tasks,
+            "completed_tasks": completed_client_tasks,
+            "open_tasks": open_client_tasks,
+            "overdue_tasks": overdue_client_tasks,
+            "overdue_rate": client_overdue_rate
+        })
+
+    sla_client_rows = sorted(
+        client_rows,
+        key=lambda row: row["overdue_tasks"],
+        reverse=True
+    )[:20]
 
     workers = c.execute("""
     SELECT id, username
@@ -2884,10 +2951,10 @@ async def sla_analytics_page(request: Request):
             "open_tasks": open_tasks,
             "overdue_tasks": overdue_tasks,
             "overdue_rate": overdue_rate,
-            "sla_worker_rows": sla_worker_rows
+            "sla_worker_rows": sla_worker_rows,
+            "sla_client_rows": sla_client_rows
         }
     )
-
 
 
 @app.get("/owner/dashboard/export")
