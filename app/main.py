@@ -2747,6 +2747,81 @@ async def finance_summary_export(request: Request, month: str = ""):
 
 
 
+@app.get("/owner/dashboard/export")
+async def owner_dashboard_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "boss":
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+    SELECT
+        month,
+        SUM(price) as revenue,
+        SUM(payroll_total) as payroll,
+        SUM(profit) as profit,
+        COUNT(task_id) as jobs_count,
+        AVG(price) as average_job_value
+    FROM finance_summary
+    WHERE company_id=?
+    GROUP BY month
+    ORDER BY month DESC
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Month",
+        "Revenue",
+        "Payroll",
+        "Profit",
+        "Net Profit",
+        "Jobs Count",
+        "Average Job Value"
+    ])
+
+    for row in rows:
+        revenue = float(row["revenue"] or 0)
+        payroll = float(row["payroll"] or 0)
+        profit = float(row["profit"] or 0)
+
+        writer.writerow([
+            row["month"],
+            round(revenue, 2),
+            round(payroll, 2),
+            round(profit, 2),
+            round(profit - payroll, 2),
+            int(row["jobs_count"] or 0),
+            round(float(row["average_job_value"] or 0), 2)
+        ])
+
+    content = output.getvalue()
+    output.close()
+
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=owner_dashboard.csv"
+        }
+    )
+
+
+
 @app.get("/owner/dashboard", response_class=HTMLResponse)
 async def owner_dashboard_page(request: Request):
 
