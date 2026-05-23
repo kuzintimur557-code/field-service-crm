@@ -3050,6 +3050,47 @@ async def sla_analytics_page(request: Request):
 
     conn.close()
 
+    completed_rows = c.execute("""
+    SELECT
+        created_at,
+        completed_at
+    FROM tasks
+    WHERE company_id=?
+      AND status='done'
+      AND created_at IS NOT NULL
+      AND completed_at IS NOT NULL
+    """, (company_id,)).fetchall()
+
+    completion_days = []
+
+    for row in completed_rows:
+        try:
+            created_date = datetime.strptime(
+                row["created_at"][:10],
+                "%Y-%m-%d"
+            ).date()
+
+            completed_date = datetime.strptime(
+                row["completed_at"][:10],
+                "%Y-%m-%d"
+            ).date()
+
+            days = (completed_date - created_date).days
+
+            if days >= 0:
+                completion_days.append(days)
+
+        except Exception:
+            pass
+
+    average_completion_days = round(
+        sum(completion_days) / len(completion_days),
+        1
+    ) if completion_days else 0
+
+    fastest_completion_days = min(completion_days) if completion_days else 0
+    slowest_completion_days = max(completion_days) if completion_days else 0
+
     overdue_rate = round(
         (overdue_tasks / total_tasks * 100),
         1
@@ -3067,6 +3108,9 @@ async def sla_analytics_page(request: Request):
             "open_tasks": open_tasks,
             "overdue_tasks": overdue_tasks,
             "overdue_rate": overdue_rate,
+            "average_completion_days": average_completion_days,
+            "fastest_completion_days": fastest_completion_days,
+            "slowest_completion_days": slowest_completion_days,
             "sla_worker_rows": sla_worker_rows,
             "sla_client_rows": sla_client_rows,
             "sla_overdue_tasks": sla_overdue_tasks
