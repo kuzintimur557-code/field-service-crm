@@ -1,28 +1,153 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аналитика владельца</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            margin: 0;
+            padding: 24px;
+            color: #111827;
+        }
 
-{% block content %}
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .col-md-3,
+        .col-md-4,
+        .col-md-6 {
+            min-width: 0;
+        }
+
+        .text-muted {
+            color: #6b7280;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 800;
+            border: 0;
+            cursor: pointer;
+        }
+
+        .btn-primary,
+        .btn-success {
+            background: #111827;
+            color: white;
+        }
+
+        .btn-outline-primary,
+        .btn-outline-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .d-flex {
+            display: flex;
+        }
+
+        .justify-content-between {
+            justify-content: space-between;
+        }
+
+        .align-items-center {
+            align-items: center;
+        }
+
+        .flex-wrap {
+            flex-wrap: wrap;
+        }
+
+        .gap-2 {
+            gap: 8px;
+        }
+
+        .g-3 {
+            gap: 16px;
+        }
+
+        .mb-0 { margin-bottom: 0; }
+        .mb-1 { margin-bottom: 4px; }
+        .mb-3 { margin-bottom: 16px; }
+        .mb-4 { margin-bottom: 24px; }
+        .mt-4 { margin-top: 24px; }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
 
 <div class="container mt-4">
 
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-      <h2 class="mb-1">Owner Analytics Dashboard</h2>
-      <p class="text-muted mb-0">Company-wide business overview</p>
+      <h2 class="mb-1">Аналитика владельца</h2>
+      <p class="text-muted mb-0">Сводка по финансам, выплатам, клиентам и рискам компании</p>
     </div>
 
     <a href="/owner/dashboard/export" class="btn btn-success">
-      Export CSV
+      Экспорт CSV
     </a>
   </div>
 
   <div class="card mb-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Filters</h3>
+      <h3 class="mb-3">Фильтры</h3>
 
       <form method="get" action="/owner/dashboard" class="row g-3 align-items-end">
         <div class="col-md-4">
-          <label class="form-label">Month</label>
+          <label class="form-label">Месяц</label>
           <input
             type="month"
             name="month"
@@ -33,13 +158,13 @@
 
         <div class="col-md-3">
           <button type="submit" class="btn btn-primary w-100">
-            Apply
+            Применить
           </button>
         </div>
 
         <div class="col-md-3">
           <a href="/owner/dashboard" class="btn btn-outline-secondary w-100">
-            Reset
+            Сбросить
           </a>
         </div>
       </form>
@@ -50,23 +175,23 @@
   <div class="card mb-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Quick Links</h3>
+      <h3 class="mb-3">Быстрые ссылки</h3>
 
       <div class="d-flex flex-wrap gap-2">
         <a href="/finance/summary" class="btn btn-primary">
-          Finance Summary
+          Финансовая сводка
         </a>
 
         <a href="/finance" class="btn btn-outline-primary">
-          Finance
+          Финансы
         </a>
 
         <a href="/payroll" class="btn btn-outline-primary">
-          Payroll
+          Выплаты
         </a>
 
         <a href="/payroll/history" class="btn btn-outline-primary">
-          Payroll History
+          История выплат
         </a>
       </div>
 
@@ -78,8 +203,8 @@
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
-          <div class="text-muted">Total Revenue</div>
-          <h3>${{ "%.2f"|format(total_revenue or 0) }}</h3>
+          <div class="text-muted">Общая выручка</div>
+          <h3>₽{{ "%.2f"|format(total_revenue or 0) }}</h3>
         </div>
       </div>
     </div>
@@ -87,8 +212,8 @@
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
-          <div class="text-muted">Total Profit</div>
-          <h3>${{ "%.2f"|format(total_profit or 0) }}</h3>
+          <div class="text-muted">Общая прибыль</div>
+          <h3>₽{{ "%.2f"|format(total_profit or 0) }}</h3>
         </div>
       </div>
     </div>
@@ -96,8 +221,8 @@
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
-          <div class="text-muted">Total Payroll</div>
-          <h3>${{ "%.2f"|format(total_payroll or 0) }}</h3>
+          <div class="text-muted">Всего выплат</div>
+          <h3>₽{{ "%.2f"|format(total_payroll or 0) }}</h3>
         </div>
       </div>
     </div>
@@ -105,8 +230,8 @@
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
-          <div class="text-muted">Net Profit</div>
-          <h3>${{ "%.2f"|format(net_profit or 0) }}</h3>
+          <div class="text-muted">Чистая прибыль</div>
+          <h3>₽{{ "%.2f"|format(net_profit or 0) }}</h3>
         </div>
       </div>
     </div>
@@ -114,8 +239,8 @@
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
-          <div class="text-muted">Unpaid Total</div>
-          <h3>${{ "%.2f"|format(unpaid_total or 0) }}</h3>
+          <div class="text-muted">Не оплачено</div>
+          <h3>₽{{ "%.2f"|format(unpaid_total or 0) }}</h3>
         </div>
       </div>
     </div>
@@ -123,8 +248,8 @@
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
-          <div class="text-muted">Average Job Value</div>
-          <h3>${{ "%.2f"|format(average_job_value or 0) }}</h3>
+          <div class="text-muted">Средний чек</div>
+          <h3>₽{{ "%.2f"|format(average_job_value or 0) }}</h3>
         </div>
       </div>
     </div>
@@ -134,14 +259,14 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Month Comparison</h3>
+      <h3 class="mb-3">Сравнение месяцев</h3>
 
       <div class="row g-3">
 
         <div class="col-md-4">
           <div class="card border-success">
             <div class="card-body">
-              <div class="text-muted">Revenue Growth</div>
+              <div class="text-muted">Рост выручки</div>
 
               <h4>
                 {{ "%.1f"|format(owner_month_comparison.revenue_growth or 0) }}%
@@ -159,7 +284,7 @@
         <div class="col-md-4">
           <div class="card border-primary">
             <div class="card-body">
-              <div class="text-muted">Payroll Growth</div>
+              <div class="text-muted">Рост выплат</div>
 
               <h4>
                 {{ "%.1f"|format(owner_month_comparison.payroll_growth or 0) }}%
@@ -177,7 +302,7 @@
         <div class="col-md-4">
           <div class="card border-warning">
             <div class="card-body">
-              <div class="text-muted">Net Profit Growth</div>
+              <div class="text-muted">Рост чистой прибыли</div>
 
               <h4>
                 {{ "%.1f"|format(owner_month_comparison.net_profit_growth or 0) }}%
@@ -200,14 +325,14 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Owner KPI Ratios</h3>
+      <h3 class="mb-3">KPI-показатели</h3>
 
       <div class="row g-3">
 
         <div class="col-md-3">
           <div class="card">
             <div class="card-body">
-              <div class="text-muted">Payroll Ratio</div>
+              <div class="text-muted">Доля выплат</div>
               <h4>{{ "%.1f"|format(payroll_ratio or 0) }}%</h4>
             </div>
           </div>
@@ -216,7 +341,7 @@
         <div class="col-md-3">
           <div class="card">
             <div class="card-body">
-              <div class="text-muted">Profit Margin</div>
+              <div class="text-muted">Маржа прибыли</div>
               <h4>{{ "%.1f"|format(profit_margin or 0) }}%</h4>
             </div>
           </div>
@@ -225,7 +350,7 @@
         <div class="col-md-3">
           <div class="card">
             <div class="card-body">
-              <div class="text-muted">Completion Rate</div>
+              <div class="text-muted">Доля завершённых</div>
               <h4>{{ "%.1f"|format(completion_rate or 0) }}%</h4>
             </div>
           </div>
@@ -234,7 +359,7 @@
         <div class="col-md-3">
           <div class="card">
             <div class="card-body">
-              <div class="text-muted">Unpaid Ratio</div>
+              <div class="text-muted">Доля неоплаченных</div>
               <h4>{{ "%.1f"|format(unpaid_ratio or 0) }}%</h4>
             </div>
           </div>
@@ -248,15 +373,15 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Unpaid Aging Analytics</h3>
+      <h3 class="mb-3">Просроченные оплаты</h3>
 
       <div class="row g-3 mb-3">
 
         <div class="col-md-4">
           <div class="card border-success">
             <div class="card-body">
-              <div class="text-muted">Unpaid 0–7 Days</div>
-              <h4>${{ "%.2f"|format(unpaid_aging_summary["0_7"] or 0) }}</h4>
+              <div class="text-muted">Не оплачено 0–7 дней</div>
+              <h4>₽{{ "%.2f"|format(unpaid_aging_summary["0_7"] or 0) }}</h4>
             </div>
           </div>
         </div>
@@ -264,8 +389,8 @@
         <div class="col-md-4">
           <div class="card border-warning">
             <div class="card-body">
-              <div class="text-muted">Unpaid 8–30 Days</div>
-              <h4>${{ "%.2f"|format(unpaid_aging_summary["8_30"] or 0) }}</h4>
+              <div class="text-muted">Не оплачено 8–30 дней</div>
+              <h4>₽{{ "%.2f"|format(unpaid_aging_summary["8_30"] or 0) }}</h4>
             </div>
           </div>
         </div>
@@ -273,8 +398,8 @@
         <div class="col-md-4">
           <div class="card border-danger">
             <div class="card-body">
-              <div class="text-muted">Unpaid 31+ Days</div>
-              <h4>${{ "%.2f"|format(unpaid_aging_summary["31_plus"] or 0) }}</h4>
+              <div class="text-muted">Не оплачено 31+ дней</div>
+              <h4>₽{{ "%.2f"|format(unpaid_aging_summary["31_plus"] or 0) }}</h4>
             </div>
           </div>
         </div>
@@ -286,11 +411,11 @@
 
           <thead>
             <tr>
-              <th>Task</th>
-              <th>Client</th>
-              <th>Date</th>
-              <th>Age</th>
-              <th>Unpaid</th>
+              <th>Заявка</th>
+              <th>Клиент</th>
+              <th>Дата</th>
+              <th>Просрочка</th>
+              <th>Не оплачено</th>
             </tr>
           </thead>
 
@@ -304,13 +429,13 @@
               </td>
               <td>{{ task.client_name }}</td>
               <td>{{ task.task_date }}</td>
-              <td>{{ task.age_days }} days</td>
-              <td>${{ "%.2f"|format(task.unpaid_amount or 0) }}</td>
+              <td>{{ task.age_days }} дн.</td>
+              <td>₽{{ "%.2f"|format(task.unpaid_amount or 0) }}</td>
             </tr>
             {% else %}
             <tr>
               <td colspan="5" class="text-center text-muted">
-                No unpaid risk tasks
+                Просроченных оплат нет
               </td>
             </tr>
             {% endfor %}
@@ -325,14 +450,14 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Repeat Clients Analytics</h3>
+      <h3 class="mb-3">Повторные клиенты</h3>
 
       <div class="row g-3 mb-3">
 
         <div class="col-md-6">
           <div class="card">
             <div class="card-body">
-              <div class="text-muted">Repeat Clients</div>
+              <div class="text-muted">Повторные клиенты</div>
               <h4>{{ repeat_clients_count or 0 }}</h4>
             </div>
           </div>
@@ -341,8 +466,8 @@
         <div class="col-md-6">
           <div class="card">
             <div class="card-body">
-              <div class="text-muted">Repeat Clients Revenue</div>
-              <h4>${{ "%.2f"|format(repeat_clients_revenue or 0) }}</h4>
+              <div class="text-muted">Выручка повторных клиентов</div>
+              <h4>₽{{ "%.2f"|format(repeat_clients_revenue or 0) }}</h4>
             </div>
           </div>
         </div>
@@ -354,12 +479,12 @@
 
           <thead>
             <tr>
-              <th>Client</th>
-              <th>Jobs</th>
-              <th>Revenue</th>
-              <th>Payroll</th>
-              <th>Profit</th>
-              <th>Net Profit</th>
+              <th>Клиент</th>
+              <th>Задачи</th>
+              <th>Выручка</th>
+              <th>Выплаты</th>
+              <th>Прибыль</th>
+              <th>Чистая прибыль</th>
             </tr>
           </thead>
 
@@ -368,15 +493,15 @@
             <tr>
               <td>{{ client.client_name }}</td>
               <td>{{ client.jobs_count or 0 }}</td>
-              <td>${{ "%.2f"|format(client.revenue or 0) }}</td>
-              <td>${{ "%.2f"|format(client.payroll or 0) }}</td>
-              <td>${{ "%.2f"|format(client.profit or 0) }}</td>
-              <td>${{ "%.2f"|format(client.net_profit or 0) }}</td>
+              <td>₽{{ "%.2f"|format(client.revenue or 0) }}</td>
+              <td>₽{{ "%.2f"|format(client.payroll or 0) }}</td>
+              <td>₽{{ "%.2f"|format(client.profit or 0) }}</td>
+              <td>₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
             </tr>
             {% else %}
             <tr>
               <td colspan="6" class="text-center text-muted">
-                No repeat clients yet
+                Повторных клиентов пока нет
               </td>
             </tr>
             {% endfor %}
@@ -391,19 +516,19 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Top Owner Clients</h3>
+      <h3 class="mb-3">Лучшие клиенты</h3>
 
       <div class="table-responsive">
         <table class="table table-striped table-bordered align-middle">
 
           <thead>
             <tr>
-              <th>Client</th>
-              <th>Revenue</th>
-              <th>Payroll</th>
-              <th>Profit</th>
-              <th>Net Profit</th>
-              <th>Jobs</th>
+              <th>Клиент</th>
+              <th>Выручка</th>
+              <th>Выплаты</th>
+              <th>Прибыль</th>
+              <th>Чистая прибыль</th>
+              <th>Задачи</th>
             </tr>
           </thead>
 
@@ -411,16 +536,16 @@
             {% for client in top_owner_clients %}
             <tr>
               <td>{{ client.client_name }}</td>
-              <td>${{ "%.2f"|format(client.revenue or 0) }}</td>
-              <td>${{ "%.2f"|format(client.payroll or 0) }}</td>
-              <td>${{ "%.2f"|format(client.profit or 0) }}</td>
-              <td>${{ "%.2f"|format(client.net_profit or 0) }}</td>
+              <td>₽{{ "%.2f"|format(client.revenue or 0) }}</td>
+              <td>₽{{ "%.2f"|format(client.payroll or 0) }}</td>
+              <td>₽{{ "%.2f"|format(client.profit or 0) }}</td>
+              <td>₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
               <td>{{ client.jobs_count or 0 }}</td>
             </tr>
             {% else %}
             <tr>
               <td colspan="6" class="text-center text-muted">
-                No client analytics available
+                Нет данных по клиентам
               </td>
             </tr>
             {% endfor %}
@@ -435,16 +560,16 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Top Owner Workers</h3>
+      <h3 class="mb-3">Лучшие исполнители</h3>
 
       <div class="table-responsive">
         <table class="table table-striped table-bordered align-middle">
 
           <thead>
             <tr>
-              <th>Worker</th>
-              <th>Total Paid</th>
-              <th>Payouts Count</th>
+              <th>Исполнитель</th>
+              <th>Выплачено</th>
+              <th>Кол-во выплат</th>
             </tr>
           </thead>
 
@@ -452,13 +577,13 @@
             {% for worker in top_owner_workers %}
             <tr>
               <td>{{ worker.worker_name }}</td>
-              <td>${{ "%.2f"|format(worker.total_paid or 0) }}</td>
+              <td>₽{{ "%.2f"|format(worker.total_paid or 0) }}</td>
               <td>{{ worker.payouts_count or 0 }}</td>
             </tr>
             {% else %}
             <tr>
               <td colspan="3" class="text-center text-muted">
-                No worker analytics available
+                Нет данных по исполнителям
               </td>
             </tr>
             {% endfor %}
@@ -473,23 +598,23 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Owner Risk Warnings</h3>
+      <h3 class="mb-3">Риски бизнеса</h3>
 
       <div class="row g-3">
 
         <div class="col-md-6">
           <div class="card border-warning">
             <div class="card-body">
-              <h5>Low Margin Clients</h5>
+              <h5>Клиенты с низкой маржой</h5>
 
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                   <thead>
                     <tr>
-                      <th>Client</th>
-                      <th>Margin</th>
-                      <th>Net Profit</th>
-                      <th>Jobs</th>
+                      <th>Клиент</th>
+                      <th>Маржа</th>
+                      <th>Чистая прибыль</th>
+                      <th>Задачи</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -497,13 +622,13 @@
                     <tr>
                       <td>{{ client.client_name }}</td>
                       <td>{{ "%.1f"|format(client.margin or 0) }}%</td>
-                      <td>${{ "%.2f"|format(client.net_profit or 0) }}</td>
+                      <td>₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
                       <td>{{ client.jobs_count or 0 }}</td>
                     </tr>
                     {% else %}
                     <tr>
                       <td colspan="4" class="text-muted text-center">
-                        No low margin clients
+                        Клиентов с низкой маржой нет
                       </td>
                     </tr>
                     {% endfor %}
@@ -518,28 +643,28 @@
         <div class="col-md-6">
           <div class="card border-danger">
             <div class="card-body">
-              <h5>Negative Months</h5>
+              <h5>Убыточные месяцы</h5>
 
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                   <thead>
                     <tr>
-                      <th>Month</th>
-                      <th>Revenue</th>
-                      <th>Net Profit</th>
+                      <th>Месяц</th>
+                      <th>Выручка</th>
+                      <th>Чистая прибыль</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for row in negative_months %}
                     <tr>
                       <td>{{ row.month }}</td>
-                      <td>${{ "%.2f"|format(row.revenue or 0) }}</td>
-                      <td>${{ "%.2f"|format(row.net_profit or 0) }}</td>
+                      <td>₽{{ "%.2f"|format(row.revenue or 0) }}</td>
+                      <td>₽{{ "%.2f"|format(row.net_profit or 0) }}</td>
                     </tr>
                     {% else %}
                     <tr>
                       <td colspan="3" class="text-muted text-center">
-                        No negative months
+                        Убыточных месяцев нет
                       </td>
                     </tr>
                     {% endfor %}
@@ -559,20 +684,20 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Monthly Owner Metrics</h3>
+      <h3 class="mb-3">Аналитика по месяцам</h3>
 
       <div class="table-responsive">
         <table class="table table-striped table-bordered align-middle">
 
           <thead>
             <tr>
-              <th>Month</th>
-              <th>Revenue</th>
-              <th>Payroll</th>
-              <th>Profit</th>
-              <th>Net Profit</th>
-              <th>Jobs</th>
-              <th>Avg Job Value</th>
+              <th>Месяц</th>
+              <th>Выручка</th>
+              <th>Выплаты</th>
+              <th>Прибыль</th>
+              <th>Чистая прибыль</th>
+              <th>Задачи</th>
+              <th>Средний чек</th>
             </tr>
           </thead>
 
@@ -580,17 +705,17 @@
             {% for row in owner_monthly_metrics %}
             <tr>
               <td>{{ row.month }}</td>
-              <td>${{ "%.2f"|format(row.revenue or 0) }}</td>
-              <td>${{ "%.2f"|format(row.payroll or 0) }}</td>
-              <td>${{ "%.2f"|format(row.profit or 0) }}</td>
-              <td>${{ "%.2f"|format(row.net_profit or 0) }}</td>
+              <td>₽{{ "%.2f"|format(row.revenue or 0) }}</td>
+              <td>₽{{ "%.2f"|format(row.payroll or 0) }}</td>
+              <td>₽{{ "%.2f"|format(row.profit or 0) }}</td>
+              <td>₽{{ "%.2f"|format(row.net_profit or 0) }}</td>
               <td>{{ row.jobs_count or 0 }}</td>
-              <td>${{ "%.2f"|format(row.average_job_value or 0) }}</td>
+              <td>₽{{ "%.2f"|format(row.average_job_value or 0) }}</td>
             </tr>
             {% else %}
             <tr>
               <td colspan="7" class="text-center text-muted">
-                No monthly owner metrics available
+                Нет месячной аналитики
               </td>
             </tr>
             {% endfor %}
@@ -605,7 +730,7 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Owner Analytics Charts</h3>
+      <h3 class="mb-3">Графики аналитики владельца</h3>
 
       <div style="display: flex; align-items: end; gap: 10px; height: 260px; overflow-x: auto; padding-top: 20px;">
 
@@ -616,13 +741,13 @@
           <div style="min-width: 95px; text-align: center;">
             <div style="display: flex; align-items: end; justify-content: center; gap: 4px; height: 200px;">
 
-              <div title="Revenue: ${{ row.revenue }}" style="width: 14px; height: {{ (row.revenue / max_value * chart_height) if max_value else 0 }}px; background: #198754;"></div>
+              <div title="Выручка: ₽{{ row.revenue }}" style="width: 14px; height: {{ (row.revenue / max_value * chart_height) if max_value else 0 }}px; background: #198754;"></div>
 
-              <div title="Payroll: ${{ row.payroll }}" style="width: 14px; height: {{ (row.payroll / max_value * chart_height) if max_value else 0 }}px; background: #0d6efd;"></div>
+              <div title="Выплаты: ₽{{ row.payroll }}" style="width: 14px; height: {{ (row.payroll / max_value * chart_height) if max_value else 0 }}px; background: #0d6efd;"></div>
 
-              <div title="Net Profit: ${{ row.net_profit }}" style="width: 14px; height: {{ (row.net_profit / max_value * chart_height) if max_value else 0 }}px; background: #ffc107;"></div>
+              <div title="Чистая прибыль: ₽{{ row.net_profit }}" style="width: 14px; height: {{ (row.net_profit / max_value * chart_height) if max_value else 0 }}px; background: #ffc107;"></div>
 
-              <div title="Avg Job Value: ${{ row.average_job_value }}" style="width: 14px; height: {{ (row.average_job_value / max_value * chart_height) if max_value else 0 }}px; background: #6f42c1;"></div>
+              <div title="Средний чек: ₽{{ row.average_job_value }}" style="width: 14px; height: {{ (row.average_job_value / max_value * chart_height) if max_value else 0 }}px; background: #6f42c1;"></div>
 
             </div>
 
@@ -633,7 +758,7 @@
         {% else %}
 
           <div class="text-muted">
-            No owner chart data available
+            Нет данных для графика
           </div>
 
         {% endfor %}
@@ -641,10 +766,10 @@
       </div>
 
       <div class="mt-3 small">
-        <span class="me-3">🟩 Revenue</span>
-        <span class="me-3">🟦 Payroll</span>
-        <span class="me-3">🟨 Net Profit</span>
-        <span class="me-3">🟪 Avg Job Value</span>
+        <span class="me-3">🟩 Выручка</span>
+        <span class="me-3">🟦 Выплаты</span>
+        <span class="me-3">🟨 Чистая прибыль</span>
+        <span class="me-3">🟪 Средний чек</span>
       </div>
 
     </div>
@@ -652,4 +777,6 @@
 
 </div>
 
-{% endblock %}
+
+</body>
+</html>

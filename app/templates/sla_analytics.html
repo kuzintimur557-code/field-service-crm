@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>SLA Analytics</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLA-аналитика</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -77,66 +79,66 @@
 
     <div class="header">
         <div>
-            <h1>SLA Analytics</h1>
-            <p>Service level and overdue task overview</p>
+            <h1>SLA-аналитика</h1>
+            <p>Контроль сроков, просрочек и качества выполнения заявок</p>
         </div>
 
         <div>
             <a href="/sla/analytics/export" class="back" style="background:#16a34a;margin-right:8px;">
-                Export CSV
+                Экспорт CSV
             </a>
 
-            <a href="/" class="back">← Dashboard</a>
+            <a href="/" class="back">← Панель</a>
         </div>
     </div>
 
     <div class="grid">
 
         <div class="card">
-            <div class="label">Total Tasks</div>
+            <div class="label">Всего заявок</div>
             <div class="value">{{ total_tasks }}</div>
         </div>
 
         <div class="card">
-            <div class="label">Completed Tasks</div>
+            <div class="label">Завершено</div>
             <div class="value success">{{ completed_tasks }}</div>
         </div>
 
         <div class="card">
-            <div class="label">Open Tasks</div>
+            <div class="label">Открытые</div>
             <div class="value warning">{{ open_tasks }}</div>
         </div>
 
         <div class="card">
-            <div class="label">Overdue Tasks</div>
+            <div class="label">Просрочено</div>
             <div class="value danger">{{ overdue_tasks }}</div>
         </div>
 
         <div class="card">
-            <div class="label">Overdue Rate</div>
+            <div class="label">Доля просрочек</div>
             <div class="value danger">{{ "%.1f"|format(overdue_rate or 0) }}%</div>
         </div>
 
         <div class="card">
-            <div class="label">Overall SLA Score</div>
+            <div class="label">SLA-рейтинг</div>
             <div class="value success">{{ "%.1f"|format(overall_sla_score or 0) }}%</div>
         </div>
 
     </div>
 
     <div class="card" style="margin-top:24px;">
-        <h2>Monthly SLA Trends</h2>
+        <h2>SLA по месяцам</h2>
 
         <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;margin-top:16px;">
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Month</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Total</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Completed</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Overdue</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Overdue Rate</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA Score</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Месяц</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Всего</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Завершено</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочено</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Доля просрочек</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA-рейтинг</th>
                     </tr>
                 </thead>
 
@@ -165,7 +167,7 @@
                     {% else %}
                     <tr>
                         <td colspan="6" style="padding:16px;text-align:center;color:#6b7280;">
-                            No monthly SLA data available
+                            Нет данных по SLA за месяцы
                         </td>
                     </tr>
                     {% endfor %}
@@ -175,41 +177,41 @@
     </div>
 
     <div class="card" style="margin-top:24px;">
-        <h2>Completion Time Analytics</h2>
+        <h2>Сроки выполнения</h2>
 
         <div class="grid" style="margin-top:16px;">
 
             <div class="card">
-                <div class="label">Average Completion</div>
-                <div class="value">{{ "%.1f"|format(average_completion_days or 0) }} days</div>
+                <div class="label">Среднее время</div>
+                <div class="value">{{ "%.1f"|format(average_completion_days or 0) }} дней</div>
             </div>
 
             <div class="card">
-                <div class="label">Fastest Completion</div>
-                <div class="value success">{{ fastest_completion_days or 0 }} days</div>
+                <div class="label">Быстрее всего</div>
+                <div class="value success">{{ fastest_completion_days or 0 }} дней</div>
             </div>
 
             <div class="card">
-                <div class="label">Slowest Completion</div>
-                <div class="value danger">{{ slowest_completion_days or 0 }} days</div>
+                <div class="label">Дольше всего</div>
+                <div class="value danger">{{ slowest_completion_days or 0 }} дней</div>
             </div>
 
         </div>
     </div>
 
     <div class="card" style="margin-top:24px;">
-        <h2>Overdue Task List</h2>
+        <h2>Просроченные заявки</h2>
 
         <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;margin-top:16px;">
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Task</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Client</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Workers</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Date</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Age</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Status</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Задача</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Клиент</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Исполнители</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Дата</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочка</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Статус</th>
                     </tr>
                 </thead>
 
@@ -229,7 +231,7 @@
                             {{ task.task_date }}
                         </td>
                         <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
-                            {{ task.age_days }} days
+                            {{ task.age_days }} дней
                         </td>
                         <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
                             {{ task.status }}
@@ -238,7 +240,7 @@
                     {% else %}
                     <tr>
                         <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
-                            No overdue tasks
+                            Нет просроченных задач
                         </td>
                     </tr>
                     {% endfor %}
@@ -248,19 +250,19 @@
     </div>
 
     <div class="card" style="margin-top:24px;">
-        <h2>SLA by Client</h2>
+        <h2>SLA по клиентам</h2>
 
         <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;margin-top:16px;">
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Client</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Total</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Completed</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Open</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Overdue</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Overdue Rate</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA Score</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Клиент</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Всего</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Завершено</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Открыто</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочено</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Доля просрочек</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA-рейтинг</th>
                     </tr>
                 </thead>
 
@@ -292,7 +294,7 @@
                     {% else %}
                     <tr>
                         <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
-                            No client SLA data available
+                            Нет SLA-данных по клиентам
                         </td>
                     </tr>
                     {% endfor %}
@@ -302,19 +304,19 @@
     </div>
 
     <div class="card" style="margin-top:24px;">
-        <h2>SLA by Worker</h2>
+        <h2>SLA по исполнителям</h2>
 
         <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;margin-top:16px;">
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Worker</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Total</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Completed</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Open</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Overdue</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Overdue Rate</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA Score</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Исполнитель</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Всего</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Завершено</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Открыто</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочено</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Доля просрочек</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA-рейтинг</th>
                     </tr>
                 </thead>
 
@@ -345,8 +347,8 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" style="padding:16px;text-align:center;color:#6b7280;">
-                            No worker SLA data available
+                        <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
+                            Нет SLA-данных по исполнителям
                         </td>
                     </tr>
                     {% endfor %}

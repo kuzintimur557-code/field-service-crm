@@ -3050,8 +3050,6 @@ async def sla_analytics_page(request: Request):
         reverse=True
     )
 
-    conn.close()
-
     monthly_task_rows = c.execute("""
     SELECT
         substr(task_date, 1, 7) as month,
@@ -3090,12 +3088,13 @@ async def sla_analytics_page(request: Request):
     completed_rows = c.execute("""
     SELECT
         created_at,
-        completed_at
+        task_date
     FROM tasks
     WHERE company_id=?
       AND status='done'
       AND created_at IS NOT NULL
-      AND completed_at IS NOT NULL
+      AND task_date IS NOT NULL
+      AND task_date!=''
     """, (company_id,)).fetchall()
 
     completion_days = []
@@ -3108,7 +3107,7 @@ async def sla_analytics_page(request: Request):
             ).date()
 
             completed_date = datetime.strptime(
-                row["completed_at"][:10],
+                row["task_date"][:10],
                 "%Y-%m-%d"
             ).date()
 
@@ -3127,6 +3126,8 @@ async def sla_analytics_page(request: Request):
 
     fastest_completion_days = min(completion_days) if completion_days else 0
     slowest_completion_days = max(completion_days) if completion_days else 0
+
+    conn.close()
 
     overdue_rate = round(
         (overdue_tasks / total_tasks * 100),
@@ -3249,6 +3250,9 @@ async def owner_dashboard_page(request: Request, month: str = ""):
 
     company_id = get_user_company_id(username)
 
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
     conn = connect()
     c = conn.cursor()
 
@@ -3297,9 +3301,10 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     """, (company_id,)).fetchone()[0]
 
     unpaid_total = c.execute("""
-    SELECT COALESCE(SUM(price - paid_amount), 0)
+    SELECT COALESCE(SUM(price), 0)
     FROM tasks
     WHERE company_id=?
+      AND payment_status!='paid'
     """, (company_id,)).fetchone()[0]
 
     average_job_value = c.execute("""
@@ -3311,13 +3316,13 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     unpaid_tasks = c.execute("""
     SELECT
         id,
-        client_name,
+        client,
         task_date,
-        price,
-        paid_amount
+        price
     FROM tasks
     WHERE company_id=?
-      AND COALESCE(price, 0) > COALESCE(paid_amount, 0)
+      AND payment_status!='paid'
+      AND COALESCE(price, 0) > 0
     ORDER BY task_date ASC
     LIMIT 20
     """, (company_id,)).fetchall()
@@ -3333,7 +3338,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     today = datetime.now().date()
 
     for row in unpaid_tasks:
-        unpaid_amount = float(row["price"] or 0) - float(row["paid_amount"] or 0)
+        unpaid_amount = float(row["price"] or 0)
 
         try:
             task_date = datetime.strptime(row["task_date"], "%Y-%m-%d").date()
@@ -3350,7 +3355,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
 
         unpaid_risk_tasks.append({
             "id": row["id"],
-            "client_name": row["client_name"] or "Unknown",
+            "client_name": row["client"] or "Не указан",
             "task_date": row["task_date"],
             "unpaid_amount": round(unpaid_amount, 1),
             "age_days": age_days
@@ -3466,8 +3471,6 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     LIMIT 12
     """, (company_id,)).fetchall()
 
-    conn.close()
-
     total_revenue = round(float(total_revenue or 0), 1)
     total_profit = round(float(total_profit or 0), 1)
     total_payroll = round(float(total_payroll or 0), 1)
@@ -3486,7 +3489,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
 
     top_repeat_clients = [
         {
-            "client_name": row["client_name"] or "Unknown",
+            "client_name": row["client"] or "Не указан",
             "jobs_count": int(row["jobs_count"] or 0),
             "revenue": round(float(row["revenue"] or 0), 1),
             "profit": round(float(row["profit"] or 0), 1),
@@ -3498,7 +3501,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
 
     top_owner_clients = [
         {
-            "client_name": row["client_name"] or "Unknown",
+            "client_name": row["client"] or "Не указан",
             "revenue": round(float(row["revenue"] or 0), 1),
             "profit": round(float(row["profit"] or 0), 1),
             "payroll": round(float(row["payroll"] or 0), 1),
@@ -3519,7 +3522,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
 
     low_margin_clients = [
         {
-            "client_name": row["client_name"] or "Unknown",
+            "client_name": row["client"] or "Unknown",
             "revenue": round(float(row["revenue"] or 0), 1),
             "profit": round(float(row["profit"] or 0), 1),
             "payroll": round(float(row["payroll"] or 0), 1),
@@ -3602,6 +3605,8 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     }
 
     owner_chart_data = list(reversed(owner_monthly_metrics))
+
+    conn.close()
 
     return templates.TemplateResponse(
         request,
