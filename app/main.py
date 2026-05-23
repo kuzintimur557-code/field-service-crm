@@ -870,6 +870,8 @@ async def platform_companies_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
+            "month": month,
+            "owner_selected_month": owner_selected_month,
             "companies": companies
         }
     )
@@ -934,6 +936,11 @@ async def my_tasks_page(request: Request, status: str = ""):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    owner_selected_month = month
 
     conn = connect()
     c = conn.cursor()
@@ -2823,7 +2830,7 @@ async def owner_dashboard_export(request: Request):
 
 
 @app.get("/owner/dashboard", response_class=HTMLResponse)
-async def owner_dashboard_page(request: Request):
+async def owner_dashboard_page(request: Request, month: str = ""):
 
     username = get_user(request)
 

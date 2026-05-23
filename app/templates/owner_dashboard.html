@@ -18,6 +18,38 @@
   <div class="card mb-4">
     <div class="card-body">
 
+      <h3 class="mb-3">Filters</h3>
+
+      <form method="get" action="/owner/dashboard" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label">Month</label>
+          <input
+            type="month"
+            name="month"
+            value="{{ month }}"
+            class="form-control"
+          >
+        </div>
+
+        <div class="col-md-3">
+          <button type="submit" class="btn btn-primary w-100">
+            Apply
+          </button>
+        </div>
+
+        <div class="col-md-3">
+          <a href="/owner/dashboard" class="btn btn-outline-secondary w-100">
+            Reset
+          </a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+
       <h3 class="mb-3">Quick Links</h3>
 
       <div class="d-flex flex-wrap gap-2">
