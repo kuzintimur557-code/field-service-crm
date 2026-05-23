@@ -2813,6 +2813,8 @@ async def finance_summary_page(request: Request, month: str = ""):
             "net_profit": round(row_profit - row_payroll, 1)
         })
 
+    monthly_chart_data = list(reversed(monthly_summary))
+
     top_profitable_clients = c.execute("""
     SELECT
         client_name,
@@ -2857,6 +2859,7 @@ async def finance_summary_page(request: Request, month: str = ""):
             "profit": profit,
             "net_profit": net_profit,
             "monthly_summary": monthly_summary,
+            "monthly_chart_data": monthly_chart_data,
             "top_profitable_clients": top_profitable_clients,
             "top_profitable_workers": top_profitable_workers
         }
