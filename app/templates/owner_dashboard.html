@@ -248,6 +248,72 @@
   <div class="card mt-4">
     <div class="card-body">
 
+      <h3 class="mb-3">Repeat Clients Analytics</h3>
+
+      <div class="row g-3 mb-3">
+
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted">Repeat Clients</div>
+              <h4>{{ repeat_clients_count or 0 }}</h4>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted">Repeat Clients Revenue</div>
+              <h4>${{ "%.2f"|format(repeat_clients_revenue or 0) }}</h4>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-striped table-bordered align-middle">
+
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Jobs</th>
+              <th>Revenue</th>
+              <th>Payroll</th>
+              <th>Profit</th>
+              <th>Net Profit</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for client in top_repeat_clients %}
+            <tr>
+              <td>{{ client.client_name }}</td>
+              <td>{{ client.jobs_count or 0 }}</td>
+              <td>${{ "%.2f"|format(client.revenue or 0) }}</td>
+              <td>${{ "%.2f"|format(client.payroll or 0) }}</td>
+              <td>${{ "%.2f"|format(client.profit or 0) }}</td>
+              <td>${{ "%.2f"|format(client.net_profit or 0) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted">
+                No repeat clients yet
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-body">
+
       <h3 class="mb-3">Top Owner Clients</h3>
 
       <div class="table-responsive">

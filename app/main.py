@@ -2903,6 +2903,37 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     WHERE company_id=?
     """, (company_id,)).fetchone()[0]
 
+    repeat_clients_summary = c.execute("""
+    SELECT
+        COUNT(*) as repeat_clients_count,
+        COALESCE(SUM(revenue), 0) as repeat_clients_revenue
+    FROM (
+        SELECT
+            client_name,
+            COUNT(task_id) as jobs_count,
+            SUM(price) as revenue
+        FROM finance_summary
+        WHERE company_id=?
+        GROUP BY client_name
+        HAVING jobs_count > 1
+    )
+    """, (company_id,)).fetchone()
+
+    top_repeat_clients = c.execute("""
+    SELECT
+        client_name,
+        COUNT(task_id) as jobs_count,
+        SUM(price) as revenue,
+        SUM(profit) as profit,
+        SUM(payroll_total) as payroll
+    FROM finance_summary
+    WHERE company_id=?
+    GROUP BY client_name
+    HAVING jobs_count > 1
+    ORDER BY revenue DESC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
     top_owner_clients = c.execute("""
     SELECT
         client_name,
@@ -2990,6 +3021,21 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     profit_margin = round((net_profit / total_revenue * 100), 1) if total_revenue else 0
     completion_rate = round((total_completed_tasks / total_tasks * 100), 1) if total_tasks else 0
     unpaid_ratio = round((unpaid_total / total_revenue * 100), 1) if total_revenue else 0
+
+    repeat_clients_count = int(repeat_clients_summary["repeat_clients_count"] or 0)
+    repeat_clients_revenue = round(float(repeat_clients_summary["repeat_clients_revenue"] or 0), 1)
+
+    top_repeat_clients = [
+        {
+            "client_name": row["client_name"] or "Unknown",
+            "jobs_count": int(row["jobs_count"] or 0),
+            "revenue": round(float(row["revenue"] or 0), 1),
+            "profit": round(float(row["profit"] or 0), 1),
+            "payroll": round(float(row["payroll"] or 0), 1),
+            "net_profit": round(float(row["profit"] or 0) - float(row["payroll"] or 0), 1)
+        }
+        for row in top_repeat_clients
+    ]
 
     top_owner_clients = [
         {
@@ -3119,6 +3165,9 @@ async def owner_dashboard_page(request: Request, month: str = ""):
             "profit_margin": profit_margin,
             "completion_rate": completion_rate,
             "unpaid_ratio": unpaid_ratio,
+            "repeat_clients_count": repeat_clients_count,
+            "repeat_clients_revenue": repeat_clients_revenue,
+            "top_repeat_clients": top_repeat_clients,
             "top_owner_clients": top_owner_clients,
             "top_owner_workers": top_owner_workers,
             "low_margin_clients": low_margin_clients,
