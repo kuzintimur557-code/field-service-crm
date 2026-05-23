@@ -141,6 +141,54 @@
     </div>
   </div>
 
+  <div class="card mt-4">
+    <div class="card-body">
+
+      <h3 class="mb-3">Owner Analytics Charts</h3>
+
+      <div style="display: flex; align-items: end; gap: 10px; height: 260px; overflow-x: auto; padding-top: 20px;">
+
+        {% for row in owner_chart_data %}
+          {% set max_value = [row.revenue, row.payroll, row.net_profit, row.average_job_value] | max %}
+          {% set chart_height = 190 %}
+
+          <div style="min-width: 95px; text-align: center;">
+            <div style="display: flex; align-items: end; justify-content: center; gap: 4px; height: 200px;">
+
+              <div title="Revenue: ${{ row.revenue }}" style="width: 14px; height: {{ (row.revenue / max_value * chart_height) if max_value else 0 }}px; background: #198754;"></div>
+
+              <div title="Payroll: ${{ row.payroll }}" style="width: 14px; height: {{ (row.payroll / max_value * chart_height) if max_value else 0 }}px; background: #0d6efd;"></div>
+
+              <div title="Net Profit: ${{ row.net_profit }}" style="width: 14px; height: {{ (row.net_profit / max_value * chart_height) if max_value else 0 }}px; background: #ffc107;"></div>
+
+              <div title="Avg Job Value: ${{ row.average_job_value }}" style="width: 14px; height: {{ (row.average_job_value / max_value * chart_height) if max_value else 0 }}px; background: #6f42c1;"></div>
+
+            </div>
+
+            <div class="small text-muted mt-2">
+              {{ row.month }}
+            </div>
+          </div>
+        {% else %}
+
+          <div class="text-muted">
+            No owner chart data available
+          </div>
+
+        {% endfor %}
+
+      </div>
+
+      <div class="mt-3 small">
+        <span class="me-3">🟩 Revenue</span>
+        <span class="me-3">🟦 Payroll</span>
+        <span class="me-3">🟨 Net Profit</span>
+        <span class="me-3">🟪 Avg Job Value</span>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 
 {% endblock %}
