@@ -114,6 +114,56 @@
     </div>
 
     <div class="card" style="margin-top:24px;">
+        <h2>Overdue Task List</h2>
+
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Task</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Client</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Workers</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Date</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Age</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for task in sla_overdue_tasks %}
+                    <tr>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            <a href="/task/{{ task.id }}">#{{ task.id }}</a>
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ task.client }}
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ task.workers }}
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ task.task_date }}
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ task.age_days }} days
+                        </td>
+                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                            {{ task.status }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="padding:16px;text-align:center;color:#6b7280;">
+                            No overdue tasks
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
         <h2>SLA by Client</h2>
 
         <div style="overflow-x:auto;">

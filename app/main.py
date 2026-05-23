@@ -2867,6 +2867,41 @@ async def sla_analytics_page(request: Request):
         reverse=True
     )[:20]
 
+    overdue_task_rows = c.execute("""
+    SELECT
+        id,
+        client,
+        workers,
+        task_date,
+        status
+    FROM tasks
+    WHERE company_id=?
+      AND status!='done'
+      AND task_date < date('now')
+    ORDER BY task_date ASC
+    LIMIT 30
+    """, (company_id,)).fetchall()
+
+    today = datetime.now().date()
+    sla_overdue_tasks = []
+
+    for row in overdue_task_rows:
+        try:
+            task_date_value = datetime.strptime(row["task_date"], "%Y-%m-%d").date()
+            age_days = (today - task_date_value).days
+        except Exception:
+            age_days = 0
+
+        sla_overdue_tasks.append({
+            "id": row["id"],
+            "client": row["client"] or "Unknown",
+            "workers": row["workers"] or "",
+            "task_date": row["task_date"],
+            "status": row["status"],
+            "age_days": age_days
+        })
+
+
     workers = c.execute("""
     SELECT id, username
     FROM users
@@ -2952,7 +2987,8 @@ async def sla_analytics_page(request: Request):
             "overdue_tasks": overdue_tasks,
             "overdue_rate": overdue_rate,
             "sla_worker_rows": sla_worker_rows,
-            "sla_client_rows": sla_client_rows
+            "sla_client_rows": sla_client_rows,
+            "sla_overdue_tasks": sla_overdue_tasks
         }
     )
 
