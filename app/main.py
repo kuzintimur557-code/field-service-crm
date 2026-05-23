@@ -3049,6 +3049,53 @@ async def owner_dashboard_page(request: Request, month: str = ""):
         for row in owner_monthly_metrics
     ]
 
+    selected_month_metrics = c.execute("""
+    SELECT
+        COALESCE(SUM(price), 0) as revenue,
+        COALESCE(SUM(payroll_total), 0) as payroll,
+        COALESCE(SUM(profit), 0) as profit
+    FROM finance_summary
+    WHERE company_id=?
+      AND month=?
+    """, (company_id, month)).fetchone()
+
+    selected_month_date = datetime.strptime(month + "-01", "%Y-%m-%d")
+    previous_month = (selected_month_date.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+
+    previous_month_metrics = c.execute("""
+    SELECT
+        COALESCE(SUM(price), 0) as revenue,
+        COALESCE(SUM(payroll_total), 0) as payroll,
+        COALESCE(SUM(profit), 0) as profit
+    FROM finance_summary
+    WHERE company_id=?
+      AND month=?
+    """, (company_id, previous_month)).fetchone()
+
+    selected_revenue = float(selected_month_metrics["revenue"] or 0)
+    selected_payroll = float(selected_month_metrics["payroll"] or 0)
+    selected_profit = float(selected_month_metrics["profit"] or 0)
+    selected_net_profit = selected_profit - selected_payroll
+
+    previous_revenue = float(previous_month_metrics["revenue"] or 0)
+    previous_payroll = float(previous_month_metrics["payroll"] or 0)
+    previous_profit = float(previous_month_metrics["profit"] or 0)
+    previous_net_profit = previous_profit - previous_payroll
+
+    owner_month_comparison = {
+        "selected_month": month,
+        "previous_month": previous_month,
+        "revenue_growth": round(((selected_revenue - previous_revenue) / previous_revenue * 100), 1) if previous_revenue else 0,
+        "payroll_growth": round(((selected_payroll - previous_payroll) / previous_payroll * 100), 1) if previous_payroll else 0,
+        "net_profit_growth": round(((selected_net_profit - previous_net_profit) / previous_net_profit * 100), 1) if previous_net_profit else 0,
+        "selected_revenue": round(selected_revenue, 1),
+        "selected_payroll": round(selected_payroll, 1),
+        "selected_net_profit": round(selected_net_profit, 1),
+        "previous_revenue": round(previous_revenue, 1),
+        "previous_payroll": round(previous_payroll, 1),
+        "previous_net_profit": round(previous_net_profit, 1)
+    }
+
     owner_chart_data = list(reversed(owner_monthly_metrics))
 
     return templates.TemplateResponse(
@@ -3077,7 +3124,8 @@ async def owner_dashboard_page(request: Request, month: str = ""):
             "low_margin_clients": low_margin_clients,
             "negative_months": negative_months,
             "owner_monthly_metrics": owner_monthly_metrics,
-            "owner_chart_data": owner_chart_data
+            "owner_chart_data": owner_chart_data,
+            "owner_month_comparison": owner_month_comparison
         }
     )
 

@@ -134,6 +134,72 @@
   <div class="card mt-4">
     <div class="card-body">
 
+      <h3 class="mb-3">Month Comparison</h3>
+
+      <div class="row g-3">
+
+        <div class="col-md-4">
+          <div class="card border-success">
+            <div class="card-body">
+              <div class="text-muted">Revenue Growth</div>
+
+              <h4>
+                {{ "%.1f"|format(owner_month_comparison.revenue_growth or 0) }}%
+              </h4>
+
+              <div class="small text-muted">
+                {{ owner_month_comparison.previous_month }}
+                →
+                {{ owner_month_comparison.selected_month }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card border-primary">
+            <div class="card-body">
+              <div class="text-muted">Payroll Growth</div>
+
+              <h4>
+                {{ "%.1f"|format(owner_month_comparison.payroll_growth or 0) }}%
+              </h4>
+
+              <div class="small text-muted">
+                {{ owner_month_comparison.previous_month }}
+                →
+                {{ owner_month_comparison.selected_month }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card border-warning">
+            <div class="card-body">
+              <div class="text-muted">Net Profit Growth</div>
+
+              <h4>
+                {{ "%.1f"|format(owner_month_comparison.net_profit_growth or 0) }}%
+              </h4>
+
+              <div class="small text-muted">
+                {{ owner_month_comparison.previous_month }}
+                →
+                {{ owner_month_comparison.selected_month }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-body">
+
       <h3 class="mb-3">Owner KPI Ratios</h3>
 
       <div class="row g-3">
