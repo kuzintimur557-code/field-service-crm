@@ -98,6 +98,54 @@
   <div class="card mt-4">
     <div class="card-body">
 
+      <h3 class="mb-3">Owner KPI Ratios</h3>
+
+      <div class="row g-3">
+
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted">Payroll Ratio</div>
+              <h4>{{ "%.1f"|format(payroll_ratio or 0) }}%</h4>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted">Profit Margin</div>
+              <h4>{{ "%.1f"|format(profit_margin or 0) }}%</h4>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted">Completion Rate</div>
+              <h4>{{ "%.1f"|format(completion_rate or 0) }}%</h4>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted">Unpaid Ratio</div>
+              <h4>{{ "%.1f"|format(unpaid_ratio or 0) }}%</h4>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-body">
+
       <h3 class="mb-3">Monthly Owner Metrics</h3>
 
       <div class="table-responsive">

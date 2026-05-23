@@ -2746,6 +2746,7 @@ async def finance_summary_export(request: Request, month: str = ""):
 
 
 
+
 @app.get("/owner/dashboard", response_class=HTMLResponse)
 async def owner_dashboard_page(request: Request):
 
@@ -2756,7 +2757,7 @@ async def owner_dashboard_page(request: Request):
 
     role = get_role(username)
 
-    if role not in ("boss",):
+    if role != "boss":
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
@@ -2790,7 +2791,80 @@ async def owner_dashboard_page(request: Request):
       AND status='done'
     """, (company_id,)).fetchone()[0]
 
+    total_revenue = c.execute("""
+    SELECT COALESCE(SUM(price), 0)
+    FROM finance_summary
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0]
+
+    total_profit = c.execute("""
+    SELECT COALESCE(SUM(profit), 0)
+    FROM finance_summary
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0]
+
+    total_payroll = c.execute("""
+    SELECT COALESCE(SUM(payroll_total), 0)
+    FROM finance_summary
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0]
+
+    unpaid_total = c.execute("""
+    SELECT COALESCE(SUM(price - paid_amount), 0)
+    FROM tasks
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0]
+
+    average_job_value = c.execute("""
+    SELECT COALESCE(AVG(price), 0)
+    FROM tasks
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0]
+
+    owner_monthly_metrics = c.execute("""
+    SELECT
+        month,
+        SUM(price) as revenue,
+        SUM(payroll_total) as payroll,
+        SUM(profit) as profit,
+        COUNT(task_id) as jobs_count,
+        AVG(price) as average_job_value
+    FROM finance_summary
+    WHERE company_id=?
+    GROUP BY month
+    ORDER BY month DESC
+    LIMIT 12
+    """, (company_id,)).fetchall()
+
     conn.close()
+
+    total_revenue = round(float(total_revenue or 0), 1)
+    total_profit = round(float(total_profit or 0), 1)
+    total_payroll = round(float(total_payroll or 0), 1)
+    unpaid_total = round(float(unpaid_total or 0), 1)
+    average_job_value = round(float(average_job_value or 0), 1)
+
+    net_profit = round(total_profit - total_payroll, 1)
+
+    payroll_ratio = round((total_payroll / total_revenue * 100), 1) if total_revenue else 0
+    profit_margin = round((net_profit / total_revenue * 100), 1) if total_revenue else 0
+    completion_rate = round((total_completed_tasks / total_tasks * 100), 1) if total_tasks else 0
+    unpaid_ratio = round((unpaid_total / total_revenue * 100), 1) if total_revenue else 0
+
+    owner_monthly_metrics = [
+        {
+            "month": row["month"],
+            "revenue": round(float(row["revenue"] or 0), 1),
+            "payroll": round(float(row["payroll"] or 0), 1),
+            "profit": round(float(row["profit"] or 0), 1),
+            "net_profit": round(float(row["profit"] or 0) - float(row["payroll"] or 0), 1),
+            "jobs_count": int(row["jobs_count"] or 0),
+            "average_job_value": round(float(row["average_job_value"] or 0), 1)
+        }
+        for row in owner_monthly_metrics
+    ]
+
+    owner_chart_data = list(reversed(owner_monthly_metrics))
 
     return templates.TemplateResponse(
         request,
@@ -2802,10 +2876,21 @@ async def owner_dashboard_page(request: Request):
             "total_clients": total_clients,
             "total_workers": total_workers,
             "total_tasks": total_tasks,
-            "total_completed_tasks": total_completed_tasks
+            "total_completed_tasks": total_completed_tasks,
+            "total_revenue": total_revenue,
+            "total_profit": total_profit,
+            "total_payroll": total_payroll,
+            "net_profit": net_profit,
+            "unpaid_total": unpaid_total,
+            "average_job_value": average_job_value,
+            "payroll_ratio": payroll_ratio,
+            "profit_margin": profit_margin,
+            "completion_rate": completion_rate,
+            "unpaid_ratio": unpaid_ratio,
+            "owner_monthly_metrics": owner_monthly_metrics,
+            "owner_chart_data": owner_chart_data
         }
     )
-
 
 
 @app.get("/finance/summary", response_class=HTMLResponse)
