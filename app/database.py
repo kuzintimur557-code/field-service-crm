@@ -273,6 +273,22 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS finance_summary (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        month TEXT,
+        client_name TEXT,
+        task_id INTEGER,
+        price REAL DEFAULT 0,
+        expense_total REAL DEFAULT 0,
+        payroll_total REAL DEFAULT 0,
+        profit REAL DEFAULT 0,
+        created_at TEXT
+    )
+    """)
+
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS payroll_payouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER,

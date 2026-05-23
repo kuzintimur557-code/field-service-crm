@@ -2669,6 +2669,125 @@ async def finance_export(
     )
 
 
+@app.get("/finance/summary", response_class=HTMLResponse)
+async def finance_summary_page(request: Request, month: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    conn = connect()
+    c = conn.cursor()
+
+    finance_rows = c.execute("""
+    SELECT
+        price,
+        expense_total,
+        payroll_total,
+        profit
+    FROM finance_summary
+    WHERE company_id=?
+      AND month=?
+    """, (company_id, month)).fetchall()
+
+    revenue = round(sum(float(row["price"] or 0) for row in finance_rows), 1)
+    expenses = round(sum(float(row["expense_total"] or 0) for row in finance_rows), 1)
+    payroll_total = round(sum(float(row["payroll_total"] or 0) for row in finance_rows), 1)
+    profit = round(sum(float(row["profit"] or 0) for row in finance_rows), 1)
+    net_profit = round(profit - payroll_total, 1)
+
+    monthly_rows = c.execute("""
+    SELECT
+        month,
+        SUM(price) as revenue,
+        SUM(expense_total) as expenses,
+        SUM(payroll_total) as payroll_total,
+        SUM(profit) as profit
+    FROM finance_summary
+    WHERE company_id=?
+    GROUP BY month
+    ORDER BY month DESC
+    LIMIT 12
+    """, (company_id,)).fetchall()
+
+    monthly_summary = []
+
+    for row in monthly_rows:
+        row_profit = round(float(row["profit"] or 0), 1)
+        row_payroll = round(float(row["payroll_total"] or 0), 1)
+
+        monthly_summary.append({
+            "month": row["month"],
+            "revenue": round(float(row["revenue"] or 0), 1),
+            "expenses": round(float(row["expenses"] or 0), 1),
+            "payroll_total": row_payroll,
+            "profit": row_profit,
+            "net_profit": round(row_profit - row_payroll, 1)
+        })
+
+    top_profitable_clients = c.execute("""
+    SELECT
+        client_name,
+        SUM(profit) as total_profit,
+        SUM(price) as revenue
+    FROM finance_summary
+    WHERE company_id=?
+      AND month=?
+    GROUP BY client_name
+    ORDER BY total_profit DESC
+    LIMIT 10
+    """, (company_id, month)).fetchall()
+
+    top_profitable_workers = c.execute("""
+    SELECT
+        users.username as worker_name,
+        SUM(payroll_payouts.amount) as total_paid,
+        COUNT(payroll_payouts.id) as payouts_count
+    FROM payroll_payouts
+    JOIN users ON users.id = payroll_payouts.worker_id
+    WHERE payroll_payouts.company_id=?
+      AND payroll_payouts.month=?
+      AND payroll_payouts.status='paid'
+    GROUP BY payroll_payouts.worker_id
+    ORDER BY total_paid DESC
+    LIMIT 10
+    """, (company_id, month)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "finance_summary.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "month": month,
+            "revenue": revenue,
+            "expenses": expenses,
+            "payroll_total": payroll_total,
+            "profit": profit,
+            "net_profit": net_profit,
+            "monthly_summary": monthly_summary,
+            "top_profitable_clients": top_profitable_clients,
+            "top_profitable_workers": top_profitable_workers
+        }
+    )
+
+
+
+
 @app.get("/finance", response_class=HTMLResponse)
 async def finance_page(
     request: Request,
@@ -3104,6 +3223,322 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
             "payout_history": payout_history
         }
     )
+
+
+@app.get("/payroll/history", response_class=HTMLResponse)
+async def payroll_history_page(request: Request, month: str = "", worker: str = "", paid_by: str = "", date_from: str = "", date_to: str = "", sort: str = "date_desc"):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    conn = connect()
+    c = conn.cursor()
+
+    query = """
+    SELECT
+        p.id,
+        p.worker_id,
+        p.amount,
+        p.paid_at,
+        p.paid_by,
+        p.note,
+        u.full_name as worker_name,
+        u.username as worker_username
+    FROM payroll_payouts p
+    JOIN users u ON u.id=p.worker_id
+    WHERE p.company_id=?
+      AND p.month=?
+    """
+
+    params = [company_id, month]
+
+    if worker:
+        query += """
+          AND (
+            lower(u.username) LIKE ?
+            OR lower(u.full_name) LIKE ?
+          )
+        """
+        search = f"%{worker.lower()}%"
+        params.extend([search, search])
+
+    if paid_by:
+        query += """
+          AND lower(p.paid_by) LIKE ?
+        """
+        params.append(f"%{paid_by.lower()}%")
+
+    if date_from:
+        query += """
+          AND p.paid_at >= ?
+        """
+        params.append(date_from)
+
+    if date_to:
+        query += """
+          AND p.paid_at <= ?
+        """
+        params.append(date_to + " 23:59")
+
+    if sort == "date_asc":
+        query += """
+        ORDER BY p.paid_at ASC
+        """
+    elif sort == "amount_desc":
+        query += """
+        ORDER BY p.amount DESC
+        """
+    elif sort == "amount_asc":
+        query += """
+        ORDER BY p.amount ASC
+        """
+    elif sort == "worker":
+        query += """
+        ORDER BY u.username ASC
+        """
+    else:
+        sort = "date_desc"
+        query += """
+        ORDER BY p.paid_at DESC
+        """
+
+    payout_history_rows = c.execute(query, params).fetchall()
+
+    payout_history = [
+        dict(row)
+        for row in payout_history_rows
+    ]
+
+    total_paid = round(sum(
+        float(row["amount"] or 0)
+        for row in payout_history
+    ), 1)
+
+    payouts_count = len(payout_history)
+
+    workers_count = len(set(
+        row["worker_id"]
+        for row in payout_history
+    ))
+
+    average_payout = round(
+        total_paid / payouts_count,
+        1
+    ) if payouts_count else 0
+
+    top_workers_map = {}
+
+    for row in payout_history:
+        key = row["worker_id"]
+
+        if key not in top_workers_map:
+            top_workers_map[key] = {
+                "worker_id": row["worker_id"],
+                "worker_name": row["worker_name"],
+                "worker_username": row["worker_username"],
+                "amount": 0
+            }
+
+        top_workers_map[key]["amount"] += float(row["amount"] or 0)
+
+    top_workers = sorted(
+        top_workers_map.values(),
+        key=lambda item: item["amount"],
+        reverse=True
+    )[:3]
+
+    for item in top_workers:
+        item["amount"] = round(item["amount"], 1)
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "payroll_history.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "month": month,
+            "worker": worker,
+            "paid_by": paid_by,
+            "date_from": date_from,
+            "date_to": date_to,
+            "sort": sort,
+            "payout_history": payout_history,
+            "total_paid": total_paid,
+            "payouts_count": payouts_count,
+            "workers_count": workers_count,
+            "average_payout": average_payout,
+            "top_workers": top_workers
+        }
+    )
+
+
+@app.get("/payroll/history/export")
+async def payroll_history_export(
+    request: Request,
+    month: str = "",
+    worker: str = "",
+    paid_by: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    sort: str = "date_desc"
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+
+    conn = connect()
+    c = conn.cursor()
+
+    query = """
+    SELECT
+        p.month,
+        p.amount,
+        p.paid_at,
+        p.paid_by,
+        p.note,
+        u.username,
+        u.full_name,
+        u.position
+    FROM payroll_payouts p
+    JOIN users u ON u.id=p.worker_id
+    WHERE p.company_id=?
+      AND p.month=?
+    """
+
+    params = [company_id, month]
+
+    if worker:
+        query += """
+          AND (
+            lower(u.username) LIKE ?
+            OR lower(u.full_name) LIKE ?
+          )
+        """
+        search = f"%{worker.lower()}%"
+        params.extend([search, search])
+
+    if paid_by:
+        query += """
+          AND lower(p.paid_by) LIKE ?
+        """
+        params.append(f"%{paid_by.lower()}%")
+
+    if date_from:
+        query += """
+          AND p.paid_at >= ?
+        """
+        params.append(date_from)
+
+    if date_to:
+        query += """
+          AND p.paid_at <= ?
+        """
+        params.append(date_to + " 23:59")
+
+    if sort == "date_asc":
+        query += """
+        ORDER BY p.paid_at ASC
+        """
+    elif sort == "amount_desc":
+        query += """
+        ORDER BY p.amount DESC
+        """
+    elif sort == "amount_asc":
+        query += """
+        ORDER BY p.amount ASC
+        """
+    elif sort == "worker":
+        query += """
+        ORDER BY u.username ASC
+        """
+    else:
+        sort = "date_desc"
+        query += """
+        ORDER BY p.paid_at DESC
+        """
+
+    payouts = c.execute(query, params).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["Журнал выплат"])
+    writer.writerow(["Месяц", month])
+    writer.writerow(["Фильтр исполнитель", worker or ""])
+    writer.writerow(["Фильтр кем выплачено", paid_by or ""])
+    writer.writerow(["Дата от", date_from or ""])
+    writer.writerow(["Дата до", date_to or ""])
+    writer.writerow(["Сортировка", sort])
+    writer.writerow([])
+
+    writer.writerow([
+        "Исполнитель",
+        "ФИО",
+        "Должность",
+        "Месяц",
+        "Сумма выплаты",
+        "Дата выплаты",
+        "Кем выплачено",
+        "Комментарий"
+    ])
+
+    total_paid = 0
+
+    for payout in payouts:
+        amount = round(float(payout["amount"] or 0), 1)
+        total_paid += amount
+
+        writer.writerow([
+            payout["username"],
+            payout["full_name"] or "",
+            payout["position"] or "",
+            payout["month"],
+            amount,
+            payout["paid_at"] or "",
+            payout["paid_by"] or "",
+            payout["note"] or ""
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Итого выплачено", round(total_paid, 1)])
+
+    response = Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8"
+    )
+
+    response.headers["Content-Disposition"] = f"attachment; filename=payroll_history_{month}.csv"
+
+    return response
 
 
 @app.get("/payroll/export")
