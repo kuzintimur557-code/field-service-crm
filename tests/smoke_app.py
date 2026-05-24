@@ -1537,6 +1537,18 @@ async def assert_overdue_sla(task):
     outsider_sla_html = outsider_sla_response.body.decode("utf-8")
     assert task["client"] not in outsider_sla_html
 
+    conn = connect()
+    c = conn.cursor()
+    automation_events_before = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND trigger_key='sla_overdue'
+      AND entity_type='task'
+      AND entity_id=?
+    """, (2, task["id"])).fetchone()[0]
+    conn.close()
+
     reminder_response = await crm.create_sla_reminders(make_request("owner2"))
     assert reminder_response.status_code == 302
     assert reminder_response.headers["location"] == "/sla?reminders=1&created=2&filter=overdue"
@@ -1555,9 +1567,30 @@ async def assert_overdue_sla(task):
       AND link=?
       AND is_read=0
     """, (2, f"/task/{task['id']}")).fetchone()[0]
+
+    automation_events_after = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND trigger_key='sla_overdue'
+      AND entity_type='task'
+      AND entity_id=?
+    """, (2, task["id"])).fetchone()[0]
+
+    automation_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=?
+      AND username='owner2'
+      AND title='SLA runner rule'
+      AND link=?
+    ORDER BY id DESC
+    """, (2, f"/task/{task['id']}")).fetchone()
     conn.close()
 
     assert notification_count == 2
+    assert automation_events_after == automation_events_before + 1
+    assert automation_notification is not None
 
     escalation_response = await crm.create_sla_escalations(make_request("manager2"))
     assert escalation_response.status_code == 302

@@ -704,6 +704,10 @@ def run_automation_event(
     link=""
 ):
     company_id = company_id or 1
+
+    if not has_feature(company_id, "automation"):
+        return 0
+
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     created_events = 0
 
@@ -2136,8 +2140,11 @@ async def create_sla_reminders(request: Request):
     """, (company_id,)).fetchall()
 
     created_count = 0
+    automation_tasks = []
 
     for task in tasks:
+        task_created_count = 0
+
         for user in users:
             existing_notification = c.execute("""
             SELECT id
@@ -2176,9 +2183,23 @@ async def create_sla_reminders(request: Request):
                 datetime.now().strftime("%Y-%m-%d %H:%M")
             ))
             created_count += 1
+            task_created_count += 1
+
+        if task_created_count:
+            automation_tasks.append(task)
 
     conn.commit()
     conn.close()
+
+    for task in automation_tasks:
+        run_automation_event(
+            company_id,
+            "sla_overdue",
+            "task",
+            task["id"],
+            f"Заявка #{task['id']} просрочила deadline",
+            f"/task/{task['id']}"
+        )
 
     return RedirectResponse(f"/sla?reminders=1&created={created_count}&filter=overdue", status_code=302)
 
