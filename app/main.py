@@ -6368,6 +6368,31 @@ async def ai_insights_page(request: Request):
             "message": "Сейчас система не видит явных проблем по просрочкам, оплатам и сотрудникам."
         })
 
+    risk_score = 0
+
+    risk_score += overdue_tasks * 10
+
+    if unpaid_total:
+        risk_score += min(int(float(unpaid_total) / 1000), 40)
+
+    if weak_workers:
+        weakest_worker = weak_workers[0]
+        if weakest_worker["completed_count"] == 0:
+            risk_score += 20
+
+    if risk_score > 100:
+        risk_score = 100
+
+    if risk_score >= 70:
+        risk_level = "danger"
+        risk_title = "Высокий риск"
+    elif risk_score >= 40:
+        risk_level = "warning"
+        risk_title = "Средний риск"
+    else:
+        risk_level = "success"
+        risk_title = "Низкий риск"
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -6382,7 +6407,10 @@ async def ai_insights_page(request: Request):
             "overdue_tasks": overdue_tasks,
             "unpaid_total": unpaid_total,
             "weak_workers": weak_workers[:5],
-            "low_margin_clients": low_margin_clients
+            "low_margin_clients": low_margin_clients,
+            "risk_score": risk_score,
+            "risk_level": risk_level,
+            "risk_title": risk_title
         }
     )
 
