@@ -93,14 +93,20 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
 	<label>Отрасль</label>
 	<select name="industry">
-	    <option value="field_service" {% if settings["industry"] == "field_service" %}selected{% endif %}>Сервис / выездные работы</option>
-	    <option value="beauty" {% if settings["industry"] == "beauty" %}selected{% endif %}>Бьюти</option>
-	    <option value="auto_service" {% if settings["industry"] == "auto_service" %}selected{% endif %}>Автосервис</option>
-	    <option value="logistics" {% if settings["industry"] == "logistics" %}selected{% endif %}>Грузоперевозки</option>
-	    <option value="cleaning" {% if settings["industry"] == "cleaning" %}selected{% endif %}>Клининг</option>
-	    <option value="repair" {% if settings["industry"] == "repair" %}selected{% endif %}>Ремонт техники</option>
-	    <option value="custom" {% if settings["industry"] == "custom" %}selected{% endif %}>Своя сфера</option>
+        {% for industry_key, industry_label in industry_options %}
+	    <option value="{{ industry_key }}" {% if settings["industry"] == industry_key %}selected{% endif %}>{{ industry_label }}</option>
+        {% endfor %}
 	</select>
+
+    <label class="module-card" style="margin-top:12px">
+        <input type="checkbox" name="apply_business_preset" value="1">
+        <span>
+            <span class="module-title">Применить пресет отрасли</span>
+            <span class="module-desc">
+                Система включит рекомендуемые модули для выбранной отрасли. Без этой галочки сохранятся ручные настройки модулей ниже.
+            </span>
+        </span>
+    </label>
 
 	<div class="grid">
 	    <div>

@@ -245,6 +245,16 @@ def assert_company_features():
     assert features["finance"]
     assert not features["calendar"]
 
+    crm.apply_business_preset(2, "beauty")
+
+    features = crm.get_company_features(2)
+    assert features["tasks"]
+    assert features["calendar"]
+    assert features["clients"]
+    assert features["payroll"]
+    assert features["notifications"]
+    assert not features["sla"]
+
 
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")

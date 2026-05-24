@@ -85,6 +85,80 @@ FEATURE_DEFINITIONS = [
 
 CORE_FEATURES = {"tasks", "notifications"}
 
+INDUSTRY_OPTIONS = [
+    ("field_service", "Сервис / выездные работы"),
+    ("beauty", "Бьюти"),
+    ("cleaning", "Клининг"),
+    ("repair", "Ремонт"),
+    ("auto_service", "Автосервис"),
+    ("logistics", "Грузоперевозки"),
+    ("agency", "Агентство"),
+    ("medical", "Медицина"),
+    ("education", "Обучение"),
+    ("restaurant", "Ресторан / кафе"),
+    ("ecommerce", "Интернет-магазин"),
+    ("other", "Другая сфера"),
+    ("custom", "Своя сфера")
+]
+
+BUSINESS_PRESETS = {
+    "field_service": {
+        "calendar", "clients", "catalog", "recurring", "finance", "payroll",
+        "analytics", "sla", "archive", "workload", "notifications", "calls",
+        "custom_fields"
+    },
+    "beauty": {
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics",
+        "notifications", "calls", "custom_fields"
+    },
+    "cleaning": {
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics",
+        "sla", "archive", "workload", "notifications", "calls", "custom_fields"
+    },
+    "repair": {
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics",
+        "sla", "archive", "workload", "notifications", "calls", "custom_fields"
+    },
+    "auto_service": {
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics",
+        "sla", "archive", "workload", "notifications", "calls", "custom_fields"
+    },
+    "logistics": {
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics",
+        "sla", "archive", "workload", "notifications", "calls", "custom_fields"
+    },
+    "agency": {
+        "clients", "finance", "payroll", "analytics", "archive",
+        "notifications", "calls", "custom_fields"
+    },
+    "medical": {
+        "calendar", "clients", "finance", "payroll", "analytics",
+        "notifications", "calls", "custom_fields"
+    },
+    "education": {
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics",
+        "notifications", "custom_fields"
+    },
+    "restaurant": {
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics",
+        "notifications", "custom_fields"
+    },
+    "ecommerce": {
+        "clients", "catalog", "finance", "payroll", "analytics",
+        "archive", "notifications", "custom_fields"
+    },
+    "other": {
+        "calendar", "clients", "catalog", "recurring", "finance", "payroll",
+        "analytics", "sla", "archive", "workload", "notifications", "calls",
+        "custom_fields"
+    },
+    "custom": {
+        "calendar", "clients", "catalog", "recurring", "finance", "payroll",
+        "analytics", "sla", "archive", "workload", "notifications", "calls",
+        "custom_fields"
+    }
+}
+
 
 def safe_upload_filename(task_id, prefix, original_filename):
     original = Path(original_filename or "photo").name
@@ -409,6 +483,35 @@ def update_company_features(company_id, form):
 
     for feature_key, _, _ in FEATURE_DEFINITIONS:
         enabled = 1 if feature_key in CORE_FEATURES else int(form.get(f"feature_{feature_key}") == "1")
+
+        c.execute("""
+        UPDATE company_features
+        SET enabled=?, updated_at=?
+        WHERE company_id=? AND feature_key=?
+        """, (
+            enabled,
+            now,
+            company_id,
+            feature_key
+        ))
+
+    conn.commit()
+    conn.close()
+
+
+def apply_business_preset(company_id, industry):
+    company_id = company_id or 1
+    ensure_company_features(company_id)
+
+    enabled_features = set(BUSINESS_PRESETS.get(industry) or BUSINESS_PRESETS["other"])
+    enabled_features.update(CORE_FEATURES)
+
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    for feature_key, _, _ in FEATURE_DEFINITIONS:
+        enabled = 1 if feature_key in enabled_features else 0
 
         c.execute("""
         UPDATE company_features
@@ -5200,7 +5303,9 @@ async def settings_page(request: Request):
             "settings": settings,
             "features": features,
             "feature_definitions": FEATURE_DEFINITIONS,
-            "core_features": CORE_FEATURES
+            "core_features": CORE_FEATURES,
+            "industry_options": INDUSTRY_OPTIONS,
+            "business_presets": BUSINESS_PRESETS
         }
     )
 
@@ -5235,15 +5340,7 @@ async def update_settings(request: Request):
     service_label = (form.get("service_label") or "Услуга").strip()
 
     allowed_plans = ["basic", "team", "business", "business_1c", "enterprise_1c"]
-    allowed_industries = [
-        "field_service",
-        "beauty",
-        "auto_service",
-        "logistics",
-        "cleaning",
-        "repair",
-        "custom"
-    ]
+    allowed_industries = [industry_key for industry_key, _ in INDUSTRY_OPTIONS]
 
     if plan not in allowed_plans:
         plan = "basic"
@@ -5255,7 +5352,11 @@ async def update_settings(request: Request):
     calls_enabled = 1 if plan in ("business", "business_1c", "enterprise_1c") else 0
     ai_calls_enabled = 1 if plan == "enterprise_1c" else 0
     company_id = get_user_company_id(username)
-    update_company_features(company_id, form)
+
+    if form.get("apply_business_preset") == "1":
+        apply_business_preset(company_id, industry)
+    else:
+        update_company_features(company_id, form)
 
     conn = connect()
     c = conn.cursor()
