@@ -473,6 +473,13 @@ def has_feature(company_id, feature_key):
     return get_company_features(company_id).get(feature_key, True)
 
 
+def require_feature(company_id, feature_key):
+    if has_feature(company_id, feature_key):
+        return None
+
+    return RedirectResponse("/", status_code=302)
+
+
 def update_company_features(company_id, form):
     company_id = company_id or 1
     ensure_company_features(company_id)
@@ -1425,6 +1432,10 @@ async def notifications_page(request: Request):
 
     role = get_role(username)
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "notifications")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -1545,6 +1556,10 @@ async def workload_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "workload")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -1640,6 +1655,11 @@ async def create_sla_reminders(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "sla")
+
+    if disabled_response:
+        return disabled_response
+
     now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
     soon_value = (datetime.now() + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
 
@@ -1813,6 +1833,11 @@ async def sla_page(request: Request, filter: str = "", worker: str = ""):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "sla")
+
+    if disabled_response:
+        return disabled_response
+
     now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
     soon_value = (datetime.now() + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
 
@@ -2063,6 +2088,10 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
         return RedirectResponse("/platform", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calendar")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -2303,6 +2332,10 @@ async def recurring_jobs_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "recurring")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -2460,6 +2493,10 @@ async def generate_recurring_task(request: Request, job_id: int):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "recurring")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -2565,6 +2602,10 @@ async def toggle_recurring_job(request: Request, job_id: int):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "recurring")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -2895,6 +2936,10 @@ async def finance_summary_export(request: Request, month: str = ""):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "finance")
+
+    if disabled_response:
+        return disabled_response
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -2974,6 +3019,10 @@ async def sla_analytics_export(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "sla")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -3055,6 +3104,10 @@ async def sla_analytics_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "sla")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -3454,6 +3507,10 @@ async def owner_dashboard_page(request: Request, month: str = ""):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "analytics")
+
+    if disabled_response:
+        return disabled_response
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -3864,6 +3921,10 @@ async def finance_summary_page(request: Request, month: str = ""):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "finance")
+
+    if disabled_response:
+        return disabled_response
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -3996,6 +4057,10 @@ async def finance_page(
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "finance")
+
+    if disabled_response:
+        return disabled_response
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -4236,6 +4301,10 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "payroll")
+
+    if disabled_response:
+        return disabled_response
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -4423,6 +4492,10 @@ async def payroll_history_page(request: Request, month: str = "", worker: str = 
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "payroll")
+
+    if disabled_response:
+        return disabled_response
 
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -4743,6 +4816,10 @@ async def payroll_export(request: Request, month: str = "", payout_filter: str =
     selected_payout_filter = payout_filter if payout_filter in ("positive", "paid", "partial", "unpaid") else ""
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "payroll")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -5202,6 +5279,11 @@ async def calls_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calls")
+
+    if disabled_response:
+        return disabled_response
+
     settings = get_company_settings(company_id)
 
     return templates.TemplateResponse(
@@ -5430,6 +5512,10 @@ async def custom_fields_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "custom_fields")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -5602,6 +5688,10 @@ async def toggle_custom_field(request: Request, field_id: int):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "custom_fields")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -5646,13 +5736,14 @@ async def catalog_page(request: Request):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "catalog")
+
+    if disabled_response:
+        return disabled_response
+
     conn = connect()
     c = conn.cursor()
-
-    if role == "superadmin":
-        return RedirectResponse("/platform", status_code=302)
-
-    company_id = get_user_company_id(username)
 
     items = c.execute("""
     SELECT *
@@ -5825,13 +5916,15 @@ async def clients_page(
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "clients")
+
+    if disabled_response:
+        return disabled_response
+
     conn = connect()
     c = conn.cursor()
 
-    if role == "superadmin":
-        return RedirectResponse("/platform", status_code=302)
-
-    company_id = get_user_company_id(username)
     today = datetime.now().strftime("%Y-%m-%d")
     selected_search = str(search or "").strip()
     selected_client_filter = client_filter if client_filter in ("active", "overdue", "empty") else ""
@@ -5951,6 +6044,10 @@ async def client_detail(
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "clients")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -6771,6 +6868,10 @@ async def archive_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "archive")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -6805,6 +6906,8 @@ async def more_page(request: Request):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
+    company_id = get_user_company_id(username)
+    features = get_company_features(company_id)
 
     return templates.TemplateResponse(
         request,
@@ -6812,7 +6915,8 @@ async def more_page(request: Request):
         {
             "request": request,
             "username": username,
-            "role": role
+            "role": role,
+            "features": features
         }
     )
 

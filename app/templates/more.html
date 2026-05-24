@@ -30,21 +30,40 @@ h1{margin:0 0 8px;font-size:32px}
 
 <div class="card">
 <div class="menu">
+{% set f = features if features is defined else {} %}
 
 <a href="/">🏠 Главная</a>
 <a href="/profile">👤 Мой профиль</a>
+{% if f.get("calendar", True) %}
 <a href="/calendar">📅 Календарь</a>
+{% endif %}
 
 {% if role in ["boss", "manager"] %}
+{% if f.get("clients", True) %}
 <a href="/clients">👤 Клиенты</a>
+{% endif %}
+{% if f.get("finance", True) %}
 <a href="/finance">💰 Финансы</a>
+{% endif %}
+{% if f.get("payroll", True) %}
 <a href="/payroll">💵 Зарплаты</a>
+{% endif %}
+{% if f.get("catalog", True) %}
 <a href="/catalog">📦 Каталог</a>
+{% endif %}
+{% if f.get("custom_fields", True) %}
 <a href="/custom-fields">🧩 Поля компании</a>
+{% endif %}
+{% if f.get("recurring", True) %}
 <a href="/recurring">🔁 Регулярные работы</a>
+{% endif %}
 <a href="/workers">👥 Команда</a>
+{% if f.get("archive", True) %}
 <a href="/archive">🗄 Архив</a>
+{% endif %}
+{% if f.get("calls", True) %}
 <a href="/calls">☎️ Звонки</a>
+{% endif %}
 {% endif %}
 
 {% if role == "boss" %}

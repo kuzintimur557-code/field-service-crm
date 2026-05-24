@@ -255,6 +255,10 @@ def assert_company_features():
     assert features["notifications"]
     assert not features["sla"]
 
+    response = asyncio.run(crm.sla_page(make_asgi_request("owner2", "/sla")))
+    assert response.status_code == 302
+    assert response.headers["location"] == "/"
+
 
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")
