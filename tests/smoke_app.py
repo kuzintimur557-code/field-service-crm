@@ -385,6 +385,46 @@ async def assert_automation_page():
     assert "Включено" in list_html
     assert "Создать уведомление" in list_html
     assert f"/automation/rules/{rule['id']}/toggle" in list_html
+    assert f"/automation/rules/{rule['id']}/edit" in list_html
+
+    edit_response = await crm.edit_automation_rule(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/edit",
+            {
+                "name": "SLA smoke rule updated",
+                "target_username": "manager2",
+                "message": "Updated SLA smoke message",
+            },
+        ),
+        rule["id"],
+    )
+    assert edit_response.status_code == 302
+    assert edit_response.headers["location"] == "/automation?updated=1"
+
+    conn = connect()
+    c = conn.cursor()
+    updated_rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()
+    updated_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE rule_id=?
+    """, (rule["id"],)).fetchone()
+    conn.close()
+
+    assert updated_rule["name"] == "SLA smoke rule updated"
+    assert "manager2" in updated_action["payload_json"]
+    assert "Updated SLA smoke message" in updated_action["payload_json"]
+
+    updated_page_response = await crm.automation_page(make_asgi_request("owner2", "/automation"))
+    assert updated_page_response.status_code == 200
+    updated_page_html = updated_page_response.body.decode("utf-8")
+    assert "SLA smoke rule updated" in updated_page_html
+    assert "Updated SLA smoke message" in updated_page_html
 
     toggle_response = await crm.toggle_automation_rule(
         make_request("owner2"),

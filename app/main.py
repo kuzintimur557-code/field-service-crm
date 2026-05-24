@@ -1803,11 +1803,27 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     conn = connect()
     c = conn.cursor()
 
-    rules = c.execute("""
+    rule_rows = c.execute("""
     SELECT
         automation_rules.*,
         COUNT(automation_actions.id) AS action_count,
-        GROUP_CONCAT(automation_actions.action_key) AS action_keys
+        GROUP_CONCAT(automation_actions.action_key) AS action_keys,
+        (
+            SELECT action_key
+            FROM automation_actions
+            WHERE company_id=automation_rules.company_id
+              AND rule_id=automation_rules.id
+            ORDER BY sort_order, id
+            LIMIT 1
+        ) AS primary_action_key,
+        (
+            SELECT payload_json
+            FROM automation_actions
+            WHERE company_id=automation_rules.company_id
+              AND rule_id=automation_rules.id
+            ORDER BY sort_order, id
+            LIMIT 1
+        ) AS primary_payload_json
     FROM automation_rules
     LEFT JOIN automation_actions
       ON automation_actions.rule_id=automation_rules.id
@@ -1833,6 +1849,20 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     """, (company_id,)).fetchall()
 
     conn.close()
+
+    rules = []
+
+    for rule_row in rule_rows:
+        rule = dict(rule_row)
+
+        try:
+            payload = json.loads(rule.get("primary_payload_json") or "{}")
+        except Exception:
+            payload = {}
+
+        rule["edit_target_username"] = payload.get("target_username") or rule["created_by"] or username
+        rule["edit_message"] = payload.get("message") or ""
+        rules.append(rule)
 
     if selected_rule_filter == "active":
         rules = [rule for rule in rules if rule["active"]]
@@ -1954,6 +1984,103 @@ async def create_automation_rule(request: Request):
     conn.close()
 
     return RedirectResponse("/automation?created=1", status_code=302)
+
+
+@app.post("/automation/rules/{rule_id}/edit")
+async def edit_automation_rule(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    form = await request.form()
+    name = str(form.get("name") or "").strip()
+    target_username = str(form.get("target_username") or username).strip()
+    message = str(form.get("message") or "").strip()
+
+    if not name:
+        return RedirectResponse("/automation?error=name", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT id
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse("/automation", status_code=302)
+
+    target_exists = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=?
+      AND username=?
+    """, (company_id, target_username)).fetchone()
+
+    if not target_exists:
+        conn.close()
+        return RedirectResponse("/automation?error=target", status_code=302)
+
+    payload = {
+        "target_username": target_username,
+        "message": message
+    }
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    c.execute("""
+    UPDATE automation_rules
+    SET name=?, updated_at=?
+    WHERE id=?
+      AND company_id=?
+    """, (
+        name,
+        now,
+        rule_id,
+        company_id
+    ))
+
+    action = c.execute("""
+    SELECT id
+    FROM automation_actions
+    WHERE company_id=?
+      AND rule_id=?
+    ORDER BY sort_order, id
+    LIMIT 1
+    """, (company_id, rule_id)).fetchone()
+
+    if action:
+        c.execute("""
+        UPDATE automation_actions
+        SET payload_json=?
+        WHERE id=?
+          AND company_id=?
+        """, (
+            json.dumps(payload, ensure_ascii=False),
+            action["id"],
+            company_id
+        ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/automation?updated=1", status_code=302)
 
 
 @app.post("/automation/rules/{rule_id}/toggle")

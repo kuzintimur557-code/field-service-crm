@@ -58,6 +58,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">Статус правила обновлён</div>
 {% endif %}
 
+{% if request.query_params.get("updated") == "1" %}
+<div class="notice ok">Правило обновлено</div>
+{% endif %}
+
 {% if request.query_params.get("deleted") == "1" %}
 <div class="notice ok">Правило удалено</div>
 {% endif %}
@@ -139,6 +143,29 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         </span>
         <span class="pill">Создал: {{ rule["created_by"] }}</span>
         <span class="pill">{{ rule["created_at"] }}</span>
+        <form method="post" action="/automation/rules/{{ rule['id'] }}/edit" style="margin-top:14px">
+            <div class="grid">
+                <div>
+                    <label>Название</label>
+                    <input type="text" name="name" value="{{ rule['name'] }}" required>
+                </div>
+                <div>
+                    <label>Получатель</label>
+                    <select name="target_username">
+                        {% for user in users %}
+                        <option value="{{ user['username'] }}" {% if user["username"] == rule["edit_target_username"] %}selected{% endif %}>
+                            {{ user["username"] }} / {{ user["role"] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:10px">
+                <label>Сообщение</label>
+                <textarea name="message">{{ rule["edit_message"] }}</textarea>
+            </div>
+            <button type="submit" style="margin-top:10px">Сохранить</button>
+        </form>
     </div>
     <div>
     <form method="post" action="/automation/rules/{{ rule['id'] }}/toggle" style="margin-bottom:8px">
