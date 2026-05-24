@@ -2501,6 +2501,13 @@ async def create_recurring_job(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "recurring")
+
+    if disabled_response:
+        return disabled_response
+
+
     form = await request.form()
 
     client_id = form.get("client_id") or None
@@ -2763,6 +2770,13 @@ async def update_recurring_job_date(request: Request, job_id: int):
         return RedirectResponse("/recurring?error=empty", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "recurring")
+
+    if disabled_response:
+        return disabled_response
+
+
 
     conn = connect()
     c = conn.cursor()
