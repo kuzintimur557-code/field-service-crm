@@ -247,6 +247,22 @@ def assert_company_features():
 
     crm.apply_business_preset(2, "beauty")
 
+    conn = crm.connect()
+    c = conn.cursor()
+
+    settings = c.execute("""
+    SELECT task_label, worker_label, client_label, service_label
+    FROM company_settings
+    WHERE company_id=?
+    """, (2,)).fetchone()
+
+    conn.close()
+
+    assert settings["task_label"] == "Запись"
+    assert settings["worker_label"] == "Мастер"
+    assert settings["client_label"] == "Клиент"
+    assert settings["service_label"] == "Услуга"
+
     features = crm.get_company_features(2)
     assert features["tasks"]
     assert features["calendar"]

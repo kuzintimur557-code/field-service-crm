@@ -160,6 +160,88 @@ BUSINESS_PRESETS = {
 }
 
 
+INDUSTRY_LABEL_PRESETS = {
+    "field_service": {
+        "task_label": "Заявка",
+        "worker_label": "Исполнитель",
+        "client_label": "Клиент",
+        "service_label": "Услуга"
+    },
+    "beauty": {
+        "task_label": "Запись",
+        "worker_label": "Мастер",
+        "client_label": "Клиент",
+        "service_label": "Услуга"
+    },
+    "cleaning": {
+        "task_label": "Заказ",
+        "worker_label": "Клинер",
+        "client_label": "Клиент",
+        "service_label": "Уборка"
+    },
+    "repair": {
+        "task_label": "Заказ",
+        "worker_label": "Мастер",
+        "client_label": "Клиент",
+        "service_label": "Работа"
+    },
+    "auto_service": {
+        "task_label": "Заказ-наряд",
+        "worker_label": "Мастер",
+        "client_label": "Клиент",
+        "service_label": "Работа"
+    },
+    "logistics": {
+        "task_label": "Рейс",
+        "worker_label": "Водитель",
+        "client_label": "Клиент",
+        "service_label": "Перевозка"
+    },
+    "agency": {
+        "task_label": "Проект",
+        "worker_label": "Специалист",
+        "client_label": "Клиент",
+        "service_label": "Услуга"
+    },
+    "medical": {
+        "task_label": "Приём",
+        "worker_label": "Специалист",
+        "client_label": "Пациент",
+        "service_label": "Услуга"
+    },
+    "education": {
+        "task_label": "Занятие",
+        "worker_label": "Преподаватель",
+        "client_label": "Ученик",
+        "service_label": "Курс"
+    },
+    "restaurant": {
+        "task_label": "Заказ",
+        "worker_label": "Сотрудник",
+        "client_label": "Гость",
+        "service_label": "Блюдо"
+    },
+    "ecommerce": {
+        "task_label": "Заказ",
+        "worker_label": "Сотрудник",
+        "client_label": "Покупатель",
+        "service_label": "Товар"
+    },
+    "other": {
+        "task_label": "Задача",
+        "worker_label": "Сотрудник",
+        "client_label": "Клиент",
+        "service_label": "Услуга"
+    },
+    "custom": {
+        "task_label": "Задача",
+        "worker_label": "Сотрудник",
+        "client_label": "Клиент",
+        "service_label": "Услуга"
+    }
+}
+
+
 def safe_upload_filename(task_id, prefix, original_filename):
     original = Path(original_filename or "photo").name
     extension = Path(original).suffix.lower()
@@ -506,12 +588,21 @@ def update_company_features(company_id, form):
     conn.close()
 
 
+def get_industry_labels(industry):
+    return INDUSTRY_LABEL_PRESETS.get(
+        industry,
+        INDUSTRY_LABEL_PRESETS["other"]
+    )
+
+
+
 def apply_business_preset(company_id, industry):
     company_id = company_id or 1
     ensure_company_features(company_id)
 
     enabled_features = set(BUSINESS_PRESETS.get(industry) or BUSINESS_PRESETS["other"])
     enabled_features.update(CORE_FEATURES)
+    labels = get_industry_labels(industry)
 
     conn = connect()
     c = conn.cursor()
@@ -530,6 +621,24 @@ def apply_business_preset(company_id, industry):
             company_id,
             feature_key
         ))
+
+    c.execute("""
+    UPDATE company_settings
+    SET
+        task_label=?,
+        worker_label=?,
+        client_label=?,
+        service_label=?,
+        updated_at=?
+    WHERE company_id=?
+    """, (
+        labels["task_label"],
+        labels["worker_label"],
+        labels["client_label"],
+        labels["service_label"],
+        now,
+        company_id
+    ))
 
     conn.commit()
     conn.close()
