@@ -2843,6 +2843,13 @@ async def finance_export(
 
     company_id = get_user_company_id(username)
 
+    disabled_response = require_feature(company_id, "finance")
+
+    if disabled_response:
+        return disabled_response
+
+
+
     workers = c.execute("""
     SELECT id, username, commission_percent
     FROM users
@@ -3562,6 +3569,13 @@ async def owner_dashboard_export(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "analytics")
+
+    if disabled_response:
+        return disabled_response
+
+
 
     conn = connect()
     c = conn.cursor()
