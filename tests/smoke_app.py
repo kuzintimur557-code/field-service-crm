@@ -1622,6 +1622,7 @@ async def assert_overdue_sla(task):
     html = response.body.decode("utf-8")
     assert "Нарушен SLA" in html
     assert f"#{task['id']}" in html
+    assert "Создать напоминания по просрочкам" in html
 
     sla_response = await crm.sla_page(
         make_asgi_request("owner2", "/sla"),
@@ -1654,6 +1655,65 @@ async def assert_overdue_sla(task):
     assert outsider_sla_response.status_code == 200
     outsider_sla_html = outsider_sla_response.body.decode("utf-8")
     assert task["client"] not in outsider_sla_html
+
+    overdue_rule_response = await crm.create_automation_rule(
+        make_form_request(
+            "owner2",
+            "/automation/rules",
+            {
+                "name": "Overdue runner rule",
+                "trigger_key": "overdue_task",
+                "action_key": "notification",
+                "target_username": "owner2",
+                "message": "Overdue automation message",
+            },
+        )
+    )
+    assert overdue_rule_response.status_code == 302
+
+    overdue_reminder_response = await crm.create_overdue_reminders(make_request("owner2"))
+    assert overdue_reminder_response.status_code == 302
+    assert overdue_reminder_response.headers["location"].startswith("/overdue?reminders=1&created=")
+
+    duplicate_overdue_reminder_response = await crm.create_overdue_reminders(make_request("owner2"))
+    assert duplicate_overdue_reminder_response.status_code == 302
+    assert duplicate_overdue_reminder_response.headers["location"] == "/overdue?reminders=1&created=0"
+
+    conn = connect()
+    c = conn.cursor()
+    overdue_notification_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=?
+      AND title='🟠 Просрочена задача'
+      AND link=?
+      AND is_read=0
+    """, (2, f"/task/{task['id']}")).fetchone()[0]
+    overdue_automation_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=?
+      AND trigger_key='overdue_task'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (2, task["id"])).fetchone()
+    overdue_automation_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=?
+      AND username='owner2'
+      AND title='Overdue runner rule'
+      AND link=?
+    ORDER BY id DESC
+    """, (2, f"/task/{task['id']}")).fetchone()
+    conn.close()
+
+    assert overdue_notification_count == 2
+    assert overdue_automation_event is not None
+    assert overdue_automation_event["status"] == "done"
+    assert overdue_automation_notification is not None
+    assert overdue_automation_notification["message"] == "Overdue automation message"
 
     conn = connect()
     c = conn.cursor()

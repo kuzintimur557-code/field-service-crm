@@ -2755,6 +2755,109 @@ async def overdue_page(request: Request):
     )
 
 
+@app.post("/overdue/reminders")
+async def create_overdue_reminders(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date!=''
+      AND task_date < ?
+    ORDER BY task_date ASC
+    """, (company_id, today)).fetchall()
+
+    users = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=?
+      AND role IN ('boss', 'manager')
+    """, (company_id,)).fetchall()
+
+    created_count = 0
+    automation_tasks = []
+
+    for task in tasks:
+        task_created_count = 0
+
+        for user in users:
+            existing_notification = c.execute("""
+            SELECT id
+            FROM notifications
+            WHERE company_id=?
+              AND username=?
+              AND title=?
+              AND link=?
+              AND is_read=0
+            """, (
+                company_id,
+                user["username"],
+                "🟠 Просрочена задача",
+                f"/task/{task['id']}"
+            )).fetchone()
+
+            if existing_notification:
+                continue
+
+            c.execute("""
+            INSERT INTO notifications (
+                company_id,
+                username,
+                title,
+                message,
+                link,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                user["username"],
+                "🟠 Просрочена задача",
+                f"Задача #{task['id']} просрочена по дате",
+                f"/task/{task['id']}",
+                datetime.now().strftime("%Y-%m-%d %H:%M")
+            ))
+            created_count += 1
+            task_created_count += 1
+
+        if task_created_count:
+            automation_tasks.append(task)
+
+    conn.commit()
+    conn.close()
+
+    for task in automation_tasks:
+        run_automation_event(
+            company_id,
+            "overdue_task",
+            "task",
+            task["id"],
+            f"Задача #{task['id']} просрочена по дате",
+            f"/task/{task['id']}"
+        )
+
+    return RedirectResponse(f"/overdue?reminders=1&created={created_count}", status_code=302)
+
+
 @app.get("/calendar", response_class=HTMLResponse)
 async def calendar_page(request: Request, worker: str = "", month: str = "", status: str = "", date: str = "", availability: str = ""):
 
