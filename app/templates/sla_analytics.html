@@ -76,11 +76,14 @@
 <body>
 
 <div class="container">
+    {% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+    {% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+    {% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 
     <div class="header">
         <div>
             <h1>SLA-аналитика</h1>
-            <p>Контроль сроков, просрочек и качества выполнения заявок</p>
+            <p>Контроль сроков, просрочек и качества выполнения: {{ task_label }}</p>
         </div>
 
         <div>
@@ -95,7 +98,7 @@
     <div class="grid">
 
         <div class="card">
-            <div class="label">Всего заявок</div>
+            <div class="label">Всего: {{ task_label }}</div>
             <div class="value">{{ total_tasks }}</div>
         </div>
 
@@ -200,15 +203,15 @@
     </div>
 
     <div class="card" style="margin-top:24px;">
-        <h2>Просроченные заявки</h2>
+        <h2>Просрочено: {{ task_label }}</h2>
 
         <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;margin-top:16px;">
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Задача</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Клиент</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Исполнители</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ task_label }}</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ client_label }}</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ worker_label }}</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Дата</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочка</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Статус</th>
@@ -240,7 +243,7 @@
                     {% else %}
                     <tr>
                         <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
-                            Нет просроченных задач
+                            Нет просрочек: {{ task_label }}
                         </td>
                     </tr>
                     {% endfor %}
@@ -250,13 +253,13 @@
     </div>
 
     <div class="card" style="margin-top:24px;">
-        <h2>SLA по клиентам</h2>
+        <h2>SLA: {{ client_label }}</h2>
 
         <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;margin-top:16px;">
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Клиент</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ client_label }}</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Всего</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Завершено</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Открыто</th>
@@ -294,7 +297,7 @@
                     {% else %}
                     <tr>
                         <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
-                            Нет SLA-данных по клиентам
+                            Нет SLA-данных: {{ client_label }}
                         </td>
                     </tr>
                     {% endfor %}
@@ -304,13 +307,13 @@
     </div>
 
     <div class="card" style="margin-top:24px;">
-        <h2>SLA по исполнителям</h2>
+        <h2>SLA: {{ worker_label }}</h2>
 
         <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;margin-top:16px;">
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Исполнитель</th>
+                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ worker_label }}</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Всего</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Завершено</th>
                         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Открыто</th>
@@ -348,7 +351,7 @@
                     {% else %}
                     <tr>
                         <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
-                            Нет SLA-данных по исполнителям
+                            Нет SLA-данных: {{ worker_label }}
                         </td>
                     </tr>
                     {% endfor %}

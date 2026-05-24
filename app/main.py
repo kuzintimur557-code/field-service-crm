@@ -1952,6 +1952,7 @@ async def sla_page(request: Request, filter: str = "", worker: str = ""):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
     disabled_response = require_feature(company_id, "sla")
 
     if disabled_response:
@@ -2087,7 +2088,8 @@ async def sla_page(request: Request, filter: str = "", worker: str = ""):
             "now_value": now_value,
             "soon_value": soon_value,
             "selected_filter": filter,
-            "selected_worker": worker
+            "selected_worker": worker,
+            "settings": settings
         }
     )
 
@@ -3244,6 +3246,7 @@ async def sla_analytics_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
     disabled_response = require_feature(company_id, "sla")
 
     if disabled_response:
@@ -3553,7 +3556,8 @@ async def sla_analytics_page(request: Request):
             "sla_worker_rows": sla_worker_rows,
             "sla_client_rows": sla_client_rows,
             "sla_overdue_tasks": sla_overdue_tasks,
-            "sla_monthly_rows": sla_monthly_rows
+            "sla_monthly_rows": sla_monthly_rows,
+            "settings": settings
         }
     )
 

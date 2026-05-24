@@ -37,12 +37,15 @@ h1{margin:0 0 8px;font-size:34px}
 
 <body>
 <div class="container">
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
 <h1>⏰ SLA контроль</h1>
-<div class="meta">Заявки с установленным deadline</div>
+<div class="meta">Контроль сроков: {{ task_label }}</div>
 
 {% if request.query_params.get("reminders") == "1" %}
 <div style="margin-top:14px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900">
@@ -71,7 +74,7 @@ h1{margin:0 0 8px;font-size:34px}
 
 <div class="stats">
     <a href="/sla" class="stat" style="text-decoration:none;color:inherit">
-        <div class="stat-title">Всего SLA</div>
+        <div class="stat-title">Всего: {{ task_label }}</div>
         <div class="stat-value">{{ sla_stats["total"] }}</div>
     </a>
     <a href="/sla?filter=overdue" class="stat" style="text-decoration:none;color:inherit">
@@ -93,7 +96,7 @@ h1{margin:0 0 8px;font-size:34px}
 	</div>
 
 	<div class="card">
-	<h2 style="margin:0 0 14px">SLA по исполнителям</h2>
+	<h2 style="margin:0 0 14px">SLA: {{ worker_label }}</h2>
 	{% if worker_sla_stats %}
 	{% for row in worker_sla_stats %}
 	<div class="worker-row">
@@ -105,15 +108,15 @@ h1{margin:0 0 8px;font-size:34px}
 	</div>
 	{% endfor %}
 	{% else %}
-	<div class="meta">Исполнителей пока нет</div>
+	<div class="meta">Нет данных: {{ worker_label }}</div>
 	{% endif %}
 	</div>
 
 	<form method="get" action="/sla" class="card">
     <input type="hidden" name="filter" value="{{ selected_filter }}">
-    <label style="display:block;font-weight:900;margin-bottom:8px">Исполнитель</label>
+    <label style="display:block;font-weight:900;margin-bottom:8px">{{ worker_label }}</label>
     <select name="worker" style="width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db">
-        <option value="">Все исполнители</option>
+        <option value="">Все: {{ worker_label }}</option>
         {% for worker in workers %}
         <option value="{{ worker['username'] }}" {% if selected_worker == worker["username"] %}selected{% endif %}>
             {{ worker["username"] }}
@@ -137,7 +140,7 @@ h1{margin:0 0 8px;font-size:34px}
 {% if tasks %}
 {% for task in tasks %}
 <div class="task">
-    <div class="title">#{{ task["id"] }} — {{ task["client"] }}</div>
+    <div class="title">#{{ task["id"] }} — {{ client_label }}: {{ task["client"] }}</div>
 
     {% if task["status"] == "Завершено" %}
         <div class="badge green">🟢 Выполнено</div>
@@ -151,17 +154,17 @@ h1{margin:0 0 8px;font-size:34px}
 
     <div class="info">
         ⏰ Deadline: {{ task["deadline_at"] }}<br>
-        📅 Дата заявки: {{ task["task_date"] }}<br>
+        📅 Дата: {{ task_label }} / {{ task["task_date"] }}<br>
         📍 Адрес: {{ task["address"] }}<br>
-        👷 Исполнитель: {{ task["workers"] or task["worker"] }}<br>
+        👷 {{ worker_label }}: {{ task["workers"] or task["worker"] }}<br>
         📌 Статус: {{ task["status"] }}
     </div>
 
-    <a class="btn" href="/task/{{ task['id'] }}">Открыть заявку</a>
+    <a class="btn" href="/task/{{ task['id'] }}">Открыть: {{ task_label }}</a>
 </div>
 {% endfor %}
 {% else %}
-<div class="meta">SLA-заявок пока нет</div>
+<div class="meta">Нет SLA-записей: {{ task_label }}</div>
 {% endif %}
 </div>
 
