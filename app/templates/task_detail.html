@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Заявка #{{ task["id"] }}</title>
+<title>{{ settings["task_label"] or "Заявка" }} #{{ task["id"] }}</title>
 
 <link rel="stylesheet" href="/static/app.css">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -361,7 +361,7 @@ button{
 <a href="/" class="back">← Назад</a>
 
 <div>
-<span class="title">Заявка #{{ task["id"] }}</span>
+<span class="title">{{ settings["task_label"] or "Заявка" }} #{{ task["id"] }}</span>
 <span class="badge">{{ task["status"] }}</span>
 
 {% if sla_status == "overdue" %}
@@ -406,7 +406,7 @@ button{
 
 <div class="info-row">
 <div class="icon">👤</div>
-<div class="label">Клиент</div>
+<div class="label">{{ settings["client_label"] or "Клиент" }}</div>
 <div class="value">{{ task["client"] }}</div>
 <button class="edit-btn" onclick="openEdit('client','{{ task['client'] }}')">✎</button>
 </div>
@@ -427,7 +427,7 @@ button{
 
 <div class="info-row">
 <div class="icon">📝</div>
-<div class="label">Описание</div>
+<div class="label">Описание {{ (settings["service_label"] or "услуги")|lower }}</div>
 <div class="value">{{ task["description"] }}</div>
 <button class="edit-btn" onclick="openEdit('description','{{ task['description'] }}')">✎</button>
 </div>
@@ -448,7 +448,7 @@ button{
 
 	<div class="info-row">
 	<div class="icon">👷</div>
-	<div class="label">Исполнители</div>
+	<div class="label">{{ settings["worker_label"] or "Исполнители" }}</div>
 	<div class="value">
 	<div class="worker-list">
 	{% if task_workers %}
@@ -614,7 +614,7 @@ button{
     <button class="btn green" type="submit">Добавить в смету</button>
 </form>
 {% elif role in ["boss", "manager"] %}
-<div class="comment">Каталог пуст. Сначала добавьте услуги или материалы в каталоге.</div>
+<div class="comment">Каталог пуст. Сначала добавьте {{ (settings["service_label"] or "услуги")|lower }} или материалы в каталоге.</div>
 {% endif %}
 
 {% if task_expenses %}
@@ -654,7 +654,7 @@ button{
         <div>
             <label>Тип</label>
             <select name="item_type">
-                <option value="service">Услуга</option>
+                <option value="service">{{ settings["service_label"] or "Услуга" }}</option>
                 <option value="material">Материал</option>
             </select>
         </div>
@@ -734,7 +734,7 @@ button{
 </div>
 
 	<div class="mini">
-	<div class="mini-label">Исполнители</div>
+	<div class="mini-label">{{ settings["worker_label"] or "Исполнители" }}</div>
 	<div class="mini-value">
 	{% if task_workers %}
 	{{ task_workers|join(", ") }}

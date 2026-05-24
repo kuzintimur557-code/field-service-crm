@@ -8534,6 +8534,8 @@ async def task_detail(request: Request, task_id: int):
     ORDER BY custom_fields.sort_order, custom_fields.id
     """, (task_id, company_id)).fetchall()
 
+    settings = get_company_settings(company_id)
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -8560,7 +8562,8 @@ async def task_detail(request: Request, task_id: int):
             "estimate_margin": estimate_margin,
             "task_workers": task_workers,
             "task_custom_fields": task_custom_fields,
-            "sla_status": sla_status
+            "sla_status": sla_status,
+            "settings": settings
         }
     )
 
