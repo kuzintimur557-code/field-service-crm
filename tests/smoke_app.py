@@ -1088,32 +1088,33 @@ async def assert_client_card(task):
     )
     assert response.status_code == 200
     html = response.body.decode("utf-8")
-    assert "Всего заявок" in html
+    assert "Всего: Заявка" in html
     assert "Активные" in html
     assert "Выручка" in html
     assert "task_filter=active" in html
     assert "task_filter=completed" in html
     assert "task_filter=overdue" in html
-    assert "Поиск по заявкам" in html
+    assert "Поиск: Заявка" in html
     assert "task_search" in html
     assert "Сортировка" in html
     assert 'name="task_sort"' in html
     assert f'href="/clients/{task["client_id"]}">Сбросить</a>' in html
     assert "Показано:" in html
-    assert "Последняя заявка" in html
-    assert "Ближайшая заявка" in html
+    assert "Заявка #" in html
+    assert ": последнее" in html
+    assert ": ближайшее" in html
     assert "latest-task" in html
     assert "worker2, helper2" in html
     assert "Последний контакт" in html
     assert "Последняя заметка" in html
     assert "Следующее действие" in html
-    assert "Ближайшая заявка" in html
+    assert "Заявка #" in html
     assert "Smoke latest client note" in html
     assert "Поиск по заметкам" in html
     assert "note_search" in html
     assert "Заметок:" in html
-    assert "Создать заявку из заметки" in html
-    assert "Файлы клиента" in html
+    assert "Создать из заметки: Заявка" in html
+    assert "Файлы: Клиент" in html
     assert "client-contract.txt" in html
     assert "Загрузить файл" in html
     assert "Поиск по файлам" in html

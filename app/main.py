@@ -6255,6 +6255,8 @@ async def client_detail(
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
+    task_label = settings["task_label"] or "Заявка"
     disabled_response = require_feature(company_id, "clients")
 
     if disabled_response:
@@ -6342,29 +6344,29 @@ async def client_detail(
 
     client_next_action = {
         "title": "Активных работ нет",
-        "text": "Можно создать новую заявку или добавить заметку по клиенту.",
+        "text": f"Можно создать запись в разделе «{task_label}» или добавить заметку.",
         "link": f"/create-task?client_id={client_id}&return_to=client",
-        "link_text": "Создать заявку"
+        "link_text": f"Создать: {task_label}"
     }
 
     if client_overdue_tasks:
         client_next_action = {
-            "title": "Есть просроченные заявки",
-            "text": "Проверьте просрочки клиента и перенесите дату или закройте работу.",
+            "title": f"Просрочено: {task_label}",
+            "text": "Проверьте просрочки, перенесите дату или закройте работу.",
             "link": f"/clients/{client_id}?task_filter=overdue",
             "link_text": "Открыть просрочки"
         }
     elif upcoming_task:
         client_next_action = {
-            "title": f"Ближайшая заявка #{upcoming_task['id']}",
+            "title": f"{task_label} #{upcoming_task['id']}: ближайшее",
             "text": f"{upcoming_task['task_date'] or 'Без даты'} / {upcoming_task['status']}",
             "link": f"/task/{upcoming_task['id']}",
-            "link_text": "Открыть заявку"
+            "link_text": f"Открыть: {task_label}"
         }
     elif client_active_tasks:
         client_next_action = {
-            "title": "Есть активные заявки",
-            "text": "У клиента есть работы без будущей даты. Проверьте список активных заявок.",
+            "title": f"Активно: {task_label}",
+            "text": "Есть работы без будущей даты. Проверьте активный список.",
             "link": f"/clients/{client_id}?task_filter=active",
             "link_text": "Показать активные"
         }
@@ -6549,7 +6551,8 @@ async def client_detail(
             "client_overdue_tasks": client_overdue_tasks,
             "client_revenue": client_revenue,
             "client_timeline": client_timeline,
-            "client_custom_fields": client_custom_fields
+            "client_custom_fields": client_custom_fields,
+            "settings": settings
         }
     )
 
