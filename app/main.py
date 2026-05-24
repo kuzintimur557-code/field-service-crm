@@ -1501,6 +1501,8 @@ async def home(
                 "last_seen": w["last_seen"]
             })
 
+    settings = get_company_settings(company_id)
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -1526,7 +1528,8 @@ async def home(
             "selected_worker": worker,
             "selected_date": task_date,
             "search": search,
-            "features": features
+            "features": features,
+            "settings": settings
         }
     )
 
