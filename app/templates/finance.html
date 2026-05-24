@@ -77,7 +77,7 @@ input,select,button{width:100%;margin-top:8px}
     <input type="hidden" name="profit_filter" value="{{ selected_profit_filter }}">
     {% endif %}
     <div>
-        <div class="label">Исполнитель</div>
+        <div class="label">{{ settings["worker_label"] or "Исполнитель" }}</div>
         <select name="worker">
             <option value="">Все исполнители</option>
             {% for worker in workers %}
@@ -189,8 +189,8 @@ input,select,button{width:100%;margin-top:8px}
 {% if worker_finance_stats %}
 <div class="table">
     <div class="worker-row head">
-        <div>Исполнитель</div>
-        <div>Заявки</div>
+        <div>{{ settings["worker_label"] or "Исполнитель" }}</div>
+        <div>{{ settings["task_label"] or "Заявки" }}</div>
         <div>Выручка</div>
         <div>Расходы</div>
         <div>Прибыль</div>
@@ -231,15 +231,15 @@ input,select,button{width:100%;margin-top:8px}
 </div>
 
 <div class="card">
-<h2>Заявки за месяц</h2>
+<h2>{{ settings["task_label"] or "Заявки" }} за месяц</h2>
 
 {% if rows %}
 <div class="table">
     <div class="row head">
         <div>#</div>
-        <div>Клиент</div>
+        <div>{{ settings["client_label"] or "Клиент" }}</div>
         <div>Дата</div>
-        <div>Исполнитель</div>
+        <div>{{ settings["worker_label"] or "Исполнитель" }}</div>
         <div>Оплата</div>
         <div>Сумма / прибыль</div>
         <div></div>

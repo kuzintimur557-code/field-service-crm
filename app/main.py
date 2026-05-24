@@ -4394,6 +4394,8 @@ async def finance_page(
     total_worker_paid = round(sum(row["paid_amount"] for row in worker_finance_stats), 1)
     total_worker_due = round(sum(row["due_amount"] for row in worker_finance_stats), 1)
 
+    settings = get_company_settings(company_id)
+
     conn.close()
     total_margin = round((total_profit / total_estimate) * 100, 1) if total_estimate else 0
     average_estimate = round(total_estimate / len(rows), 1) if rows else 0
@@ -4426,7 +4428,8 @@ async def finance_page(
             "unpaid_total": unpaid_total,
             "total_worker_payout": total_worker_payout,
             "total_worker_paid": total_worker_paid,
-            "total_worker_due": total_worker_due
+            "total_worker_due": total_worker_due,
+            "settings": settings
         }
     )
 
