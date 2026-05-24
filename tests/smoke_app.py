@@ -1623,6 +1623,7 @@ async def assert_overdue_sla(task):
     assert "Нарушен SLA" in html
     assert f"#{task['id']}" in html
     assert "Создать напоминания по просрочкам" in html
+    assert 'href="/automation"' in html
 
     sla_response = await crm.sla_page(
         make_asgi_request("owner2", "/sla"),
