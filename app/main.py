@@ -5723,6 +5723,13 @@ async def create_custom_field(request: Request):
 
     company_id = get_user_company_id(username)
 
+    disabled_response = require_feature(company_id, "custom_fields")
+
+    if disabled_response:
+        return disabled_response
+
+
+
     conn = connect()
     c = conn.cursor()
 
@@ -5792,6 +5799,13 @@ async def update_custom_field_order(request: Request, field_id: int):
         sort_order = 0
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "custom_fields")
+
+    if disabled_response:
+        return disabled_response
+
+
 
     conn = connect()
     c = conn.cursor()
