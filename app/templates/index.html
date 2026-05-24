@@ -180,12 +180,12 @@ h1{font-size:30px}
     </a>
     {% endif %}
     <div class="stat">
-        <div class="stat-label">Всего заявок</div>
+        <div class="stat-label">Всего {{ (settings["task_label"] or "заявок")|lower }}</div>
         <div class="stat-value">{{ total_tasks }}</div>
     </div>
 
     <div class="stat">
-        <div class="stat-label">Новые</div>
+        <div class="stat-label">Новые {{ (settings["task_label"] or "заявки")|lower }}</div>
         <div class="stat-value">{{ new_tasks }}</div>
     </div>
 
@@ -244,7 +244,7 @@ h1{font-size:30px}
 
     {% if role in ["boss", "manager"] %}
     <select name="worker">
-        <option value="">Все исполнители</option>
+        <option value="">Все {{ (settings["worker_label"] or "исполнители")|lower }}</option>
         {% for worker in workers %}
         <option value="{{ worker[0] }}" {% if selected_worker == worker[0] %}selected{% endif %}>{{ worker[0] }}</option>
         {% endfor %}
