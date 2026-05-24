@@ -6427,6 +6427,86 @@ async def ai_insights_page(request: Request):
         }
     )
 
+
+@app.post("/ai/insights/digest")
+async def create_ai_insights_digest(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    conn = connect()
+    c = conn.cursor()
+
+    overdue_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status!='Завершено'
+      AND task_date < date('now')
+    """, (company_id,)).fetchone()[0]
+
+    unpaid_total = c.execute("""
+    SELECT COALESCE(SUM(price), 0)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND payment_status!='Оплачено'
+    """, (company_id,)).fetchone()[0]
+
+    message_lines = [
+        "AI-сводка по бизнесу",
+        f"Просроченные {settings['task_label'] or 'задачи'}: {overdue_tasks}",
+        f"Неоплаченная сумма: ₽{round(float(unpaid_total or 0), 1)}"
+    ]
+
+    if overdue_tasks:
+        message_lines.append("Рекомендация: проверьте ответственных и сроки.")
+
+    if unpaid_total:
+        message_lines.append("Рекомендация: запустите напоминания по оплатам.")
+
+    digest_message = "\\n".join(message_lines)
+
+    c.execute("""
+    INSERT INTO notifications (
+        company_id,
+        username,
+        title,
+        message,
+        link,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        username,
+        "🤖 AI-сводка",
+        digest_message,
+        "/ai/insights",
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/ai/insights?digest=1", status_code=302)
+
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
 

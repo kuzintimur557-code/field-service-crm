@@ -35,7 +35,15 @@
             <p class="label">Рекомендации и риски по бизнесу</p>
         </div>
 
-        <a href="/" class="btn">← Главное меню</a>
+        <div style="display:flex;gap:12px;align-items:center;">
+            <form method="post" action="/ai/insights/digest" style="margin:0;">
+                <button type="submit" class="btn" style="border:0;cursor:pointer;">
+                    Создать AI-сводку
+                </button>
+            </form>
+
+            <a href="/" class="btn">← Главное меню</a>
+        </div>
     </div>
 
     <div class="card insight {{ risk_level }}" style="margin-bottom:24px;">
@@ -51,6 +59,13 @@
             AI оценка рисков компании по просрочкам, неоплатам и эффективности сотрудников.
         </p>
     </div>
+
+    {% if request.query_params.get("digest") %}
+    <div class="card insight success" style="margin-bottom:24px;">
+        <h3>AI-сводка создана</h3>
+        <p>Уведомление добавлено в центр уведомлений.</p>
+    </div>
+    {% endif %}
 
     <div class="grid">
         <div class="card">
