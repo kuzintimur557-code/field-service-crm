@@ -2009,6 +2009,57 @@ async def toggle_automation_rule(request: Request, rule_id: int):
     return RedirectResponse("/automation?toggled=1", status_code=302)
 
 
+@app.post("/automation/rules/{rule_id}/delete")
+async def delete_automation_rule(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT id
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse("/automation", status_code=302)
+
+    c.execute("""
+    DELETE FROM automation_actions
+    WHERE rule_id=?
+      AND company_id=?
+    """, (rule_id, company_id))
+
+    c.execute("""
+    DELETE FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/automation?deleted=1", status_code=302)
+
+
 @app.get("/workload", response_class=HTMLResponse)
 async def workload_page(request: Request):
 

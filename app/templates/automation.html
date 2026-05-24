@@ -58,6 +58,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">Статус правила обновлён</div>
 {% endif %}
 
+{% if request.query_params.get("deleted") == "1" %}
+<div class="notice ok">Правило удалено</div>
+{% endif %}
+
 {% if request.query_params.get("error") %}
 <div class="notice err">Проверьте название, триггер, действие и получателя</div>
 {% endif %}
@@ -136,11 +140,16 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <span class="pill">Создал: {{ rule["created_by"] }}</span>
         <span class="pill">{{ rule["created_at"] }}</span>
     </div>
-    <form method="post" action="/automation/rules/{{ rule['id'] }}/toggle">
+    <div>
+    <form method="post" action="/automation/rules/{{ rule['id'] }}/toggle" style="margin-bottom:8px">
         <button type="submit" style="background:{% if rule['active'] %}#991b1b{% else %}#16a34a{% endif %}">
             {% if rule["active"] %}Выключить{% else %}Включить{% endif %}
         </button>
     </form>
+    <form method="post" action="/automation/rules/{{ rule['id'] }}/delete">
+        <button type="submit" style="background:#6b7280">Удалить</button>
+    </form>
+    </div>
 </div>
 {% endfor %}
 {% else %}

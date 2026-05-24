@@ -481,6 +481,62 @@ async def assert_automation_runner(task):
     assert "done" in done_html
 
 
+async def assert_automation_delete():
+    create_response = await crm.create_automation_rule(
+        make_form_request(
+            "owner2",
+            "/automation/rules",
+            {
+                "name": "Delete automation smoke",
+                "trigger_key": "overdue_task",
+                "action_key": "notification",
+                "target_username": "owner2",
+                "message": "Delete smoke",
+            },
+        )
+    )
+    assert create_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    rule = c.execute("""
+    SELECT id
+    FROM automation_rules
+    WHERE company_id=2
+      AND name='Delete automation smoke'
+    """).fetchone()
+    conn.close()
+
+    page_response = await crm.automation_page(make_asgi_request("owner2", "/automation"))
+    assert page_response.status_code == 200
+    page_html = page_response.body.decode("utf-8")
+    assert f"/automation/rules/{rule['id']}/delete" in page_html
+
+    delete_response = await crm.delete_automation_rule(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert delete_response.status_code == 302
+    assert delete_response.headers["location"] == "/automation?deleted=1"
+
+    conn = connect()
+    c = conn.cursor()
+    rule_count = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()[0]
+    action_count = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_actions
+    WHERE rule_id=?
+    """, (rule["id"],)).fetchone()[0]
+    conn.close()
+
+    assert rule_count == 0
+    assert action_count == 0
+
+
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")
     assert anonymous.status_code == 404
@@ -2362,6 +2418,7 @@ def main():
         assert_automation_foundation()
         asyncio.run(assert_automation_page())
         asyncio.run(assert_automation_runner(task))
+        asyncio.run(assert_automation_delete())
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_archive_restore(task))
