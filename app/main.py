@@ -695,6 +695,107 @@ def create_notification(
     conn.close()
 
 
+def run_automation_event(
+    company_id,
+    trigger_key,
+    entity_type="",
+    entity_id=None,
+    message="",
+    link=""
+):
+    company_id = company_id or 1
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    created_events = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    rules = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE company_id=?
+      AND trigger_key=?
+      AND active=1
+    ORDER BY id
+    """, (company_id, trigger_key)).fetchall()
+
+    for rule in rules:
+        c.execute("""
+        INSERT INTO automation_events (
+            company_id, rule_id, trigger_key, entity_type,
+            entity_id, status, message, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+        """, (
+            company_id,
+            rule["id"],
+            trigger_key,
+            entity_type,
+            entity_id,
+            message,
+            now
+        ))
+
+        event_id = c.lastrowid
+        handled_actions = 0
+
+        actions = c.execute("""
+        SELECT *
+        FROM automation_actions
+        WHERE company_id=?
+          AND rule_id=?
+          AND active=1
+        ORDER BY sort_order, id
+        """, (company_id, rule["id"])).fetchall()
+
+        for action in actions:
+            try:
+                payload = json.loads(action["payload_json"] or "{}")
+            except Exception:
+                payload = {}
+
+            if action["action_key"] == "notification":
+                target_username = (payload.get("target_username") or rule["created_by"] or "").strip()
+                notification_message = (payload.get("message") or message or "").strip()
+
+                if target_username:
+                    c.execute("""
+                    INSERT INTO notifications (
+                        company_id, username, title, message, link, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        company_id,
+                        target_username,
+                        rule["name"],
+                        notification_message,
+                        link,
+                        now
+                    ))
+                    handled_actions += 1
+
+        status = "done" if handled_actions else "skipped"
+
+        c.execute("""
+        UPDATE automation_events
+        SET status=?, processed_at=?
+        WHERE id=?
+          AND company_id=?
+        """, (
+            status,
+            now,
+            event_id,
+            company_id
+        ))
+
+        created_events += 1
+
+    conn.commit()
+    conn.close()
+
+    return created_events
+
+
 def log_task_activity(task_id, username, role, action, details=""):
     conn = connect()
     c = conn.cursor()

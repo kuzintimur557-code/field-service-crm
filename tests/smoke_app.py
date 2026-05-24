@@ -404,6 +404,64 @@ async def assert_automation_page():
     assert toggled["active"] == 0
 
 
+async def assert_automation_runner(task):
+    create_response = await crm.create_automation_rule(
+        make_form_request(
+            "owner2",
+            "/automation/rules",
+            {
+                "name": "SLA runner rule",
+                "trigger_key": "sla_overdue",
+                "action_key": "notification",
+                "target_username": "owner2",
+                "message": "Runner notification message",
+            },
+        )
+    )
+    assert create_response.status_code == 302
+
+    created_events = crm.run_automation_event(
+        2,
+        "sla_overdue",
+        "task",
+        task["id"],
+        "SLA event happened",
+        f"/task/{task['id']}",
+    )
+    assert created_events == 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND trigger_key='sla_overdue'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (task["id"],)).fetchone()
+
+    notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='SLA runner rule'
+    ORDER BY id DESC
+    """).fetchone()
+
+    conn.close()
+
+    assert event is not None
+    assert event["status"] == "done"
+    assert event["processed_at"]
+    assert notification is not None
+    assert notification["message"] == "Runner notification message"
+    assert notification["link"] == f"/task/{task['id']}"
+
+
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")
     assert anonymous.status_code == 404
@@ -2251,6 +2309,7 @@ def main():
         assert_task_access(task)
         assert_automation_foundation()
         asyncio.run(assert_automation_page())
+        asyncio.run(assert_automation_runner(task))
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_archive_restore(task))
