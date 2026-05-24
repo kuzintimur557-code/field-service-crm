@@ -18,6 +18,10 @@ h1{margin:0 0 8px;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
 .meta{color:#6b7280;font-weight:800;line-height:1.45}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:white;padding:18px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
+.stat-title{color:#6b7280;font-weight:900;font-size:13px}
+.stat-value{font-size:28px;font-weight:900;margin-top:6px}
 label{display:block;font-weight:900;color:#374151;margin-bottom:7px}
 input,select,textarea,button{width:100%;padding:14px;border-radius:14px;font-size:16px}
 input,select,textarea{border:1px solid #d1d5db;background:white}
@@ -69,6 +73,29 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 {% if request.query_params.get("error") %}
 <div class="notice err">Проверьте название, триггер, действие и получателя</div>
 {% endif %}
+
+<div class="stats">
+    <div class="stat">
+        <div class="stat-title">Всего правил</div>
+        <div class="stat-value">{{ automation_stats["rules_total"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Включено правил</div>
+        <div class="stat-value">{{ automation_stats["rules_active"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Выключено правил</div>
+        <div class="stat-value">{{ automation_stats["rules_disabled"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Событий done</div>
+        <div class="stat-value">{{ automation_stats["events_done"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Событий skipped</div>
+        <div class="stat-value">{{ automation_stats["events_skipped"] }}</div>
+    </div>
+</div>
 
 <div class="card">
 <h2>Новое правило</h2>

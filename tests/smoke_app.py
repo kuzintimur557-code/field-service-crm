@@ -338,6 +338,9 @@ async def assert_automation_page():
     assert "Правил пока нет" in html
     assert "Просрочен SLA" in html
     assert "Создать уведомление" in html
+    assert "Всего правил" in html
+    assert "Включено правил" in html
+    assert "Событий done" in html
 
     create_response = await crm.create_automation_rule(
         make_form_request(

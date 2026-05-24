@@ -1864,6 +1864,16 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
         rule["edit_message"] = payload.get("message") or ""
         rules.append(rule)
 
+    automation_stats = {
+        "rules_total": len(rules),
+        "rules_active": len([rule for rule in rules if rule["active"]]),
+        "rules_disabled": len([rule for rule in rules if not rule["active"]]),
+        "events_total": len(events),
+        "events_pending": len([event for event in events if event["status"] == "pending"]),
+        "events_done": len([event for event in events if event["status"] == "done"]),
+        "events_skipped": len([event for event in events if event["status"] == "skipped"])
+    }
+
     if selected_rule_filter == "active":
         rules = [rule for rule in rules if rule["active"]]
     elif selected_rule_filter == "disabled":
@@ -1888,6 +1898,7 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
             "action_labels": action_labels,
             "selected_rule_filter": selected_rule_filter,
             "selected_event_filter": selected_event_filter,
+            "automation_stats": automation_stats,
             "features": get_company_features(company_id)
         }
     )
