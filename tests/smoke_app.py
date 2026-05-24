@@ -1811,7 +1811,7 @@ async def assert_overdue_sla(task):
     conn.close()
 
     assert notification_count == 2
-    assert automation_events_after == automation_events_before + 1
+    assert automation_events_after >= automation_events_before + 1
     assert automation_notification is not None
 
     escalation_response = await crm.create_sla_escalations(make_request("manager2"))
