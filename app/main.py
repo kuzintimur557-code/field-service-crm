@@ -5120,6 +5120,13 @@ async def mark_payroll_paid(request: Request, worker_id: int):
         return RedirectResponse("/payroll?error=only_boss", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "payroll")
+
+    if disabled_response:
+        return disabled_response
+
+
     form = await request.form()
     month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
     amount = form.get("amount") or "0"
@@ -5197,6 +5204,13 @@ async def update_payroll_payout_note(request: Request, worker_id: int):
         return RedirectResponse("/payroll?error=only_boss", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "payroll")
+
+    if disabled_response:
+        return disabled_response
+
+
     form = await request.form()
     month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
     note = (form.get("note") or "").strip()
@@ -5235,6 +5249,13 @@ async def mark_payroll_unpaid(request: Request, worker_id: int):
         return RedirectResponse("/payroll?error=only_boss", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "payroll")
+
+    if disabled_response:
+        return disabled_response
+
+
     form = await request.form()
     month = (form.get("month") or datetime.now().strftime("%Y-%m")).strip()
     payout_filter = form.get("payout_filter") or ""
