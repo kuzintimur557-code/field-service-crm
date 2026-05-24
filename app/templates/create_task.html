@@ -75,8 +75,8 @@ button:hover{background:#1d4ed8}
 <input type="hidden" name="source_task_id" value="{{ selected_source_task_id }}">
 {% endif %}
 
-<label>Клиент</label>
-<input name="client" placeholder="Имя клиента" value="{{ selected_client['name'] if selected_client else '' }}" required>
+<label>{{ settings["client_label"] or "Клиент" }}</label>
+<input name="client" placeholder="{{ settings["client_label"] or "Клиент" }}" value="{{ selected_client['name'] if selected_client else '' }}" required>
 
 <div class="grid">
 <div>
@@ -85,22 +85,22 @@ button:hover{background:#1d4ed8}
 </div>
 
 <div>
-<label>Дата заявки</label>
+<label>Дата {{ (settings["task_label"] or "заявки")|lower }}</label>
 <input name="task_date" type="date" value="{{ selected_task_date }}">
 </div>
 </div>
 
 <label>Адрес</label>
-<input name="address" placeholder="Адрес объекта" value="{{ selected_address if selected_client else '' }}">
+<input name="address" placeholder="Адрес" value="{{ selected_address if selected_client else '' }}">
 
 <label>Описание</label>
-<textarea name="description" placeholder="Что нужно сделать">{{ selected_description or "" }}</textarea>
+<textarea name="description" placeholder="Описание {{ (settings["service_label"] or "услуги")|lower }}">{{ selected_description or "" }}</textarea>
 
 <div class="grid">
 <div>
-<label>Исполнитель</label>
+<label>{{ settings["worker_label"] or "Исполнитель" }}</label>
 <details style="background:white;border:1px solid #d1d5db;border-radius:14px;padding:12px">
-    <summary style="cursor:pointer;font-weight:900">Выбрать исполнителей</summary>
+    <summary style="cursor:pointer;font-weight:900">Выбрать {{ (settings["worker_label"] or "исполнителей")|lower }}</summary>
 
     <div style="display:grid;gap:10px;margin-top:12px">
         {% for worker in workers %}

@@ -8103,6 +8103,8 @@ async def create_task_page(
                 selected_description = selected_note["note"] or ""
                 selected_note_id = note_id
 
+    settings = get_company_settings(company_id)
+
     custom_fields = c.execute("""
     SELECT *
     FROM custom_fields
@@ -8132,7 +8134,8 @@ async def create_task_page(
             "selected_return_to": selected_return_to,
             "selected_worker_active_count": selected_worker_active_count,
             "selected_worker_active_tasks": selected_worker_active_tasks,
-            "recommended_worker": recommended_worker
+            "recommended_worker": recommended_worker,
+            "settings": settings
         }
     )
 
