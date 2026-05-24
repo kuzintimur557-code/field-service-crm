@@ -236,6 +236,7 @@ def assert_company_features():
     assert features["tasks"]
     assert features["finance"]
     assert features["notifications"]
+    assert features["automation"]
 
     crm.update_company_features(2, {"feature_finance": "1"})
 
@@ -244,6 +245,7 @@ def assert_company_features():
     assert features["notifications"]
     assert features["finance"]
     assert not features["calendar"]
+    assert not features["automation"]
 
     beauty_labels = crm.get_industry_labels("beauty")
 
@@ -276,6 +278,7 @@ def assert_company_features():
     assert features["clients"]
     assert features["payroll"]
     assert features["notifications"]
+    assert features["automation"]
     assert not features["sla"]
 
     response = asyncio.run(crm.sla_page(make_asgi_request("owner2", "/sla")))
@@ -286,6 +289,44 @@ def assert_company_features():
     response = asyncio.run(crm.reports_page(make_asgi_request("owner2", "/reports")))
     assert response.status_code == 302
     assert response.headers["location"] == "/"
+
+
+def assert_automation_foundation():
+    conn = connect()
+    c = conn.cursor()
+
+    table_names = {
+        row["name"]
+        for row in c.execute("""
+        SELECT name
+        FROM sqlite_master
+        WHERE type='table'
+          AND name IN ('automation_rules', 'automation_actions', 'automation_events')
+        """).fetchall()
+    }
+
+    index_names = {
+        row["name"]
+        for row in c.execute("""
+        SELECT name
+        FROM sqlite_master
+        WHERE type='index'
+          AND name IN (
+              'idx_automation_rules_company_active',
+              'idx_automation_actions_rule',
+              'idx_automation_events_company_status'
+          )
+        """).fetchall()
+    }
+
+    conn.close()
+
+    assert table_names == {"automation_rules", "automation_actions", "automation_events"}
+    assert index_names == {
+        "idx_automation_rules_company_active",
+        "idx_automation_actions_rule",
+        "idx_automation_events_company_status",
+    }
 
 
 async def assert_upload_access():
@@ -2133,6 +2174,7 @@ def main():
         task = seed_data()
         assert_session_cookie_auth()
         assert_task_access(task)
+        assert_automation_foundation()
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_archive_restore(task))

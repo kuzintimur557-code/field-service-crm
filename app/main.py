@@ -78,6 +78,7 @@ FEATURE_DEFINITIONS = [
     ("archive", "Архив", "Архивированные заявки"),
     ("workload", "Загрузка", "Загрузка исполнителей"),
     ("notifications", "Уведомления", "Центр уведомлений"),
+    ("automation", "Автоматизация", "Правила, триггеры и действия"),
     ("calls", "Звонки", "История и будущая телефония"),
     ("one_c", "1С", "Интеграция с 1С"),
     ("custom_fields", "Поля компании", "Настраиваемые поля")
@@ -104,57 +105,57 @@ INDUSTRY_OPTIONS = [
 BUSINESS_PRESETS = {
     "field_service": {
         "calendar", "clients", "catalog", "recurring", "finance", "payroll",
-        "analytics", "sla", "archive", "workload", "notifications", "calls",
+        "analytics", "sla", "archive", "workload", "notifications", "automation", "calls",
         "custom_fields"
     },
     "beauty": {
         "calendar", "clients", "catalog", "finance", "payroll", "analytics",
-        "notifications", "calls", "custom_fields"
+        "notifications", "automation", "calls", "custom_fields"
     },
     "cleaning": {
         "calendar", "clients", "recurring", "finance", "payroll", "analytics",
-        "sla", "archive", "workload", "notifications", "calls", "custom_fields"
+        "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
     },
     "repair": {
         "calendar", "clients", "catalog", "finance", "payroll", "analytics",
-        "sla", "archive", "workload", "notifications", "calls", "custom_fields"
+        "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
     },
     "auto_service": {
         "calendar", "clients", "catalog", "finance", "payroll", "analytics",
-        "sla", "archive", "workload", "notifications", "calls", "custom_fields"
+        "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
     },
     "logistics": {
         "calendar", "clients", "recurring", "finance", "payroll", "analytics",
-        "sla", "archive", "workload", "notifications", "calls", "custom_fields"
+        "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
     },
     "agency": {
         "clients", "finance", "payroll", "analytics", "archive",
-        "notifications", "calls", "custom_fields"
+        "notifications", "automation", "calls", "custom_fields"
     },
     "medical": {
         "calendar", "clients", "finance", "payroll", "analytics",
-        "notifications", "calls", "custom_fields"
+        "notifications", "automation", "calls", "custom_fields"
     },
     "education": {
         "calendar", "clients", "recurring", "finance", "payroll", "analytics",
-        "notifications", "custom_fields"
+        "notifications", "automation", "custom_fields"
     },
     "restaurant": {
         "calendar", "clients", "catalog", "finance", "payroll", "analytics",
-        "notifications", "custom_fields"
+        "notifications", "automation", "custom_fields"
     },
     "ecommerce": {
         "clients", "catalog", "finance", "payroll", "analytics",
-        "archive", "notifications", "custom_fields"
+        "archive", "notifications", "automation", "custom_fields"
     },
     "other": {
         "calendar", "clients", "catalog", "recurring", "finance", "payroll",
-        "analytics", "sla", "archive", "workload", "notifications", "calls",
+        "analytics", "sla", "archive", "workload", "notifications", "automation", "calls",
         "custom_fields"
     },
     "custom": {
         "calendar", "clients", "catalog", "recurring", "finance", "payroll",
-        "analytics", "sla", "archive", "workload", "notifications", "calls",
+        "analytics", "sla", "archive", "workload", "notifications", "automation", "calls",
         "custom_fields"
     }
 }

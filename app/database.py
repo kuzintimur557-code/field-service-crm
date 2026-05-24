@@ -312,6 +312,48 @@ def init_db():
     )
     """)
 
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS automation_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        name TEXT,
+        trigger_key TEXT,
+        conditions_json TEXT,
+        active INTEGER DEFAULT 1,
+        created_by TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS automation_actions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        rule_id INTEGER,
+        action_key TEXT,
+        payload_json TEXT,
+        sort_order INTEGER DEFAULT 0,
+        active INTEGER DEFAULT 1,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS automation_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        rule_id INTEGER,
+        trigger_key TEXT,
+        entity_type TEXT,
+        entity_id INTEGER,
+        status TEXT DEFAULT 'pending',
+        message TEXT,
+        created_at TEXT,
+        processed_at TEXT
+    )
+    """)
+
     add_column_if_missing(c, "payroll_payouts", "note", "TEXT")
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
@@ -425,6 +467,7 @@ def init_db():
         "archive",
         "workload",
         "notifications",
+        "automation",
         "calls",
         "one_c",
         "custom_fields"
@@ -500,6 +543,21 @@ def init_db():
     c.execute("""
     CREATE UNIQUE INDEX IF NOT EXISTS idx_payroll_payouts_company_worker_month
     ON payroll_payouts(company_id, worker_id, month)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_automation_rules_company_active
+    ON automation_rules(company_id, active)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_automation_actions_rule
+    ON automation_actions(rule_id, sort_order)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_automation_events_company_status
+    ON automation_events(company_id, status, created_at)
     """)
 
     if os.getenv("ENV") != "production":
