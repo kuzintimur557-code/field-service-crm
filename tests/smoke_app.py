@@ -259,6 +259,11 @@ def assert_company_features():
     assert response.status_code == 302
     assert response.headers["location"] == "/"
 
+    crm.update_company_features(2, {"feature_finance": "1"})
+    response = asyncio.run(crm.reports_page(make_asgi_request("owner2", "/reports")))
+    assert response.status_code == 302
+    assert response.headers["location"] == "/"
+
 
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")

@@ -113,7 +113,7 @@ h1{font-size:30px}
     </div>
 </div>
 
-{% if sla_breached_tasks and sla_breached_tasks > 0 %}
+{% if f.get("sla", True) and sla_breached_tasks and sla_breached_tasks > 0 %}
 <div style="background:#fee2e2;color:#991b1b;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
     🔴 Есть просроченные SLA: {{ sla_breached_tasks }}
     <a href="/sla?filter=overdue" style="display:inline-block;margin-left:12px;color:#991b1b;text-decoration:underline">
@@ -122,7 +122,7 @@ h1{font-size:30px}
 </div>
 {% endif %}
 
-{% if sla_due_soon_tasks and sla_due_soon_tasks > 0 %}
+{% if f.get("sla", True) and sla_due_soon_tasks and sla_due_soon_tasks > 0 %}
 <div style="background:#fef3c7;color:#92400e;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
     🟡 Горит SLA в ближайшие 24 часа: {{ sla_due_soon_tasks }}
     <a href="/sla?filter=soon" style="display:inline-block;margin-left:12px;color:#92400e;text-decoration:underline">
@@ -161,6 +161,7 @@ h1{font-size:30px}
         <div class="stat-value">{{ overdue_tasks }}</div>
     </a>
 
+    {% if f.get("sla", True) %}
     <a href="/sla" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">SLA просрочено</div>
         <div class="stat-value">{{ sla_breached_tasks }}</div>
@@ -170,11 +171,14 @@ h1{font-size:30px}
         <div class="stat-title">SLA горит</div>
         <div class="stat-value">{{ sla_due_soon_tasks }}</div>
     </a>
+    {% endif %}
 
+    {% if f.get("workload", True) %}
     <a href="/workload" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">Исполнителей в работе</div>
         <div class="stat-value">{{ active_workers }}</div>
     </a>
+    {% endif %}
     <div class="stat">
         <div class="stat-label">Всего заявок</div>
         <div class="stat-value">{{ total_tasks }}</div>
@@ -195,13 +199,15 @@ h1{font-size:30px}
         <div class="stat-value">{{ done_tasks }}</div>
     </div>
 
+    {% if f.get("finance", True) %}
     <div class="stat">
         <div class="stat-label">Доход</div>
         <div class="stat-value">{{ revenue }} ₽</div>
     </div>
+    {% endif %}
 </div>
 
-{% if role in ["boss", "manager"] %}
+{% if role in ["boss", "manager"] and f.get("workload", True) %}
 <div class="section-title">👥 Команда</div>
 
 {% if worker_stats %}

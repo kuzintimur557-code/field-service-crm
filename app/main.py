@@ -5162,10 +5162,14 @@ async def reports_page(request: Request, month: str = ""):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "analytics")
+
+    if disabled_response:
+        return disabled_response
+
     if not month:
         month = datetime.now().strftime("%Y-%m")
-
-    company_id = get_user_company_id(username)
 
     conn = connect()
     c = conn.cursor()
