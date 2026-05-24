@@ -5939,6 +5939,13 @@ async def create_catalog_item(request: Request):
 
     company_id = get_user_company_id(username)
 
+    disabled_response = require_feature(company_id, "catalog")
+
+    if disabled_response:
+        return disabled_response
+
+
+
     conn = connect()
     c = conn.cursor()
 
@@ -6001,6 +6008,13 @@ async def toggle_catalog_item(request: Request, item_id: int):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "catalog")
+
+    if disabled_response:
+        return disabled_response
+
+
 
     conn = connect()
     c = conn.cursor()
