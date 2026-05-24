@@ -70,6 +70,16 @@
     </div>
 
     <div class="card" style="margin-top:24px;">
+        <h2>Еженедельная сводка</h2>
+
+        <ul style="font-weight:800;line-height:1.8;">
+            {% for item in weekly_summary %}
+            <li>{{ item }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
         <h2>Рекомендации</h2>
 
         <div class="grid">

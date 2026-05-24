@@ -6393,6 +6393,18 @@ async def ai_insights_page(request: Request):
         risk_level = "success"
         risk_title = "Низкий риск"
 
+    weekly_summary = []
+
+    weekly_summary.append(f"За неделю система видит {overdue_tasks} просроченных {settings['task_label'] or 'задач'}.")
+
+    if unpaid_total:
+        weekly_summary.append(f"Неоплаченная сумма составляет ₽{round(float(unpaid_total or 0), 1)}.")
+
+    if weak_workers:
+        weekly_summary.append(f"Требует внимания {settings['worker_label'] or 'сотрудник'}: {weak_workers[0]['username']}.")
+
+    weekly_summary.append(f"Общий уровень риска: {risk_title} ({risk_score}/100).")
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -6410,7 +6422,8 @@ async def ai_insights_page(request: Request):
             "low_margin_clients": low_margin_clients,
             "risk_score": risk_score,
             "risk_level": risk_level,
-            "risk_title": risk_title
+            "risk_title": risk_title,
+            "weekly_summary": weekly_summary
         }
     )
 
