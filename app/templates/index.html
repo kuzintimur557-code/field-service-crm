@@ -56,7 +56,7 @@ h1{font-size:30px}
 
     <div class="nav">
         {% set f = features if features is defined else {} %}
-        <a href="/create-task">➕ Новая заявка</a>
+        <a href="/create-task">➕ Новая {{ settings["task_label"] or "Заявка" }}</a>
         {% if f.get("calendar", True) %}
         <a href="/calendar">📅 Календарь</a>
         {% endif %}
@@ -66,7 +66,7 @@ h1{font-size:30px}
 
         {% if role in ["boss", "manager"] %}
         {% if f.get("clients", True) %}
-        <a href="/clients">👤 Клиенты</a>
+        <a href="/clients">👤 {{ settings["client_label"] or "Клиенты" }}</a>
         {% endif %}
         {% if f.get("catalog", True) %}
         <a href="/catalog">📦 Каталог</a>
@@ -95,7 +95,7 @@ h1{font-size:30px}
         {% endif %}
 
         {% if role == "boss" %}
-        <a href="/workers" class="dark">👥 Команда</a>
+        <a href="/workers" class="dark">👥 {{ settings["worker_label"] or "Исполнители" }}</a>
         {% endif %}
 
         {% if role == "boss" %}
@@ -133,7 +133,7 @@ h1{font-size:30px}
 
 {% if overdue_tasks and overdue_tasks > 0 %}
 <div style="background:#fee2e2;color:#991b1b;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
-    ⚠️ Есть просроченные заявки: {{ overdue_tasks }}
+    ⚠️ Есть просроченные {{ (settings["task_label"] or "заявка")|lower }}: {{ overdue_tasks }}
     <a href="/overdue" style="display:inline-block;margin-left:12px;color:#991b1b;text-decoration:underline">
         Открыть
     </a>
@@ -142,7 +142,7 @@ h1{font-size:30px}
 
 {% if today_tasks and today_tasks > 0 %}
 <div style="background:#dbeafe;color:#1d4ed8;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
-    📅 Сегодня есть заявки: {{ today_tasks }}
+    📅 Сегодня есть {{ (settings["task_label"] or "заявка")|lower }}: {{ today_tasks }}
     <a href="/today" style="display:inline-block;margin-left:12px;color:#1d4ed8;text-decoration:underline">
         Открыть
     </a>
@@ -175,7 +175,7 @@ h1{font-size:30px}
 
     {% if f.get("workload", True) %}
     <a href="/workload" class="stat" style="text-decoration:none;color:inherit">
-        <div class="stat-title">Исполнителей в работе</div>
+        <div class="stat-title">{{ settings["worker_label"] or "Исполнитель" }} в работе</div>
         <div class="stat-value">{{ active_workers }}</div>
     </a>
     {% endif %}
@@ -208,7 +208,7 @@ h1{font-size:30px}
 </div>
 
 {% if role in ["boss", "manager"] and f.get("workload", True) %}
-<div class="section-title">👥 Команда</div>
+<div class="section-title">👥 {{ settings["worker_label"] or "Исполнители" }}</div>
 
 {% if worker_stats %}
 <div class="worker-grid">
@@ -223,12 +223,12 @@ h1{font-size:30px}
 {% endfor %}
 </div>
 {% else %}
-<div class="card empty">Исполнителей пока нет.</div>
+<div class="card empty">{{ settings["worker_label"] or "Исполнитель" }} пока нет.</div>
 {% endif %}
 {% endif %}
 
 <div class="card">
-<div class="section-title">📋 Заявки</div>
+<div class="section-title">📋 {{ settings["task_label"] or "Заявки" }}</div>
 
 <form method="get" action="/">
 <div class="filters">
@@ -259,7 +259,7 @@ h1{font-size:30px}
 {% for task in tasks %}
 <div class="task">
     <div>
-        <div class="label">Клиент</div>
+        <div class="label">{{ settings["client_label"] or "Клиент" }}</div>
         <div class="value">{{ task["client"] }}</div>
     </div>
 
