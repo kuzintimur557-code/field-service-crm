@@ -404,6 +404,15 @@ async def assert_automation_page():
 
     assert toggled["active"] == 0
 
+    disabled_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        rule_filter="disabled",
+    )
+    assert disabled_response.status_code == 200
+    disabled_html = disabled_response.body.decode("utf-8")
+    assert "Выключенные" in disabled_html
+    assert "SLA smoke rule" in disabled_html
+
 
 async def assert_automation_runner(task):
     create_response = await crm.create_automation_rule(
@@ -461,6 +470,15 @@ async def assert_automation_runner(task):
     assert notification is not None
     assert notification["message"] == "Runner notification message"
     assert notification["link"] == f"/task/{task['id']}"
+
+    done_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        event_filter="done",
+    )
+    assert done_response.status_code == 200
+    done_html = done_response.body.decode("utf-8")
+    assert "SLA event happened" in done_html
+    assert "done" in done_html
 
 
 async def assert_upload_access():

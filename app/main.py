@@ -1777,7 +1777,7 @@ async def open_notification(request: Request, notification_id: int):
 
 
 @app.get("/automation", response_class=HTMLResponse)
-async def automation_page(request: Request):
+async def automation_page(request: Request, rule_filter: str = "", event_filter: str = ""):
 
     username = get_user(request)
 
@@ -1797,6 +1797,8 @@ async def automation_page(request: Request):
 
     trigger_labels = dict(AUTOMATION_TRIGGERS)
     action_labels = dict(AUTOMATION_ACTIONS)
+    selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
+    selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
 
     conn = connect()
     c = conn.cursor()
@@ -1832,6 +1834,14 @@ async def automation_page(request: Request):
 
     conn.close()
 
+    if selected_rule_filter == "active":
+        rules = [rule for rule in rules if rule["active"]]
+    elif selected_rule_filter == "disabled":
+        rules = [rule for rule in rules if not rule["active"]]
+
+    if selected_event_filter:
+        events = [event for event in events if event["status"] == selected_event_filter]
+
     return templates.TemplateResponse(
         request,
         "automation.html",
@@ -1846,6 +1856,8 @@ async def automation_page(request: Request):
             "actions": AUTOMATION_ACTIONS,
             "trigger_labels": trigger_labels,
             "action_labels": action_labels,
+            "selected_rule_filter": selected_rule_filter,
+            "selected_event_filter": selected_event_filter,
             "features": get_company_features(company_id)
         }
     )
