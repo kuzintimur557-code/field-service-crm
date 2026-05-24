@@ -4811,6 +4811,12 @@ async def payroll_history_export(
 
     company_id = get_user_company_id(username)
 
+    disabled_response = require_feature(company_id, "payroll")
+
+    if disabled_response:
+        return disabled_response
+
+
     if not month:
         month = datetime.now().strftime("%Y-%m")
 
@@ -9567,6 +9573,12 @@ async def update_task_custom_field(request: Request, task_id: int):
         return RedirectResponse("/", status_code=302)
 
     company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "custom_fields")
+
+    if disabled_response:
+        conn.close()
+        return disabled_response
 
     custom_field = c.execute("""
     SELECT *
