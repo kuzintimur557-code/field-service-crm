@@ -566,6 +566,60 @@ async def assert_automation_runner(task):
     assert telegram_event["status"] in ("done", "skipped")
     assert telegram_event["processed_at"]
 
+    ai_digest_response = await crm.create_automation_rule(
+        make_form_request(
+            "owner2",
+            "/automation/rules",
+            {
+                "name": "AI digest runner rule",
+                "trigger_key": "weekly_digest",
+                "action_key": "ai_digest",
+                "target_username": "owner2",
+                "message": "",
+            },
+        )
+    )
+    assert ai_digest_response.status_code == 302
+
+    ai_digest_events = crm.run_automation_event(
+        2,
+        "weekly_digest",
+        "company",
+        2,
+        "Weekly digest event",
+        "/ai/insights",
+    )
+    assert ai_digest_events >= 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    ai_digest_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND trigger_key='weekly_digest'
+      AND message='Weekly digest event'
+    ORDER BY id DESC
+    """).fetchone()
+
+    ai_digest_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='🤖 AI-сводка'
+    ORDER BY id DESC
+    """).fetchone()
+
+    conn.close()
+
+    assert ai_digest_event is not None
+    assert ai_digest_event["status"] == "done"
+    assert ai_digest_notification is not None
+    assert "AI-сводка по бизнесу" in ai_digest_notification["message"]
+    assert ai_digest_notification["link"] == "/ai/insights"
+
 
 async def assert_automation_delete():
     create_response = await crm.create_automation_rule(

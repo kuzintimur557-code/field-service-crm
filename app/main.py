@@ -71,12 +71,15 @@ AUTOMATION_TRIGGERS = [
     ("sla_overdue", "Просрочен SLA"),
     ("unpaid_task", "Нет оплаты"),
     ("worker_overload", "Перегрузка сотрудника"),
-    ("new_client", "Новый клиент")
+    ("new_client", "Новый клиент"),
+    ("daily_digest", "Ежедневная AI-сводка"),
+    ("weekly_digest", "Еженедельная AI-сводка")
 ]
 
 AUTOMATION_ACTIONS = [
     ("notification", "Создать уведомление"),
     ("telegram_alert", "Telegram alert"),
+    ("ai_digest", "AI-сводка"),
     ("email", "Email"),
     ("create_task", "Создать задачу")
 ]
@@ -487,8 +490,12 @@ def get_plan_user_limit(plan):
 def get_company_settings(company_id=1):
     company_id = company_id or 1
 
-    conn = connect()
-    c = conn.cursor()
+    conn = None
+    c = cursor
+
+    if c is None:
+        conn = connect()
+        c = conn.cursor()
 
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
@@ -508,7 +515,8 @@ def get_company_settings(company_id=1):
     WHERE company_id=?
     """, (company_id,)).fetchone()
 
-    conn.close()
+    if conn:
+        conn.close()
 
     return settings
 
@@ -696,6 +704,47 @@ def create_notification(
     conn.close()
 
 
+
+def build_ai_digest_message(company_id, cursor=None):
+    settings = get_company_settings(company_id)
+
+    conn = connect()
+    c = conn.cursor()
+
+    overdue_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status!='Завершено'
+      AND task_date < date('now')
+    """, (company_id,)).fetchone()[0]
+
+    unpaid_total = c.execute("""
+    SELECT COALESCE(SUM(price), 0)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND payment_status!='Оплачено'
+    """, (company_id,)).fetchone()[0]
+
+    conn.close()
+
+    message_lines = [
+        "AI-сводка по бизнесу",
+        f"Просроченные {settings['task_label'] or 'задачи'}: {overdue_tasks}",
+        f"Неоплаченная сумма: ₽{round(float(unpaid_total or 0), 1)}"
+    ]
+
+    if overdue_tasks:
+        message_lines.append("Рекомендация: проверьте ответственных и сроки.")
+
+    if unpaid_total:
+        message_lines.append("Рекомендация: запустите напоминания по оплатам.")
+
+    return "\\n".join(message_lines)
+
+
 def run_automation_event(
     company_id,
     trigger_key,
@@ -800,6 +849,28 @@ def run_automation_event(
                             handled_actions += 1
                         except Exception:
                             pass
+
+            if action["action_key"] == "ai_digest":
+                target_username = (payload.get("target_username") or rule["created_by"] or "").strip()
+
+                if target_username:
+                    digest_message = build_ai_digest_message(company_id, c)
+
+                    c.execute("""
+                    INSERT INTO notifications (
+                        company_id, username, title, message, link, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        company_id,
+                        target_username,
+                        "🤖 AI-сводка",
+                        digest_message,
+                        "/ai/insights",
+                        now
+                    ))
+
+                    handled_actions += 1
 
         status = "done" if handled_actions else "skipped"
 
