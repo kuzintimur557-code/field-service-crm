@@ -778,6 +778,28 @@ def run_automation_event(
                     ))
                     handled_actions += 1
 
+            if action["action_key"] == "telegram_alert":
+                target_username = (payload.get("target_username") or rule["created_by"] or "").strip()
+                telegram_message = (payload.get("message") or message or "").strip()
+
+                if target_username and telegram_message:
+                    user_row = c.execute("""
+                    SELECT telegram_chat_id
+                    FROM users
+                    WHERE company_id=?
+                      AND username=?
+                    """, (company_id, target_username)).fetchone()
+
+                    if user_row and user_row["telegram_chat_id"]:
+                        try:
+                            send_message_to_chat(
+                                user_row["telegram_chat_id"],
+                                telegram_message
+                            )
+                            handled_actions += 1
+                        except Exception:
+                            pass
+
         status = "done" if handled_actions else "skipped"
 
         c.execute("""

@@ -523,6 +523,49 @@ async def assert_automation_runner(task):
     assert "SLA event happened" in done_html
     assert "done" in done_html
 
+    telegram_response = await crm.create_automation_rule(
+        make_form_request(
+            "owner2",
+            "/automation/rules",
+            {
+                "name": "Telegram runner rule",
+                "trigger_key": "sla_overdue",
+                "action_key": "telegram_alert",
+                "target_username": "owner2",
+                "message": "Telegram runner message",
+            },
+        )
+    )
+    assert telegram_response.status_code == 302
+
+    telegram_events = crm.run_automation_event(
+        2,
+        "sla_overdue",
+        "task",
+        task["id"],
+        "Telegram event happened",
+        f"/task/{task['id']}",
+    )
+    assert telegram_events >= 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    telegram_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND trigger_key='sla_overdue'
+      AND message='Telegram event happened'
+    ORDER BY id DESC
+    """).fetchone()
+
+    conn.close()
+
+    assert telegram_event is not None
+    assert telegram_event["status"] in ("done", "skipped")
+    assert telegram_event["processed_at"]
+
 
 async def assert_automation_delete():
     create_response = await crm.create_automation_rule(
