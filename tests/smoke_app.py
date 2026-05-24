@@ -714,7 +714,7 @@ async def assert_finance_margin(task):
     assert paid_filter_response.status_code == 200
     paid_filter_html = paid_filter_response.body.decode("utf-8")
     assert 'name="payout_filter" value="paid"' in paid_filter_html
-    assert "Нет исполнителей" in paid_filter_html
+    assert "Нет данных по выплатам" in paid_filter_html
     assert "/payroll/export?month=2026-05&payout_filter=paid" in paid_filter_html
 
     partial_filter_response = await crm.payroll_page(
@@ -736,7 +736,7 @@ async def assert_finance_margin(task):
     )
     assert unpaid_after_paid_response.status_code == 200
     unpaid_after_paid_html = unpaid_after_paid_response.body.decode("utf-8")
-    assert "Нет исполнителей" in unpaid_after_paid_html
+    assert "Нет данных по выплатам" in unpaid_after_paid_html
 
     payroll_export_response = await crm.payroll_export(
         make_request("owner2"),

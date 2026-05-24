@@ -4606,6 +4606,7 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
     total_paid = round(sum(row["paid_amount"] for row in rows if row["payout_paid"]), 1)
     total_due = round(sum(row["due_amount"] for row in rows), 1)
     total_profit = round(sum(row["profit"] for row in rows), 1)
+    settings = get_company_settings(company_id)
 
     conn.close()
 
@@ -4623,7 +4624,8 @@ async def payroll_page(request: Request, month: str = "", payout_filter: str = "
             "total_paid": total_paid,
             "total_due": total_due,
             "total_profit": total_profit,
-            "payout_history": payout_history
+            "payout_history": payout_history,
+            "settings": settings
         }
     )
 
