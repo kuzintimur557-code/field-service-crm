@@ -62,6 +62,15 @@ h1{margin:0 0 12px;font-size:36px}
     <input name="company_name" placeholder="Название компании" style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
     <input name="owner_username" placeholder="Логин владельца" style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
     <input name="owner_password" placeholder="Пароль владельца" style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
+
+    <select name="industry" style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
+        {% for industry_key, industry_title in industry_options %}
+        <option value="{{ industry_key }}" {% if industry_key == "field_service" %}selected{% endif %}>
+            {{ industry_title }}
+        </option>
+        {% endfor %}
+    </select>
+
     <button type="submit" style="padding:14px;border-radius:14px;background:#2563eb;color:white;border:0;font-weight:900">
         Создать компанию
     </button>

@@ -245,6 +245,13 @@ def assert_company_features():
     assert features["finance"]
     assert not features["calendar"]
 
+    beauty_labels = crm.get_industry_labels("beauty")
+
+    assert beauty_labels["task_label"] == "Запись"
+    assert beauty_labels["worker_label"] == "Мастер"
+    assert beauty_labels["client_label"] == "Клиент"
+    assert beauty_labels["service_label"] == "Услуга"
+
     crm.apply_business_preset(2, "beauty")
 
     conn = crm.connect()
