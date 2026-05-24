@@ -13,15 +13,18 @@ padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(0,0,0,.06
 
 <div class="mobile-nav">
 <div class="mobile-nav-grid">
+{% set f = features if features is defined else {} %}
 
 {% if role == "worker" %}
 <a href="/my-tasks" class="{% if request.url.path == '/my-tasks' %}active{% endif %}">
 <div class="mobile-nav-icon">📋</div><div>Мои заявки</div>
 </a>
 
+{% if f.get("calendar", True) %}
 <a href="/calendar" class="{% if '/calendar' in request.url.path %}active{% endif %}">
 <div class="mobile-nav-icon">📅</div><div>Календарь</div>
 </a>
+{% endif %}
 
 <a href="/profile" class="{% if '/profile' in request.url.path %}active{% endif %}">
 <div class="mobile-nav-icon">👤</div><div>Профиль</div>
@@ -44,13 +47,17 @@ padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(0,0,0,.06
 <div class="mobile-nav-icon">➕</div><div>Заявка</div>
 </a>
 
+{% if f.get("calendar", True) %}
 <a href="/calendar" class="{% if '/calendar' in request.url.path %}active{% endif %}">
 <div class="mobile-nav-icon">📅</div><div>Календарь</div>
 </a>
+{% endif %}
 
+{% if f.get("clients", True) %}
 <a href="/clients" class="{% if '/clients' in request.url.path %}active{% endif %}">
 <div class="mobile-nav-icon">👤</div><div>Клиенты</div>
 </a>
+{% endif %}
 
 <a href="/more" class="{% if request.url.path == '/more' %}active{% endif %}">
 <div class="mobile-nav-icon">☰</div><div>Ещё</div>

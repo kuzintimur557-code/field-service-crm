@@ -55,20 +55,43 @@ h1{font-size:30px}
     <div class="subtitle">Вы вошли как: {{ username }} / {{ role }}</div>
 
     <div class="nav">
+        {% set f = features if features is defined else {} %}
         <a href="/create-task">➕ Новая заявка</a>
+        {% if f.get("calendar", True) %}
         <a href="/calendar">📅 Календарь</a>
+        {% endif %}
+        {% if f.get("sla", True) %}
         <a href="/sla">⏰ SLA</a>
+        {% endif %}
 
         {% if role in ["boss", "manager"] %}
+        {% if f.get("clients", True) %}
         <a href="/clients">👤 Клиенты</a>
+        {% endif %}
+        {% if f.get("catalog", True) %}
         <a href="/catalog">📦 Каталог</a>
+        {% endif %}
+        {% if f.get("recurring", True) %}
         <a href="/recurring">🔁 Регулярные</a>
+        {% endif %}
+        {% if f.get("finance", True) %}
         <a href="/finance">💰 Финансы</a>
+        {% endif %}
+        {% if f.get("payroll", True) %}
         <a href="/payroll">💵 Зарплаты</a>
+        {% endif %}
+        {% if f.get("analytics", True) %}
         <a href="/owner/dashboard">📊 Аналитика владельца</a>
+        {% endif %}
+        {% if f.get("sla", True) %}
         <a href="/sla/analytics">⏱ SLA-аналитика</a>
+        {% endif %}
+        {% if f.get("archive", True) %}
         <a href="/archive" class="dark">🗄 Архив</a>
+        {% endif %}
+        {% if f.get("calls", True) %}
         <a href="/calls">☎️ Звонки</a>
+        {% endif %}
         {% endif %}
 
         {% if role == "boss" %}
@@ -82,7 +105,9 @@ h1{font-size:30px}
         <a href="/settings" class="dark">⚙️ Настройки</a>
         {% endif %}
 
+        {% if f.get("notifications", True) %}
         <a href="/notifications" class="dark">🔔 Уведомления</a>
+        {% endif %}
         <a href="/profile" class="dark">👤 Профиль</a>
         <a href="/logout" class="red">Выйти</a>
     </div>

@@ -231,6 +231,21 @@ def assert_task_access(task):
     assert matched is not None
 
 
+def assert_company_features():
+    features = crm.get_company_features(2)
+    assert features["tasks"]
+    assert features["finance"]
+    assert features["notifications"]
+
+    crm.update_company_features(2, {"feature_finance": "1"})
+
+    features = crm.get_company_features(2)
+    assert features["tasks"]
+    assert features["notifications"]
+    assert features["finance"]
+    assert not features["calendar"]
+
+
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")
     assert anonymous.status_code == 404
@@ -2086,6 +2101,7 @@ def main():
         asyncio.run(assert_client_custom_fields())
         asyncio.run(assert_task_custom_fields())
         asyncio.run(assert_required_custom_fields())
+        assert_company_features()
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()

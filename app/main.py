@@ -65,6 +65,26 @@ ALLOWED_CLIENT_FILE_EXTENSIONS = {
 }
 PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
+FEATURE_DEFINITIONS = [
+    ("tasks", "Заявки", "Создание и ведение заявок"),
+    ("calendar", "Календарь", "Планирование работ по дням"),
+    ("clients", "Клиенты", "База клиентов и карточки"),
+    ("catalog", "Каталог", "Услуги, товары и материалы"),
+    ("recurring", "Регулярные работы", "Повторяющиеся заявки"),
+    ("finance", "Финансы", "Выручка, расходы и прибыль"),
+    ("payroll", "Зарплаты", "Выплаты и комиссии исполнителей"),
+    ("analytics", "Аналитика", "Dashboard владельца и графики"),
+    ("sla", "SLA", "Сроки, просрочки и качество сервиса"),
+    ("archive", "Архив", "Архивированные заявки"),
+    ("workload", "Загрузка", "Загрузка исполнителей"),
+    ("notifications", "Уведомления", "Центр уведомлений"),
+    ("calls", "Звонки", "История и будущая телефония"),
+    ("one_c", "1С", "Интеграция с 1С"),
+    ("custom_fields", "Поля компании", "Настраиваемые поля")
+]
+
+CORE_FEATURES = {"tasks", "notifications"}
+
 
 def safe_upload_filename(task_id, prefix, original_filename):
     original = Path(original_filename or "photo").name
@@ -317,6 +337,92 @@ def get_company_settings(company_id=1):
     conn.close()
 
     return settings
+
+
+def ensure_company_features(company_id=1):
+    company_id = company_id or 1
+
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    for feature_key, _, _ in FEATURE_DEFINITIONS:
+        c.execute("""
+        INSERT OR IGNORE INTO company_features (
+            company_id,
+            feature_key,
+            enabled,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?)
+        """, (
+            company_id,
+            feature_key,
+            1,
+            now
+        ))
+
+    conn.commit()
+    conn.close()
+
+
+def get_company_features(company_id=1):
+    company_id = company_id or 1
+    ensure_company_features(company_id)
+
+    features = {
+        feature_key: True
+        for feature_key, _, _ in FEATURE_DEFINITIONS
+    }
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+    SELECT feature_key, enabled
+    FROM company_features
+    WHERE company_id=?
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    for row in rows:
+        features[row["feature_key"]] = bool(row["enabled"])
+
+    for feature_key in CORE_FEATURES:
+        features[feature_key] = True
+
+    return features
+
+
+def has_feature(company_id, feature_key):
+    return get_company_features(company_id).get(feature_key, True)
+
+
+def update_company_features(company_id, form):
+    company_id = company_id or 1
+    ensure_company_features(company_id)
+
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    for feature_key, _, _ in FEATURE_DEFINITIONS:
+        enabled = 1 if feature_key in CORE_FEATURES else int(form.get(f"feature_{feature_key}") == "1")
+
+        c.execute("""
+        UPDATE company_features
+        SET enabled=?, updated_at=?
+        WHERE company_id=? AND feature_key=?
+        """, (
+            enabled,
+            now,
+            company_id,
+            feature_key
+        ))
+
+    conn.commit()
+    conn.close()
 
 
 def create_notification(
@@ -835,6 +941,7 @@ async def create_platform_company(request: Request):
 
     conn.commit()
     conn.close()
+    ensure_company_features(company_id)
 
     return RedirectResponse("/platform/companies?created=1", status_code=302)
 
@@ -870,8 +977,6 @@ async def platform_companies_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "month": month,
-            "owner_selected_month": owner_selected_month,
             "companies": companies
         }
     )
@@ -937,11 +1042,6 @@ async def my_tasks_page(request: Request, status: str = ""):
 
     company_id = get_user_company_id(username)
 
-    if not month:
-        month = datetime.now().strftime("%Y-%m")
-
-    owner_selected_month = month
-
     conn = connect()
     c = conn.cursor()
 
@@ -1005,6 +1105,7 @@ async def home(
         return RedirectResponse("/my-tasks", status_code=302)
 
     company_id = get_user_company_id(username)
+    features = get_company_features(company_id)
 
     conn = connect()
     c = conn.cursor()
@@ -1205,7 +1306,8 @@ async def home(
             "selected_status": status,
             "selected_worker": worker,
             "selected_date": task_date,
-            "search": search
+            "search": search,
+            "features": features
         }
     )
 
@@ -5086,6 +5188,7 @@ async def settings_page(request: Request):
 
     company_id = get_user_company_id(username)
     settings = get_company_settings(company_id)
+    features = get_company_features(company_id)
 
     return templates.TemplateResponse(
         request,
@@ -5094,7 +5197,10 @@ async def settings_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "settings": settings
+            "settings": settings,
+            "features": features,
+            "feature_definitions": FEATURE_DEFINITIONS,
+            "core_features": CORE_FEATURES
         }
     )
 
@@ -5149,6 +5255,7 @@ async def update_settings(request: Request):
     calls_enabled = 1 if plan in ("business", "business_1c", "enterprise_1c") else 0
     ai_calls_enabled = 1 if plan == "enterprise_1c" else 0
     company_id = get_user_company_id(username)
+    update_company_features(company_id, form)
 
     conn = connect()
     c = conn.cursor()

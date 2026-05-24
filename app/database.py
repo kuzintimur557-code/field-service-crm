@@ -71,6 +71,16 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS company_features (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        feature_key TEXT,
+        enabled INTEGER DEFAULT 1,
+        updated_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS clients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
@@ -357,6 +367,11 @@ def init_db():
     add_column_if_missing(c, "company_settings", "calls_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "ai_calls_enabled", "INTEGER DEFAULT 0")
 
+    add_column_if_missing(c, "company_features", "company_id", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "company_features", "feature_key", "TEXT")
+    add_column_if_missing(c, "company_features", "enabled", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "company_features", "updated_at", "TEXT")
+
     c.execute("""
     UPDATE company_settings
     SET company_id=1
@@ -378,6 +393,11 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_company_features_company_key
+    ON company_features(company_id, feature_key)
+    """)
+
+    c.execute("""
     INSERT OR IGNORE INTO companies (
         id,
         name,
@@ -391,6 +411,44 @@ def init_db():
         "boss",
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
+
+    default_features = [
+        "tasks",
+        "calendar",
+        "clients",
+        "catalog",
+        "recurring",
+        "finance",
+        "payroll",
+        "analytics",
+        "sla",
+        "archive",
+        "workload",
+        "notifications",
+        "calls",
+        "one_c",
+        "custom_fields"
+    ]
+
+    company_rows = c.execute("SELECT id FROM companies").fetchall()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    for company in company_rows:
+        for feature_key in default_features:
+            c.execute("""
+            INSERT OR IGNORE INTO company_features (
+                company_id,
+                feature_key,
+                enabled,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?)
+            """, (
+                company["id"],
+                feature_key,
+                1,
+                now
+            ))
 
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
