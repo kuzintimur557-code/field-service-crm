@@ -135,39 +135,53 @@
       <p class="text-muted mb-0">Сводка по финансам, выплатам, клиентам и рискам компании</p>
     </div>
 
-    <a href="/owner/dashboard/export" class="btn btn-success">
-      Экспорт CSV
-    </a>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <a href="/" class="btn btn-outline-secondary" style="height:48px;display:flex;align-items:center;justify-content:center;padding:0 22px;">
+        ← Главное меню
+      </a>
+
+      <a href="/owner/dashboard/export" class="btn btn-success" style="height:48px;display:flex;align-items:center;justify-content:center;padding:0 22px;">
+        Экспорт CSV
+      </a>
+    </div>
   </div>
 
   <div class="card mb-4">
     <div class="card-body">
+<h3 class="mb-3">Фильтры</h3>
 
-      <h3 class="mb-3">Фильтры</h3>
+<form method="get" action="/owner/dashboard" style="display:grid;grid-template-columns:340px 160px 160px;gap:18px;align-items:end;max-width:720px;">
 
-      <form method="get" action="/owner/dashboard" class="row g-3 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label">Месяц</label>
-          <input
-            type="month"
-            name="month"
-            value="{{ month }}"
-            class="form-control"
-          >
-        </div>
+  <div>
+    <label class="form-label">Месяц</label>
+    <input
+      type="month"
+      name="month"
+      value="{{ month }}"
+      class="form-control"
+      style="height:54px;box-sizing:border-box;padding:0 18px;margin:0;"
+    >
+  </div>
 
-        <div class="col-md-3">
-          <button type="submit" class="btn btn-primary w-100">
-            Применить
-          </button>
-        </div>
+  <button
+    type="submit"
+    class="btn btn-primary"
+    style="height:54px;box-sizing:border-box;padding:0 24px;margin:0;display:flex;align-items:center;justify-content:center;"
+  >
+    Применить
+  </button>
 
-        <div class="col-md-3">
-          <a href="/owner/dashboard" class="btn btn-outline-secondary w-100">
-            Сбросить
-          </a>
-        </div>
-      </form>
+  <a
+    href="/owner/dashboard"
+    class="btn btn-outline-secondary"
+    style="height:54px;box-sizing:border-box;padding:0 24px;margin:0;display:flex;align-items:center;justify-content:center;"
+  >
+    Сбросить
+  </a>
+
+</form>
+
+
 
     </div>
   </div>
@@ -178,7 +192,7 @@
       <h3 class="mb-3">Быстрые ссылки</h3>
 
       <div class="d-flex flex-wrap gap-2">
-        <a href="/finance/summary" class="btn btn-primary">
+        <a href="/finance/summary" class="btn btn-primary" style="height:48px;display:flex;align-items:center;justify-content:center;padding:0 24px;">
           Финансовая сводка
         </a>
 
