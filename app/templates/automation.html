@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Автоматизация</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1100px;margin:auto;padding:24px}
+.header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
+.back{display:inline-block;padding:12px 16px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900}
+h1{margin:0 0 8px;font-size:34px}
+h2{margin:0 0 16px;font-size:22px}
+.meta{color:#6b7280;font-weight:800;line-height:1.45}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+label{display:block;font-weight:900;color:#374151;margin-bottom:7px}
+input,select,textarea,button{width:100%;padding:14px;border-radius:14px;font-size:16px}
+input,select,textarea{border:1px solid #d1d5db;background:white}
+textarea{height:90px;resize:vertical}
+button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.notice{padding:14px;border-radius:16px;font-weight:900;margin-bottom:16px}
+.notice.ok{background:#dcfce7;color:#166534}
+.notice.err{background:#fee2e2;color:#991b1b}
+.rule{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
+.rule-title{font-size:18px;font-weight:900;margin-bottom:6px}
+.pill{display:inline-block;padding:7px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;margin-right:6px;margin-top:6px}
+.pill.off{background:#fee2e2;color:#991b1b}
+.event{display:grid;grid-template-columns:150px 1fr 120px;gap:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin-bottom:10px}
+.empty{font-weight:900;color:#6b7280;text-align:center;padding:20px}
+@media(max-width:760px){.container{padding:14px}.header,.grid,.rule,.event{grid-template-columns:1fr}.back{text-align:center}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="header">
+    <div>
+        <h1>Автоматизация</h1>
+        <div class="meta">Правила, триггеры и действия компании. Сейчас правила сохраняются, исполнение подключается отдельным шагом.</div>
+    </div>
+    <a href="/" class="back">← Назад</a>
+</div>
+
+{% if request.query_params.get("created") == "1" %}
+<div class="notice ok">Правило создано</div>
+{% endif %}
+
+{% if request.query_params.get("toggled") == "1" %}
+<div class="notice ok">Статус правила обновлён</div>
+{% endif %}
+
+{% if request.query_params.get("error") %}
+<div class="notice err">Проверьте название, триггер, действие и получателя</div>
+{% endif %}
+
+<div class="card">
+<h2>Новое правило</h2>
+
+<form method="post" action="/automation/rules">
+    <div class="grid">
+        <div>
+            <label>Название</label>
+            <input type="text" name="name" placeholder="Например: SLA просрочен → уведомить владельца" required>
+        </div>
+        <div>
+            <label>Триггер</label>
+            <select name="trigger_key">
+                {% for key, label in triggers %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>Действие</label>
+            <select name="action_key">
+                {% for key, label in actions %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>Получатель</label>
+            <select name="target_username">
+                {% for user in users %}
+                <option value="{{ user['username'] }}" {% if user["username"] == username %}selected{% endif %}>
+                    {{ user["username"] }} / {{ user["role"] }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-top:14px">
+        <label>Сообщение</label>
+        <textarea name="message" placeholder="Текст уведомления или будущего действия"></textarea>
+    </div>
+
+    <button type="submit" style="margin-top:14px">Создать правило</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Правила</h2>
+
+{% if rules %}
+{% for rule in rules %}
+<div class="rule">
+    <div>
+        <div class="rule-title">{{ rule["name"] }}</div>
+        <div class="meta">
+            {{ trigger_labels.get(rule["trigger_key"], rule["trigger_key"]) }} → {{ rule["action_count"] }} действий
+        </div>
+        <span class="pill {% if not rule['active'] %}off{% endif %}">
+            {% if rule["active"] %}Включено{% else %}Выключено{% endif %}
+        </span>
+        <span class="pill">Создал: {{ rule["created_by"] }}</span>
+        <span class="pill">{{ rule["created_at"] }}</span>
+    </div>
+    <form method="post" action="/automation/rules/{{ rule['id'] }}/toggle">
+        <button type="submit" style="background:{% if rule['active'] %}#991b1b{% else %}#16a34a{% endif %}">
+            {% if rule["active"] %}Выключить{% else %}Включить{% endif %}
+        </button>
+    </form>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">Правил пока нет</div>
+{% endif %}
+</div>
+
+<div class="card">
+<h2>Последние события</h2>
+
+{% if events %}
+{% for event in events %}
+<div class="event">
+    <div class="meta">{{ event["created_at"] }}</div>
+    <div>
+        <div class="rule-title">{{ trigger_labels.get(event["trigger_key"], event["trigger_key"]) }}</div>
+        <div class="meta">{{ event["message"] or "" }}</div>
+    </div>
+    <span class="pill">{{ event["status"] }}</span>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">Событий автоматизации пока нет</div>
+{% endif %}
+</div>
+
+</div>
+
+{% include 'mobile_nav.html' %}
+</body>
+</html>

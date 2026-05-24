@@ -329,6 +329,81 @@ def assert_automation_foundation():
     }
 
 
+async def assert_automation_page():
+    response = await crm.automation_page(make_asgi_request("owner2", "/automation"))
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "Автоматизация" in html
+    assert "Новое правило" in html
+    assert "Правил пока нет" in html
+    assert "Просрочен SLA" in html
+    assert "Создать уведомление" in html
+
+    create_response = await crm.create_automation_rule(
+        make_form_request(
+            "owner2",
+            "/automation/rules",
+            {
+                "name": "SLA smoke rule",
+                "trigger_key": "sla_overdue",
+                "action_key": "notification",
+                "target_username": "owner2",
+                "message": "SLA smoke message",
+            },
+        )
+    )
+    assert create_response.status_code == 302
+    assert create_response.headers["location"] == "/automation?created=1"
+
+    conn = connect()
+    c = conn.cursor()
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE company_id=2
+      AND name='SLA smoke rule'
+    """).fetchone()
+    action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE company_id=2
+      AND rule_id=?
+    """, (rule["id"],)).fetchone()
+    conn.close()
+
+    assert rule is not None
+    assert rule["trigger_key"] == "sla_overdue"
+    assert rule["active"] == 1
+    assert action is not None
+    assert action["action_key"] == "notification"
+    assert "SLA smoke message" in action["payload_json"]
+
+    list_response = await crm.automation_page(make_asgi_request("owner2", "/automation"))
+    assert list_response.status_code == 200
+    list_html = list_response.body.decode("utf-8")
+    assert "SLA smoke rule" in list_html
+    assert "Включено" in list_html
+    assert f"/automation/rules/{rule['id']}/toggle" in list_html
+
+    toggle_response = await crm.toggle_automation_rule(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert toggle_response.status_code == 302
+    assert toggle_response.headers["location"] == "/automation?toggled=1"
+
+    conn = connect()
+    c = conn.cursor()
+    toggled = c.execute("""
+    SELECT active
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()
+    conn.close()
+
+    assert toggled["active"] == 0
+
+
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")
     assert anonymous.status_code == 404
@@ -2175,6 +2250,7 @@ def main():
         assert_session_cookie_auth()
         assert_task_access(task)
         assert_automation_foundation()
+        asyncio.run(assert_automation_page())
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_archive_restore(task))

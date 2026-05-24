@@ -26,6 +26,7 @@ import secrets
 import csv
 import io
 import calendar
+import json
 
 
 APP_VERSION = "0.2.1"
@@ -64,6 +65,21 @@ ALLOWED_CLIENT_FILE_EXTENSIONS = {
     ".xls", ".xlsx", ".csv", ".txt"
 }
 PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+AUTOMATION_TRIGGERS = [
+    ("overdue_task", "Просрочена задача"),
+    ("sla_overdue", "Просрочен SLA"),
+    ("unpaid_task", "Нет оплаты"),
+    ("worker_overload", "Перегрузка сотрудника"),
+    ("new_client", "Новый клиент")
+]
+
+AUTOMATION_ACTIONS = [
+    ("notification", "Создать уведомление"),
+    ("telegram_alert", "Telegram alert"),
+    ("email", "Email"),
+    ("create_task", "Создать задачу")
+]
 
 FEATURE_DEFINITIONS = [
     ("tasks", "Заявки", "Создание и ведение заявок"),
@@ -1653,6 +1669,226 @@ async def open_notification(request: Request, notification_id: int):
         link = "/notifications"
 
     return RedirectResponse(link, status_code=302)
+
+
+@app.get("/automation", response_class=HTMLResponse)
+async def automation_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    trigger_labels = dict(AUTOMATION_TRIGGERS)
+    action_labels = dict(AUTOMATION_ACTIONS)
+
+    conn = connect()
+    c = conn.cursor()
+
+    rules = c.execute("""
+    SELECT
+        automation_rules.*,
+        COUNT(automation_actions.id) AS action_count
+    FROM automation_rules
+    LEFT JOIN automation_actions
+      ON automation_actions.rule_id=automation_rules.id
+      AND automation_actions.company_id=automation_rules.company_id
+    WHERE automation_rules.company_id=?
+    GROUP BY automation_rules.id
+    ORDER BY automation_rules.id DESC
+    """, (company_id,)).fetchall()
+
+    events = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 30
+    """, (company_id,)).fetchall()
+
+    users = c.execute("""
+    SELECT username, role
+    FROM users
+    WHERE company_id=?
+    ORDER BY role, username
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "automation.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "rules": rules,
+            "events": events,
+            "users": users,
+            "triggers": AUTOMATION_TRIGGERS,
+            "actions": AUTOMATION_ACTIONS,
+            "trigger_labels": trigger_labels,
+            "action_labels": action_labels,
+            "features": get_company_features(company_id)
+        }
+    )
+
+
+@app.post("/automation/rules")
+async def create_automation_rule(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    form = await request.form()
+    name = str(form.get("name") or "").strip()
+    trigger_key = str(form.get("trigger_key") or "").strip()
+    action_key = str(form.get("action_key") or "").strip()
+    target_username = str(form.get("target_username") or username).strip()
+    message = str(form.get("message") or "").strip()
+
+    trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
+    action_keys = {key for key, _ in AUTOMATION_ACTIONS}
+
+    if not name:
+        return RedirectResponse("/automation?error=name", status_code=302)
+
+    if trigger_key not in trigger_keys or action_key not in action_keys:
+        return RedirectResponse("/automation?error=invalid", status_code=302)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    payload = {
+        "target_username": target_username,
+        "message": message
+    }
+
+    conn = connect()
+    c = conn.cursor()
+
+    target_exists = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=?
+      AND username=?
+    """, (company_id, target_username)).fetchone()
+
+    if not target_exists:
+        conn.close()
+        return RedirectResponse("/automation?error=target", status_code=302)
+
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+    """, (
+        company_id,
+        name,
+        trigger_key,
+        json.dumps({}, ensure_ascii=False),
+        username,
+        now,
+        now
+    ))
+
+    rule_id = c.lastrowid
+
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, 1, 1, ?)
+    """, (
+        company_id,
+        rule_id,
+        action_key,
+        json.dumps(payload, ensure_ascii=False),
+        now
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/automation?created=1", status_code=302)
+
+
+@app.post("/automation/rules/{rule_id}/toggle")
+async def toggle_automation_rule(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT active
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse("/automation", status_code=302)
+
+    new_active = 0 if rule["active"] else 1
+
+    c.execute("""
+    UPDATE automation_rules
+    SET active=?, updated_at=?
+    WHERE id=?
+      AND company_id=?
+    """, (
+        new_active,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        rule_id,
+        company_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/automation?toggled=1", status_code=302)
 
 
 @app.get("/workload", response_class=HTMLResponse)

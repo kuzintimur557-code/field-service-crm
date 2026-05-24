@@ -92,6 +92,9 @@ h1{font-size:30px}
         {% if f.get("calls", True) %}
         <a href="/calls">☎️ Звонки</a>
         {% endif %}
+        {% if f.get("automation", True) %}
+        <a href="/automation">⚙️ Автоматизация</a>
+        {% endif %}
         {% endif %}
 
         {% if role == "boss" %}
