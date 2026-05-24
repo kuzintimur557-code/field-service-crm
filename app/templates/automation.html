@@ -116,6 +116,11 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="meta">
             {{ trigger_labels.get(rule["trigger_key"], rule["trigger_key"]) }} → {{ rule["action_count"] }} действий
         </div>
+        {% for action_key in (rule["action_keys"] or "").split(",") %}
+        {% if action_key %}
+        <span class="pill">{{ action_labels.get(action_key, action_key) }}</span>
+        {% endif %}
+        {% endfor %}
         <span class="pill {% if not rule['active'] %}off{% endif %}">
             {% if rule["active"] %}Включено{% else %}Выключено{% endif %}
         </span>

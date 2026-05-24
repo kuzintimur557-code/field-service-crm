@@ -1804,7 +1804,8 @@ async def automation_page(request: Request):
     rules = c.execute("""
     SELECT
         automation_rules.*,
-        COUNT(automation_actions.id) AS action_count
+        COUNT(automation_actions.id) AS action_count,
+        GROUP_CONCAT(automation_actions.action_key) AS action_keys
     FROM automation_rules
     LEFT JOIN automation_actions
       ON automation_actions.rule_id=automation_rules.id

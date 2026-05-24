@@ -383,6 +383,7 @@ async def assert_automation_page():
     list_html = list_response.body.decode("utf-8")
     assert "SLA smoke rule" in list_html
     assert "Включено" in list_html
+    assert "Создать уведомление" in list_html
     assert f"/automation/rules/{rule['id']}/toggle" in list_html
 
     toggle_response = await crm.toggle_automation_rule(
