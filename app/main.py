@@ -1856,6 +1856,13 @@ async def create_sla_escalations(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "sla")
+
+    if disabled_response:
+        return disabled_response
+
+
     escalation_cutoff = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
 
     conn = connect()
