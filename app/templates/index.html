@@ -95,6 +95,10 @@ h1{font-size:30px}
         {% if f.get("automation", True) %}
         <a href="/automation">⚙️ Автоматизация</a>
         {% endif %}
+
+        {% if f.get("ai_insights", True) %}
+        <a href="/ai/insights">🤖 AI Insights</a>
+        {% endif %}
         {% endif %}
 
         {% if role == "boss" %}

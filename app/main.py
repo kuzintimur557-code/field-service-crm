@@ -95,6 +95,7 @@ FEATURE_DEFINITIONS = [
     ("workload", "Загрузка", "Загрузка исполнителей"),
     ("notifications", "Уведомления", "Центр уведомлений"),
     ("automation", "Автоматизация", "Правила, триггеры и действия"),
+    ("ai_insights", "AI Insights", "AI рекомендации и бизнес-инсайты"),
     ("calls", "Звонки", "История и будущая телефония"),
     ("one_c", "1С", "Интеграция с 1С"),
     ("custom_fields", "Поля компании", "Настраиваемые поля")
@@ -121,57 +122,57 @@ INDUSTRY_OPTIONS = [
 BUSINESS_PRESETS = {
     "field_service": {
         "calendar", "clients", "catalog", "recurring", "finance", "payroll",
-        "analytics", "sla", "archive", "workload", "notifications", "automation", "calls",
+        "analytics", "ai_insights", "sla", "archive", "workload", "notifications", "automation", "calls",
         "custom_fields"
     },
     "beauty": {
-        "calendar", "clients", "catalog", "finance", "payroll", "analytics",
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
         "notifications", "automation", "calls", "custom_fields"
     },
     "cleaning": {
-        "calendar", "clients", "recurring", "finance", "payroll", "analytics",
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics", "ai_insights",
         "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
     },
     "repair": {
-        "calendar", "clients", "catalog", "finance", "payroll", "analytics",
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
         "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
     },
     "auto_service": {
-        "calendar", "clients", "catalog", "finance", "payroll", "analytics",
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
         "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
     },
     "logistics": {
-        "calendar", "clients", "recurring", "finance", "payroll", "analytics",
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics", "ai_insights",
         "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
     },
     "agency": {
-        "clients", "finance", "payroll", "analytics", "archive",
+        "clients", "finance", "payroll", "analytics", "ai_insights", "archive",
         "notifications", "automation", "calls", "custom_fields"
     },
     "medical": {
-        "calendar", "clients", "finance", "payroll", "analytics",
+        "calendar", "clients", "finance", "payroll", "analytics", "ai_insights",
         "notifications", "automation", "calls", "custom_fields"
     },
     "education": {
-        "calendar", "clients", "recurring", "finance", "payroll", "analytics",
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics", "ai_insights",
         "notifications", "automation", "custom_fields"
     },
     "restaurant": {
-        "calendar", "clients", "catalog", "finance", "payroll", "analytics",
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
         "notifications", "automation", "custom_fields"
     },
     "ecommerce": {
-        "clients", "catalog", "finance", "payroll", "analytics",
+        "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
         "archive", "notifications", "automation", "custom_fields"
     },
     "other": {
         "calendar", "clients", "catalog", "recurring", "finance", "payroll",
-        "analytics", "sla", "archive", "workload", "notifications", "automation", "calls",
+        "analytics", "ai_insights", "sla", "archive", "workload", "notifications", "automation", "calls",
         "custom_fields"
     },
     "custom": {
         "calendar", "clients", "catalog", "recurring", "finance", "payroll",
-        "analytics", "sla", "archive", "workload", "notifications", "automation", "calls",
+        "analytics", "ai_insights", "sla", "archive", "workload", "notifications", "automation", "calls",
         "custom_fields"
     }
 }
@@ -6230,6 +6231,160 @@ async def billing_page(request: Request):
         }
     )
 
+
+
+@app.get("/ai/insights", response_class=HTMLResponse)
+async def ai_insights_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    conn = connect()
+    c = conn.cursor()
+
+    overdue_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status!='Завершено'
+      AND task_date < date('now')
+    """, (company_id,)).fetchone()[0]
+
+    unpaid_total = c.execute("""
+    SELECT COALESCE(SUM(price), 0)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND payment_status!='Оплачено'
+    """, (company_id,)).fetchone()[0]
+
+    low_margin_clients = c.execute("""
+    SELECT
+        client,
+        COUNT(*) as tasks_count,
+        COALESCE(SUM(price), 0) as revenue
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+    GROUP BY client
+    HAVING revenue > 0
+    ORDER BY revenue ASC
+    LIMIT 5
+    """, (company_id,)).fetchall()
+
+    worker_rows = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+    ORDER BY username
+    """, (company_id,)).fetchall()
+
+    weak_workers = []
+
+    for worker_row in worker_rows:
+        worker_name = worker_row["username"]
+        worker_condition = worker_task_condition()
+        worker_params = worker_task_params(worker_name)
+
+        completed_count = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND archived=0
+          AND status='Завершено'
+          AND {worker_condition}
+        """, [company_id] + worker_params).fetchone()[0]
+
+        active_count = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND archived=0
+          AND status!='Завершено'
+          AND {worker_condition}
+        """, [company_id] + worker_params).fetchone()[0]
+
+        weak_workers.append({
+            "username": worker_name,
+            "completed_count": completed_count,
+            "active_count": active_count
+        })
+
+    weak_workers.sort(key=lambda row: (row["completed_count"], -row["active_count"]))
+
+    insights = []
+
+    if overdue_tasks:
+        insights.append({
+            "level": "danger",
+            "title": "Есть риск по просрочкам",
+            "message": f"Просрочено {overdue_tasks} {settings['task_label'] or 'задач'}. Рекомендуется проверить ответственных и сроки."
+        })
+
+    if unpaid_total:
+        insights.append({
+            "level": "warning",
+            "title": "Есть риск неоплаты",
+            "message": f"Неоплаченная сумма: ₽{round(float(unpaid_total or 0), 1)}. Рекомендуется запустить напоминания клиентам."
+        })
+
+    if weak_workers:
+        weakest_worker = weak_workers[0]
+        insights.append({
+            "level": "info",
+            "title": "Сотрудник требует внимания",
+            "message": f"{settings['worker_label'] or 'Сотрудник'} {weakest_worker['username']} имеет мало завершённых задач: {weakest_worker['completed_count']}."
+        })
+
+    if low_margin_clients:
+        client = low_margin_clients[0]
+        insights.append({
+            "level": "info",
+            "title": "Клиент с низкой выручкой",
+            "message": f"{settings['client_label'] or 'Клиент'} {client['client'] or 'Не указан'} принёс ₽{round(float(client['revenue'] or 0), 1)}."
+        })
+
+    if not insights:
+        insights.append({
+            "level": "success",
+            "title": "Критичных рисков не найдено",
+            "message": "Сейчас система не видит явных проблем по просрочкам, оплатам и сотрудникам."
+        })
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "ai_insights.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "insights": insights,
+            "overdue_tasks": overdue_tasks,
+            "unpaid_total": unpaid_total,
+            "weak_workers": weak_workers[:5],
+            "low_margin_clients": low_margin_clients
+        }
+    )
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):

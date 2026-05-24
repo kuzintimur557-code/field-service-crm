@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Insights</title>
+    <style>
+        body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; }
+        .container { max-width:1200px; margin:0 auto; }
+        .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:24px; }
+        .btn { display:inline-flex; align-items:center; justify-content:center; padding:12px 18px; border-radius:14px; text-decoration:none; font-weight:900; background:#111827; color:white; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+        .card { background:white; border-radius:20px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.08); }
+        .label { color:#6b7280; font-size:14px; font-weight:800; }
+        .value { font-size:30px; font-weight:900; margin-top:8px; }
+        .danger { color:#dc2626; }
+        .warning { color:#d97706; }
+        .info { color:#2563eb; }
+        .success { color:#16a34a; }
+        .insight { border-left:6px solid #111827; }
+        .insight.danger { border-left-color:#dc2626; }
+        .insight.warning { border-left-color:#d97706; }
+        .insight.info { border-left-color:#2563eb; }
+        .insight.success { border-left-color:#16a34a; }
+        h1, h2, h3 { margin-top:0; }
+        table { width:100%; border-collapse:collapse; margin-top:12px; }
+        th, td { text-align:left; padding:12px; border-bottom:1px solid #e5e7eb; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="top">
+        <div>
+            <h1>AI Insights</h1>
+            <p class="label">Рекомендации и риски по бизнесу</p>
+        </div>
+
+        <a href="/" class="btn">← Главное меню</a>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="label">Просроченные {{ (settings["task_label"] or "задачи")|lower }}</div>
+            <div class="value danger">{{ overdue_tasks }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Неоплаченная сумма</div>
+            <div class="value warning">₽{{ "%.1f"|format(unpaid_total or 0) }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">{{ settings["worker_label"] or "Сотрудники" }} в анализе</div>
+            <div class="value info">{{ weak_workers|length }}</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
+        <h2>Рекомендации</h2>
+
+        <div class="grid">
+            {% for insight in insights %}
+            <div class="card insight {{ insight.level }}">
+                <h3>{{ insight.title }}</h3>
+                <p>{{ insight.message }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="grid" style="margin-top:24px;">
+        <div class="card">
+            <h2>{{ settings["worker_label"] or "Сотрудники" }} требуют внимания</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>{{ settings["worker_label"] or "Сотрудник" }}</th>
+                        <th>Завершено</th>
+                        <th>Активно</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for worker in weak_workers %}
+                    <tr>
+                        <td>{{ worker.username }}</td>
+                        <td>{{ worker.completed_count }}</td>
+                        <td>{{ worker.active_count }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="label">Нет данных</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>{{ settings["client_label"] or "Клиенты" }} с низкой выручкой</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>{{ settings["client_label"] or "Клиент" }}</th>
+                        <th>{{ settings["task_label"] or "Задачи" }}</th>
+                        <th>Выручка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in low_margin_clients %}
+                    <tr>
+                        <td>{{ client.client or "Не указан" }}</td>
+                        <td>{{ client.tasks_count }}</td>
+                        <td>₽{{ "%.1f"|format(client.revenue or 0) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="label">Нет данных</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
