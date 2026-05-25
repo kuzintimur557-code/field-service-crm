@@ -114,6 +114,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 </div>
 
 <div class="card">
+<h2>Cron endpoint</h2>
+<div class="meta">Для Railway cron или внешнего планировщика задайте переменную AUTOMATION_CRON_SECRET и вызывайте endpoint с header x-automation-secret.</div>
+<div style="margin-top:12px;padding:14px;border-radius:14px;background:#f9fafb;font-weight:900;word-break:break-word">
+    POST /automation/cron/ai-digest
+</div>
+</div>
+
+<div class="card">
 <h2>Новое правило</h2>
 
 <form method="post" action="/automation/rules">

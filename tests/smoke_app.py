@@ -360,6 +360,9 @@ async def assert_automation_page():
     assert "Событий done" in html
     assert "AI scheduler" in html
     assert 'action="/automation/ai-digest/run"' in html
+    assert "Cron endpoint" in html
+    assert "AUTOMATION_CRON_SECRET" in html
+    assert "POST /automation/cron/ai-digest" in html
 
     create_response = await crm.create_automation_rule(
         make_form_request(
