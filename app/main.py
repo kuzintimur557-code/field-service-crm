@@ -765,6 +765,7 @@ def build_owner_ai_assistant_context(company_id):
     settings = get_company_settings(company_id)
     task_label = settings["task_label"] or "задачи"
     worker_label = settings["worker_label"] or "сотрудник"
+    trigger_labels = dict(AUTOMATION_TRIGGERS)
 
     conn = connect()
     c = conn.cursor()
@@ -828,6 +829,13 @@ def build_owner_ai_assistant_context(company_id):
 
     conn.close()
 
+    action_history_rows = []
+
+    for event in action_history:
+        event_row = dict(event)
+        event_row["trigger_label"] = trigger_labels.get(event["trigger_key"], event["trigger_key"])
+        action_history_rows.append(event_row)
+
     priorities = []
 
     if overdue_tasks:
@@ -883,7 +891,7 @@ def build_owner_ai_assistant_context(company_id):
         "priorities": priorities,
         "next_steps": next_steps,
         "overdue_rows": overdue_rows,
-        "action_history": action_history
+        "action_history": action_history_rows
     }
 
 

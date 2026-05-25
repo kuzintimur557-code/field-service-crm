@@ -169,7 +169,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 {% for event in action_history %}
                 <tr>
                     <td>{{ event["created_at"] }}</td>
-                    <td>{{ event["trigger_key"] }}</td>
+                    <td>{{ event["trigger_label"] }}</td>
                     <td>{{ event["status"] }}</td>
                 </tr>
                 {% else %}
