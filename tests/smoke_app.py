@@ -832,6 +832,7 @@ async def assert_ai_assistant_page():
     assert 'action="/sla/reminders"' in html
     assert 'action="/automation/ai-digest/run"' in html
     assert 'action="/ai/assistant/setup-digests"' in html
+    assert "История действий" in html
     assert "Не оплачено" in html
 
     conn = connect()

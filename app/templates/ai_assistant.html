@@ -154,6 +154,32 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
             <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#16a34a">Настроить daily/weekly AI digest</button>
         </form>
     </div>
+
+    <div class="card">
+        <h2>История действий</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Триггер</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in action_history %}
+                <tr>
+                    <td>{{ event["created_at"] }}</td>
+                    <td>{{ event["trigger_key"] }}</td>
+                    <td>{{ event["status"] }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" class="meta">Действий пока нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 </div>

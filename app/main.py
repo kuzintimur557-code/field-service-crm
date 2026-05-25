@@ -812,6 +812,20 @@ def build_owner_ai_assistant_context(company_id):
     LIMIT 5
     """, (company_id,)).fetchall()
 
+    action_history = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=?
+      AND trigger_key IN (
+          'overdue_task',
+          'sla_overdue',
+          'daily_digest',
+          'weekly_digest'
+      )
+    ORDER BY id DESC
+    LIMIT 8
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     priorities = []
@@ -868,7 +882,8 @@ def build_owner_ai_assistant_context(company_id):
         },
         "priorities": priorities,
         "next_steps": next_steps,
-        "overdue_rows": overdue_rows
+        "overdue_rows": overdue_rows,
+        "action_history": action_history
     }
 
 
@@ -6920,6 +6935,7 @@ async def ai_assistant_page(request: Request):
             "priorities": assistant["priorities"],
             "next_steps": assistant["next_steps"],
             "overdue_rows": assistant["overdue_rows"],
+            "action_history": assistant["action_history"],
             "features": get_company_features(company_id)
         }
     )
