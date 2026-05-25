@@ -828,7 +828,59 @@ async def assert_ai_assistant_page():
     assert 'action="/overdue/reminders"' in html
     assert 'action="/sla/reminders"' in html
     assert 'action="/automation/ai-digest/run"' in html
+    assert 'action="/ai/assistant/setup-digests"' in html
     assert "Не оплачено" in html
+
+    conn = connect()
+    c = conn.cursor()
+    digest_rule_ids = [
+        row["id"]
+        for row in c.execute("""
+        SELECT id
+        FROM automation_rules
+        WHERE company_id=2
+          AND trigger_key IN ('daily_digest', 'weekly_digest')
+        """).fetchall()
+    ]
+
+    for rule_id in digest_rule_ids:
+        c.execute("""
+        DELETE FROM automation_actions
+        WHERE company_id=2
+          AND rule_id=?
+        """, (rule_id,))
+        c.execute("""
+        DELETE FROM automation_rules
+        WHERE company_id=2
+          AND id=?
+        """, (rule_id,))
+
+    conn.commit()
+    conn.close()
+
+    setup_response = await crm.setup_ai_assistant_digest_rules(make_request("owner2"))
+    assert setup_response.status_code == 302
+    assert setup_response.headers["location"] == "/ai/assistant?digest_rules=2"
+
+    duplicate_setup_response = await crm.setup_ai_assistant_digest_rules(make_request("owner2"))
+    assert duplicate_setup_response.status_code == 302
+    assert duplicate_setup_response.headers["location"] == "/ai/assistant?digest_rules=0"
+
+    conn = connect()
+    c = conn.cursor()
+    digest_rule_count = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_rules
+    JOIN automation_actions
+      ON automation_actions.rule_id=automation_rules.id
+      AND automation_actions.company_id=automation_rules.company_id
+    WHERE automation_rules.company_id=2
+      AND automation_rules.trigger_key IN ('daily_digest', 'weekly_digest')
+      AND automation_actions.action_key='ai_digest'
+    """).fetchone()[0]
+    conn.close()
+
+    assert digest_rule_count >= 2
 
 
 async def assert_upload_access():

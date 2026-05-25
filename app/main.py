@@ -1148,6 +1148,77 @@ def run_ai_digest_scheduler_for_all_companies(now_dt=None):
     return summary
 
 
+def ensure_ai_digest_automation_rules(company_id, username):
+    company_id = company_id or 1
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    created_count = 0
+    defaults = [
+        ("daily_digest", "Daily AI digest"),
+        ("weekly_digest", "Weekly AI digest")
+    ]
+
+    conn = connect()
+    c = conn.cursor()
+
+    for trigger_key, name in defaults:
+        existing = c.execute("""
+        SELECT automation_rules.id
+        FROM automation_rules
+        JOIN automation_actions
+          ON automation_actions.rule_id=automation_rules.id
+          AND automation_actions.company_id=automation_rules.company_id
+        WHERE automation_rules.company_id=?
+          AND automation_rules.trigger_key=?
+          AND automation_actions.action_key='ai_digest'
+        LIMIT 1
+        """, (company_id, trigger_key)).fetchone()
+
+        if existing:
+            continue
+
+        c.execute("""
+        INSERT INTO automation_rules (
+            company_id, name, trigger_key, conditions_json,
+            active, created_by, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+        """, (
+            company_id,
+            name,
+            trigger_key,
+            json.dumps({}, ensure_ascii=False),
+            username,
+            now,
+            now
+        ))
+
+        rule_id = c.lastrowid
+        payload = {
+            "target_username": username,
+            "message": ""
+        }
+
+        c.execute("""
+        INSERT INTO automation_actions (
+            company_id, rule_id, action_key, payload_json,
+            sort_order, active, created_at
+        )
+        VALUES (?, ?, 'ai_digest', ?, 1, 1, ?)
+        """, (
+            company_id,
+            rule_id,
+            json.dumps(payload, ensure_ascii=False),
+            now
+        ))
+
+        created_count += 1
+
+    conn.commit()
+    conn.close()
+
+    return created_count
+
+
 def log_task_activity(task_id, username, role, action, details=""):
     conn = connect()
     c = conn.cursor()
@@ -6852,6 +6923,35 @@ async def ai_assistant_page(request: Request):
             "features": get_company_features(company_id)
         }
     )
+
+
+@app.post("/ai/assistant/setup-digests")
+async def setup_ai_assistant_digest_rules(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    created_count = ensure_ai_digest_automation_rules(company_id, username)
+
+    return RedirectResponse(f"/ai/assistant?digest_rules={created_count}", status_code=302)
 
 
 @app.post("/ai/insights/digest")
