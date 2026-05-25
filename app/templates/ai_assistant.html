@@ -41,10 +41,20 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
         <div class="meta">Короткий список действий для владельца на основе текущих рисков.</div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <form method="post" action="/ai/insights/digest" style="margin:0">
+            <button class="btn" type="submit" style="border:0;cursor:pointer">Создать AI-сводку</button>
+        </form>
         <a class="btn" href="/ai/insights">AI Insights</a>
         <a class="btn" href="/">← Главное меню</a>
     </div>
 </div>
+
+{% if request.query_params.get("digest") %}
+<div class="card priority success">
+    <h2>AI-сводка создана</h2>
+    <div class="meta">Уведомление добавлено в центр уведомлений.</div>
+</div>
+{% endif %}
 
 <div class="stats">
     <div class="stat">
