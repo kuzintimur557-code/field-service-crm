@@ -490,12 +490,8 @@ def get_plan_user_limit(plan):
 def get_company_settings(company_id=1):
     company_id = company_id or 1
 
-    conn = None
-    c = cursor
-
-    if c is None:
-        conn = connect()
-        c = conn.cursor()
+    conn = connect()
+    c = conn.cursor()
 
     c.execute("""
     INSERT OR IGNORE INTO company_settings (
@@ -515,8 +511,7 @@ def get_company_settings(company_id=1):
     WHERE company_id=?
     """, (company_id,)).fetchone()
 
-    if conn:
-        conn.close()
+    conn.close()
 
     return settings
 
@@ -705,11 +700,30 @@ def create_notification(
 
 
 
-def build_ai_digest_message(company_id, cursor=None):
-    settings = get_company_settings(company_id)
 
-    conn = connect()
-    c = conn.cursor()
+def build_ai_digest_message(company_id, cursor=None):
+    conn = None
+    c = cursor
+
+    if c is None:
+        conn = connect()
+        c = conn.cursor()
+
+    c.execute("""
+    INSERT OR IGNORE INTO company_settings (
+        company_id, company_name, phone, email, address, tax_number, bank_details,
+        plan, industry, task_label, worker_label, client_label, service_label,
+        one_c_enabled, calls_enabled, ai_calls_enabled, updated_at
+    )
+    VALUES (?, '', '', '', '', '', '', 'basic', 'field_service',
+            'Заявка', 'Исполнитель', 'Клиент', 'Услуга', 0, 0, 0, '')
+    """, (company_id,))
+
+    settings = c.execute("""
+    SELECT *
+    FROM company_settings
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
 
     overdue_tasks = c.execute("""
     SELECT COUNT(*)
@@ -728,7 +742,9 @@ def build_ai_digest_message(company_id, cursor=None):
       AND payment_status!='Оплачено'
     """, (company_id,)).fetchone()[0]
 
-    conn.close()
+    if conn:
+        conn.commit()
+        conn.close()
 
     message_lines = [
         "AI-сводка по бизнесу",
@@ -742,8 +758,7 @@ def build_ai_digest_message(company_id, cursor=None):
     if unpaid_total:
         message_lines.append("Рекомендация: запустите напоминания по оплатам.")
 
-    return "\\n".join(message_lines)
-
+    return "\n".join(message_lines)
 
 def run_automation_event(
     company_id,
