@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import sys
 import tempfile
@@ -40,6 +41,22 @@ def make_asgi_request(username, path="/calendar", query_string=""):
         "method": "GET",
         "path": path,
         "headers": [(b"cookie", cookie.encode("utf-8"))],
+        "query_string": query_bytes,
+        "scheme": "http",
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    })
+
+
+def make_public_asgi_request(path="/", query_string="", headers=None):
+    request_headers = list(headers or [])
+    query_bytes = query_string.encode("utf-8") if isinstance(query_string, str) else query_string
+
+    return Request({
+        "type": "http",
+        "method": "POST",
+        "path": path,
+        "headers": request_headers,
         "query_string": query_bytes,
         "scheme": "http",
         "client": ("127.0.0.1", 50000),
@@ -684,6 +701,39 @@ async def assert_automation_runner(task):
     assert daily_event["status"] == "done"
     assert weekly_event is not None
     assert weekly_event["status"] == "done"
+
+    all_companies_summary = crm.run_ai_digest_scheduler_for_all_companies(
+        datetime(2026, 5, 25, 13, 0),
+    )
+    assert all_companies_summary["companies"] >= 1
+    assert all_companies_summary["daily"] == 0
+    assert all_companies_summary["weekly"] == 0
+    assert all_companies_summary["skipped"] >= 0
+
+    old_cron_secret = os.environ.get("AUTOMATION_CRON_SECRET")
+    os.environ["AUTOMATION_CRON_SECRET"] = "cron-secret"
+
+    try:
+        forbidden_response = await crm.run_ai_digest_scheduler_cron(
+            make_public_asgi_request("/automation/cron/ai-digest")
+        )
+        assert forbidden_response.status_code == 403
+
+        cron_response = await crm.run_ai_digest_scheduler_cron(
+            make_public_asgi_request(
+                "/automation/cron/ai-digest",
+                headers=[(b"x-automation-secret", b"cron-secret")],
+            )
+        )
+        assert cron_response.status_code == 200
+        cron_payload = json.loads(cron_response.body.decode("utf-8"))
+        assert cron_payload["ok"] is True
+        assert cron_payload["summary"]["companies"] >= 1
+    finally:
+        if old_cron_secret is None:
+            os.environ.pop("AUTOMATION_CRON_SECRET", None)
+        else:
+            os.environ["AUTOMATION_CRON_SECRET"] = old_cron_secret
 
 
 async def assert_automation_delete():

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -989,6 +989,35 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
         result["skipped"] += 1
 
     return result
+
+
+def run_ai_digest_scheduler_for_all_companies(now_dt=None):
+    summary = {
+        "companies": 0,
+        "daily": 0,
+        "weekly": 0,
+        "skipped": 0
+    }
+
+    conn = connect()
+    c = conn.cursor()
+
+    companies = c.execute("""
+    SELECT id
+    FROM companies
+    ORDER BY id
+    """).fetchall()
+
+    conn.close()
+
+    for company in companies:
+        result = run_ai_digest_scheduler(company["id"], now_dt)
+        summary["companies"] += 1
+        summary["daily"] += result["daily"]
+        summary["weekly"] += result["weekly"]
+        summary["skipped"] += result["skipped"]
+
+    return summary
 
 
 def log_task_activity(task_id, username, role, action, details=""):
@@ -2125,6 +2154,37 @@ async def run_ai_digest_scheduler_page(request: Request):
         f"/automation?scheduler=1&daily={result['daily']}&weekly={result['weekly']}&skipped={result['skipped']}",
         status_code=302
     )
+
+
+@app.post("/automation/cron/ai-digest")
+async def run_ai_digest_scheduler_cron(request: Request):
+
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
+            status_code=503
+        )
+
+    token = (
+        request.headers.get("x-automation-secret")
+        or request.query_params.get("token")
+        or ""
+    ).strip()
+
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403
+        )
+
+    summary = run_ai_digest_scheduler_for_all_companies()
+
+    return JSONResponse({
+        "ok": True,
+        "summary": summary
+    })
 
 
 @app.post("/automation/rules")
