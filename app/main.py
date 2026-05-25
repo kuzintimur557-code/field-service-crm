@@ -742,6 +742,15 @@ def build_ai_digest_message(company_id, cursor=None):
       AND payment_status!='Оплачено'
     """, (company_id,)).fetchone()[0]
 
+    active_notes = c.execute("""
+    SELECT note
+    FROM ai_assistant_notes
+    WHERE company_id=?
+      AND COALESCE(is_done, 0)=0
+    ORDER BY id DESC
+    LIMIT 3
+    """, (company_id,)).fetchall()
+
     if conn:
         conn.commit()
         conn.close()
@@ -757,6 +766,12 @@ def build_ai_digest_message(company_id, cursor=None):
 
     if unpaid_total:
         message_lines.append("Рекомендация: запустите напоминания по оплатам.")
+
+    if active_notes:
+        message_lines.append("Активные заметки владельца:")
+
+        for note in active_notes:
+            message_lines.append(f"- {note['note']}")
 
     return "\n".join(message_lines)
 

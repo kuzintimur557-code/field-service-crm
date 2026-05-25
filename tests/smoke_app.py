@@ -889,6 +889,10 @@ async def assert_ai_assistant_page():
     assert saved_note["note"] == "Проверить AI assistant рекомендацию"
     assert saved_note["is_done"] == 0
 
+    digest_message = crm.build_ai_digest_message(2)
+    assert "Активные заметки владельца" in digest_message
+    assert "Проверить AI assistant рекомендацию" in digest_message
+
     done_response = await crm.complete_ai_assistant_note(
         make_form_request(
             "owner2",
