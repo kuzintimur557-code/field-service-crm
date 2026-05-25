@@ -70,6 +70,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">Правило удалено</div>
 {% endif %}
 
+{% if request.query_params.get("scheduler") == "1" %}
+<div class="notice ok">
+    AI scheduler: daily {{ request.query_params.get("daily") or "0" }},
+    weekly {{ request.query_params.get("weekly") or "0" }},
+    skipped {{ request.query_params.get("skipped") or "0" }}
+</div>
+{% endif %}
+
 {% if request.query_params.get("error") %}
 <div class="notice err">Проверьте название, триггер, действие и получателя</div>
 {% endif %}
@@ -95,6 +103,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="stat-title">Событий skipped</div>
         <div class="stat-value">{{ automation_stats["events_skipped"] }}</div>
     </div>
+</div>
+
+<div class="card">
+<h2>AI scheduler</h2>
+<div class="meta">Ручной запуск расписания для daily_digest и weekly_digest. Повторный запуск за тот же день или неделю не создаёт дубли.</div>
+<form method="post" action="/automation/ai-digest/run" style="margin-top:14px">
+    <button type="submit">Запустить AI scheduler</button>
+</form>
 </div>
 
 <div class="card">

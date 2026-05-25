@@ -909,6 +909,88 @@ def run_automation_event(
     return created_events
 
 
+def run_ai_digest_scheduler(company_id, now_dt=None):
+    company_id = company_id or 1
+
+    result = {
+        "daily": 0,
+        "weekly": 0,
+        "skipped": 0
+    }
+
+    if not has_feature(company_id, "automation") or not has_feature(company_id, "ai_insights"):
+        return result
+
+    now_dt = now_dt or datetime.now()
+    today_key = now_dt.strftime("%Y-%m-%d")
+    iso_year, iso_week, _ = now_dt.isocalendar()
+    week_key = f"{iso_year}-W{iso_week:02d}"
+
+    conn = connect()
+    c = conn.cursor()
+
+    daily_rules = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_rules
+    WHERE company_id=?
+      AND trigger_key='daily_digest'
+      AND active=1
+    """, (company_id,)).fetchone()[0]
+
+    weekly_rules = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_rules
+    WHERE company_id=?
+      AND trigger_key='weekly_digest'
+      AND active=1
+    """, (company_id,)).fetchone()[0]
+
+    daily_already_sent = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND trigger_key='daily_digest'
+      AND created_at LIKE ?
+    """, (company_id, f"{today_key}%")).fetchone()[0]
+
+    weekly_message = f"AI weekly digest {week_key}"
+    weekly_already_sent = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND trigger_key='weekly_digest'
+      AND message=?
+    """, (company_id, weekly_message)).fetchone()[0]
+
+    conn.close()
+
+    if daily_rules and not daily_already_sent:
+        result["daily"] = run_automation_event(
+            company_id,
+            "daily_digest",
+            "company",
+            company_id,
+            f"AI daily digest {today_key}",
+            "/ai/insights"
+        )
+    elif daily_rules:
+        result["skipped"] += 1
+
+    if weekly_rules and not weekly_already_sent:
+        result["weekly"] = run_automation_event(
+            company_id,
+            "weekly_digest",
+            "company",
+            company_id,
+            weekly_message,
+            "/ai/insights"
+        )
+    elif weekly_rules:
+        result["skipped"] += 1
+
+    return result
+
+
 def log_task_activity(task_id, username, role, action, details=""):
     conn = connect()
     c = conn.cursor()
@@ -2010,6 +2092,38 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
             "automation_stats": automation_stats,
             "features": get_company_features(company_id)
         }
+    )
+
+
+@app.post("/automation/ai-digest/run")
+async def run_ai_digest_scheduler_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    result = run_ai_digest_scheduler(company_id)
+
+    return RedirectResponse(
+        f"/automation?scheduler=1&daily={result['daily']}&weekly={result['weekly']}&skipped={result['skipped']}",
+        status_code=302
     )
 
 

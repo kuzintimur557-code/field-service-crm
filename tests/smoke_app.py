@@ -341,6 +341,8 @@ async def assert_automation_page():
     assert "Всего правил" in html
     assert "Включено правил" in html
     assert "Событий done" in html
+    assert "AI scheduler" in html
+    assert 'action="/automation/ai-digest/run"' in html
 
     create_response = await crm.create_automation_rule(
         make_form_request(
@@ -619,6 +621,69 @@ async def assert_automation_runner(task):
     assert ai_digest_notification is not None
     assert "AI-сводка по бизнесу" in ai_digest_notification["message"]
     assert ai_digest_notification["link"] == "/ai/insights"
+
+    daily_digest_response = await crm.create_automation_rule(
+        make_form_request(
+            "owner2",
+            "/automation/rules",
+            {
+                "name": "Daily AI digest runner rule",
+                "trigger_key": "daily_digest",
+                "action_key": "ai_digest",
+                "target_username": "owner2",
+                "message": "",
+            },
+        )
+    )
+    assert daily_digest_response.status_code == 302
+
+    scheduled = crm.run_ai_digest_scheduler(
+        2,
+        datetime(2026, 5, 25, 9, 0),
+    )
+    assert scheduled["daily"] >= 1
+    assert scheduled["weekly"] >= 1
+    assert scheduled["skipped"] == 0
+
+    duplicate_scheduled = crm.run_ai_digest_scheduler(
+        2,
+        datetime(2026, 5, 25, 12, 0),
+    )
+    assert duplicate_scheduled["daily"] == 0
+    assert duplicate_scheduled["weekly"] == 0
+    assert duplicate_scheduled["skipped"] == 2
+
+    scheduler_response = await crm.run_ai_digest_scheduler_page(make_request("owner2"))
+    assert scheduler_response.status_code == 302
+    assert scheduler_response.headers["location"].startswith("/automation?scheduler=1")
+
+    conn = connect()
+    c = conn.cursor()
+
+    daily_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND trigger_key='daily_digest'
+      AND message='AI daily digest 2026-05-25'
+    ORDER BY id DESC
+    """).fetchone()
+
+    weekly_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND trigger_key='weekly_digest'
+      AND message='AI weekly digest 2026-W22'
+    ORDER BY id DESC
+    """).fetchone()
+
+    conn.close()
+
+    assert daily_event is not None
+    assert daily_event["status"] == "done"
+    assert weekly_event is not None
+    assert weekly_event["status"] == "done"
 
 
 async def assert_automation_delete():
