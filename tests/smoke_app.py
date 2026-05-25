@@ -887,6 +887,37 @@ async def assert_ai_assistant_page():
 
     assert saved_note is not None
     assert saved_note["note"] == "Проверить AI assistant рекомендацию"
+    assert saved_note["is_done"] == 0
+
+    done_response = await crm.complete_ai_assistant_note(
+        make_form_request(
+            "owner2",
+            f"/ai/assistant/notes/{saved_note['id']}/done",
+            {},
+        ),
+        saved_note["id"],
+    )
+    assert done_response.status_code == 302
+    assert done_response.headers["location"] == "/ai/assistant?note_done=1"
+
+    conn = connect()
+    c = conn.cursor()
+    completed_note = c.execute("""
+    SELECT *
+    FROM ai_assistant_notes
+    WHERE id=?
+      AND company_id=2
+    """, (saved_note["id"],)).fetchone()
+    conn.close()
+
+    assert completed_note is not None
+    assert completed_note["is_done"] == 1
+    assert completed_note["done_by"] == "owner2"
+
+    completed_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
+    assert completed_page_response.status_code == 200
+    completed_html = completed_page_response.body.decode("utf-8")
+    assert "Проверить AI assistant рекомендацию" not in completed_html
 
     conn = connect()
     c = conn.cursor()

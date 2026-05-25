@@ -78,6 +78,13 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 </div>
 {% endif %}
 
+{% if request.query_params.get("note_done") %}
+<div class="card priority success">
+    <h2>Заметка выполнена</h2>
+    <div class="meta">Пункт убран из активного списка.</div>
+</div>
+{% endif %}
+
 <div class="stats">
     <div class="stat">
         <div class="stat-title">Просрочено</div>
@@ -152,6 +159,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                         <th>Дата</th>
                         <th>Автор</th>
                         <th>Заметка</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -160,10 +168,15 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                         <td>{{ note["created_at"] }}</td>
                         <td>{{ note["username"] }}</td>
                         <td>{{ note["note"] }}</td>
+                        <td>
+                            <form method="post" action="/ai/assistant/notes/{{ note['id'] }}/done" style="margin:0">
+                                <button class="btn" type="submit" style="border:0;cursor:pointer;background:#16a34a;padding:8px 10px">Выполнено</button>
+                            </form>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="3" class="meta">Заметок пока нет</td>
+                        <td colspan="4" class="meta">Активных заметок пока нет</td>
                     </tr>
                     {% endfor %}
                 </tbody>

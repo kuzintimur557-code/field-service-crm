@@ -360,11 +360,17 @@ def init_db():
         company_id INTEGER,
         username TEXT,
         note TEXT,
+        is_done INTEGER DEFAULT 0,
+        done_by TEXT,
+        done_at TEXT,
         created_at TEXT
     )
     """)
 
     add_column_if_missing(c, "payroll_payouts", "note", "TEXT")
+    add_column_if_missing(c, "ai_assistant_notes", "is_done", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "ai_assistant_notes", "done_by", "TEXT")
+    add_column_if_missing(c, "ai_assistant_notes", "done_at", "TEXT")
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "full_name", "TEXT")

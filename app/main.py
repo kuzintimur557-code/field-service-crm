@@ -831,6 +831,7 @@ def build_owner_ai_assistant_context(company_id):
     SELECT *
     FROM ai_assistant_notes
     WHERE company_id=?
+      AND COALESCE(is_done, 0)=0
     ORDER BY id DESC
     LIMIT 8
     """, (company_id,)).fetchall()
@@ -7003,6 +7004,48 @@ async def add_ai_assistant_note(request: Request):
     conn.close()
 
     return RedirectResponse("/ai/assistant?note_created=1", status_code=302)
+
+
+@app.post("/ai/assistant/notes/{note_id}/done")
+async def complete_ai_assistant_note(request: Request, note_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    UPDATE ai_assistant_notes
+    SET is_done=1,
+        done_by=?,
+        done_at=?
+    WHERE id=?
+      AND company_id=?
+    """, (
+        username,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        note_id,
+        company_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/ai/assistant?note_done=1", status_code=302)
 
 
 @app.post("/ai/assistant/setup-digests")
