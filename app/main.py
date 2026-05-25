@@ -827,6 +827,14 @@ def build_owner_ai_assistant_context(company_id):
     LIMIT 8
     """, (company_id,)).fetchall()
 
+    assistant_notes = c.execute("""
+    SELECT *
+    FROM ai_assistant_notes
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 8
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     action_history_rows = []
@@ -891,7 +899,8 @@ def build_owner_ai_assistant_context(company_id):
         "priorities": priorities,
         "next_steps": next_steps,
         "overdue_rows": overdue_rows,
-        "action_history": action_history_rows
+        "action_history": action_history_rows,
+        "assistant_notes": assistant_notes
     }
 
 
@@ -6944,9 +6953,56 @@ async def ai_assistant_page(request: Request):
             "next_steps": assistant["next_steps"],
             "overdue_rows": assistant["overdue_rows"],
             "action_history": assistant["action_history"],
+            "assistant_notes": assistant["assistant_notes"],
             "features": get_company_features(company_id)
         }
     )
+
+
+@app.post("/ai/assistant/notes")
+async def add_ai_assistant_note(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    form = await request.form()
+    note = str(form.get("note") or "").strip()
+
+    if not note:
+        return RedirectResponse("/ai/assistant?note_error=empty", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO ai_assistant_notes (
+        company_id, username, note, created_at
+    )
+    VALUES (?, ?, ?, ?)
+    """, (
+        company_id,
+        username,
+        note,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/ai/assistant?note_created=1", status_code=302)
 
 
 @app.post("/ai/assistant/setup-digests")

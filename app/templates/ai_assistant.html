@@ -26,6 +26,7 @@ h2{margin:0 0 14px;font-size:22px}
 .priority.warning{border-left-color:#d97706}
 .priority.success{border-left-color:#16a34a}
 .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+textarea{width:100%;min-height:90px;padding:14px;border-radius:14px;border:1px solid #d1d5db;font-size:16px;resize:vertical}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 @media(max-width:800px){.container{padding:14px}.header,.grid{grid-template-columns:1fr;display:grid}h1{font-size:28px}}
@@ -60,6 +61,20 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 <div class="card priority success">
     <h2>AI digest automation настроена</h2>
     <div class="meta">Создано правил: {{ request.query_params.get("digest_rules") or "0" }}</div>
+</div>
+{% endif %}
+
+{% if request.query_params.get("note_created") %}
+<div class="card priority success">
+    <h2>Заметка сохранена</h2>
+    <div class="meta">Решение добавлено в историю AI Assistant.</div>
+</div>
+{% endif %}
+
+{% if request.query_params.get("note_error") %}
+<div class="card priority danger">
+    <h2>Заметка не сохранена</h2>
+    <div class="meta">Текст заметки не может быть пустым.</div>
 </div>
 {% endif %}
 
@@ -118,6 +133,37 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     {% else %}
                     <tr>
                         <td colspan="4" class="meta">Просрочек нет</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>Заметки владельца</h2>
+            <form method="post" action="/ai/assistant/notes">
+                <textarea name="note" placeholder="Например: связаться с монтажником, перенести срок, проверить оплату..."></textarea>
+                <button class="btn" type="submit" style="border:0;cursor:pointer;margin-top:10px">Сохранить заметку</button>
+            </form>
+
+            <table style="margin-top:14px">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Автор</th>
+                        <th>Заметка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for note in assistant_notes %}
+                    <tr>
+                        <td>{{ note["created_at"] }}</td>
+                        <td>{{ note["username"] }}</td>
+                        <td>{{ note["note"] }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="meta">Заметок пока нет</td>
                     </tr>
                     {% endfor %}
                 </tbody>

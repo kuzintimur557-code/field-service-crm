@@ -318,7 +318,12 @@ def assert_automation_foundation():
         SELECT name
         FROM sqlite_master
         WHERE type='table'
-          AND name IN ('automation_rules', 'automation_actions', 'automation_events')
+          AND name IN (
+              'automation_rules',
+              'automation_actions',
+              'automation_events',
+              'ai_assistant_notes'
+          )
         """).fetchall()
     }
 
@@ -331,18 +336,25 @@ def assert_automation_foundation():
           AND name IN (
               'idx_automation_rules_company_active',
               'idx_automation_actions_rule',
-              'idx_automation_events_company_status'
+              'idx_automation_events_company_status',
+              'idx_ai_assistant_notes_company_created'
           )
         """).fetchall()
     }
 
     conn.close()
 
-    assert table_names == {"automation_rules", "automation_actions", "automation_events"}
+    assert table_names == {
+        "automation_rules",
+        "automation_actions",
+        "automation_events",
+        "ai_assistant_notes",
+    }
     assert index_names == {
         "idx_automation_rules_company_active",
         "idx_automation_actions_rule",
         "idx_automation_events_company_status",
+        "idx_ai_assistant_notes_company_created",
     }
 
 
@@ -833,7 +845,48 @@ async def assert_ai_assistant_page():
     assert 'action="/automation/ai-digest/run"' in html
     assert 'action="/ai/assistant/setup-digests"' in html
     assert "История действий" in html
+    assert "Заметки владельца" in html
+    assert 'action="/ai/assistant/notes"' in html
     assert "Не оплачено" in html
+
+    empty_note_response = await crm.add_ai_assistant_note(
+        make_form_request(
+            "owner2",
+            "/ai/assistant/notes",
+            {"note": ""},
+        )
+    )
+    assert empty_note_response.status_code == 302
+    assert empty_note_response.headers["location"] == "/ai/assistant?note_error=empty"
+
+    note_response = await crm.add_ai_assistant_note(
+        make_form_request(
+            "owner2",
+            "/ai/assistant/notes",
+            {"note": "Проверить AI assistant рекомендацию"},
+        )
+    )
+    assert note_response.status_code == 302
+    assert note_response.headers["location"] == "/ai/assistant?note_created=1"
+
+    notes_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
+    assert notes_response.status_code == 200
+    notes_html = notes_response.body.decode("utf-8")
+    assert "Проверить AI assistant рекомендацию" in notes_html
+
+    conn = connect()
+    c = conn.cursor()
+    saved_note = c.execute("""
+    SELECT *
+    FROM ai_assistant_notes
+    WHERE company_id=2
+      AND username='owner2'
+    ORDER BY id DESC
+    """).fetchone()
+    conn.close()
+
+    assert saved_note is not None
+    assert saved_note["note"] == "Проверить AI assistant рекомендацию"
 
     conn = connect()
     c = conn.cursor()
