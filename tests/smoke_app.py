@@ -814,6 +814,17 @@ async def assert_automation_delete():
     assert action_count == 0
 
 
+async def assert_ai_assistant_page():
+    response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "AI Assistant" in html
+    assert "Что сделать сейчас" in html
+    assert "Порядок работы" in html
+    assert "AI Insights" in html
+    assert "Не оплачено" in html
+
+
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")
     assert anonymous.status_code == 404
@@ -2757,6 +2768,7 @@ def main():
         asyncio.run(assert_automation_page())
         asyncio.run(assert_automation_runner(task))
         asyncio.run(assert_automation_delete())
+        asyncio.run(assert_ai_assistant_page())
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_archive_restore(task))

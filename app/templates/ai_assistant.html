@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Assistant</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1100px;margin:auto;padding:24px}
+.header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+.btn{display:inline-block;padding:12px 16px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900}
+.card{background:white;padding:22px;border-radius:22px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
+h1{margin:0 0 8px;font-size:34px}
+h2{margin:0 0 14px;font-size:22px}
+.meta{color:#6b7280;font-weight:800;line-height:1.45}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:white;padding:18px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
+.stat-title{color:#6b7280;font-weight:900;font-size:13px}
+.stat-value{font-size:28px;font-weight:900;margin-top:6px}
+.priority{border-left:6px solid #2563eb}
+.priority.danger{border-left-color:#dc2626}
+.priority.warning{border-left-color:#d97706}
+.priority.success{border-left-color:#16a34a}
+.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
+@media(max-width:800px){.container{padding:14px}.header,.grid{grid-template-columns:1fr;display:grid}h1{font-size:28px}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="header">
+    <div>
+        <h1>AI Assistant</h1>
+        <div class="meta">Короткий список действий для владельца на основе текущих рисков.</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="btn" href="/ai/insights">AI Insights</a>
+        <a class="btn" href="/">← Главное меню</a>
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat">
+        <div class="stat-title">Просрочено</div>
+        <div class="stat-value">{{ metrics["overdue_tasks"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Активно</div>
+        <div class="stat-value">{{ metrics["active_tasks"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Не оплачено</div>
+        <div class="stat-value">₽{{ "%.1f"|format(metrics["unpaid_total"] or 0) }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">{{ settings["worker_label"] or "Сотрудники" }}</div>
+        <div class="stat-value">{{ metrics["worker_count"] }}</div>
+    </div>
+</div>
+
+<div class="grid">
+    <div>
+        <div class="card">
+            <h2>Что сделать сейчас</h2>
+
+            {% for item in priorities %}
+            <div class="card priority {{ item['level'] }}">
+                <h2>{{ item["title"] }}</h2>
+                <div class="meta">{{ item["reason"] }}</div>
+                <a class="btn" href="{{ item['link'] }}" style="margin-top:12px">{{ item["action"] }}</a>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="card">
+            <h2>Самые старые просрочки</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>{{ settings["client_label"] or "Клиент" }}</th>
+                        <th>Дата</th>
+                        <th>{{ settings["worker_label"] or "Исполнитель" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in overdue_rows %}
+                    <tr>
+                        <td><a href="/task/{{ task['id'] }}">#{{ task["id"] }}</a></td>
+                        <td>{{ task["client"] or "Не указан" }}</td>
+                        <td>{{ task["task_date"] }}</td>
+                        <td>{{ task["workers"] or task["worker"] or "Не назначен" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="meta">Просрочек нет</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Порядок работы</h2>
+        <ol style="font-weight:900;line-height:1.8">
+            {% for step in next_steps %}
+            <li>{{ step }}</li>
+            {% endfor %}
+        </ol>
+    </div>
+</div>
+
+</div>
+
+{% include 'mobile_nav.html' %}
+</body>
+</html>

@@ -760,6 +760,118 @@ def build_ai_digest_message(company_id, cursor=None):
 
     return "\n".join(message_lines)
 
+
+def build_owner_ai_assistant_context(company_id):
+    settings = get_company_settings(company_id)
+    task_label = settings["task_label"] or "задачи"
+    worker_label = settings["worker_label"] or "сотрудник"
+
+    conn = connect()
+    c = conn.cursor()
+
+    overdue_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date < date('now')
+    """, (company_id,)).fetchone()[0]
+
+    active_tasks = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status IN ('Новая', 'В работе')
+    """, (company_id,)).fetchone()[0]
+
+    unpaid_total = c.execute("""
+    SELECT COALESCE(SUM(CAST(REPLACE(COALESCE(price, '0'), ',', '.') AS REAL)), 0)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND payment_status!='Оплачено'
+    """, (company_id,)).fetchone()[0]
+
+    worker_count = c.execute("""
+    SELECT COUNT(*)
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+    """, (company_id,)).fetchone()[0]
+
+    overdue_rows = c.execute("""
+    SELECT id, client, task_date, workers, worker, status
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date < date('now')
+    ORDER BY task_date ASC
+    LIMIT 5
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    priorities = []
+
+    if overdue_tasks:
+        priorities.append({
+            "level": "danger",
+            "title": "Сначала разберите просрочки",
+            "reason": f"Просрочено: {overdue_tasks} ({task_label}).",
+            "action": "Открыть просрочки",
+            "link": "/overdue"
+        })
+
+    if unpaid_total:
+        priorities.append({
+            "level": "warning",
+            "title": "Проверьте неоплаченные работы",
+            "reason": f"Неоплаченная сумма: ₽{round(float(unpaid_total or 0), 1)}.",
+            "action": "Открыть финансы",
+            "link": "/finance"
+        })
+
+    if worker_count and active_tasks > worker_count * 3:
+        priorities.append({
+            "level": "warning",
+            "title": "Проверьте загрузку команды",
+            "reason": f"Активных {task_label}: {active_tasks}, {worker_label}: {worker_count}.",
+            "action": "Открыть загрузку",
+            "link": "/workload"
+        })
+
+    if not priorities:
+        priorities.append({
+            "level": "success",
+            "title": "Критичных действий сейчас нет",
+            "reason": "AI assistant не видит срочных просрочек, перегруза или кассового риска.",
+            "action": "Смотреть AI Insights",
+            "link": "/ai/insights"
+        })
+
+    next_steps = [
+        "Проверьте самый старый риск первым.",
+        "Назначьте ответственного и дату следующего действия.",
+        "После исправления запустите AI-сводку повторно."
+    ]
+
+    return {
+        "settings": settings,
+        "metrics": {
+            "overdue_tasks": overdue_tasks,
+            "active_tasks": active_tasks,
+            "unpaid_total": round(float(unpaid_total or 0), 1),
+            "worker_count": worker_count
+        },
+        "priorities": priorities,
+        "next_steps": next_steps,
+        "overdue_rows": overdue_rows
+    }
+
+
 def run_automation_event(
     company_id,
     trigger_key,
@@ -6700,6 +6812,44 @@ async def ai_insights_page(request: Request):
             "risk_level": risk_level,
             "risk_title": risk_title,
             "weekly_summary": weekly_summary
+        }
+    )
+
+
+@app.get("/ai/assistant", response_class=HTMLResponse)
+async def ai_assistant_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    assistant = build_owner_ai_assistant_context(company_id)
+
+    return templates.TemplateResponse(
+        request,
+        "ai_assistant.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": assistant["settings"],
+            "metrics": assistant["metrics"],
+            "priorities": assistant["priorities"],
+            "next_steps": assistant["next_steps"],
+            "overdue_rows": assistant["overdue_rows"],
+            "features": get_company_features(company_id)
         }
     )
 
