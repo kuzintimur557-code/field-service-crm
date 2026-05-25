@@ -126,6 +126,23 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
             {% endfor %}
         </ol>
     </div>
+
+    <div class="card">
+        <h2>Быстрые действия</h2>
+        <div class="meta">Запустите готовые действия из рекомендаций без перехода в настройки.</div>
+
+        <form method="post" action="/overdue/reminders" style="margin-top:14px">
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%">Напомнить по просрочкам</button>
+        </form>
+
+        <form method="post" action="/sla/reminders" style="margin-top:10px">
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#991b1b">Запустить SLA reminders</button>
+        </form>
+
+        <form method="post" action="/automation/ai-digest/run" style="margin-top:10px">
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#2563eb">Запустить AI scheduler</button>
+        </form>
+    </div>
 </div>
 
 </div>

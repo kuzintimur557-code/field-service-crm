@@ -824,6 +824,10 @@ async def assert_ai_assistant_page():
     assert "AI Insights" in html
     assert 'action="/ai/insights/digest"' in html
     assert "Создать AI-сводку" in html
+    assert "Быстрые действия" in html
+    assert 'action="/overdue/reminders"' in html
+    assert 'action="/sla/reminders"' in html
+    assert 'action="/automation/ai-digest/run"' in html
     assert "Не оплачено" in html
 
 
