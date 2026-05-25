@@ -600,14 +600,33 @@ async def assert_automation_runner(task):
     )
     assert ai_digest_response.status_code == 302
 
-    ai_digest_events = crm.run_automation_event(
-        2,
-        "weekly_digest",
-        "company",
-        2,
-        "Weekly digest event",
-        "/ai/insights",
-    )
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE users
+    SET telegram_chat_id='chat-owner2'
+    WHERE company_id=2
+      AND username='owner2'
+    """)
+    conn.commit()
+    conn.close()
+
+    sent_telegram_messages = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = lambda chat_id, text: sent_telegram_messages.append((chat_id, text)) or True
+
+    try:
+        ai_digest_events = crm.run_automation_event(
+            2,
+            "weekly_digest",
+            "company",
+            2,
+            "Weekly digest event",
+            "/ai/insights",
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
     assert ai_digest_events >= 1
 
     conn = connect()
@@ -638,6 +657,9 @@ async def assert_automation_runner(task):
     assert ai_digest_notification is not None
     assert "AI-сводка по бизнесу" in ai_digest_notification["message"]
     assert ai_digest_notification["link"] == "/ai/insights"
+    assert sent_telegram_messages
+    assert sent_telegram_messages[-1][0] == "chat-owner2"
+    assert "AI-сводка по бизнесу" in sent_telegram_messages[-1][1]
 
     daily_digest_response = await crm.create_automation_rule(
         make_form_request(

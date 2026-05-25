@@ -887,6 +887,22 @@ def run_automation_event(
 
                     handled_actions += 1
 
+                    user_row = c.execute("""
+                    SELECT telegram_chat_id
+                    FROM users
+                    WHERE company_id=?
+                      AND username=?
+                    """, (company_id, target_username)).fetchone()
+
+                    if user_row and user_row["telegram_chat_id"]:
+                        try:
+                            send_message_to_chat(
+                                user_row["telegram_chat_id"],
+                                digest_message
+                            )
+                        except Exception:
+                            pass
+
         status = "done" if handled_actions else "skipped"
 
         c.execute("""
