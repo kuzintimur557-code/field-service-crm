@@ -33,6 +33,9 @@ select{width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db;font-
 .badge.urgent{background:#fee2e2;color:#991b1b}
 .badge.normal{background:#dbeafe;color:#1d4ed8}
 .badge.later{background:#f3f4f6;color:#6b7280}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.filters a{padding:9px 12px;border-radius:999px;background:#e5e7eb;color:#111827;text-decoration:none;font-weight:900}
+.filters a.active{background:#111827;color:white}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 @media(max-width:800px){.container{padding:14px}.header,.grid{grid-template-columns:1fr;display:grid}h1{font-size:28px}}
@@ -190,6 +193,12 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 <input type="date" name="follow_up_date" style="margin-top:10px">
                 <button class="btn" type="submit" style="border:0;cursor:pointer;margin-top:10px">Сохранить заметку</button>
             </form>
+
+            <div class="filters">
+                <a href="/ai/assistant" class="{% if not selected_note_filter %}active{% endif %}">Все</a>
+                <a href="/ai/assistant?note_filter=due" class="{% if selected_note_filter == 'due' %}active{% endif %}">К контролю</a>
+                <a href="/ai/assistant?note_filter=urgent" class="{% if selected_note_filter == 'urgent' %}active{% endif %}">Срочные</a>
+            </div>
 
             <table style="margin-top:14px">
                 <thead>

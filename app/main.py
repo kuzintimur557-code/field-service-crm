@@ -915,11 +915,24 @@ def build_ai_digest_message(company_id, cursor=None):
     return "\n".join(message_lines)
 
 
-def build_owner_ai_assistant_context(company_id):
+def build_owner_ai_assistant_context(company_id, note_filter=""):
     settings = get_company_settings(company_id)
     task_label = settings["task_label"] or "задачи"
     worker_label = settings["worker_label"] or "сотрудник"
     trigger_labels = dict(AUTOMATION_TRIGGERS)
+    selected_note_filter = note_filter if note_filter in ("due", "urgent") else ""
+    note_filter_sql = ""
+
+    if selected_note_filter == "due":
+        note_filter_sql = """
+          AND follow_up_date IS NOT NULL
+          AND follow_up_date!=''
+          AND follow_up_date <= date('now')
+        """
+    elif selected_note_filter == "urgent":
+        note_filter_sql = """
+          AND COALESCE(priority, 'normal')='urgent'
+        """
 
     conn = connect()
     c = conn.cursor()
@@ -999,11 +1012,12 @@ def build_owner_ai_assistant_context(company_id):
     LIMIT 8
     """, (company_id,)).fetchall()
 
-    assistant_notes = c.execute("""
+    assistant_notes = c.execute(f"""
     SELECT *
     FROM ai_assistant_notes
     WHERE company_id=?
       AND COALESCE(is_done, 0)=0
+      {note_filter_sql}
     ORDER BY
       CASE
         WHEN follow_up_date IS NOT NULL
@@ -1104,6 +1118,7 @@ def build_owner_ai_assistant_context(company_id):
         "overdue_rows": overdue_rows,
         "action_history": action_history_rows,
         "assistant_notes": assistant_notes,
+        "selected_note_filter": selected_note_filter,
         "completed_notes": completed_notes
     }
 
@@ -7133,7 +7148,7 @@ async def ai_insights_page(request: Request):
 
 
 @app.get("/ai/assistant", response_class=HTMLResponse)
-async def ai_assistant_page(request: Request):
+async def ai_assistant_page(request: Request, note_filter: str = ""):
 
     username = get_user(request)
 
@@ -7151,7 +7166,7 @@ async def ai_assistant_page(request: Request):
     if disabled_response:
         return disabled_response
 
-    assistant = build_owner_ai_assistant_context(company_id)
+    assistant = build_owner_ai_assistant_context(company_id, note_filter)
 
     return templates.TemplateResponse(
         request,
@@ -7167,6 +7182,7 @@ async def ai_assistant_page(request: Request):
             "overdue_rows": assistant["overdue_rows"],
             "action_history": assistant["action_history"],
             "assistant_notes": assistant["assistant_notes"],
+            "selected_note_filter": assistant["selected_note_filter"],
             "completed_notes": assistant["completed_notes"],
             "features": get_company_features(company_id)
         }
