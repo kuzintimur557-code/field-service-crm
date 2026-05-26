@@ -322,7 +322,8 @@ def assert_automation_foundation():
               'automation_rules',
               'automation_actions',
               'automation_events',
-              'ai_assistant_notes'
+              'ai_assistant_notes',
+              'ai_assistant_events'
           )
         """).fetchall()
     }
@@ -337,7 +338,8 @@ def assert_automation_foundation():
               'idx_automation_rules_company_active',
               'idx_automation_actions_rule',
               'idx_automation_events_company_status',
-              'idx_ai_assistant_notes_company_created'
+              'idx_ai_assistant_notes_company_created',
+              'idx_ai_assistant_events_company_created'
           )
         """).fetchall()
     }
@@ -354,12 +356,14 @@ def assert_automation_foundation():
         "automation_actions",
         "automation_events",
         "ai_assistant_notes",
+        "ai_assistant_events",
     }
     assert index_names == {
         "idx_automation_rules_company_active",
         "idx_automation_actions_rule",
         "idx_automation_events_company_status",
         "idx_ai_assistant_notes_company_created",
+        "idx_ai_assistant_events_company_created",
     }
     assert "priority" in ai_note_columns
     assert "follow_up_date" in ai_note_columns
@@ -857,6 +861,7 @@ async def assert_ai_assistant_page():
     assert 'action="/automation/ai-digest/run"' in html
     assert 'action="/ai/assistant/setup-digests"' in html
     assert "История действий" in html
+    assert "Журнал AI Assistant" in html
     assert "Заметки владельца" in html
     assert "Выполненные решения" in html
     assert 'action="/ai/assistant/notes"' in html
@@ -937,6 +942,22 @@ async def assert_ai_assistant_page():
     assert saved_note["follow_up_date"] == "2026-05-26"
     assert saved_note["is_done"] == 0
 
+    conn = connect()
+    c = conn.cursor()
+    created_event = c.execute("""
+    SELECT *
+    FROM ai_assistant_events
+    WHERE company_id=2
+      AND note_id=?
+      AND username='owner2'
+      AND action='created'
+    ORDER BY id DESC
+    """, (saved_note["id"],)).fetchone()
+    conn.close()
+
+    assert created_event is not None
+    assert created_event["details"] == "Проверить AI assistant рекомендацию"
+
     digest_message = crm.build_ai_digest_message(2)
     assert "Активные заметки владельца" in digest_message
     assert "Срочно: Проверить AI assistant рекомендацию" in digest_message
@@ -990,6 +1011,21 @@ async def assert_ai_assistant_page():
 
     conn = connect()
     c = conn.cursor()
+    notification_event = c.execute("""
+    SELECT *
+    FROM ai_assistant_events
+    WHERE company_id=2
+      AND note_id=?
+      AND username='owner2'
+      AND action='notification_sent'
+    ORDER BY id DESC
+    """, (saved_note["id"],)).fetchone()
+    conn.close()
+
+    assert notification_event is not None
+
+    conn = connect()
+    c = conn.cursor()
     notified_note = c.execute("""
     SELECT *
     FROM ai_assistant_notes
@@ -1033,6 +1069,21 @@ async def assert_ai_assistant_page():
     assert postponed_note["follow_up_date"] == (
         datetime.now() + timedelta(days=1)
     ).strftime("%Y-%m-%d")
+
+    conn = connect()
+    c = conn.cursor()
+    postponed_event = c.execute("""
+    SELECT *
+    FROM ai_assistant_events
+    WHERE company_id=2
+      AND note_id=?
+      AND username='owner2'
+      AND action='postponed'
+    ORDER BY id DESC
+    """, (saved_note["id"],)).fetchone()
+    conn.close()
+
+    assert postponed_event is not None
 
     scheduled_note_response = await crm.add_ai_assistant_note(
         make_form_request(
@@ -1100,6 +1151,21 @@ async def assert_ai_assistant_page():
     assert completed_note is not None
     assert completed_note["is_done"] == 1
     assert completed_note["done_by"] == "owner2"
+
+    conn = connect()
+    c = conn.cursor()
+    done_event = c.execute("""
+    SELECT *
+    FROM ai_assistant_events
+    WHERE company_id=2
+      AND note_id=?
+      AND username='owner2'
+      AND action='done'
+    ORDER BY id DESC
+    """, (saved_note["id"],)).fetchone()
+    conn.close()
+
+    assert done_event is not None
 
     completed_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert completed_page_response.status_code == 200

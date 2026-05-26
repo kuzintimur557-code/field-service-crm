@@ -378,6 +378,36 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
             </tbody>
         </table>
     </div>
+
+    <div class="card">
+        <h2>Журнал AI Assistant</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Автор</th>
+                    <th>Действие</th>
+                    <th>Детали</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in ai_events %}
+                <tr>
+                    <td>{{ event["created_at"] }}</td>
+                    <td>{{ event["username"] }}</td>
+                    <td>
+                        {% if event["action"] == "created" %}Создано{% elif event["action"] == "done" %}Выполнено{% elif event["action"] == "postponed" %}Перенесено{% elif event["action"] == "notification_sent" %}Уведомление{% else %}{{ event["action"] }}{% endif %}
+                    </td>
+                    <td>{{ event["details"] }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="meta">Событий AI Assistant пока нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 </div>

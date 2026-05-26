@@ -699,6 +699,28 @@ def create_notification(
     conn.close()
 
 
+def log_ai_assistant_event(company_id, note_id, username, action, details=""):
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO ai_assistant_events (
+        company_id, note_id, username, action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        note_id,
+        username,
+        action,
+        details,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 def create_ai_follow_up_notifications(company_id, username, now_dt=None):
     now_dt = now_dt or datetime.now()
     today_key = now_dt.strftime("%Y-%m-%d")
@@ -771,6 +793,20 @@ def create_ai_follow_up_notifications(company_id, username, now_dt=None):
             now,
             note["id"],
             company_id
+        ))
+
+        c.execute("""
+        INSERT INTO ai_assistant_events (
+            company_id, note_id, username, action, details, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            note["id"],
+            username,
+            "notification_sent",
+            title,
+            now
         ))
 
         user_row = c.execute("""
@@ -1045,6 +1081,14 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
     LIMIT 8
     """, note_params).fetchall()
 
+    ai_events = c.execute("""
+    SELECT *
+    FROM ai_assistant_events
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
     completed_notes = c.execute(f"""
     SELECT
         ai_assistant_notes.*,
@@ -1130,6 +1174,7 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
         "overdue_rows": overdue_rows,
         "action_history": action_history_rows,
         "assistant_notes": assistant_notes,
+        "ai_events": ai_events,
         "selected_note_filter": selected_note_filter,
         "selected_note_search": selected_note_search,
         "completed_notes": completed_notes
@@ -7195,6 +7240,7 @@ async def ai_assistant_page(request: Request, note_filter: str = "", note_search
             "overdue_rows": assistant["overdue_rows"],
             "action_history": assistant["action_history"],
             "assistant_notes": assistant["assistant_notes"],
+            "ai_events": assistant["ai_events"],
             "selected_note_filter": assistant["selected_note_filter"],
             "selected_note_search": assistant["selected_note_search"],
             "completed_notes": assistant["completed_notes"],
@@ -7257,7 +7303,16 @@ async def add_ai_assistant_note(request: Request):
     ))
 
     conn.commit()
+    note_id = c.lastrowid
     conn.close()
+
+    log_ai_assistant_event(
+        company_id,
+        note_id,
+        username,
+        "created",
+        note
+    )
 
     return RedirectResponse("/ai/assistant?note_created=1", status_code=302)
 
@@ -7300,6 +7355,14 @@ async def complete_ai_assistant_note(request: Request, note_id: int):
 
     conn.commit()
     conn.close()
+
+    log_ai_assistant_event(
+        company_id,
+        note_id,
+        username,
+        "done",
+        "AI заметка выполнена"
+    )
 
     return RedirectResponse("/ai/assistant?note_done=1", status_code=302)
 
@@ -7348,6 +7411,14 @@ async def postpone_ai_assistant_note(request: Request, note_id: int):
 
     conn.commit()
     conn.close()
+
+    log_ai_assistant_event(
+        company_id,
+        note_id,
+        username,
+        "postponed",
+        f"Контроль перенесён на {next_date}"
+    )
 
     return RedirectResponse("/ai/assistant?note_postponed=1", status_code=302)
 

@@ -372,6 +372,18 @@ def init_db():
     )
     """)
 
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS ai_assistant_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        note_id INTEGER,
+        username TEXT,
+        action TEXT,
+        details TEXT,
+        created_at TEXT
+    )
+    """)
+
     add_column_if_missing(c, "payroll_payouts", "note", "TEXT")
     add_column_if_missing(c, "ai_assistant_notes", "priority", "TEXT DEFAULT 'normal'")
     add_column_if_missing(c, "ai_assistant_notes", "follow_up_date", "TEXT")
@@ -589,6 +601,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_ai_assistant_notes_company_created
     ON ai_assistant_notes(company_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_ai_assistant_events_company_created
+    ON ai_assistant_events(company_id, created_at)
     """)
 
     if os.getenv("ENV") != "production":
