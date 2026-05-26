@@ -2561,7 +2561,7 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     event_params = [company_id]
 
     if selected_event_filter:
-        event_filter_sql = "AND status=?"
+        event_filter_sql = "AND automation_events.status=?"
         event_params.append(selected_event_filter)
 
     conn = connect()
@@ -2598,11 +2598,16 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     """, (company_id,)).fetchall()
 
     events = c.execute(f"""
-    SELECT *
+    SELECT
+        automation_events.*,
+        automation_rules.name AS rule_name
     FROM automation_events
-    WHERE company_id=?
+    LEFT JOIN automation_rules
+      ON automation_rules.id=automation_events.rule_id
+      AND automation_rules.company_id=automation_events.company_id
+    WHERE automation_events.company_id=?
       {event_filter_sql}
-    ORDER BY id DESC
+    ORDER BY automation_events.id DESC
     LIMIT 30
     """, event_params).fetchall()
 
@@ -2783,18 +2788,23 @@ async def automation_events_export(request: Request, event_filter: str = ""):
     event_params = [company_id]
 
     if selected_event_filter:
-        event_filter_sql = "AND status=?"
+        event_filter_sql = "AND automation_events.status=?"
         event_params.append(selected_event_filter)
 
     conn = connect()
     c = conn.cursor()
 
     events = c.execute(f"""
-    SELECT *
+    SELECT
+        automation_events.*,
+        automation_rules.name AS rule_name
     FROM automation_events
-    WHERE company_id=?
+    LEFT JOIN automation_rules
+      ON automation_rules.id=automation_events.rule_id
+      AND automation_rules.company_id=automation_events.company_id
+    WHERE automation_events.company_id=?
       {event_filter_sql}
-    ORDER BY id DESC
+    ORDER BY automation_events.id DESC
     LIMIT 500
     """, event_params).fetchall()
 
@@ -2805,6 +2815,7 @@ async def automation_events_export(request: Request, event_filter: str = ""):
     writer.writerow([
         "id",
         "rule_id",
+        "rule_name",
         "trigger_key",
         "status",
         "entity_type",
@@ -2818,6 +2829,7 @@ async def automation_events_export(request: Request, event_filter: str = ""):
         writer.writerow([
             event["id"],
             event["rule_id"],
+            event["rule_name"] or "",
             event["trigger_key"],
             event["status"],
             event["entity_type"],

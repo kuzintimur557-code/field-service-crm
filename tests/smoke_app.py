@@ -584,6 +584,7 @@ async def assert_automation_runner(task):
     done_html = done_response.body.decode("utf-8")
     assert "SLA event happened" in done_html
     assert "Выполнено" in done_html
+    assert "Правило: SLA runner rule" in done_html
     assert 'href="/automation/events/export?event_filter=done"' in done_html
 
     done_export_response = await crm.automation_events_export(
@@ -593,6 +594,7 @@ async def assert_automation_runner(task):
     assert done_export_response.status_code == 200
     done_export_csv = done_export_response.body.decode("utf-8")
     assert "SLA event happened" in done_export_csv
+    assert "SLA runner rule" in done_export_csv
     assert "done" in done_export_csv
 
     conn = connect()

@@ -256,6 +256,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <div class="meta">{{ event["created_at"] }}</div>
     <div>
         <div class="rule-title">{{ trigger_labels.get(event["trigger_key"], event["trigger_key"]) }}</div>
+        {% if event["rule_name"] %}
+        <div class="meta">Правило: {{ event["rule_name"] }}</div>
+        {% endif %}
         <div class="meta">{{ event["message"] or "" }}</div>
     </div>
     <span class="pill">{{ status_labels.get(event["status"], event["status"]) }}</span>
