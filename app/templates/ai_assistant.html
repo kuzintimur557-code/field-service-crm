@@ -360,6 +360,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 <tr>
                     <th>Дата</th>
                     <th>Триггер</th>
+                    <th>Правило</th>
                     <th>Статус</th>
                 </tr>
             </thead>
@@ -368,11 +369,12 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 <tr>
                     <td>{{ event["created_at"] }}</td>
                     <td>{{ event["trigger_label"] }}</td>
-                    <td>{{ event["status"] }}</td>
+                    <td>{{ event["rule_name"] or "Без правила" }}</td>
+                    <td>{{ event["status_label"] }}</td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="3" class="meta">Действий пока нет</td>
+                    <td colspan="4" class="meta">Действий пока нет</td>
                 </tr>
                 {% endfor %}
             </tbody>

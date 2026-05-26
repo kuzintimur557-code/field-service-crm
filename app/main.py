@@ -1063,16 +1063,21 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="",
     """, (company_id,)).fetchall()
 
     action_history = c.execute("""
-    SELECT *
+    SELECT
+        automation_events.*,
+        automation_rules.name AS rule_name
     FROM automation_events
-    WHERE company_id=?
-      AND trigger_key IN (
+    LEFT JOIN automation_rules
+      ON automation_rules.id=automation_events.rule_id
+      AND automation_rules.company_id=automation_events.company_id
+    WHERE automation_events.company_id=?
+      AND automation_events.trigger_key IN (
           'overdue_task',
           'sla_overdue',
           'daily_digest',
           'weekly_digest'
       )
-    ORDER BY id DESC
+    ORDER BY automation_events.id DESC
     LIMIT 8
     """, (company_id,)).fetchall()
 
@@ -1131,6 +1136,7 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="",
     for event in action_history:
         event_row = dict(event)
         event_row["trigger_label"] = trigger_labels.get(event["trigger_key"], event["trigger_key"])
+        event_row["status_label"] = AUTOMATION_STATUS_LABELS.get(event["status"], event["status"])
         action_history_rows.append(event_row)
 
     priorities = []
