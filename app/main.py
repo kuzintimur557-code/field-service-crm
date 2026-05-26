@@ -2678,6 +2678,12 @@ async def automation_page(
     """, (company_id,)).fetchall()
     event_counts = {row["status"]: row["count"] for row in event_count_rows}
 
+    last_event_at = c.execute("""
+    SELECT MAX(created_at)
+    FROM automation_events
+    WHERE company_id=?
+    """, (company_id,)).fetchone()[0] or ""
+
     users = c.execute("""
     SELECT username, role
     FROM users
@@ -2708,7 +2714,8 @@ async def automation_page(
         "events_total": sum(event_counts.values()),
         "events_pending": event_counts.get("pending", 0),
         "events_done": event_counts.get("done", 0),
-        "events_skipped": event_counts.get("skipped", 0)
+        "events_skipped": event_counts.get("skipped", 0),
+        "last_event_at": last_event_at
     }
 
     if selected_rule_filter == "active":

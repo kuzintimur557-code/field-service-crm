@@ -112,6 +112,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="stat-title">Событий пропущено</div>
         <div class="stat-value">{{ automation_stats["events_skipped"] }}</div>
     </div>
+    <div class="stat">
+        <div class="stat-title">Последнее событие</div>
+        <div class="stat-value" style="font-size:18px">{{ automation_stats["last_event_at"] or "Нет" }}</div>
+    </div>
 </div>
 
 <div class="card">
