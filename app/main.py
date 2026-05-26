@@ -728,6 +728,7 @@ def create_ai_follow_up_notifications(company_id, username, now_dt=None):
 
     for note in due_notes:
         title = f"AI контроль: заметка #{note['id']}"
+        message = note["note"]
         duplicate_count = c.execute("""
         SELECT COUNT(*)
         FROM notifications
@@ -754,11 +755,27 @@ def create_ai_follow_up_notifications(company_id, username, now_dt=None):
             company_id,
             username,
             title,
-            note["note"],
+            message,
             "/ai/assistant",
             now
         ))
         created_count += 1
+
+        user_row = c.execute("""
+        SELECT telegram_chat_id
+        FROM users
+        WHERE company_id=?
+          AND username=?
+        """, (company_id, username)).fetchone()
+
+        if user_row and user_row["telegram_chat_id"]:
+            try:
+                send_message_to_chat(
+                    user_row["telegram_chat_id"],
+                    f"{title}\n{message}"
+                )
+            except Exception:
+                pass
 
     conn.commit()
     conn.close()

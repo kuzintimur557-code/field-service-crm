@@ -919,11 +919,35 @@ async def assert_ai_assistant_page():
     assert "Срочно: Проверить AI assistant рекомендацию" in digest_message
     assert "контроль: 2026-05-26" in digest_message
 
-    follow_up_response = await crm.notify_ai_assistant_follow_ups(make_request("owner2"))
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE users
+    SET telegram_chat_id='chat-owner2'
+    WHERE company_id=2
+      AND username='owner2'
+    """)
+    conn.commit()
+    conn.close()
+
+    sent_follow_up_telegram_messages = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = (
+        lambda chat_id, text: sent_follow_up_telegram_messages.append((chat_id, text)) or True
+    )
+
+    try:
+        follow_up_response = await crm.notify_ai_assistant_follow_ups(make_request("owner2"))
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
     assert follow_up_response.status_code == 302
     assert follow_up_response.headers["location"].startswith(
         "/ai/assistant?follow_up_notifications="
     )
+    assert sent_follow_up_telegram_messages
+    assert sent_follow_up_telegram_messages[-1][0] == "chat-owner2"
+    assert "Проверить AI assistant рекомендацию" in sent_follow_up_telegram_messages[-1][1]
 
     conn = connect()
     c = conn.cursor()
