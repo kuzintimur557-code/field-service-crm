@@ -2715,6 +2715,13 @@ async def automation_page(
         "events_pending": event_counts.get("pending", 0),
         "events_done": event_counts.get("done", 0),
         "events_skipped": event_counts.get("skipped", 0),
+        "success_rate": round(
+            event_counts.get("done", 0) / max(
+                event_counts.get("done", 0) + event_counts.get("skipped", 0),
+                1
+            ) * 100,
+            1
+        ),
         "last_event_at": last_event_at
     }
 
