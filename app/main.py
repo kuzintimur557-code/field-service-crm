@@ -699,6 +699,73 @@ def create_notification(
     conn.close()
 
 
+def create_ai_follow_up_notifications(company_id, username, now_dt=None):
+    now_dt = now_dt or datetime.now()
+    today_key = now_dt.strftime("%Y-%m-%d")
+    now = now_dt.strftime("%Y-%m-%d %H:%M")
+    created_count = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    due_notes = c.execute("""
+    SELECT *
+    FROM ai_assistant_notes
+    WHERE company_id=?
+      AND COALESCE(is_done, 0)=0
+      AND follow_up_date IS NOT NULL
+      AND follow_up_date!=''
+      AND follow_up_date <= ?
+    ORDER BY
+      CASE COALESCE(priority, 'normal')
+        WHEN 'urgent' THEN 0
+        WHEN 'normal' THEN 1
+        ELSE 2
+      END,
+      follow_up_date ASC,
+      id DESC
+    """, (company_id, today_key)).fetchall()
+
+    for note in due_notes:
+        title = f"AI контроль: заметка #{note['id']}"
+        duplicate_count = c.execute("""
+        SELECT COUNT(*)
+        FROM notifications
+        WHERE company_id=?
+          AND username=?
+          AND title=?
+          AND created_at LIKE ?
+        """, (
+            company_id,
+            username,
+            title,
+            f"{today_key}%"
+        )).fetchone()[0]
+
+        if duplicate_count:
+            continue
+
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message, link, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            username,
+            title,
+            note["note"],
+            "/ai/assistant",
+            now
+        ))
+        created_count += 1
+
+    conn.commit()
+    conn.close()
+
+    return created_count
+
+
 
 
 def build_ai_digest_message(company_id, cursor=None):
@@ -7139,6 +7206,38 @@ async def complete_ai_assistant_note(request: Request, note_id: int):
     conn.close()
 
     return RedirectResponse("/ai/assistant?note_done=1", status_code=302)
+
+
+@app.post("/ai/assistant/follow-ups/notify")
+async def notify_ai_assistant_follow_ups(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    disabled_response = require_feature(company_id, "notifications")
+
+    if disabled_response:
+        return disabled_response
+
+    created_count = create_ai_follow_up_notifications(company_id, username)
+
+    return RedirectResponse(
+        f"/ai/assistant?follow_up_notifications={created_count}",
+        status_code=302
+    )
 
 
 @app.post("/ai/assistant/setup-digests")

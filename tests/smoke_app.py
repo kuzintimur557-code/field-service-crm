@@ -850,6 +850,7 @@ async def assert_ai_assistant_page():
     assert "Быстрые действия" in html
     assert 'action="/overdue/reminders"' in html
     assert 'action="/sla/reminders"' in html
+    assert 'action="/ai/assistant/follow-ups/notify"' in html
     assert 'action="/automation/ai-digest/run"' in html
     assert 'action="/ai/assistant/setup-digests"' in html
     assert "История действий" in html
@@ -916,6 +917,28 @@ async def assert_ai_assistant_page():
     assert "Активные заметки владельца" in digest_message
     assert "Срочно: Проверить AI assistant рекомендацию" in digest_message
     assert "контроль: 2026-05-26" in digest_message
+
+    follow_up_response = await crm.notify_ai_assistant_follow_ups(make_request("owner2"))
+    assert follow_up_response.status_code == 302
+    assert follow_up_response.headers["location"].startswith(
+        "/ai/assistant?follow_up_notifications="
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    follow_up_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title=?
+    ORDER BY id DESC
+    """, (f"AI контроль: заметка #{saved_note['id']}",)).fetchone()
+    conn.close()
+
+    assert follow_up_notification is not None
+    assert follow_up_notification["message"] == "Проверить AI assistant рекомендацию"
+    assert follow_up_notification["link"] == "/ai/assistant"
 
     ai_note_task_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),

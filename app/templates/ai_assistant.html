@@ -91,6 +91,13 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 </div>
 {% endif %}
 
+{% if request.query_params.get("follow_up_notifications") %}
+<div class="card priority success">
+    <h2>AI контроль отправлен в уведомления</h2>
+    <div class="meta">Создано уведомлений: {{ request.query_params.get("follow_up_notifications") or "0" }}</div>
+</div>
+{% endif %}
+
 <div class="stats">
     <div class="stat">
         <div class="stat-title">Просрочено</div>
@@ -279,6 +286,10 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 
         <form method="post" action="/sla/reminders" style="margin-top:10px">
             <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#991b1b">Запустить SLA reminders</button>
+        </form>
+
+        <form method="post" action="/ai/assistant/follow-ups/notify" style="margin-top:10px">
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#7c3aed">Уведомить по AI контролю</button>
         </form>
 
         <form method="post" action="/automation/ai-digest/run" style="margin-top:10px">
