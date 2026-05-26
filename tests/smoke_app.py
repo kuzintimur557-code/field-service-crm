@@ -386,12 +386,14 @@ async def assert_automation_page():
     assert "Включено правил" in html
     assert "Событий выполнено" in html
     assert "AI-планировщик" in html
-    assert "AI контроля" in html
+    assert "AI-контроля" in html
     assert 'action="/automation/ai-digest/run"' in html
     assert 'href="/automation/rules/export"' in html
     assert 'href="/automation/events/export"' in html
-    assert "Cron endpoint" in html
+    assert "Cron-запуск" in html
+    assert "дневных и недельных AI-сводок" in html
     assert "AUTOMATION_CRON_SECRET" in html
+    assert "заголовком x-automation-secret" in html
     assert "POST /automation/cron/ai-digest" in html
 
     create_response = await crm.create_automation_rule(
