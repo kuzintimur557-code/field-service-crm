@@ -851,6 +851,21 @@ def build_owner_ai_assistant_context(company_id):
     LIMIT 8
     """, (company_id,)).fetchall()
 
+    completed_notes = c.execute("""
+    SELECT
+        ai_assistant_notes.*,
+        tasks.client AS created_task_client,
+        tasks.status AS created_task_status
+    FROM ai_assistant_notes
+    LEFT JOIN tasks
+      ON tasks.id=ai_assistant_notes.created_task_id
+      AND tasks.company_id=ai_assistant_notes.company_id
+    WHERE ai_assistant_notes.company_id=?
+      AND COALESCE(ai_assistant_notes.is_done, 0)=1
+    ORDER BY ai_assistant_notes.id DESC
+    LIMIT 8
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     action_history_rows = []
@@ -916,7 +931,8 @@ def build_owner_ai_assistant_context(company_id):
         "next_steps": next_steps,
         "overdue_rows": overdue_rows,
         "action_history": action_history_rows,
-        "assistant_notes": assistant_notes
+        "assistant_notes": assistant_notes,
+        "completed_notes": completed_notes
     }
 
 
@@ -6971,6 +6987,7 @@ async def ai_assistant_page(request: Request):
             "overdue_rows": assistant["overdue_rows"],
             "action_history": assistant["action_history"],
             "assistant_notes": assistant["assistant_notes"],
+            "completed_notes": assistant["completed_notes"],
             "features": get_company_features(company_id)
         }
     )
@@ -10034,13 +10051,15 @@ async def create_task(
         UPDATE ai_assistant_notes
         SET is_done=1,
             done_by=?,
-            done_at=?
+            done_at=?,
+            created_task_id=?
         WHERE id=?
           AND company_id=?
           AND COALESCE(is_done, 0)=0
         """, (
             username,
             datetime.now().strftime("%Y-%m-%d %H:%M"),
+            task_id,
             int(ai_note_id),
             company_id
         ))

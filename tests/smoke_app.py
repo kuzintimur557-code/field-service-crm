@@ -342,6 +342,11 @@ def assert_automation_foundation():
         """).fetchall()
     }
 
+    ai_note_columns = {
+        row["name"]
+        for row in c.execute("PRAGMA table_info(ai_assistant_notes)").fetchall()
+    }
+
     conn.close()
 
     assert table_names == {
@@ -356,6 +361,7 @@ def assert_automation_foundation():
         "idx_automation_events_company_status",
         "idx_ai_assistant_notes_company_created",
     }
+    assert "created_task_id" in ai_note_columns
 
 
 async def assert_automation_page():
@@ -846,6 +852,7 @@ async def assert_ai_assistant_page():
     assert 'action="/ai/assistant/setup-digests"' in html
     assert "История действий" in html
     assert "Заметки владельца" in html
+    assert "Выполненные решения" in html
     assert 'action="/ai/assistant/notes"' in html
     assert "Не оплачено" in html
 
@@ -931,7 +938,81 @@ async def assert_ai_assistant_page():
     completed_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert completed_page_response.status_code == 200
     completed_html = completed_page_response.body.decode("utf-8")
-    assert "Проверить AI assistant рекомендацию" not in completed_html
+    assert "Проверить AI assistant рекомендацию" in completed_html
+    assert "Без заявки" in completed_html
+
+    task_note_response = await crm.add_ai_assistant_note(
+        make_form_request(
+            "owner2",
+            "/ai/assistant/notes",
+            {"note": "Создать заявку из AI заметки"},
+        )
+    )
+    assert task_note_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    task_note = c.execute("""
+    SELECT *
+    FROM ai_assistant_notes
+    WHERE company_id=2
+      AND username='owner2'
+      AND note='Создать заявку из AI заметки'
+    ORDER BY id DESC
+    """).fetchone()
+    conn.close()
+
+    assert task_note is not None
+
+    original_send_message = crm.send_message
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message = lambda text: True
+    crm.send_message_to_chat = lambda chat_id, text: True
+
+    try:
+        created_task_response = await crm.create_task(
+            make_multipart_request(
+                "owner2",
+                "/create-task",
+                {
+                    "client": "AI client",
+                    "phone": "+70000000001",
+                    "address": "AI address",
+                    "description": "Создать заявку из AI заметки",
+                    "task_date": "2026-05-26",
+                    "ai_note_id": str(task_note["id"]),
+                    "priority": "Обычный",
+                    "price": "0",
+                },
+            ),
+            photo=None,
+        )
+    finally:
+        crm.send_message = original_send_message
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert created_task_response.status_code == 302
+    assert created_task_response.headers["location"] == "/"
+
+    conn = connect()
+    c = conn.cursor()
+    linked_note = c.execute("""
+    SELECT *
+    FROM ai_assistant_notes
+    WHERE id=?
+      AND company_id=2
+    """, (task_note["id"],)).fetchone()
+    conn.close()
+
+    assert linked_note is not None
+    assert linked_note["is_done"] == 1
+    assert linked_note["created_task_id"] is not None
+
+    linked_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
+    assert linked_page_response.status_code == 200
+    linked_html = linked_page_response.body.decode("utf-8")
+    assert "Создать заявку из AI заметки" in linked_html
+    assert f"/task/{linked_note['created_task_id']}" in linked_html
 
     conn = connect()
     c = conn.cursor()

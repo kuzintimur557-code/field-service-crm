@@ -183,6 +183,41 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 </tbody>
             </table>
         </div>
+
+        <div class="card">
+            <h2>Выполненные решения</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Кто закрыл</th>
+                        <th>Решение</th>
+                        <th>{{ settings["task_label"] or "Заявка" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for note in completed_notes %}
+                    <tr>
+                        <td>{{ note["done_at"] or note["created_at"] }}</td>
+                        <td>{{ note["done_by"] or note["username"] }}</td>
+                        <td>{{ note["note"] }}</td>
+                        <td>
+                            {% if note["created_task_id"] %}
+                            <a href="/task/{{ note['created_task_id'] }}">#{{ note["created_task_id"] }}</a>
+                            {% if note["created_task_client"] %}<span class="meta">{{ note["created_task_client"] }}</span>{% endif %}
+                            {% else %}
+                            <span class="meta">Без заявки</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="meta">Выполненных решений пока нет</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div class="card">

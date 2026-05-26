@@ -363,6 +363,7 @@ def init_db():
         is_done INTEGER DEFAULT 0,
         done_by TEXT,
         done_at TEXT,
+        created_task_id INTEGER,
         created_at TEXT
     )
     """)
@@ -371,6 +372,7 @@ def init_db():
     add_column_if_missing(c, "ai_assistant_notes", "is_done", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "ai_assistant_notes", "done_by", "TEXT")
     add_column_if_missing(c, "ai_assistant_notes", "done_at", "TEXT")
+    add_column_if_missing(c, "ai_assistant_notes", "created_task_id", "INTEGER")
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "full_name", "TEXT")
