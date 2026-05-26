@@ -2546,7 +2546,8 @@ async def automation_page(
     event_filter: str = "",
     trigger_filter: str = "",
     rule_trigger_filter: str = "",
-    rule_search: str = ""
+    rule_search: str = "",
+    event_search: str = ""
 ):
 
     username = get_user(request)
@@ -2574,6 +2575,7 @@ async def automation_page(
     selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
     selected_rule_trigger_filter = rule_trigger_filter if rule_trigger_filter in trigger_keys else ""
     selected_rule_search = (rule_search or "").strip()[:80]
+    selected_event_search = (event_search or "").strip()[:80]
     event_filter_sql = ""
     event_params = [company_id]
 
@@ -2584,6 +2586,18 @@ async def automation_page(
     if selected_trigger_filter:
         event_filter_sql += "\n      AND automation_events.trigger_key=?"
         event_params.append(selected_trigger_filter)
+
+    if selected_event_search:
+        event_filter_sql += """
+      AND (
+        automation_events.message LIKE ?
+        OR automation_rules.name LIKE ?
+      )
+        """
+        event_params.extend([
+            f"%{selected_event_search}%",
+            f"%{selected_event_search}%"
+        ])
 
     conn = connect()
     c = conn.cursor()
@@ -2709,6 +2723,7 @@ async def automation_page(
             "selected_trigger_filter": selected_trigger_filter,
             "selected_rule_trigger_filter": selected_rule_trigger_filter,
             "selected_rule_search": selected_rule_search,
+            "selected_event_search": selected_event_search,
             "automation_stats": automation_stats,
             "features": get_company_features(company_id)
         }
@@ -2833,7 +2848,8 @@ async def automation_rules_export(
 async def automation_events_export(
     request: Request,
     event_filter: str = "",
-    trigger_filter: str = ""
+    trigger_filter: str = "",
+    event_search: str = ""
 ):
 
     username = get_user(request)
@@ -2855,6 +2871,7 @@ async def automation_events_export(
     selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
+    selected_event_search = (event_search or "").strip()[:80]
     event_filter_sql = ""
     event_params = [company_id]
 
@@ -2865,6 +2882,18 @@ async def automation_events_export(
     if selected_trigger_filter:
         event_filter_sql += "\n      AND automation_events.trigger_key=?"
         event_params.append(selected_trigger_filter)
+
+    if selected_event_search:
+        event_filter_sql += """
+      AND (
+        automation_events.message LIKE ?
+        OR automation_rules.name LIKE ?
+      )
+        """
+        event_params.extend([
+            f"%{selected_event_search}%",
+            f"%{selected_event_search}%"
+        ])
 
     conn = connect()
     c = conn.cursor()
@@ -2920,7 +2949,7 @@ async def automation_events_export(
         content,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}.csv"
+            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}_{selected_event_search or 'all'}.csv"
         }
     )
 

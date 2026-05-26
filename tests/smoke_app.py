@@ -661,6 +661,27 @@ async def assert_automation_runner(task):
     assert "SLA event happened" in trigger_export_csv
     assert "sla_overdue" in trigger_export_csv
 
+    event_search_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        event_filter="done",
+        event_search="happened",
+    )
+    assert event_search_response.status_code == 200
+    event_search_html = event_search_response.body.decode("utf-8")
+    assert 'name="event_search" value="happened"' in event_search_html
+    assert "SLA event happened" in event_search_html
+    assert 'href="/automation/events/export?event_filter=done&event_search=happened"' in event_search_html
+
+    event_search_export_response = await crm.automation_events_export(
+        make_request("owner2"),
+        event_filter="done",
+        event_search="happened",
+    )
+    assert event_search_export_response.status_code == 200
+    event_search_export_csv = event_search_export_response.body.decode("utf-8")
+    assert "SLA event happened" in event_search_export_csv
+    assert "SLA runner rule" in event_search_export_csv
+
     conn = connect()
     c = conn.cursor()
     c.executemany("""
