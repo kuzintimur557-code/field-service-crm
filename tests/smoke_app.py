@@ -387,6 +387,7 @@ async def assert_automation_page():
     assert "AI scheduler" in html
     assert "AI контроля" in html
     assert 'action="/automation/ai-digest/run"' in html
+    assert 'href="/automation/rules/export"' in html
     assert 'href="/automation/events/export"' in html
     assert "Cron endpoint" in html
     assert "AUTOMATION_CRON_SECRET" in html
@@ -505,6 +506,16 @@ async def assert_automation_page():
     disabled_html = disabled_response.body.decode("utf-8")
     assert "Выключенные" in disabled_html
     assert "SLA smoke rule" in disabled_html
+    assert 'href="/automation/rules/export?rule_filter=disabled"' in disabled_html
+
+    disabled_export_response = await crm.automation_rules_export(
+        make_request("owner2"),
+        rule_filter="disabled",
+    )
+    assert disabled_export_response.status_code == 200
+    disabled_export_csv = disabled_export_response.body.decode("utf-8")
+    assert "SLA smoke rule updated" in disabled_export_csv
+    assert "sla_overdue" in disabled_export_csv
 
 
 async def assert_automation_runner(task):

@@ -2667,6 +2667,90 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     )
 
 
+@app.get("/automation/rules/export")
+async def automation_rules_export(request: Request, rule_filter: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
+    rule_filter_sql = ""
+    rule_params = [company_id]
+
+    if selected_rule_filter == "active":
+        rule_filter_sql = "AND automation_rules.active=1"
+    elif selected_rule_filter == "disabled":
+        rule_filter_sql = "AND automation_rules.active=0"
+
+    conn = connect()
+    c = conn.cursor()
+
+    rules = c.execute(f"""
+    SELECT
+        automation_rules.*,
+        COUNT(automation_actions.id) AS action_count,
+        GROUP_CONCAT(automation_actions.action_key) AS action_keys
+    FROM automation_rules
+    LEFT JOIN automation_actions
+      ON automation_actions.rule_id=automation_rules.id
+      AND automation_actions.company_id=automation_rules.company_id
+    WHERE automation_rules.company_id=?
+      {rule_filter_sql}
+    GROUP BY automation_rules.id
+    ORDER BY automation_rules.id DESC
+    """, rule_params).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id",
+        "name",
+        "trigger_key",
+        "active",
+        "action_count",
+        "action_keys",
+        "created_by",
+        "created_at"
+    ])
+
+    for rule in rules:
+        writer.writerow([
+            rule["id"],
+            rule["name"],
+            rule["trigger_key"],
+            rule["active"],
+            rule["action_count"],
+            rule["action_keys"] or "",
+            rule["created_by"] or "",
+            rule["created_at"] or ""
+        ])
+
+    content = "\ufeff" + output.getvalue()
+
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=automation_rules_{selected_rule_filter or 'all'}.csv"
+        }
+    )
+
+
 @app.get("/automation/events/export")
 async def automation_events_export(request: Request, event_filter: str = ""):
 

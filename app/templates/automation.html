@@ -171,6 +171,8 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="card">
 <h2>Правила</h2>
 
+<a class="back" href="/automation/rules/export{% if selected_rule_filter %}?rule_filter={{ selected_rule_filter }}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
+
 <div class="filters">
     <a href="/automation{% if selected_event_filter %}?event_filter={{ selected_event_filter }}{% endif %}" class="{% if not selected_rule_filter %}active{% endif %}">Все</a>
     <a href="/automation?rule_filter=active{% if selected_event_filter %}&event_filter={{ selected_event_filter }}{% endif %}" class="{% if selected_rule_filter == 'active' %}active{% endif %}">Включённые</a>
