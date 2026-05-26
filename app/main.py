@@ -951,16 +951,24 @@ def build_ai_digest_message(company_id, cursor=None):
     return "\n".join(message_lines)
 
 
-def build_owner_ai_assistant_context(company_id, note_filter="", note_search=""):
+def build_owner_ai_assistant_context(company_id, note_filter="", note_search="", event_filter=""):
     settings = get_company_settings(company_id)
     task_label = settings["task_label"] or "задачи"
     worker_label = settings["worker_label"] or "сотрудник"
     trigger_labels = dict(AUTOMATION_TRIGGERS)
     selected_note_filter = note_filter if note_filter in ("due", "urgent") else ""
     selected_note_search = (note_search or "").strip()[:80]
+    selected_event_filter = event_filter if event_filter in (
+        "created",
+        "notification_sent",
+        "postponed",
+        "done"
+    ) else ""
     note_filter_sql = ""
     note_params = [company_id]
     completed_note_params = [company_id]
+    event_filter_sql = ""
+    event_params = [company_id]
 
     if selected_note_filter == "due":
         note_filter_sql = """
@@ -979,6 +987,10 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
         note_search_sql = "AND note LIKE ?"
         note_params.append(f"%{selected_note_search}%")
         completed_note_params.append(f"%{selected_note_search}%")
+
+    if selected_event_filter:
+        event_filter_sql = "AND action=?"
+        event_params.append(selected_event_filter)
 
     conn = connect()
     c = conn.cursor()
@@ -1081,13 +1093,14 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
     LIMIT 8
     """, note_params).fetchall()
 
-    ai_events = c.execute("""
+    ai_events = c.execute(f"""
     SELECT *
     FROM ai_assistant_events
     WHERE company_id=?
+      {event_filter_sql}
     ORDER BY id DESC
     LIMIT 10
-    """, (company_id,)).fetchall()
+    """, event_params).fetchall()
 
     completed_notes = c.execute(f"""
     SELECT
@@ -1177,6 +1190,7 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
         "ai_events": ai_events,
         "selected_note_filter": selected_note_filter,
         "selected_note_search": selected_note_search,
+        "selected_event_filter": selected_event_filter,
         "completed_notes": completed_notes
     }
 
@@ -7206,7 +7220,12 @@ async def ai_insights_page(request: Request):
 
 
 @app.get("/ai/assistant", response_class=HTMLResponse)
-async def ai_assistant_page(request: Request, note_filter: str = "", note_search: str = ""):
+async def ai_assistant_page(
+    request: Request,
+    note_filter: str = "",
+    note_search: str = "",
+    event_filter: str = ""
+):
 
     username = get_user(request)
 
@@ -7224,7 +7243,12 @@ async def ai_assistant_page(request: Request, note_filter: str = "", note_search
     if disabled_response:
         return disabled_response
 
-    assistant = build_owner_ai_assistant_context(company_id, note_filter, note_search)
+    assistant = build_owner_ai_assistant_context(
+        company_id,
+        note_filter,
+        note_search,
+        event_filter
+    )
 
     return templates.TemplateResponse(
         request,
@@ -7243,6 +7267,7 @@ async def ai_assistant_page(request: Request, note_filter: str = "", note_search
             "ai_events": assistant["ai_events"],
             "selected_note_filter": assistant["selected_note_filter"],
             "selected_note_search": assistant["selected_note_search"],
+            "selected_event_filter": assistant["selected_event_filter"],
             "completed_notes": assistant["completed_notes"],
             "features": get_company_features(company_id)
         }

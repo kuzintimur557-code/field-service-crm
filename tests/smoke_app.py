@@ -863,6 +863,8 @@ async def assert_ai_assistant_page():
     assert "История действий" in html
     assert "Журнал AI Assistant" in html
     assert 'href="/ai/assistant/events/export"' in html
+    assert 'href="/ai/assistant?event_filter=created"' in html
+    assert 'href="/ai/assistant?event_filter=notification_sent"' in html
     assert "Заметки владельца" in html
     assert "Выполненные решения" in html
     assert 'action="/ai/assistant/notes"' in html
@@ -1167,6 +1169,15 @@ async def assert_ai_assistant_page():
     conn.close()
 
     assert done_event is not None
+
+    done_events_response = await crm.ai_assistant_page(
+        make_asgi_request("owner2", "/ai/assistant"),
+        event_filter="done",
+    )
+    assert done_events_response.status_code == 200
+    done_events_html = done_events_response.body.decode("utf-8")
+    assert 'href="/ai/assistant?event_filter=done" class="active"' in done_events_html
+    assert "Выполнено" in done_events_html
 
     events_export_response = await crm.ai_assistant_events_export(make_request("owner2"))
     assert events_export_response.status_code == 200
