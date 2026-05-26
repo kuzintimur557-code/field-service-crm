@@ -860,6 +860,9 @@ async def assert_ai_assistant_page():
     assert 'name="follow_up_date"' in html
     assert "Срочно" in html
     assert "Не оплачено" in html
+    assert "AI к контролю" in html
+    assert "AI срочно" in html
+    assert "AI активные" in html
 
     empty_note_response = await crm.add_ai_assistant_note(
         make_form_request(
@@ -890,6 +893,7 @@ async def assert_ai_assistant_page():
     notes_html = notes_response.body.decode("utf-8")
     assert "Проверить AI assistant рекомендацию" in notes_html
     assert "/create-task?ai_note_id=" in notes_html
+    assert "AI к контролю" in notes_html
 
     conn = connect()
     c = conn.cursor()

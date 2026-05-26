@@ -831,6 +831,24 @@ def build_owner_ai_assistant_context(company_id):
       AND role='worker'
     """, (company_id,)).fetchone()[0]
 
+    assistant_note_stats = c.execute("""
+    SELECT
+        COUNT(*) AS active_count,
+        SUM(CASE WHEN COALESCE(priority, 'normal')='urgent' THEN 1 ELSE 0 END) AS urgent_count,
+        SUM(
+            CASE
+                WHEN follow_up_date IS NOT NULL
+                 AND follow_up_date!=''
+                 AND follow_up_date <= date('now')
+                THEN 1
+                ELSE 0
+            END
+        ) AS due_count
+    FROM ai_assistant_notes
+    WHERE company_id=?
+      AND COALESCE(is_done, 0)=0
+    """, (company_id,)).fetchone()
+
     overdue_rows = c.execute("""
     SELECT id, client, task_date, workers, worker, status
     FROM tasks
@@ -951,7 +969,10 @@ def build_owner_ai_assistant_context(company_id):
             "overdue_tasks": overdue_tasks,
             "active_tasks": active_tasks,
             "unpaid_total": round(float(unpaid_total or 0), 1),
-            "worker_count": worker_count
+            "worker_count": worker_count,
+            "ai_notes_active": assistant_note_stats["active_count"] or 0,
+            "ai_notes_urgent": assistant_note_stats["urgent_count"] or 0,
+            "ai_notes_due": assistant_note_stats["due_count"] or 0
         },
         "priorities": priorities,
         "next_steps": next_steps,

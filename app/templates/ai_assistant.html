@@ -108,6 +108,18 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
         <div class="stat-title">{{ settings["worker_label"] or "Сотрудники" }}</div>
         <div class="stat-value">{{ metrics["worker_count"] }}</div>
     </div>
+    <div class="stat">
+        <div class="stat-title">AI к контролю</div>
+        <div class="stat-value">{{ metrics["ai_notes_due"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">AI срочно</div>
+        <div class="stat-value">{{ metrics["ai_notes_urgent"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">AI активные</div>
+        <div class="stat-value">{{ metrics["ai_notes_active"] }}</div>
+    </div>
 </div>
 
 <div class="grid">
