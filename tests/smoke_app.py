@@ -483,6 +483,26 @@ async def assert_automation_page():
     assert "SLA smoke rule updated" in updated_page_html
     assert "Updated SLA smoke message" in updated_page_html
 
+    rule_trigger_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        rule_trigger_filter="sla_overdue",
+    )
+    assert rule_trigger_response.status_code == 200
+    rule_trigger_html = rule_trigger_response.body.decode("utf-8")
+    assert 'name="rule_trigger_filter"' in rule_trigger_html
+    assert 'option value="sla_overdue" selected' in rule_trigger_html
+    assert "SLA smoke rule updated" in rule_trigger_html
+    assert 'href="/automation/rules/export?rule_trigger_filter=sla_overdue"' in rule_trigger_html
+
+    rule_trigger_export_response = await crm.automation_rules_export(
+        make_request("owner2"),
+        rule_trigger_filter="sla_overdue",
+    )
+    assert rule_trigger_export_response.status_code == 200
+    rule_trigger_export_csv = rule_trigger_export_response.body.decode("utf-8")
+    assert "SLA smoke rule updated" in rule_trigger_export_csv
+    assert "sla_overdue" in rule_trigger_export_csv
+
     toggle_response = await crm.toggle_automation_rule(
         make_request("owner2"),
         rule["id"],
