@@ -588,6 +588,7 @@ async def assert_automation_runner(task):
     assert "Выполнено" in done_html
     assert "Правило: SLA runner rule" in done_html
     assert 'href="/automation/events/export?event_filter=done"' in done_html
+    assert "Все триггеры" in done_html
 
     done_export_response = await crm.automation_events_export(
         make_request("owner2"),
@@ -598,6 +599,27 @@ async def assert_automation_runner(task):
     assert "SLA event happened" in done_export_csv
     assert "SLA runner rule" in done_export_csv
     assert "done" in done_export_csv
+
+    trigger_filter_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        event_filter="done",
+        trigger_filter="sla_overdue",
+    )
+    assert trigger_filter_response.status_code == 200
+    trigger_filter_html = trigger_filter_response.body.decode("utf-8")
+    assert 'option value="sla_overdue" selected' in trigger_filter_html
+    assert "SLA event happened" in trigger_filter_html
+    assert 'href="/automation/events/export?event_filter=done&trigger_filter=sla_overdue"' in trigger_filter_html
+
+    trigger_export_response = await crm.automation_events_export(
+        make_request("owner2"),
+        event_filter="done",
+        trigger_filter="sla_overdue",
+    )
+    assert trigger_export_response.status_code == 200
+    trigger_export_csv = trigger_export_response.body.decode("utf-8")
+    assert "SLA event happened" in trigger_export_csv
+    assert "sla_overdue" in trigger_export_csv
 
     conn = connect()
     c = conn.cursor()

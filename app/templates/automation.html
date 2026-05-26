@@ -241,13 +241,29 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="card">
 <h2>Последние события</h2>
 
-<a class="back" href="/automation/events/export{% if selected_event_filter %}?event_filter={{ selected_event_filter }}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
+<a class="back" href="/automation/events/export{% if selected_event_filter or selected_trigger_filter %}?{% if selected_event_filter %}event_filter={{ selected_event_filter }}{% endif %}{% if selected_event_filter and selected_trigger_filter %}&{% endif %}{% if selected_trigger_filter %}trigger_filter={{ selected_trigger_filter }}{% endif %}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
+
+<form method="get" action="/automation" class="filters">
+    {% if selected_rule_filter %}
+    <input type="hidden" name="rule_filter" value="{{ selected_rule_filter }}">
+    {% endif %}
+    {% if selected_event_filter %}
+    <input type="hidden" name="event_filter" value="{{ selected_event_filter }}">
+    {% endif %}
+    <select name="trigger_filter">
+        <option value="">Все триггеры</option>
+        {% for key, label in triggers %}
+        <option value="{{ key }}" {% if selected_trigger_filter == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" style="width:auto;padding:10px 14px;border-radius:999px;font-size:13px">Фильтровать</button>
+</form>
 
 <div class="filters">
-    <a href="/automation{% if selected_rule_filter %}?rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if not selected_event_filter %}active{% endif %}">Все</a>
-    <a href="/automation?event_filter=pending{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'pending' %}active{% endif %}">Ожидает</a>
-    <a href="/automation?event_filter=done{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'done' %}active{% endif %}">Выполнено</a>
-    <a href="/automation?event_filter=skipped{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'skipped' %}active{% endif %}">Пропущено</a>
+    <a href="/automation{% if selected_rule_filter or selected_trigger_filter %}?{% if selected_rule_filter %}rule_filter={{ selected_rule_filter }}{% endif %}{% if selected_rule_filter and selected_trigger_filter %}&{% endif %}{% if selected_trigger_filter %}trigger_filter={{ selected_trigger_filter }}{% endif %}{% endif %}" class="{% if not selected_event_filter %}active{% endif %}">Все</a>
+    <a href="/automation?event_filter=pending{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}{% if selected_trigger_filter %}&trigger_filter={{ selected_trigger_filter }}{% endif %}" class="{% if selected_event_filter == 'pending' %}active{% endif %}">Ожидает</a>
+    <a href="/automation?event_filter=done{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}{% if selected_trigger_filter %}&trigger_filter={{ selected_trigger_filter }}{% endif %}" class="{% if selected_event_filter == 'done' %}active{% endif %}">Выполнено</a>
+    <a href="/automation?event_filter=skipped{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}{% if selected_trigger_filter %}&trigger_filter={{ selected_trigger_filter }}{% endif %}" class="{% if selected_event_filter == 'skipped' %}active{% endif %}">Пропущено</a>
 </div>
 
 {% if events %}

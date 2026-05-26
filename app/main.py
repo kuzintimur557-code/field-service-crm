@@ -2540,7 +2540,12 @@ async def open_notification(request: Request, notification_id: int):
 
 
 @app.get("/automation", response_class=HTMLResponse)
-async def automation_page(request: Request, rule_filter: str = "", event_filter: str = ""):
+async def automation_page(
+    request: Request,
+    rule_filter: str = "",
+    event_filter: str = "",
+    trigger_filter: str = ""
+):
 
     username = get_user(request)
 
@@ -2563,12 +2568,18 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     status_labels = AUTOMATION_STATUS_LABELS
     selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
     selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
+    trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
+    selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
     event_filter_sql = ""
     event_params = [company_id]
 
     if selected_event_filter:
         event_filter_sql = "AND automation_events.status=?"
         event_params.append(selected_event_filter)
+
+    if selected_trigger_filter:
+        event_filter_sql += "\n      AND automation_events.trigger_key=?"
+        event_params.append(selected_trigger_filter)
 
     conn = connect()
     c = conn.cursor()
@@ -2680,6 +2691,7 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
             "status_labels": status_labels,
             "selected_rule_filter": selected_rule_filter,
             "selected_event_filter": selected_event_filter,
+            "selected_trigger_filter": selected_trigger_filter,
             "automation_stats": automation_stats,
             "features": get_company_features(company_id)
         }
@@ -2771,7 +2783,11 @@ async def automation_rules_export(request: Request, rule_filter: str = ""):
 
 
 @app.get("/automation/events/export")
-async def automation_events_export(request: Request, event_filter: str = ""):
+async def automation_events_export(
+    request: Request,
+    event_filter: str = "",
+    trigger_filter: str = ""
+):
 
     username = get_user(request)
 
@@ -2790,12 +2806,18 @@ async def automation_events_export(request: Request, event_filter: str = ""):
         return disabled_response
 
     selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
+    trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
+    selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
     event_filter_sql = ""
     event_params = [company_id]
 
     if selected_event_filter:
         event_filter_sql = "AND automation_events.status=?"
         event_params.append(selected_event_filter)
+
+    if selected_trigger_filter:
+        event_filter_sql += "\n      AND automation_events.trigger_key=?"
+        event_params.append(selected_trigger_filter)
 
     conn = connect()
     c = conn.cursor()
@@ -2851,7 +2873,7 @@ async def automation_events_export(request: Request, event_filter: str = ""):
         content,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}.csv"
+            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}.csv"
         }
     )
 
