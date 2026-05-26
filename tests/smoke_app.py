@@ -862,6 +862,7 @@ async def assert_ai_assistant_page():
     assert 'action="/ai/assistant/notes"' in html
     assert 'href="/ai/assistant?note_filter=due"' in html
     assert 'href="/ai/assistant?note_filter=urgent"' in html
+    assert 'name="note_search"' in html
     assert 'name="priority"' in html
     assert 'name="follow_up_date"' in html
     assert "Срочно" in html
@@ -909,6 +910,15 @@ async def assert_ai_assistant_page():
     urgent_filter_html = urgent_filter_response.body.decode("utf-8")
     assert "Проверить AI assistant рекомендацию" in urgent_filter_html
     assert 'href="/ai/assistant?note_filter=urgent" class="active"' in urgent_filter_html
+
+    search_response = await crm.ai_assistant_page(
+        make_asgi_request("owner2", "/ai/assistant"),
+        note_search="рекомендацию",
+    )
+    assert search_response.status_code == 200
+    search_html = search_response.body.decode("utf-8")
+    assert 'name="note_search" placeholder="Поиск по AI заметкам" value="рекомендацию"' in search_html
+    assert "Проверить AI assistant рекомендацию" in search_html
 
     conn = connect()
     c = conn.cursor()

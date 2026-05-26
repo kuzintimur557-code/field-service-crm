@@ -915,13 +915,15 @@ def build_ai_digest_message(company_id, cursor=None):
     return "\n".join(message_lines)
 
 
-def build_owner_ai_assistant_context(company_id, note_filter=""):
+def build_owner_ai_assistant_context(company_id, note_filter="", note_search=""):
     settings = get_company_settings(company_id)
     task_label = settings["task_label"] or "задачи"
     worker_label = settings["worker_label"] or "сотрудник"
     trigger_labels = dict(AUTOMATION_TRIGGERS)
     selected_note_filter = note_filter if note_filter in ("due", "urgent") else ""
+    selected_note_search = (note_search or "").strip()[:80]
     note_filter_sql = ""
+    note_params = [company_id]
 
     if selected_note_filter == "due":
         note_filter_sql = """
@@ -933,6 +935,12 @@ def build_owner_ai_assistant_context(company_id, note_filter=""):
         note_filter_sql = """
           AND COALESCE(priority, 'normal')='urgent'
         """
+
+    note_search_sql = ""
+
+    if selected_note_search:
+        note_search_sql = "AND note LIKE ?"
+        note_params.append(f"%{selected_note_search}%")
 
     conn = connect()
     c = conn.cursor()
@@ -1018,6 +1026,7 @@ def build_owner_ai_assistant_context(company_id, note_filter=""):
     WHERE company_id=?
       AND COALESCE(is_done, 0)=0
       {note_filter_sql}
+      {note_search_sql}
     ORDER BY
       CASE
         WHEN follow_up_date IS NOT NULL
@@ -1032,7 +1041,7 @@ def build_owner_ai_assistant_context(company_id, note_filter=""):
       END,
       id DESC
     LIMIT 8
-    """, (company_id,)).fetchall()
+    """, note_params).fetchall()
 
     completed_notes = c.execute("""
     SELECT
@@ -1119,6 +1128,7 @@ def build_owner_ai_assistant_context(company_id, note_filter=""):
         "action_history": action_history_rows,
         "assistant_notes": assistant_notes,
         "selected_note_filter": selected_note_filter,
+        "selected_note_search": selected_note_search,
         "completed_notes": completed_notes
     }
 
@@ -7148,7 +7158,7 @@ async def ai_insights_page(request: Request):
 
 
 @app.get("/ai/assistant", response_class=HTMLResponse)
-async def ai_assistant_page(request: Request, note_filter: str = ""):
+async def ai_assistant_page(request: Request, note_filter: str = "", note_search: str = ""):
 
     username = get_user(request)
 
@@ -7166,7 +7176,7 @@ async def ai_assistant_page(request: Request, note_filter: str = ""):
     if disabled_response:
         return disabled_response
 
-    assistant = build_owner_ai_assistant_context(company_id, note_filter)
+    assistant = build_owner_ai_assistant_context(company_id, note_filter, note_search)
 
     return templates.TemplateResponse(
         request,
@@ -7183,6 +7193,7 @@ async def ai_assistant_page(request: Request, note_filter: str = ""):
             "action_history": assistant["action_history"],
             "assistant_notes": assistant["assistant_notes"],
             "selected_note_filter": assistant["selected_note_filter"],
+            "selected_note_search": assistant["selected_note_search"],
             "completed_notes": assistant["completed_notes"],
             "features": get_company_features(company_id)
         }

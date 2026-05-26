@@ -27,6 +27,7 @@ h2{margin:0 0 14px;font-size:22px}
 .priority.success{border-left-color:#16a34a}
 .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
 textarea{width:100%;min-height:90px;padding:14px;border-radius:14px;border:1px solid #d1d5db;font-size:16px;resize:vertical}
+input[name="note_search"]{width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db;font-size:16px;background:white;font-weight:800}
 input[type="date"]{width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db;font-size:16px;background:white;font-weight:800}
 select{width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db;font-size:16px;background:white;font-weight:800}
 .badge{display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:900;background:#e5e7eb;color:#374151}
@@ -199,6 +200,17 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 <a href="/ai/assistant?note_filter=due" class="{% if selected_note_filter == 'due' %}active{% endif %}">К контролю</a>
                 <a href="/ai/assistant?note_filter=urgent" class="{% if selected_note_filter == 'urgent' %}active{% endif %}">Срочные</a>
             </div>
+
+            <form method="get" action="/ai/assistant" style="margin-top:12px">
+                {% if selected_note_filter %}
+                <input type="hidden" name="note_filter" value="{{ selected_note_filter }}">
+                {% endif %}
+                <input name="note_search" placeholder="Поиск по AI заметкам" value="{{ selected_note_search or '' }}">
+                <button class="btn" type="submit" style="border:0;cursor:pointer;margin-top:10px">Найти</button>
+                {% if selected_note_search %}
+                <a class="btn" href="/ai/assistant{% if selected_note_filter %}?note_filter={{ selected_note_filter }}{% endif %}" style="margin-top:10px;background:#6b7280">Сбросить поиск</a>
+                {% endif %}
+            </form>
 
             <table style="margin-top:14px">
                 <thead>
