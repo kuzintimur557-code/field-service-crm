@@ -80,7 +80,7 @@ AUTOMATION_ACTIONS = [
     ("notification", "Создать уведомление"),
     ("telegram_alert", "Telegram-уведомление"),
     ("ai_digest", "AI-сводка"),
-    ("email", "Email"),
+    ("email", "Электронная почта"),
     ("create_task", "Создать задачу")
 ]
 
@@ -98,13 +98,13 @@ FEATURE_DEFINITIONS = [
     ("recurring", "Регулярные работы", "Повторяющиеся заявки"),
     ("finance", "Финансы", "Выручка, расходы и прибыль"),
     ("payroll", "Зарплаты", "Выплаты и комиссии исполнителей"),
-    ("analytics", "Аналитика", "Dashboard владельца и графики"),
+    ("analytics", "Аналитика", "Панель владельца и графики"),
     ("sla", "SLA", "Сроки, просрочки и качество сервиса"),
     ("archive", "Архив", "Архивированные заявки"),
     ("workload", "Загрузка", "Загрузка исполнителей"),
     ("notifications", "Уведомления", "Центр уведомлений"),
     ("automation", "Автоматизация", "Правила, триггеры и действия"),
-    ("ai_insights", "AI Insights", "AI рекомендации и бизнес-инсайты"),
+    ("ai_insights", "AI-инсайты", "AI-рекомендации и бизнес-инсайты"),
     ("calls", "Звонки", "История и будущая телефония"),
     ("one_c", "1С", "Интеграция с 1С"),
     ("custom_fields", "Поля компании", "Настраиваемые поля")
@@ -1172,8 +1172,8 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="",
         priorities.append({
             "level": "success",
             "title": "Критичных действий сейчас нет",
-            "reason": "AI assistant не видит срочных просрочек, перегруза или кассового риска.",
-            "action": "Смотреть AI Insights",
+            "reason": "AI-помощник не видит срочных просрочек, перегруза или кассового риска.",
+            "action": "Смотреть AI-инсайты",
             "link": "/ai/insights"
         })
 
@@ -4705,7 +4705,7 @@ async def finance_export(
             "Прибыль",
             "Процент",
             "Выплата",
-            "Payroll статус",
+            "Статус зарплаты",
             "Выплачено",
             "Остаток"
         ])
@@ -4786,13 +4786,13 @@ async def finance_summary_export(request: Request, month: str = ""):
     writer = csv.writer(output)
 
     writer.writerow([
-        "Month",
-        "Client",
-        "Revenue",
-        "Expenses",
-        "Payroll",
-        "Profit",
-        "Net Profit"
+        "Месяц",
+        "Клиент",
+        "Выручка",
+        "Расходы",
+        "Зарплаты",
+        "Прибыль",
+        "Чистая прибыль"
     ])
 
     for row in rows:
@@ -4868,13 +4868,13 @@ async def sla_analytics_export(request: Request):
     writer = csv.writer(output)
 
     writer.writerow([
-        "Task ID",
-        "Client",
-        "Workers",
-        "Task Date",
-        "Status",
-        "Is Overdue",
-        "Age Days"
+        "ID заявки",
+        "Клиент",
+        "Исполнители",
+        "Дата заявки",
+        "Статус",
+        "Просрочено",
+        "Дней просрочки"
     ])
 
     for row in rows:
@@ -5286,13 +5286,13 @@ async def owner_dashboard_export(request: Request):
     writer = csv.writer(output)
 
     writer.writerow([
-        "Month",
-        "Revenue",
-        "Payroll",
-        "Profit",
-        "Net Profit",
-        "Jobs Count",
-        "Average Job Value"
+        "Месяц",
+        "Выручка",
+        "Зарплаты",
+        "Прибыль",
+        "Чистая прибыль",
+        "Количество заявок",
+        "Средний чек"
     ])
 
     for row in rows:
@@ -9255,7 +9255,7 @@ async def edit_client(request: Request, client_id: int):
 
 Клиент: {name}
 Телефон: {phone}
-Email: {email}
+Электронная почта: {email}
 Адрес: {address}
 
 Изменил: {username} ({get_role_title(role)})
@@ -12690,11 +12690,11 @@ async def task_invoice_pdf(request: Request, task_id: int):
         if settings["phone"]:
             y = draw_text(pdf, f"Телефон: {settings['phone']}", 40, y, font_name, size=10)
         if settings["email"]:
-            y = draw_text(pdf, f"Email: {settings['email']}", 40, y, font_name, size=10)
+            y = draw_text(pdf, f"Электронная почта: {settings['email']}", 40, y, font_name, size=10)
         if settings["address"]:
             y = draw_text(pdf, f"Адрес: {settings['address']}", 40, y, font_name, size=10)
         if settings["tax_number"]:
-            y = draw_text(pdf, f"VAT / налоговый номер: {settings['tax_number']}", 40, y, font_name, size=10)
+            y = draw_text(pdf, f"Налоговый номер: {settings['tax_number']}", 40, y, font_name, size=10)
         y -= 12
     else:
         y = page_height - 115
@@ -12842,11 +12842,11 @@ async def task_pdf(request: Request, task_id: int):
         if settings["phone"]:
             y = draw_text(pdf, f"Телефон: {settings['phone']}", 40, y, font_name, size=10)
         if settings["email"]:
-            y = draw_text(pdf, f"Email: {settings['email']}", 40, y, font_name, size=10)
+            y = draw_text(pdf, f"Электронная почта: {settings['email']}", 40, y, font_name, size=10)
         if settings["address"]:
             y = draw_text(pdf, f"Адрес: {settings['address']}", 40, y, font_name, size=10)
         if settings["tax_number"]:
-            y = draw_text(pdf, f"VAT / налоговый номер: {settings['tax_number']}", 40, y, font_name, size=10)
+            y = draw_text(pdf, f"Налоговый номер: {settings['tax_number']}", 40, y, font_name, size=10)
         y -= 12
     else:
         y = page_height - 110

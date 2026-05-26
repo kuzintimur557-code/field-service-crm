@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Assistant</title>
+<title>AI-помощник</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -48,14 +48,14 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 
 <div class="header">
     <div>
-        <h1>AI Assistant</h1>
+        <h1>AI-помощник</h1>
         <div class="meta">Короткий список действий для владельца на основе текущих рисков.</div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
         <form method="post" action="/ai/insights/digest" style="margin:0">
             <button class="btn" type="submit" style="border:0;cursor:pointer">Создать AI-сводку</button>
         </form>
-        <a class="btn" href="/ai/insights">AI Insights</a>
+        <a class="btn" href="/ai/insights">AI-инсайты</a>
         <a class="btn" href="/">← Главное меню</a>
     </div>
 </div>
@@ -77,7 +77,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 {% if request.query_params.get("note_created") %}
 <div class="card priority success">
     <h2>Заметка сохранена</h2>
-    <div class="meta">Решение добавлено в историю AI Assistant.</div>
+    <div class="meta">Решение добавлено в историю AI-помощника.</div>
 </div>
 {% endif %}
 
@@ -382,7 +382,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
     </div>
 
     <div class="card">
-        <h2>Журнал AI Assistant</h2>
+        <h2>Журнал AI-помощника</h2>
         <a class="btn" href="/ai/assistant/events/export{% if selected_event_filter %}?event_filter={{ selected_event_filter }}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
         <div class="filters">
             <a href="/ai/assistant" class="{% if not selected_event_filter %}active{% endif %}">Все</a>
@@ -412,7 +412,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="meta">Событий AI Assistant пока нет</td>
+                    <td colspan="4" class="meta">Событий AI-помощника пока нет</td>
                 </tr>
                 {% endfor %}
             </tbody>

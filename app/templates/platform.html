@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Platform Dashboard</title>
+<title>Панель платформы</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -39,18 +39,18 @@ h1{font-size:30px}
 <div class="container">
 
 <div class="header">
-    <h1>🛠 Platform Dashboard</h1>
+    <h1>🛠 Панель платформы</h1>
     <div class="subtitle">Вы вошли как владелец платформы: {{ username }} / {{ role }}</div>
 
     <div class="nav">
         <a href="/platform/companies">🏢 Компании</a>
-        <a href="/admin">🛠 Admin Center</a>
-        <a href="/debug">🧪 Debug</a>
-        <a href="/system">🟢 System</a>
-        <a href="/backup">💾 Backup</a>
-        <a href="/admin/checklist">✅ Checklist</a>
-        <a href="/admin/roadmap">🧭 Roadmap</a>
-        <a href="/admin/notes">📝 Notes</a>
+        <a href="/admin">🛠 Админ-центр</a>
+        <a href="/debug">🧪 Диагностика</a>
+        <a href="/system">🟢 Система</a>
+        <a href="/backup">💾 Резервная копия</a>
+        <a href="/admin/checklist">✅ Чеклист</a>
+        <a href="/admin/roadmap">🧭 План развития</a>
+        <a href="/admin/notes">📝 Заметки</a>
         <a href="/profile" class="blue">👤 Профиль</a>
         <a href="/logout" class="red">Выйти</a>
     </div>
@@ -89,8 +89,8 @@ h1{font-size:30px}
         <div class="name">{{ company["name"] }}</div>
         <div class="meta">Создана: {{ company["created_at"] }}</div>
     </div>
-    <div class="meta">Owner: {{ company["owner_username"] }}</div>
-    <div class="meta">Статус: active</div>
+    <div class="meta">Владелец: {{ company["owner_username"] }}</div>
+    <div class="meta">Статус: активна</div>
 </div>
 {% endfor %}
 {% else %}

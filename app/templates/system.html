@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>System</title>
+<title>Система</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 <style>
@@ -26,7 +26,7 @@ h1{margin:0 0 14px;font-size:34px}
 <a href="/admin" class="back">← Назад</a>
 
 <div class="card">
-<h1>🟢 System Status</h1>
+<h1>🟢 Статус системы</h1>
 <div style="color:#6b7280;font-weight:800">Техническая проверка платформы.</div>
 </div>
 
@@ -40,13 +40,13 @@ h1{margin:0 0 14px;font-size:34px}
     <div class="box">
         <div class="label">База данных</div>
         <div class="value {% if db_exists %}ok{% else %}bad{% endif %}">
-            {% if db_exists %}OK{% else %}NO{% endif %}
+            {% if db_exists %}ОК{% else %}Нет{% endif %}
         </div>
     </div>
 
     <div class="box">
         <div class="label">Размер базы</div>
-        <div class="value">{{ db_size }} bytes</div>
+        <div class="value">{{ db_size }} байт</div>
     </div>
 
     <div class="box">

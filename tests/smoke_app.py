@@ -905,10 +905,10 @@ async def assert_ai_assistant_page():
     response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert response.status_code == 200
     html = response.body.decode("utf-8")
-    assert "AI Assistant" in html
+    assert "AI-помощник" in html
     assert "Что сделать сейчас" in html
     assert "Порядок работы" in html
-    assert "AI Insights" in html
+    assert "AI-инсайты" in html
     assert 'action="/ai/insights/digest"' in html
     assert "Создать AI-сводку" in html
     assert "Быстрые действия" in html
@@ -923,7 +923,7 @@ async def assert_ai_assistant_page():
     assert "История действий" in html
     assert "SLA runner rule" in html
     assert "Выполнено" in html
-    assert "Журнал AI Assistant" in html
+    assert "Журнал AI-помощника" in html
     assert 'href="/ai/assistant/events/export"' in html
     assert 'href="/ai/assistant?event_filter=created"' in html
     assert 'href="/ai/assistant?event_filter=notification_sent"' in html
@@ -1706,7 +1706,7 @@ async def assert_finance_margin(task):
     assert "Остаток ЗП" in finance_html
     assert 'name="sort"' in finance_html
     assert "Финансы по исполнителям" in finance_html
-    assert "Payroll" in finance_html
+    assert "Зарплаты" in finance_html
     assert "790.0 ₽" in finance_html
     assert "Выплата" in finance_html
     assert "79.0 ₽ / 10.0%" in finance_html
@@ -1943,7 +1943,7 @@ async def assert_finance_margin(task):
     assert "Маржа %" in export_csv
     assert "Скидка" in export_csv
     assert "Финансы по исполнителям" in export_csv
-    assert "Payroll статус" in export_csv
+    assert "Статус зарплаты" in export_csv
     assert "Итого начислено ЗП" in export_csv
     assert "Итого выплачено ЗП" in export_csv
     assert "Итого остаток ЗП" in export_csv

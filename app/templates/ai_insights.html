@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>AI Insights</title>
+    <title>AI-инсайты</title>
     <style>
         body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; }
         .container { max-width:1200px; margin:0 auto; }
@@ -31,12 +31,12 @@
 
     <div class="top">
         <div>
-            <h1>AI Insights</h1>
+            <h1>AI-инсайты</h1>
             <p class="label">Рекомендации и риски по бизнесу</p>
         </div>
 
         <div style="display:flex;gap:12px;align-items:center;">
-            <a href="/ai/assistant" class="btn">AI Assistant</a>
+            <a href="/ai/assistant" class="btn">AI-помощник</a>
 
             <form method="post" action="/ai/insights/digest" style="margin:0;">
                 <button type="submit" class="btn" style="border:0;cursor:pointer;">
@@ -49,7 +49,7 @@
     </div>
 
     <div class="card insight {{ risk_level }}" style="margin-bottom:24px;">
-        <h2>AI Risk Score</h2>
+        <h2>AI-оценка риска</h2>
 
         <div class="value {{ risk_level }}">{{ risk_score }}/100</div>
 
