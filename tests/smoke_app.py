@@ -1107,6 +1107,15 @@ async def assert_ai_assistant_page():
     assert "Проверить AI assistant рекомендацию" in completed_html
     assert "Без заявки" in completed_html
 
+    completed_search_response = await crm.ai_assistant_page(
+        make_asgi_request("owner2", "/ai/assistant"),
+        note_search="рекомендацию",
+    )
+    assert completed_search_response.status_code == 200
+    completed_search_html = completed_search_response.body.decode("utf-8")
+    assert "Проверить AI assistant рекомендацию" in completed_search_html
+    assert "Выполненные решения" in completed_search_html
+
     task_note_response = await crm.add_ai_assistant_note(
         make_form_request(
             "owner2",

@@ -924,6 +924,7 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
     selected_note_search = (note_search or "").strip()[:80]
     note_filter_sql = ""
     note_params = [company_id]
+    completed_note_params = [company_id]
 
     if selected_note_filter == "due":
         note_filter_sql = """
@@ -941,6 +942,7 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
     if selected_note_search:
         note_search_sql = "AND note LIKE ?"
         note_params.append(f"%{selected_note_search}%")
+        completed_note_params.append(f"%{selected_note_search}%")
 
     conn = connect()
     c = conn.cursor()
@@ -1043,7 +1045,7 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
     LIMIT 8
     """, note_params).fetchall()
 
-    completed_notes = c.execute("""
+    completed_notes = c.execute(f"""
     SELECT
         ai_assistant_notes.*,
         tasks.client AS created_task_client,
@@ -1054,9 +1056,10 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="")
       AND tasks.company_id=ai_assistant_notes.company_id
     WHERE ai_assistant_notes.company_id=?
       AND COALESCE(ai_assistant_notes.is_done, 0)=1
+      {note_search_sql}
     ORDER BY ai_assistant_notes.id DESC
     LIMIT 8
-    """, (company_id,)).fetchall()
+    """, completed_note_params).fetchall()
 
     conn.close()
 
