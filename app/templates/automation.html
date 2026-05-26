@@ -74,6 +74,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">
     AI scheduler: daily {{ request.query_params.get("daily") or "0" }},
     weekly {{ request.query_params.get("weekly") or "0" }},
+    AI контроль {{ request.query_params.get("follow_ups") or "0" }},
     skipped {{ request.query_params.get("skipped") or "0" }}
 </div>
 {% endif %}
@@ -107,7 +108,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
 <div class="card">
 <h2>AI scheduler</h2>
-<div class="meta">Ручной запуск расписания для daily_digest и weekly_digest. Повторный запуск за тот же день или неделю не создаёт дубли.</div>
+<div class="meta">Ручной запуск расписания для daily_digest, weekly_digest и AI контроля. Повторный запуск за тот же день или неделю не создаёт дубли.</div>
 <form method="post" action="/automation/ai-digest/run" style="margin-top:14px">
     <button type="submit">Запустить AI scheduler</button>
 </form>

@@ -766,6 +766,35 @@ def create_ai_follow_up_notifications(company_id, username, now_dt=None):
     return created_count
 
 
+def create_ai_follow_up_notifications_for_company(company_id, now_dt=None):
+    if not has_feature(company_id, "notifications"):
+        return 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    recipients = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=?
+      AND role IN ('boss', 'manager')
+    ORDER BY role, username
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    created_count = 0
+
+    for recipient in recipients:
+        created_count += create_ai_follow_up_notifications(
+            company_id,
+            recipient["username"],
+            now_dt
+        )
+
+    return created_count
+
+
 
 
 def build_ai_digest_message(company_id, cursor=None):
@@ -1221,6 +1250,7 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
     result = {
         "daily": 0,
         "weekly": 0,
+        "follow_ups": 0,
         "skipped": 0
     }
 
@@ -1271,6 +1301,11 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
 
     conn.close()
 
+    result["follow_ups"] = create_ai_follow_up_notifications_for_company(
+        company_id,
+        now_dt
+    )
+
     if daily_rules and not daily_already_sent:
         result["daily"] = run_automation_event(
             company_id,
@@ -1303,6 +1338,7 @@ def run_ai_digest_scheduler_for_all_companies(now_dt=None):
         "companies": 0,
         "daily": 0,
         "weekly": 0,
+        "follow_ups": 0,
         "skipped": 0
     }
 
@@ -1322,6 +1358,7 @@ def run_ai_digest_scheduler_for_all_companies(now_dt=None):
         summary["companies"] += 1
         summary["daily"] += result["daily"]
         summary["weekly"] += result["weekly"]
+        summary["follow_ups"] += result["follow_ups"]
         summary["skipped"] += result["skipped"]
 
     return summary
@@ -2529,7 +2566,7 @@ async def run_ai_digest_scheduler_page(request: Request):
     result = run_ai_digest_scheduler(company_id)
 
     return RedirectResponse(
-        f"/automation?scheduler=1&daily={result['daily']}&weekly={result['weekly']}&skipped={result['skipped']}",
+        f"/automation?scheduler=1&daily={result['daily']}&weekly={result['weekly']}&follow_ups={result['follow_ups']}&skipped={result['skipped']}",
         status_code=302
     )
 

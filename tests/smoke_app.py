@@ -379,6 +379,7 @@ async def assert_automation_page():
     assert "Включено правил" in html
     assert "Событий done" in html
     assert "AI scheduler" in html
+    assert "AI контроля" in html
     assert 'action="/automation/ai-digest/run"' in html
     assert "Cron endpoint" in html
     assert "AUTOMATION_CRON_SECRET" in html
@@ -939,6 +940,39 @@ async def assert_ai_assistant_page():
     assert follow_up_notification is not None
     assert follow_up_notification["message"] == "Проверить AI assistant рекомендацию"
     assert follow_up_notification["link"] == "/ai/assistant"
+
+    scheduled_note_response = await crm.add_ai_assistant_note(
+        make_form_request(
+            "owner2",
+            "/ai/assistant/notes",
+            {
+                "note": "Автоматический AI контроль",
+                "priority": "normal",
+                "follow_up_date": "2026-05-26",
+            },
+        )
+    )
+    assert scheduled_note_response.status_code == 302
+
+    scheduled_follow_ups = crm.run_ai_digest_scheduler(
+        2,
+        datetime(2026, 5, 26, 10, 0),
+    )
+    assert scheduled_follow_ups["follow_ups"] >= 1
+
+    conn = connect()
+    c = conn.cursor()
+    scheduled_follow_up_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND message='Автоматический AI контроль'
+    ORDER BY id DESC
+    """).fetchone()
+    conn.close()
+
+    assert scheduled_follow_up_notification is not None
 
     ai_note_task_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),
