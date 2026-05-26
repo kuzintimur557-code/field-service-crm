@@ -7249,6 +7249,63 @@ async def ai_assistant_page(request: Request, note_filter: str = "", note_search
     )
 
 
+@app.get("/ai/assistant/events/export")
+async def ai_assistant_events_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    events = c.execute("""
+    SELECT *
+    FROM ai_assistant_events
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 500
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Дата", "Автор", "Действие", "Заметка ID", "Детали"])
+
+    for event in events:
+        writer.writerow([
+            event["created_at"],
+            event["username"],
+            event["action"],
+            event["note_id"],
+            event["details"],
+        ])
+
+    content = output.getvalue()
+    output.close()
+
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=ai_assistant_events.csv"
+        }
+    )
+
+
 @app.post("/ai/assistant/notes")
 async def add_ai_assistant_note(request: Request):
 
