@@ -361,6 +361,7 @@ def init_db():
         username TEXT,
         note TEXT,
         priority TEXT DEFAULT 'normal',
+        follow_up_date TEXT,
         is_done INTEGER DEFAULT 0,
         done_by TEXT,
         done_at TEXT,
@@ -371,6 +372,7 @@ def init_db():
 
     add_column_if_missing(c, "payroll_payouts", "note", "TEXT")
     add_column_if_missing(c, "ai_assistant_notes", "priority", "TEXT DEFAULT 'normal'")
+    add_column_if_missing(c, "ai_assistant_notes", "follow_up_date", "TEXT")
     add_column_if_missing(c, "ai_assistant_notes", "is_done", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "ai_assistant_notes", "done_by", "TEXT")
     add_column_if_missing(c, "ai_assistant_notes", "done_at", "TEXT")

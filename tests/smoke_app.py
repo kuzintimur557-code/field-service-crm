@@ -362,6 +362,7 @@ def assert_automation_foundation():
         "idx_ai_assistant_notes_company_created",
     }
     assert "priority" in ai_note_columns
+    assert "follow_up_date" in ai_note_columns
     assert "created_task_id" in ai_note_columns
 
 
@@ -856,6 +857,7 @@ async def assert_ai_assistant_page():
     assert "Выполненные решения" in html
     assert 'action="/ai/assistant/notes"' in html
     assert 'name="priority"' in html
+    assert 'name="follow_up_date"' in html
     assert "Срочно" in html
     assert "Не оплачено" in html
 
@@ -876,6 +878,7 @@ async def assert_ai_assistant_page():
             {
                 "note": "Проверить AI assistant рекомендацию",
                 "priority": "urgent",
+                "follow_up_date": "2026-05-26",
             },
         )
     )
@@ -902,11 +905,13 @@ async def assert_ai_assistant_page():
     assert saved_note is not None
     assert saved_note["note"] == "Проверить AI assistant рекомендацию"
     assert saved_note["priority"] == "urgent"
+    assert saved_note["follow_up_date"] == "2026-05-26"
     assert saved_note["is_done"] == 0
 
     digest_message = crm.build_ai_digest_message(2)
     assert "Активные заметки владельца" in digest_message
     assert "Срочно: Проверить AI assistant рекомендацию" in digest_message
+    assert "контроль: 2026-05-26" in digest_message
 
     ai_note_task_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),

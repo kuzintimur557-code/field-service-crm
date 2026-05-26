@@ -743,11 +743,17 @@ def build_ai_digest_message(company_id, cursor=None):
     """, (company_id,)).fetchone()[0]
 
     active_notes = c.execute("""
-    SELECT note, priority
+    SELECT note, priority, follow_up_date
     FROM ai_assistant_notes
     WHERE company_id=?
       AND COALESCE(is_done, 0)=0
     ORDER BY
+      CASE
+        WHEN follow_up_date IS NOT NULL
+         AND follow_up_date!=''
+         AND follow_up_date <= date('now') THEN 0
+        ELSE 1
+      END,
       CASE COALESCE(priority, 'normal')
         WHEN 'urgent' THEN 0
         WHEN 'normal' THEN 1
@@ -778,7 +784,8 @@ def build_ai_digest_message(company_id, cursor=None):
 
         for note in active_notes:
             priority_prefix = "Срочно: " if note["priority"] == "urgent" else ""
-            message_lines.append(f"- {priority_prefix}{note['note']}")
+            follow_up_suffix = f" (контроль: {note['follow_up_date']})" if note["follow_up_date"] else ""
+            message_lines.append(f"- {priority_prefix}{note['note']}{follow_up_suffix}")
 
     return "\n".join(message_lines)
 
@@ -855,6 +862,12 @@ def build_owner_ai_assistant_context(company_id):
     WHERE company_id=?
       AND COALESCE(is_done, 0)=0
     ORDER BY
+      CASE
+        WHEN follow_up_date IS NOT NULL
+         AND follow_up_date!=''
+         AND follow_up_date <= date('now') THEN 0
+        ELSE 1
+      END,
       CASE COALESCE(priority, 'normal')
         WHEN 'urgent' THEN 0
         WHEN 'normal' THEN 1
@@ -7028,9 +7041,16 @@ async def add_ai_assistant_note(request: Request):
     form = await request.form()
     note = str(form.get("note") or "").strip()
     priority = str(form.get("priority") or "normal").strip()
+    follow_up_date = str(form.get("follow_up_date") or "").strip()
 
     if priority not in ("urgent", "normal", "later"):
         priority = "normal"
+
+    if follow_up_date:
+        try:
+            datetime.strptime(follow_up_date, "%Y-%m-%d")
+        except Exception:
+            follow_up_date = ""
 
     if not note:
         return RedirectResponse("/ai/assistant?note_error=empty", status_code=302)
@@ -7040,14 +7060,15 @@ async def add_ai_assistant_note(request: Request):
 
     c.execute("""
     INSERT INTO ai_assistant_notes (
-        company_id, username, note, priority, created_at
+        company_id, username, note, priority, follow_up_date, created_at
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         username,
         note,
         priority,
+        follow_up_date,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
