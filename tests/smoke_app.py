@@ -915,6 +915,9 @@ async def assert_ai_assistant_page():
     assert 'action="/ai/assistant/follow-ups/notify"' in html
     assert 'action="/automation/ai-digest/run"' in html
     assert 'action="/ai/assistant/setup-digests"' in html
+    assert "Запустить SLA-напоминания" in html
+    assert "Запустить AI-планировщик" in html
+    assert "Настроить дневные и недельные AI-сводки" in html
     assert "История действий" in html
     assert "SLA runner rule" in html
     assert "Выполнено" in html

@@ -69,7 +69,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 
 {% if request.query_params.get("digest_rules") %}
 <div class="card priority success">
-    <h2>AI digest automation настроена</h2>
+    <h2>Автоматические AI-сводки настроены</h2>
     <div class="meta">Создано правил: {{ request.query_params.get("digest_rules") or "0" }}</div>
 </div>
 {% endif %}
@@ -337,7 +337,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
         </form>
 
         <form method="post" action="/sla/reminders" style="margin-top:10px">
-            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#991b1b">Запустить SLA reminders</button>
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#991b1b">Запустить SLA-напоминания</button>
         </form>
 
         <form method="post" action="/ai/assistant/follow-ups/notify" style="margin-top:10px">
@@ -345,11 +345,11 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
         </form>
 
         <form method="post" action="/automation/ai-digest/run" style="margin-top:10px">
-            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#2563eb">Запустить AI scheduler</button>
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#2563eb">Запустить AI-планировщик</button>
         </form>
 
         <form method="post" action="/ai/assistant/setup-digests" style="margin-top:10px">
-            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#16a34a">Настроить daily/weekly AI digest</button>
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#16a34a">Настроить дневные и недельные AI-сводки</button>
         </form>
     </div>
 
