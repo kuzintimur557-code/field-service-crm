@@ -2547,7 +2547,9 @@ async def automation_page(
     trigger_filter: str = "",
     rule_trigger_filter: str = "",
     rule_search: str = "",
-    event_search: str = ""
+    event_search: str = "",
+    event_date_from: str = "",
+    event_date_to: str = ""
 ):
 
     username = get_user(request)
@@ -2576,8 +2578,19 @@ async def automation_page(
     selected_rule_trigger_filter = rule_trigger_filter if rule_trigger_filter in trigger_keys else ""
     selected_rule_search = (rule_search or "").strip()[:80]
     selected_event_search = (event_search or "").strip()[:80]
+    selected_event_date_from = (event_date_from or "").strip()[:10]
+    selected_event_date_to = (event_date_to or "").strip()[:10]
     event_filter_sql = ""
     event_params = [company_id]
+
+    for selected_date in (selected_event_date_from, selected_event_date_to):
+        if selected_date:
+            try:
+                datetime.strptime(selected_date, "%Y-%m-%d")
+            except ValueError:
+                selected_event_date_from = ""
+                selected_event_date_to = ""
+                break
 
     if selected_event_filter:
         event_filter_sql = "AND automation_events.status=?"
@@ -2598,6 +2611,14 @@ async def automation_page(
             f"%{selected_event_search}%",
             f"%{selected_event_search}%"
         ])
+
+    if selected_event_date_from:
+        event_filter_sql += "\n      AND substr(automation_events.created_at, 1, 10) >= ?"
+        event_params.append(selected_event_date_from)
+
+    if selected_event_date_to:
+        event_filter_sql += "\n      AND substr(automation_events.created_at, 1, 10) <= ?"
+        event_params.append(selected_event_date_to)
 
     conn = connect()
     c = conn.cursor()
@@ -2724,6 +2745,8 @@ async def automation_page(
             "selected_rule_trigger_filter": selected_rule_trigger_filter,
             "selected_rule_search": selected_rule_search,
             "selected_event_search": selected_event_search,
+            "selected_event_date_from": selected_event_date_from,
+            "selected_event_date_to": selected_event_date_to,
             "automation_stats": automation_stats,
             "features": get_company_features(company_id)
         }
@@ -2849,7 +2872,9 @@ async def automation_events_export(
     request: Request,
     event_filter: str = "",
     trigger_filter: str = "",
-    event_search: str = ""
+    event_search: str = "",
+    event_date_from: str = "",
+    event_date_to: str = ""
 ):
 
     username = get_user(request)
@@ -2872,8 +2897,19 @@ async def automation_events_export(
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
     selected_event_search = (event_search or "").strip()[:80]
+    selected_event_date_from = (event_date_from or "").strip()[:10]
+    selected_event_date_to = (event_date_to or "").strip()[:10]
     event_filter_sql = ""
     event_params = [company_id]
+
+    for selected_date in (selected_event_date_from, selected_event_date_to):
+        if selected_date:
+            try:
+                datetime.strptime(selected_date, "%Y-%m-%d")
+            except ValueError:
+                selected_event_date_from = ""
+                selected_event_date_to = ""
+                break
 
     if selected_event_filter:
         event_filter_sql = "AND automation_events.status=?"
@@ -2894,6 +2930,14 @@ async def automation_events_export(
             f"%{selected_event_search}%",
             f"%{selected_event_search}%"
         ])
+
+    if selected_event_date_from:
+        event_filter_sql += "\n      AND substr(automation_events.created_at, 1, 10) >= ?"
+        event_params.append(selected_event_date_from)
+
+    if selected_event_date_to:
+        event_filter_sql += "\n      AND substr(automation_events.created_at, 1, 10) <= ?"
+        event_params.append(selected_event_date_to)
 
     conn = connect()
     c = conn.cursor()
@@ -2949,7 +2993,7 @@ async def automation_events_export(
         content,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}_{selected_event_search or 'all'}.csv"
+            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}_{selected_event_search or 'all'}_{selected_event_date_from or 'from'}_{selected_event_date_to or 'to'}.csv"
         }
     )
 
