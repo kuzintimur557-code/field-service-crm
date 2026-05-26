@@ -2546,6 +2546,7 @@ async def automation_page(
     event_filter: str = "",
     trigger_filter: str = "",
     rule_trigger_filter: str = "",
+    rule_action_filter: str = "",
     rule_search: str = "",
     event_search: str = "",
     event_date_from: str = "",
@@ -2574,8 +2575,10 @@ async def automation_page(
     selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
     selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
+    action_keys = {key for key, _ in AUTOMATION_ACTIONS}
     selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
     selected_rule_trigger_filter = rule_trigger_filter if rule_trigger_filter in trigger_keys else ""
+    selected_rule_action_filter = rule_action_filter if rule_action_filter in action_keys else ""
     selected_rule_search = (rule_search or "").strip()[:80]
     selected_event_search = (event_search or "").strip()[:80]
     selected_event_date_from = (event_date_from or "").strip()[:10]
@@ -2716,6 +2719,12 @@ async def automation_page(
     if selected_rule_trigger_filter:
         rules = [rule for rule in rules if rule["trigger_key"] == selected_rule_trigger_filter]
 
+    if selected_rule_action_filter:
+        rules = [
+            rule for rule in rules
+            if selected_rule_action_filter in (rule["action_keys"] or "").split(",")
+        ]
+
     if selected_rule_search:
         rule_search_lower = selected_rule_search.lower()
         rules = [
@@ -2743,6 +2752,7 @@ async def automation_page(
             "selected_event_filter": selected_event_filter,
             "selected_trigger_filter": selected_trigger_filter,
             "selected_rule_trigger_filter": selected_rule_trigger_filter,
+            "selected_rule_action_filter": selected_rule_action_filter,
             "selected_rule_search": selected_rule_search,
             "selected_event_search": selected_event_search,
             "selected_event_date_from": selected_event_date_from,
@@ -2758,6 +2768,7 @@ async def automation_rules_export(
     request: Request,
     rule_filter: str = "",
     rule_trigger_filter: str = "",
+    rule_action_filter: str = "",
     rule_search: str = ""
 ):
 
@@ -2779,7 +2790,9 @@ async def automation_rules_export(
 
     selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
+    action_keys = {key for key, _ in AUTOMATION_ACTIONS}
     selected_rule_trigger_filter = rule_trigger_filter if rule_trigger_filter in trigger_keys else ""
+    selected_rule_action_filter = rule_action_filter if rule_action_filter in action_keys else ""
     selected_rule_search = (rule_search or "").strip()[:80]
     rule_filter_sql = ""
     rule_params = [company_id]
@@ -2792,6 +2805,18 @@ async def automation_rules_export(
     if selected_rule_trigger_filter:
         rule_filter_sql += "\n      AND automation_rules.trigger_key=?"
         rule_params.append(selected_rule_trigger_filter)
+
+    if selected_rule_action_filter:
+        rule_filter_sql += """
+      AND EXISTS (
+          SELECT 1
+          FROM automation_actions action_filter
+          WHERE action_filter.company_id=automation_rules.company_id
+            AND action_filter.rule_id=automation_rules.id
+            AND action_filter.action_key=?
+      )
+        """
+        rule_params.append(selected_rule_action_filter)
 
     if selected_rule_search:
         rule_filter_sql += """
@@ -2862,7 +2887,7 @@ async def automation_rules_export(
         content,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f"attachment; filename=automation_rules_{selected_rule_filter or 'all'}_{selected_rule_trigger_filter or 'all'}_{selected_rule_search or 'all'}.csv"
+            "Content-Disposition": f"attachment; filename=automation_rules_{selected_rule_filter or 'all'}_{selected_rule_trigger_filter or 'all'}_{selected_rule_action_filter or 'all'}_{selected_rule_search or 'all'}.csv"
         }
     )
 
