@@ -761,6 +761,18 @@ def create_ai_follow_up_notifications(company_id, username, now_dt=None):
         ))
         created_count += 1
 
+        c.execute("""
+        UPDATE ai_assistant_notes
+        SET last_notified_at=?,
+            notification_count=COALESCE(notification_count, 0) + 1
+        WHERE id=?
+          AND company_id=?
+        """, (
+            now,
+            note["id"],
+            company_id
+        ))
+
         user_row = c.execute("""
         SELECT telegram_chat_id
         FROM users

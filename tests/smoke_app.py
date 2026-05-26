@@ -363,6 +363,8 @@ def assert_automation_foundation():
     }
     assert "priority" in ai_note_columns
     assert "follow_up_date" in ai_note_columns
+    assert "last_notified_at" in ai_note_columns
+    assert "notification_count" in ai_note_columns
     assert "created_task_id" in ai_note_columns
 
 
@@ -964,6 +966,24 @@ async def assert_ai_assistant_page():
     assert follow_up_notification is not None
     assert follow_up_notification["message"] == "Проверить AI assistant рекомендацию"
     assert follow_up_notification["link"] == "/ai/assistant"
+
+    conn = connect()
+    c = conn.cursor()
+    notified_note = c.execute("""
+    SELECT *
+    FROM ai_assistant_notes
+    WHERE id=?
+      AND company_id=2
+    """, (saved_note["id"],)).fetchone()
+    conn.close()
+
+    assert notified_note["last_notified_at"]
+    assert notified_note["notification_count"] >= 1
+
+    notified_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
+    assert notified_page_response.status_code == 200
+    notified_html = notified_page_response.body.decode("utf-8")
+    assert "раз:" in notified_html
 
     scheduled_note_response = await crm.add_ai_assistant_note(
         make_form_request(

@@ -191,6 +191,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                         <th>Автор</th>
                         <th>Приоритет</th>
                         <th>Контроль</th>
+                        <th>Уведомления</th>
                         <th>Заметка</th>
                         <th></th>
                     </tr>
@@ -206,6 +207,13 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                             </span>
                         </td>
                         <td>{{ note["follow_up_date"] or "Без даты" }}</td>
+                        <td>
+                            {% if note["last_notified_at"] %}
+                            {{ note["last_notified_at"] }}<br><span class="meta">раз: {{ note["notification_count"] or 0 }}</span>
+                            {% else %}
+                            <span class="meta">Не отправлялось</span>
+                            {% endif %}
+                        </td>
                         <td>{{ note["note"] }}</td>
                         <td>
                             <a class="btn" href="/create-task?ai_note_id={{ note['id'] }}" style="padding:8px 10px;margin-bottom:8px">Создать {{ (settings["task_label"] or "задачу")|lower }}</a>
@@ -216,7 +224,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="meta">Активных заметок пока нет</td>
+                        <td colspan="7" class="meta">Активных заметок пока нет</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -232,6 +240,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                         <th>Кто закрыл</th>
                         <th>Приоритет</th>
                         <th>Контроль</th>
+                        <th>Уведомления</th>
                         <th>Решение</th>
                         <th>{{ settings["task_label"] or "Заявка" }}</th>
                     </tr>
@@ -247,6 +256,13 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                             </span>
                         </td>
                         <td>{{ note["follow_up_date"] or "Без даты" }}</td>
+                        <td>
+                            {% if note["last_notified_at"] %}
+                            {{ note["last_notified_at"] }}<br><span class="meta">раз: {{ note["notification_count"] or 0 }}</span>
+                            {% else %}
+                            <span class="meta">Не отправлялось</span>
+                            {% endif %}
+                        </td>
                         <td>{{ note["note"] }}</td>
                         <td>
                             {% if note["created_task_id"] %}
@@ -259,7 +275,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="meta">Выполненных решений пока нет</td>
+                        <td colspan="7" class="meta">Выполненных решений пока нет</td>
                     </tr>
                     {% endfor %}
                 </tbody>
