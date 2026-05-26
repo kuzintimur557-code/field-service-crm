@@ -2545,7 +2545,8 @@ async def automation_page(
     rule_filter: str = "",
     event_filter: str = "",
     trigger_filter: str = "",
-    rule_trigger_filter: str = ""
+    rule_trigger_filter: str = "",
+    rule_search: str = ""
 ):
 
     username = get_user(request)
@@ -2572,6 +2573,7 @@ async def automation_page(
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
     selected_rule_trigger_filter = rule_trigger_filter if rule_trigger_filter in trigger_keys else ""
+    selected_rule_search = (rule_search or "").strip()[:80]
     event_filter_sql = ""
     event_params = [company_id]
 
@@ -2679,6 +2681,14 @@ async def automation_page(
     if selected_rule_trigger_filter:
         rules = [rule for rule in rules if rule["trigger_key"] == selected_rule_trigger_filter]
 
+    if selected_rule_search:
+        rule_search_lower = selected_rule_search.lower()
+        rules = [
+            rule for rule in rules
+            if rule_search_lower in (rule["name"] or "").lower()
+            or rule_search_lower in (rule["edit_message"] or "").lower()
+        ]
+
     return templates.TemplateResponse(
         request,
         "automation.html",
@@ -2698,6 +2708,7 @@ async def automation_page(
             "selected_event_filter": selected_event_filter,
             "selected_trigger_filter": selected_trigger_filter,
             "selected_rule_trigger_filter": selected_rule_trigger_filter,
+            "selected_rule_search": selected_rule_search,
             "automation_stats": automation_stats,
             "features": get_company_features(company_id)
         }
@@ -2708,7 +2719,8 @@ async def automation_page(
 async def automation_rules_export(
     request: Request,
     rule_filter: str = "",
-    rule_trigger_filter: str = ""
+    rule_trigger_filter: str = "",
+    rule_search: str = ""
 ):
 
     username = get_user(request)
@@ -2730,6 +2742,7 @@ async def automation_rules_export(
     selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     selected_rule_trigger_filter = rule_trigger_filter if rule_trigger_filter in trigger_keys else ""
+    selected_rule_search = (rule_search or "").strip()[:80]
     rule_filter_sql = ""
     rule_params = [company_id]
 
@@ -2741,6 +2754,24 @@ async def automation_rules_export(
     if selected_rule_trigger_filter:
         rule_filter_sql += "\n      AND automation_rules.trigger_key=?"
         rule_params.append(selected_rule_trigger_filter)
+
+    if selected_rule_search:
+        rule_filter_sql += """
+      AND (
+        automation_rules.name LIKE ?
+        OR EXISTS (
+            SELECT 1
+            FROM automation_actions search_actions
+            WHERE search_actions.company_id=automation_rules.company_id
+              AND search_actions.rule_id=automation_rules.id
+              AND search_actions.payload_json LIKE ?
+        )
+      )
+        """
+        rule_params.extend([
+            f"%{selected_rule_search}%",
+            f"%{selected_rule_search}%"
+        ])
 
     conn = connect()
     c = conn.cursor()
@@ -2793,7 +2824,7 @@ async def automation_rules_export(
         content,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f"attachment; filename=automation_rules_{selected_rule_filter or 'all'}_{selected_rule_trigger_filter or 'all'}.csv"
+            "Content-Disposition": f"attachment; filename=automation_rules_{selected_rule_filter or 'all'}_{selected_rule_trigger_filter or 'all'}_{selected_rule_search or 'all'}.csv"
         }
     )
 

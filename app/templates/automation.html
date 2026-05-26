@@ -171,7 +171,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="card">
 <h2>Правила</h2>
 
-<a class="back" href="/automation/rules/export{% if selected_rule_filter or selected_rule_trigger_filter %}?{% if selected_rule_filter %}rule_filter={{ selected_rule_filter }}{% endif %}{% if selected_rule_filter and selected_rule_trigger_filter %}&{% endif %}{% if selected_rule_trigger_filter %}rule_trigger_filter={{ selected_rule_trigger_filter }}{% endif %}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
+<a class="back" href="/automation/rules/export{% if selected_rule_filter or selected_rule_trigger_filter or selected_rule_search %}?{% if selected_rule_filter %}rule_filter={{ selected_rule_filter }}{% endif %}{% if selected_rule_filter and (selected_rule_trigger_filter or selected_rule_search) %}&{% endif %}{% if selected_rule_trigger_filter %}rule_trigger_filter={{ selected_rule_trigger_filter }}{% endif %}{% if selected_rule_trigger_filter and selected_rule_search %}&{% endif %}{% if selected_rule_search %}rule_search={{ selected_rule_search }}{% endif %}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
 
 <form method="get" action="/automation" class="filters">
     {% if selected_rule_filter %}
@@ -189,6 +189,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <option value="{{ key }}" {% if selected_rule_trigger_filter == key %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
+    <input type="text" name="rule_search" value="{{ selected_rule_search }}" placeholder="Поиск по правилу или сообщению">
     <button type="submit" style="width:auto;padding:10px 14px;border-radius:999px;font-size:13px">Фильтровать</button>
 </form>
 
