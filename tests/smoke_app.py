@@ -984,6 +984,34 @@ async def assert_ai_assistant_page():
     assert notified_page_response.status_code == 200
     notified_html = notified_page_response.body.decode("utf-8")
     assert "раз:" in notified_html
+    assert f"/ai/assistant/notes/{saved_note['id']}/postpone" in notified_html
+    assert "Завтра" in notified_html
+    assert "Через неделю" in notified_html
+
+    postponed_response = await crm.postpone_ai_assistant_note(
+        make_form_request(
+            "owner2",
+            f"/ai/assistant/notes/{saved_note['id']}/postpone",
+            {"days": "1"},
+        ),
+        saved_note["id"],
+    )
+    assert postponed_response.status_code == 302
+    assert postponed_response.headers["location"] == "/ai/assistant?note_postponed=1"
+
+    conn = connect()
+    c = conn.cursor()
+    postponed_note = c.execute("""
+    SELECT follow_up_date
+    FROM ai_assistant_notes
+    WHERE id=?
+      AND company_id=2
+    """, (saved_note["id"],)).fetchone()
+    conn.close()
+
+    assert postponed_note["follow_up_date"] == (
+        datetime.now() + timedelta(days=1)
+    ).strftime("%Y-%m-%d")
 
     scheduled_note_response = await crm.add_ai_assistant_note(
         make_form_request(

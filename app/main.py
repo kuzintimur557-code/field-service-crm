@@ -7274,6 +7274,54 @@ async def complete_ai_assistant_note(request: Request, note_id: int):
     return RedirectResponse("/ai/assistant?note_done=1", status_code=302)
 
 
+@app.post("/ai/assistant/notes/{note_id}/postpone")
+async def postpone_ai_assistant_note(request: Request, note_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "ai_insights")
+
+    if disabled_response:
+        return disabled_response
+
+    form = await request.form()
+    days = str(form.get("days") or "1").strip()
+
+    if days not in ("1", "7"):
+        days = "1"
+
+    next_date = (datetime.now() + timedelta(days=int(days))).strftime("%Y-%m-%d")
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    UPDATE ai_assistant_notes
+    SET follow_up_date=?
+    WHERE id=?
+      AND company_id=?
+      AND COALESCE(is_done, 0)=0
+    """, (
+        next_date,
+        note_id,
+        company_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/ai/assistant?note_postponed=1", status_code=302)
+
+
 @app.post("/ai/assistant/follow-ups/notify")
 async def notify_ai_assistant_follow_ups(request: Request):
 
