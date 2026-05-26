@@ -1101,6 +1101,7 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
     today_key = now_dt.strftime("%Y-%m-%d")
     iso_year, iso_week, _ = now_dt.isocalendar()
     week_key = f"{iso_year}-W{iso_week:02d}"
+    daily_message = f"AI daily digest {today_key}"
 
     conn = connect()
     c = conn.cursor()
@@ -1126,8 +1127,8 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
     FROM automation_events
     WHERE company_id=?
       AND trigger_key='daily_digest'
-      AND created_at LIKE ?
-    """, (company_id, f"{today_key}%")).fetchone()[0]
+      AND message=?
+    """, (company_id, daily_message)).fetchone()[0]
 
     weekly_message = f"AI weekly digest {week_key}"
     weekly_already_sent = c.execute("""
@@ -1146,7 +1147,7 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
             "daily_digest",
             "company",
             company_id,
-            f"AI daily digest {today_key}",
+            daily_message,
             "/ai/insights"
         )
     elif daily_rules:
@@ -9583,7 +9584,8 @@ async def create_task_page(
     return_to: str = "",
     client_id: int = 0,
     note_id: int = 0,
-    source_task_id: int = 0
+    source_task_id: int = 0,
+    ai_note_id: int = 0
 ):
 
     username = get_user(request)
@@ -9629,6 +9631,7 @@ async def create_task_page(
     selected_description = ""
     selected_note_id = 0
     selected_source_task_id = 0
+    selected_ai_note_id = 0
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
@@ -9689,6 +9692,9 @@ async def create_task_page(
                     if source_task_id:
                         switch_params["source_task_id"] = source_task_id
 
+                    if ai_note_id:
+                        switch_params["ai_note_id"] = ai_note_id
+
                     recommended_worker["switch_url"] = f"/create-task?{urlencode(switch_params)}"
 
     clients = c.execute("""
@@ -9741,6 +9747,19 @@ async def create_task_page(
                 selected_description = selected_note["note"] or ""
                 selected_note_id = note_id
 
+    if ai_note_id:
+        selected_ai_note = c.execute("""
+        SELECT *
+        FROM ai_assistant_notes
+        WHERE id=?
+          AND company_id=?
+          AND COALESCE(is_done, 0)=0
+        """, (ai_note_id, company_id)).fetchone()
+
+        if selected_ai_note:
+            selected_description = selected_ai_note["note"] or selected_description
+            selected_ai_note_id = ai_note_id
+
     settings = get_company_settings(company_id)
 
     custom_fields = c.execute("""
@@ -9767,6 +9786,7 @@ async def create_task_page(
             "selected_description": selected_description,
             "selected_note_id": selected_note_id,
             "selected_source_task_id": selected_source_task_id,
+            "selected_ai_note_id": selected_ai_note_id,
             "selected_task_date": selected_task_date,
             "selected_workers": selected_workers,
             "selected_return_to": selected_return_to,
@@ -9808,6 +9828,7 @@ async def create_task(
     return_to = (form.get("return_to") or "").strip()
     note_id = (form.get("note_id") or "").strip()
     source_task_id = (form.get("source_task_id") or "").strip()
+    ai_note_id = (form.get("ai_note_id") or "").strip()
     priority = form.get("priority")
     price = form.get("price")
     company_id = get_user_company_id(username)
@@ -9876,6 +9897,18 @@ async def create_task(
 
                     if source_task:
                         error_params["source_task_id"] = source_task_id
+
+            if ai_note_id.isdigit():
+                ai_note = c.execute("""
+                SELECT id
+                FROM ai_assistant_notes
+                WHERE id=?
+                  AND company_id=?
+                  AND COALESCE(is_done, 0)=0
+                """, (int(ai_note_id), company_id)).fetchone()
+
+                if ai_note:
+                    error_params["ai_note_id"] = ai_note_id
 
             conn.close()
             return RedirectResponse(f"/create-task?{urlencode(error_params)}", status_code=302)
@@ -9994,6 +10027,23 @@ async def create_task(
         ))
 
     if custom_fields:
+        conn.commit()
+
+    if ai_note_id.isdigit():
+        c.execute("""
+        UPDATE ai_assistant_notes
+        SET is_done=1,
+            done_by=?,
+            done_at=?
+        WHERE id=?
+          AND company_id=?
+          AND COALESCE(is_done, 0)=0
+        """, (
+            username,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            int(ai_note_id),
+            company_id
+        ))
         conn.commit()
 
     conn.close()

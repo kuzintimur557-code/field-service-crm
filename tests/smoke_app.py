@@ -873,6 +873,7 @@ async def assert_ai_assistant_page():
     assert notes_response.status_code == 200
     notes_html = notes_response.body.decode("utf-8")
     assert "Проверить AI assistant рекомендацию" in notes_html
+    assert "/create-task?ai_note_id=" in notes_html
 
     conn = connect()
     c = conn.cursor()
@@ -892,6 +893,15 @@ async def assert_ai_assistant_page():
     digest_message = crm.build_ai_digest_message(2)
     assert "Активные заметки владельца" in digest_message
     assert "Проверить AI assistant рекомендацию" in digest_message
+
+    ai_note_task_response = await crm.create_task_page(
+        make_asgi_request("owner2", "/create-task"),
+        ai_note_id=saved_note["id"],
+    )
+    assert ai_note_task_response.status_code == 200
+    ai_note_task_html = ai_note_task_response.body.decode("utf-8")
+    assert f'name="ai_note_id" value="{saved_note["id"]}"' in ai_note_task_html
+    assert "Проверить AI assistant рекомендацию</textarea>" in ai_note_task_html
 
     done_response = await crm.complete_ai_assistant_note(
         make_form_request(

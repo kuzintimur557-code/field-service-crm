@@ -169,6 +169,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                         <td>{{ note["username"] }}</td>
                         <td>{{ note["note"] }}</td>
                         <td>
+                            <a class="btn" href="/create-task?ai_note_id={{ note['id'] }}" style="padding:8px 10px;margin-bottom:8px">Создать {{ (settings["task_label"] or "задачу")|lower }}</a>
                             <form method="post" action="/ai/assistant/notes/{{ note['id'] }}/done" style="margin:0">
                                 <button class="btn" type="submit" style="border:0;cursor:pointer;background:#16a34a;padding:8px 10px">Выполнено</button>
                             </form>
