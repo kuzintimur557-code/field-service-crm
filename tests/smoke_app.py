@@ -583,6 +583,36 @@ async def assert_automation_runner(task):
     assert "SLA event happened" in done_export_csv
     assert "done" in done_export_csv
 
+    conn = connect()
+    c = conn.cursor()
+    c.executemany("""
+    INSERT INTO automation_events (
+        company_id, rule_id, trigger_key, entity_type, entity_id,
+        status, message, created_at, processed_at
+    )
+    VALUES (2, ?, 'sla_overdue', 'task', ?, 'skipped', ?, ?, ?)
+    """, [
+        (
+            event["rule_id"],
+            task["id"],
+            f"Newer skipped event {idx}",
+            f"2026-05-25 10:{idx:02d}:00",
+            f"2026-05-25 10:{idx:02d}:30",
+        )
+        for idx in range(35)
+    ])
+    conn.commit()
+    conn.close()
+
+    filtered_done_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        event_filter="done",
+    )
+    assert filtered_done_response.status_code == 200
+    filtered_done_html = filtered_done_response.body.decode("utf-8")
+    assert "SLA event happened" in filtered_done_html
+    assert "Newer skipped event 34" not in filtered_done_html
+
     telegram_response = await crm.create_automation_rule(
         make_form_request(
             "owner2",

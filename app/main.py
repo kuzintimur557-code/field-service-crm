@@ -2550,6 +2550,12 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     action_labels = dict(AUTOMATION_ACTIONS)
     selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
     selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
+    event_filter_sql = ""
+    event_params = [company_id]
+
+    if selected_event_filter:
+        event_filter_sql = "AND status=?"
+        event_params.append(selected_event_filter)
 
     conn = connect()
     c = conn.cursor()
@@ -2584,13 +2590,22 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     ORDER BY automation_rules.id DESC
     """, (company_id,)).fetchall()
 
-    events = c.execute("""
+    events = c.execute(f"""
     SELECT *
     FROM automation_events
     WHERE company_id=?
+      {event_filter_sql}
     ORDER BY id DESC
     LIMIT 30
+    """, event_params).fetchall()
+
+    event_count_rows = c.execute("""
+    SELECT status, COUNT(*) AS count
+    FROM automation_events
+    WHERE company_id=?
+    GROUP BY status
     """, (company_id,)).fetchall()
+    event_counts = {row["status"]: row["count"] for row in event_count_rows}
 
     users = c.execute("""
     SELECT username, role
@@ -2619,19 +2634,16 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
         "rules_total": len(rules),
         "rules_active": len([rule for rule in rules if rule["active"]]),
         "rules_disabled": len([rule for rule in rules if not rule["active"]]),
-        "events_total": len(events),
-        "events_pending": len([event for event in events if event["status"] == "pending"]),
-        "events_done": len([event for event in events if event["status"] == "done"]),
-        "events_skipped": len([event for event in events if event["status"] == "skipped"])
+        "events_total": sum(event_counts.values()),
+        "events_pending": event_counts.get("pending", 0),
+        "events_done": event_counts.get("done", 0),
+        "events_skipped": event_counts.get("skipped", 0)
     }
 
     if selected_rule_filter == "active":
         rules = [rule for rule in rules if rule["active"]]
     elif selected_rule_filter == "disabled":
         rules = [rule for rule in rules if not rule["active"]]
-
-    if selected_event_filter:
-        events = [event for event in events if event["status"] == selected_event_filter]
 
     return templates.TemplateResponse(
         request,
