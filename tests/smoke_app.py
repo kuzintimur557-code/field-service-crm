@@ -387,6 +387,7 @@ async def assert_automation_page():
     assert "AI scheduler" in html
     assert "AI контроля" in html
     assert 'action="/automation/ai-digest/run"' in html
+    assert 'href="/automation/events/export"' in html
     assert "Cron endpoint" in html
     assert "AUTOMATION_CRON_SECRET" in html
     assert "POST /automation/cron/ai-digest" in html
@@ -571,6 +572,16 @@ async def assert_automation_runner(task):
     done_html = done_response.body.decode("utf-8")
     assert "SLA event happened" in done_html
     assert "done" in done_html
+    assert 'href="/automation/events/export?event_filter=done"' in done_html
+
+    done_export_response = await crm.automation_events_export(
+        make_request("owner2"),
+        event_filter="done",
+    )
+    assert done_export_response.status_code == 200
+    done_export_csv = done_export_response.body.decode("utf-8")
+    assert "SLA event happened" in done_export_csv
+    assert "done" in done_export_csv
 
     telegram_response = await crm.create_automation_rule(
         make_form_request(

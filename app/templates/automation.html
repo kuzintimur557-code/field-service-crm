@@ -239,6 +239,8 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="card">
 <h2>Последние события</h2>
 
+<a class="back" href="/automation/events/export{% if selected_event_filter %}?event_filter={{ selected_event_filter }}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
+
 <div class="filters">
     <a href="/automation{% if selected_rule_filter %}?rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if not selected_event_filter %}active{% endif %}">Все</a>
     <a href="/automation?event_filter=pending{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'pending' %}active{% endif %}">Pending</a>

@@ -2655,6 +2655,85 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
     )
 
 
+@app.get("/automation/events/export")
+async def automation_events_export(request: Request, event_filter: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
+    event_filter_sql = ""
+    event_params = [company_id]
+
+    if selected_event_filter:
+        event_filter_sql = "AND status=?"
+        event_params.append(selected_event_filter)
+
+    conn = connect()
+    c = conn.cursor()
+
+    events = c.execute(f"""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=?
+      {event_filter_sql}
+    ORDER BY id DESC
+    LIMIT 500
+    """, event_params).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id",
+        "rule_id",
+        "trigger_key",
+        "status",
+        "entity_type",
+        "entity_id",
+        "message",
+        "created_at",
+        "processed_at"
+    ])
+
+    for event in events:
+        writer.writerow([
+            event["id"],
+            event["rule_id"],
+            event["trigger_key"],
+            event["status"],
+            event["entity_type"],
+            event["entity_id"],
+            event["message"] or "",
+            event["created_at"],
+            event["processed_at"] or ""
+        ])
+
+    content = "\ufeff" + output.getvalue()
+
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}.csv"
+        }
+    )
+
+
 @app.post("/automation/ai-digest/run")
 async def run_ai_digest_scheduler_page(request: Request):
 
