@@ -78,11 +78,17 @@ AUTOMATION_TRIGGERS = [
 
 AUTOMATION_ACTIONS = [
     ("notification", "Создать уведомление"),
-    ("telegram_alert", "Telegram alert"),
+    ("telegram_alert", "Telegram-уведомление"),
     ("ai_digest", "AI-сводка"),
     ("email", "Email"),
     ("create_task", "Создать задачу")
 ]
+
+AUTOMATION_STATUS_LABELS = {
+    "pending": "Ожидает",
+    "done": "Выполнено",
+    "skipped": "Пропущено"
+}
 
 FEATURE_DEFINITIONS = [
     ("tasks", "Заявки", "Создание и ведение заявок"),
@@ -2548,6 +2554,7 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
 
     trigger_labels = dict(AUTOMATION_TRIGGERS)
     action_labels = dict(AUTOMATION_ACTIONS)
+    status_labels = AUTOMATION_STATUS_LABELS
     selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
     selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
     event_filter_sql = ""
@@ -2659,6 +2666,7 @@ async def automation_page(request: Request, rule_filter: str = "", event_filter:
             "actions": AUTOMATION_ACTIONS,
             "trigger_labels": trigger_labels,
             "action_labels": action_labels,
+            "status_labels": status_labels,
             "selected_rule_filter": selected_rule_filter,
             "selected_event_filter": selected_event_filter,
             "automation_stats": automation_stats,

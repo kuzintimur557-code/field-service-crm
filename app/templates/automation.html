@@ -72,10 +72,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
 {% if request.query_params.get("scheduler") == "1" %}
 <div class="notice ok">
-    AI scheduler: daily {{ request.query_params.get("daily") or "0" }},
-    weekly {{ request.query_params.get("weekly") or "0" }},
-    AI контроль {{ request.query_params.get("follow_ups") or "0" }},
-    skipped {{ request.query_params.get("skipped") or "0" }}
+    AI-планировщик: дневных {{ request.query_params.get("daily") or "0" }},
+    недельных {{ request.query_params.get("weekly") or "0" }},
+    AI-контроль {{ request.query_params.get("follow_ups") or "0" }},
+    пропущено {{ request.query_params.get("skipped") or "0" }}
 </div>
 {% endif %}
 
@@ -97,20 +97,20 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="stat-value">{{ automation_stats["rules_disabled"] }}</div>
     </div>
     <div class="stat">
-        <div class="stat-title">Событий done</div>
+        <div class="stat-title">Событий выполнено</div>
         <div class="stat-value">{{ automation_stats["events_done"] }}</div>
     </div>
     <div class="stat">
-        <div class="stat-title">Событий skipped</div>
+        <div class="stat-title">Событий пропущено</div>
         <div class="stat-value">{{ automation_stats["events_skipped"] }}</div>
     </div>
 </div>
 
 <div class="card">
-<h2>AI scheduler</h2>
+<h2>AI-планировщик</h2>
 <div class="meta">Ручной запуск расписания для daily_digest, weekly_digest и AI контроля. Повторный запуск за тот же день или неделю не создаёт дубли.</div>
 <form method="post" action="/automation/ai-digest/run" style="margin-top:14px">
-    <button type="submit">Запустить AI scheduler</button>
+    <button type="submit">Запустить AI-планировщик</button>
 </form>
 </div>
 
@@ -245,9 +245,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
 <div class="filters">
     <a href="/automation{% if selected_rule_filter %}?rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if not selected_event_filter %}active{% endif %}">Все</a>
-    <a href="/automation?event_filter=pending{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'pending' %}active{% endif %}">Pending</a>
-    <a href="/automation?event_filter=done{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'done' %}active{% endif %}">Done</a>
-    <a href="/automation?event_filter=skipped{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'skipped' %}active{% endif %}">Skipped</a>
+    <a href="/automation?event_filter=pending{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'pending' %}active{% endif %}">Ожидает</a>
+    <a href="/automation?event_filter=done{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'done' %}active{% endif %}">Выполнено</a>
+    <a href="/automation?event_filter=skipped{% if selected_rule_filter %}&rule_filter={{ selected_rule_filter }}{% endif %}" class="{% if selected_event_filter == 'skipped' %}active{% endif %}">Пропущено</a>
 </div>
 
 {% if events %}
@@ -258,7 +258,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="rule-title">{{ trigger_labels.get(event["trigger_key"], event["trigger_key"]) }}</div>
         <div class="meta">{{ event["message"] or "" }}</div>
     </div>
-    <span class="pill">{{ event["status"] }}</span>
+    <span class="pill">{{ status_labels.get(event["status"], event["status"]) }}</span>
 </div>
 {% endfor %}
 {% else %}
