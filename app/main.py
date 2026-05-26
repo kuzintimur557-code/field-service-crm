@@ -7275,7 +7275,7 @@ async def ai_assistant_page(
 
 
 @app.get("/ai/assistant/events/export")
-async def ai_assistant_events_export(request: Request):
+async def ai_assistant_events_export(request: Request, event_filter: str = ""):
 
     username = get_user(request)
 
@@ -7293,16 +7293,30 @@ async def ai_assistant_events_export(request: Request):
     if disabled_response:
         return disabled_response
 
+    selected_event_filter = event_filter if event_filter in (
+        "created",
+        "notification_sent",
+        "postponed",
+        "done"
+    ) else ""
+    event_filter_sql = ""
+    event_params = [company_id]
+
+    if selected_event_filter:
+        event_filter_sql = "AND action=?"
+        event_params.append(selected_event_filter)
+
     conn = connect()
     c = conn.cursor()
 
-    events = c.execute("""
+    events = c.execute(f"""
     SELECT *
     FROM ai_assistant_events
     WHERE company_id=?
+      {event_filter_sql}
     ORDER BY id DESC
     LIMIT 500
-    """, (company_id,)).fetchall()
+    """, event_params).fetchall()
 
     conn.close()
 
@@ -7326,7 +7340,7 @@ async def ai_assistant_events_export(request: Request):
         content,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": "attachment; filename=ai_assistant_events.csv"
+            "Content-Disposition": f"attachment; filename=ai_assistant_events_{selected_event_filter or 'all'}.csv"
         }
     )
 

@@ -381,7 +381,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 
     <div class="card">
         <h2>Журнал AI Assistant</h2>
-        <a class="btn" href="/ai/assistant/events/export" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
+        <a class="btn" href="/ai/assistant/events/export{% if selected_event_filter %}?event_filter={{ selected_event_filter }}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
         <div class="filters">
             <a href="/ai/assistant" class="{% if not selected_event_filter %}active{% endif %}">Все</a>
             <a href="/ai/assistant?event_filter=created" class="{% if selected_event_filter == 'created' %}active{% endif %}">Создано</a>

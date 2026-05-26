@@ -1177,6 +1177,7 @@ async def assert_ai_assistant_page():
     assert done_events_response.status_code == 200
     done_events_html = done_events_response.body.decode("utf-8")
     assert 'href="/ai/assistant?event_filter=done" class="active"' in done_events_html
+    assert 'href="/ai/assistant/events/export?event_filter=done"' in done_events_html
     assert "Выполнено" in done_events_html
 
     events_export_response = await crm.ai_assistant_events_export(make_request("owner2"))
@@ -1186,6 +1187,15 @@ async def assert_ai_assistant_page():
     assert "owner2" in events_export_csv
     assert "created" in events_export_csv
     assert "done" in events_export_csv
+
+    done_events_export_response = await crm.ai_assistant_events_export(
+        make_request("owner2"),
+        event_filter="done",
+    )
+    assert done_events_export_response.status_code == 200
+    done_events_export_csv = done_events_export_response.body.decode("utf-8")
+    assert "done" in done_events_export_csv
+    assert "created" not in done_events_export_csv
 
     completed_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert completed_page_response.status_code == 200
