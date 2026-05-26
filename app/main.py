@@ -743,11 +743,17 @@ def build_ai_digest_message(company_id, cursor=None):
     """, (company_id,)).fetchone()[0]
 
     active_notes = c.execute("""
-    SELECT note
+    SELECT note, priority
     FROM ai_assistant_notes
     WHERE company_id=?
       AND COALESCE(is_done, 0)=0
-    ORDER BY id DESC
+    ORDER BY
+      CASE COALESCE(priority, 'normal')
+        WHEN 'urgent' THEN 0
+        WHEN 'normal' THEN 1
+        ELSE 2
+      END,
+      id DESC
     LIMIT 3
     """, (company_id,)).fetchall()
 
@@ -771,7 +777,8 @@ def build_ai_digest_message(company_id, cursor=None):
         message_lines.append("Активные заметки владельца:")
 
         for note in active_notes:
-            message_lines.append(f"- {note['note']}")
+            priority_prefix = "Срочно: " if note["priority"] == "urgent" else ""
+            message_lines.append(f"- {priority_prefix}{note['note']}")
 
     return "\n".join(message_lines)
 
@@ -847,7 +854,13 @@ def build_owner_ai_assistant_context(company_id):
     FROM ai_assistant_notes
     WHERE company_id=?
       AND COALESCE(is_done, 0)=0
-    ORDER BY id DESC
+    ORDER BY
+      CASE COALESCE(priority, 'normal')
+        WHEN 'urgent' THEN 0
+        WHEN 'normal' THEN 1
+        ELSE 2
+      END,
+      id DESC
     LIMIT 8
     """, (company_id,)).fetchall()
 
@@ -7014,6 +7027,10 @@ async def add_ai_assistant_note(request: Request):
 
     form = await request.form()
     note = str(form.get("note") or "").strip()
+    priority = str(form.get("priority") or "normal").strip()
+
+    if priority not in ("urgent", "normal", "later"):
+        priority = "normal"
 
     if not note:
         return RedirectResponse("/ai/assistant?note_error=empty", status_code=302)
@@ -7023,13 +7040,14 @@ async def add_ai_assistant_note(request: Request):
 
     c.execute("""
     INSERT INTO ai_assistant_notes (
-        company_id, username, note, created_at
+        company_id, username, note, priority, created_at
     )
-    VALUES (?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?)
     """, (
         company_id,
         username,
         note,
+        priority,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 

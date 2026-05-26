@@ -27,6 +27,11 @@ h2{margin:0 0 14px;font-size:22px}
 .priority.success{border-left-color:#16a34a}
 .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
 textarea{width:100%;min-height:90px;padding:14px;border-radius:14px;border:1px solid #d1d5db;font-size:16px;resize:vertical}
+select{width:100%;padding:12px;border-radius:14px;border:1px solid #d1d5db;font-size:16px;background:white;font-weight:800}
+.badge{display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:900;background:#e5e7eb;color:#374151}
+.badge.urgent{background:#fee2e2;color:#991b1b}
+.badge.normal{background:#dbeafe;color:#1d4ed8}
+.badge.later{background:#f3f4f6;color:#6b7280}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 @media(max-width:800px){.container{padding:14px}.header,.grid{grid-template-columns:1fr;display:grid}h1{font-size:28px}}
@@ -150,6 +155,11 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
             <h2>Заметки владельца</h2>
             <form method="post" action="/ai/assistant/notes">
                 <textarea name="note" placeholder="Например: связаться с монтажником, перенести срок, проверить оплату..."></textarea>
+                <select name="priority" style="margin-top:10px">
+                    <option value="urgent">Срочно</option>
+                    <option value="normal" selected>Обычно</option>
+                    <option value="later">Позже</option>
+                </select>
                 <button class="btn" type="submit" style="border:0;cursor:pointer;margin-top:10px">Сохранить заметку</button>
             </form>
 
@@ -158,6 +168,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     <tr>
                         <th>Дата</th>
                         <th>Автор</th>
+                        <th>Приоритет</th>
                         <th>Заметка</th>
                         <th></th>
                     </tr>
@@ -167,6 +178,11 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     <tr>
                         <td>{{ note["created_at"] }}</td>
                         <td>{{ note["username"] }}</td>
+                        <td>
+                            <span class="badge {{ note['priority'] or 'normal' }}">
+                                {% if note["priority"] == "urgent" %}Срочно{% elif note["priority"] == "later" %}Позже{% else %}Обычно{% endif %}
+                            </span>
+                        </td>
                         <td>{{ note["note"] }}</td>
                         <td>
                             <a class="btn" href="/create-task?ai_note_id={{ note['id'] }}" style="padding:8px 10px;margin-bottom:8px">Создать {{ (settings["task_label"] or "задачу")|lower }}</a>
@@ -177,7 +193,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="meta">Активных заметок пока нет</td>
+                        <td colspan="5" class="meta">Активных заметок пока нет</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -191,6 +207,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     <tr>
                         <th>Дата</th>
                         <th>Кто закрыл</th>
+                        <th>Приоритет</th>
                         <th>Решение</th>
                         <th>{{ settings["task_label"] or "Заявка" }}</th>
                     </tr>
@@ -200,6 +217,11 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     <tr>
                         <td>{{ note["done_at"] or note["created_at"] }}</td>
                         <td>{{ note["done_by"] or note["username"] }}</td>
+                        <td>
+                            <span class="badge {{ note['priority'] or 'normal' }}">
+                                {% if note["priority"] == "urgent" %}Срочно{% elif note["priority"] == "later" %}Позже{% else %}Обычно{% endif %}
+                            </span>
+                        </td>
                         <td>{{ note["note"] }}</td>
                         <td>
                             {% if note["created_task_id"] %}
@@ -212,7 +234,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="meta">Выполненных решений пока нет</td>
+                        <td colspan="5" class="meta">Выполненных решений пока нет</td>
                     </tr>
                     {% endfor %}
                 </tbody>
