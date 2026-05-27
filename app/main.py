@@ -2684,6 +2684,14 @@ async def automation_page(
     WHERE company_id=?
     """, (company_id,)).fetchone()[0] or ""
 
+    today_key = datetime.now().strftime("%Y-%m-%d")
+    events_today = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND substr(created_at, 1, 10)=?
+    """, (company_id, today_key)).fetchone()[0] or 0
+
     users = c.execute("""
     SELECT username, role
     FROM users
@@ -2715,6 +2723,7 @@ async def automation_page(
         "events_pending": event_counts.get("pending", 0),
         "events_done": event_counts.get("done", 0),
         "events_skipped": event_counts.get("skipped", 0),
+        "events_today": events_today,
         "success_rate": round(
             event_counts.get("done", 0) / max(
                 event_counts.get("done", 0) + event_counts.get("skipped", 0),

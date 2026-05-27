@@ -384,6 +384,7 @@ async def assert_automation_page():
     assert "Telegram-уведомление" in html
     assert "Всего правил" in html
     assert "Включено правил" in html
+    assert "Событий сегодня" in html
     assert "Событий выполнено" in html
     assert "Успешность" in html
     assert "Последнее событие" in html
