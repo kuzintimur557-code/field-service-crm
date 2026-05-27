@@ -698,6 +698,7 @@ async def assert_automation_runner(task):
     assert entity_filter_response.status_code == 200
     entity_filter_html = entity_filter_response.body.decode("utf-8")
     assert 'option value="task" selected' in entity_filter_html
+    assert 'name="event_entity_filter" value="task"' in entity_filter_html
     assert "SLA event happened" in entity_filter_html
     assert 'href="/automation/events/export?event_filter=done&event_entity_filter=task"' in entity_filter_html
 

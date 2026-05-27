@@ -203,6 +203,18 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     {% if selected_trigger_filter %}
     <input type="hidden" name="trigger_filter" value="{{ selected_trigger_filter }}">
     {% endif %}
+    {% if selected_event_entity_filter %}
+    <input type="hidden" name="event_entity_filter" value="{{ selected_event_entity_filter }}">
+    {% endif %}
+    {% if selected_event_search %}
+    <input type="hidden" name="event_search" value="{{ selected_event_search }}">
+    {% endif %}
+    {% if selected_event_date_from %}
+    <input type="hidden" name="event_date_from" value="{{ selected_event_date_from }}">
+    {% endif %}
+    {% if selected_event_date_to %}
+    <input type="hidden" name="event_date_to" value="{{ selected_event_date_to }}">
+    {% endif %}
     <select name="rule_trigger_filter">
         <option value="">Все триггеры</option>
         {% for key, label in triggers %}
