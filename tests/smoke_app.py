@@ -527,6 +527,36 @@ async def assert_automation_page():
     assert "SLA smoke rule updated" in rule_search_export_csv
     assert "sla_overdue" in rule_search_export_csv
 
+    assert f"/automation/rules/{rule['id']}/run" in updated_page_html
+    assert "Запустить сейчас" in updated_page_html
+
+    run_response = await crm.run_automation_rule_now(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert run_response.status_code == 302
+    assert run_response.headers["location"] == "/automation?run=1"
+
+    conn = connect()
+    c = conn.cursor()
+
+    manual_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND message=?
+    ORDER BY id DESC
+    """, (
+        rule["id"],
+        "Ручной запуск правила: SLA smoke rule updated"
+    )).fetchone()
+
+    conn.close()
+
+    assert manual_event is not None
+    assert manual_event["status"] == "done"
+
     toggle_response = await crm.toggle_automation_rule(
         make_request("owner2"),
         rule["id"],

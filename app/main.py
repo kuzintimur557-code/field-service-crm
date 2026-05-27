@@ -3320,6 +3320,56 @@ async def edit_automation_rule(request: Request, rule_id: int):
     return RedirectResponse("/automation?updated=1", status_code=302)
 
 
+
+@app.post("/automation/rules/{rule_id}/run")
+async def run_automation_rule_now(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+      AND active=1
+    """, (rule_id, company_id)).fetchone()
+
+    conn.close()
+
+    if not rule:
+        return RedirectResponse("/automation?run_skipped=1", status_code=302)
+
+    created_events = run_automation_event(
+        company_id,
+        rule["trigger_key"],
+        "company",
+        company_id,
+        f"Ручной запуск правила: {rule['name']}",
+        "/automation"
+    )
+
+    if created_events:
+        return RedirectResponse("/automation?run=1", status_code=302)
+
+    return RedirectResponse("/automation?run_skipped=1", status_code=302)
+
 @app.post("/automation/rules/{rule_id}/toggle")
 async def toggle_automation_rule(request: Request, rule_id: int):
 

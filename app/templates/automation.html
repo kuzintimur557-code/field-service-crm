@@ -70,6 +70,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">Правило удалено</div>
 {% endif %}
 
+{% if request.query_params.get("run") == "1" %}
+<div class="notice ok">Правило запущено вручную</div>
+{% endif %}
+
+{% if request.query_params.get("run_skipped") == "1" %}
+<div class="notice warn">Правило не запущено: оно отключено или не найдено</div>
+{% endif %}
+
 {% if request.query_params.get("scheduler") == "1" %}
 <div class="notice ok">
     AI-планировщик: дневных {{ request.query_params.get("daily") or "0" }},
@@ -280,6 +288,12 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         </form>
     </div>
     <div>
+    <form method="post" action="/automation/rules/{{ rule['id'] }}/run" style="margin-bottom:8px">
+        <button type="submit" style="background:#2563eb">
+            Запустить сейчас
+        </button>
+    </form>
+
     <form method="post" action="/automation/rules/{{ rule['id'] }}/toggle" style="margin-bottom:8px">
         <button type="submit" style="background:{% if rule['active'] %}#991b1b{% else %}#16a34a{% endif %}">
             {% if rule["active"] %}Выключить{% else %}Включить{% endif %}
