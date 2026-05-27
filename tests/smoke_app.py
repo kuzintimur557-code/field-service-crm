@@ -651,6 +651,7 @@ async def assert_automation_runner(task):
     assert "SLA event happened" in done_html
     assert "Выполнено" in done_html
     assert "Правило: SLA runner rule" in done_html
+    assert f"Объект: task #{task['id']}" in done_html
     assert f'href="/task/{task["id"]}"' in done_html
     assert "Открыть заявку" in done_html
     assert 'href="/automation/events/export?event_filter=done"' in done_html
