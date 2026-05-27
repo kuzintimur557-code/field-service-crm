@@ -299,6 +299,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     {% if selected_rule_trigger_filter %}
     <input type="hidden" name="rule_trigger_filter" value="{{ selected_rule_trigger_filter }}">
     {% endif %}
+    {% if selected_rule_action_filter %}
+    <input type="hidden" name="rule_action_filter" value="{{ selected_rule_action_filter }}">
+    {% endif %}
     {% if selected_rule_search %}
     <input type="hidden" name="rule_search" value="{{ selected_rule_search }}">
     {% endif %}

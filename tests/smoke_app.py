@@ -573,6 +573,7 @@ async def assert_automation_page():
     assert 'option value="notification" selected' in action_filter_html
     assert "SLA smoke rule updated" in action_filter_html
     assert 'rule_action_filter=notification' in action_filter_html
+    assert 'name="rule_action_filter" value="notification"' in action_filter_html
 
     action_filter_export_response = await crm.automation_rules_export(
         make_request("owner2"),
