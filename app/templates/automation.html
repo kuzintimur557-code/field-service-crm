@@ -324,7 +324,12 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 {% if events %}
 {% for event in events %}
 <div class="event">
-    <div class="meta">{{ event["created_at"] }}</div>
+    <div class="meta">
+        Создано: {{ event["created_at"] }}
+        {% if event["processed_at"] %}
+        <br>Обработано: {{ event["processed_at"] }}
+        {% endif %}
+    </div>
     <div>
         <div class="rule-title">{{ trigger_labels.get(event["trigger_key"], event["trigger_key"]) }}</div>
         {% if event["rule_name"] %}
