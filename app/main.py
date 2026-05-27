@@ -2549,6 +2549,7 @@ async def automation_page(
     rule_action_filter: str = "",
     rule_search: str = "",
     event_search: str = "",
+    event_entity_filter: str = "",
     event_date_from: str = "",
     event_date_to: str = ""
 ):
@@ -2586,6 +2587,7 @@ async def automation_page(
     selected_rule_action_filter = rule_action_filter if rule_action_filter in action_keys else ""
     selected_rule_search = (rule_search or "").strip()[:80]
     selected_event_search = (event_search or "").strip()[:80]
+    selected_event_entity_filter = event_entity_filter if event_entity_filter in entity_labels else ""
     selected_event_date_from = (event_date_from or "").strip()[:10]
     selected_event_date_to = (event_date_to or "").strip()[:10]
     event_filter_sql = ""
@@ -2607,6 +2609,10 @@ async def automation_page(
     if selected_trigger_filter:
         event_filter_sql += "\n      AND automation_events.trigger_key=?"
         event_params.append(selected_trigger_filter)
+
+    if selected_event_entity_filter:
+        event_filter_sql += "\n      AND automation_events.entity_type=?"
+        event_params.append(selected_event_entity_filter)
 
     if selected_event_search:
         event_filter_sql += """
@@ -2784,6 +2790,7 @@ async def automation_page(
             "selected_rule_action_filter": selected_rule_action_filter,
             "selected_rule_search": selected_rule_search,
             "selected_event_search": selected_event_search,
+            "selected_event_entity_filter": selected_event_entity_filter,
             "selected_event_date_from": selected_event_date_from,
             "selected_event_date_to": selected_event_date_to,
             "automation_stats": automation_stats,
@@ -2927,6 +2934,7 @@ async def automation_events_export(
     event_filter: str = "",
     trigger_filter: str = "",
     event_search: str = "",
+    event_entity_filter: str = "",
     event_date_from: str = "",
     event_date_to: str = ""
 ):
@@ -2949,8 +2957,10 @@ async def automation_events_export(
 
     selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
+    entity_keys = {"task", "client", "company"}
     selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
     selected_event_search = (event_search or "").strip()[:80]
+    selected_event_entity_filter = event_entity_filter if event_entity_filter in entity_keys else ""
     selected_event_date_from = (event_date_from or "").strip()[:10]
     selected_event_date_to = (event_date_to or "").strip()[:10]
     event_filter_sql = ""
@@ -2972,6 +2982,10 @@ async def automation_events_export(
     if selected_trigger_filter:
         event_filter_sql += "\n      AND automation_events.trigger_key=?"
         event_params.append(selected_trigger_filter)
+
+    if selected_event_entity_filter:
+        event_filter_sql += "\n      AND automation_events.entity_type=?"
+        event_params.append(selected_event_entity_filter)
 
     if selected_event_search:
         event_filter_sql += """
@@ -3047,7 +3061,7 @@ async def automation_events_export(
         content,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}_{selected_event_search or 'all'}_{selected_event_date_from or 'from'}_{selected_event_date_to or 'to'}.csv"
+            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}_{selected_event_entity_filter or 'all'}_{selected_event_search or 'all'}_{selected_event_date_from or 'from'}_{selected_event_date_to or 'to'}.csv"
         }
     )
 

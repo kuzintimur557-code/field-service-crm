@@ -689,6 +689,27 @@ async def assert_automation_runner(task):
     assert "SLA event happened" in trigger_export_csv
     assert "sla_overdue" in trigger_export_csv
 
+    entity_filter_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        event_filter="done",
+        event_entity_filter="task",
+    )
+    assert entity_filter_response.status_code == 200
+    entity_filter_html = entity_filter_response.body.decode("utf-8")
+    assert 'option value="task" selected' in entity_filter_html
+    assert "SLA event happened" in entity_filter_html
+    assert 'href="/automation/events/export?event_filter=done&event_entity_filter=task"' in entity_filter_html
+
+    entity_export_response = await crm.automation_events_export(
+        make_request("owner2"),
+        event_filter="done",
+        event_entity_filter="task",
+    )
+    assert entity_export_response.status_code == 200
+    entity_export_csv = entity_export_response.body.decode("utf-8")
+    assert "SLA event happened" in entity_export_csv
+    assert "task" in entity_export_csv
+
     event_search_response = await crm.automation_page(
         make_asgi_request("owner2", "/automation"),
         event_filter="done",
