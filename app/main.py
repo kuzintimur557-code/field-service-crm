@@ -2572,6 +2572,11 @@ async def automation_page(
     trigger_labels = dict(AUTOMATION_TRIGGERS)
     action_labels = dict(AUTOMATION_ACTIONS)
     status_labels = AUTOMATION_STATUS_LABELS
+    entity_labels = {
+        "task": "Заявка",
+        "client": "Клиент",
+        "company": "Компания"
+    }
     selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
     selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
@@ -2771,6 +2776,7 @@ async def automation_page(
             "trigger_labels": trigger_labels,
             "action_labels": action_labels,
             "status_labels": status_labels,
+            "entity_labels": entity_labels,
             "selected_rule_filter": selected_rule_filter,
             "selected_event_filter": selected_event_filter,
             "selected_trigger_filter": selected_trigger_filter,

@@ -337,7 +337,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         {% endif %}
         <div class="meta">{{ event["message"] or "" }}</div>
         {% if event["entity_type"] or event["entity_id"] %}
-        <div class="meta">Объект: {{ event["entity_type"] or "unknown" }}{% if event["entity_id"] %} #{{ event["entity_id"] }}{% endif %}</div>
+        <div class="meta">Объект: {{ entity_labels.get(event["entity_type"], event["entity_type"] or "Не указан") }}{% if event["entity_id"] %} #{{ event["entity_id"] }}{% endif %}</div>
         {% endif %}
         {% if event["entity_type"] == "task" and event["entity_id"] %}
         <a href="/task/{{ event['entity_id'] }}" class="back" style="margin-top:10px;padding:8px 11px;border-radius:999px;font-size:13px;background:#2563eb">Открыть заявку</a>
