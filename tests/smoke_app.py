@@ -393,6 +393,7 @@ async def assert_automation_page():
     assert 'action="/automation/ai-digest/run"' in html
     assert 'href="/automation/rules/export"' in html
     assert 'href="/automation/events/export"' in html
+    assert "Показано событий:" in html
     assert "Cron-запуск" in html
     assert "дневных и недельных AI-сводок" in html
     assert "AUTOMATION_CRON_SECRET" in html

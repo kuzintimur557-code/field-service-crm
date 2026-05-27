@@ -2776,6 +2776,7 @@ async def automation_page(
             "role": role,
             "rules": rules,
             "events": events,
+            "shown_events_count": len(events),
             "users": users,
             "triggers": AUTOMATION_TRIGGERS,
             "actions": AUTOMATION_ACTIONS,
