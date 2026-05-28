@@ -3615,19 +3615,53 @@ async def automation_diagnostics_page(request: Request):
     problems = []
 
     if pending_events > 5:
-        problems.append("Много ожидающих событий автоматизации.")
+        problems.append({
+            "title": "Много ожидающих событий",
+            "reason": "Некоторые события долго не обрабатываются.",
+            "action": "Проверьте последние события и повторите нужные вручную."
+        })
 
     if skipped_events > done_events:
-        problems.append("Пропущенных событий больше, чем выполненных.")
+        problems.append({
+            "title": "Много пропущенных событий",
+            "reason": "Автоматизация чаще пропускает события, чем выполняет.",
+            "action": "Проверьте правила без действий и последние пропущенные события."
+        })
 
     if rules_without_actions:
-        problems.append("Есть активные правила без активных действий.")
+        problems.append({
+            "title": "Есть правила без действий",
+            "reason": "Правило включено, но не имеет активного действия.",
+            "action": "Откройте правило и добавьте действие: уведомление, Telegram или AI-сводку."
+        })
 
     if success_rate < 80 and (done_events + skipped_events) > 0:
-        problems.append("Успешность автоматизации ниже 80%.")
+        problems.append({
+            "title": "Низкая успешность автоматизации",
+            "reason": "Процент выполненных событий ниже 80%.",
+            "action": "Проверьте skipped events и настройки получателей."
+        })
+
+    if telegram_rules:
+        problems.append({
+            "title": "Проверьте Telegram-уведомления",
+            "reason": "В системе есть Telegram automation rules.",
+            "action": "Убедитесь, что BOT_TOKEN и telegram_chat_id настроены."
+        })
+
+    if ai_digest_rules:
+        problems.append({
+            "title": "Проверьте AI-сводки",
+            "reason": "В системе есть AI digest automation.",
+            "action": "Проверьте, что AI-сводки появляются в уведомлениях и в журнале событий."
+        })
 
     if not problems:
-        problems.append("Критичных проблем не найдено.")
+        problems.append({
+            "title": "Критичных проблем не найдено",
+            "reason": "Automation engine работает стабильно.",
+            "action": "Продолжайте мониторить события и успешность."
+        })
 
     conn.close()
 

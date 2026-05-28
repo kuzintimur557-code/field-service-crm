@@ -89,7 +89,11 @@
         <h2>Проблемы и рекомендации</h2>
 
         {% for problem in problems %}
-        <p><span class="pill">{{ problem }}</span></p>
+        <div class="card" style="box-shadow:none;border:1px solid #e5e7eb;">
+            <h3>{{ problem.title }}</h3>
+            <p><b>Почему важно:</b> {{ problem.reason }}</p>
+            <p><b>Что сделать:</b> {{ problem.action }}</p>
+        </div>
         {% endfor %}
     </div>
 
