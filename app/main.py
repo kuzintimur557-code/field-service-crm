@@ -2726,23 +2726,45 @@ async def automation_page(
         rule["edit_message"] = payload.get("message") or ""
         rules.append(rule)
 
+    success_rate = round(
+        event_counts.get("done", 0) / max(
+            event_counts.get("done", 0) + event_counts.get("skipped", 0),
+            1
+        ) * 100,
+        1
+    )
+
+    pending_count = event_counts.get("pending", 0)
+    done_count = event_counts.get("done", 0)
+    skipped_count = event_counts.get("skipped", 0)
+
+    if pending_count > 5 or skipped_count > done_count:
+        health_status = "problem"
+        health_title = "Проблема"
+        health_message = "Есть много ожидающих или пропущенных событий. Нужно проверить правила автоматизации."
+    elif pending_count > 0 or skipped_count > 0 or success_rate < 80:
+        health_status = "warning"
+        health_title = "Нужно внимание"
+        health_message = "Автоматизация работает, но есть события, которые требуют проверки."
+    else:
+        health_status = "ok"
+        health_title = "OK"
+        health_message = "Автоматизация работает стабильно."
+
     automation_stats = {
         "rules_total": len(rules),
         "rules_active": len([rule for rule in rules if rule["active"]]),
         "rules_disabled": len([rule for rule in rules if not rule["active"]]),
         "events_total": sum(event_counts.values()),
-        "events_pending": event_counts.get("pending", 0),
-        "events_done": event_counts.get("done", 0),
-        "events_skipped": event_counts.get("skipped", 0),
+        "events_pending": pending_count,
+        "events_done": done_count,
+        "events_skipped": skipped_count,
         "events_today": events_today,
-        "success_rate": round(
-            event_counts.get("done", 0) / max(
-                event_counts.get("done", 0) + event_counts.get("skipped", 0),
-                1
-            ) * 100,
-            1
-        ),
-        "last_event_at": last_event_at
+        "success_rate": success_rate,
+        "last_event_at": last_event_at,
+        "health_status": health_status,
+        "health_title": health_title,
+        "health_message": health_message
     }
 
     if selected_rule_filter == "active":

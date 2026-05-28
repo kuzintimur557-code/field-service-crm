@@ -140,6 +140,11 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div class="stat-title">Последнее событие</div>
         <div class="stat-value" style="font-size:18px">{{ automation_stats["last_event_at"] or "Нет" }}</div>
     </div>
+    <div class="stat" style="{% if automation_stats['health_status'] == 'ok' %}background:#dcfce7;{% elif automation_stats['health_status'] == 'warning' %}background:#fef3c7;{% else %}background:#fee2e2;{% endif %}">
+        <div class="stat-title">Состояние автоматизации</div>
+        <div class="stat-value">{{ automation_stats["health_title"] }}</div>
+        <div class="meta" style="margin-top:10px">{{ automation_stats["health_message"] }}</div>
+    </div>
 </div>
 
 <div class="card">

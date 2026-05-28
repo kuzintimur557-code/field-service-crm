@@ -388,6 +388,8 @@ async def assert_automation_page():
     assert "Событий выполнено" in html
     assert "Успешность" in html
     assert "Последнее событие" in html
+    assert "Состояние автоматизации" in html
+    assert any(status in html for status in ("OK", "Нужно внимание", "Проблема"))
     assert "AI-планировщик" in html
     assert "AI-контроля" in html
     assert 'action="/automation/ai-digest/run"' in html
