@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Событие автоматизации</title>
+    <style>
+        body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; }
+        .container { max-width:1000px; margin:0 auto; }
+        .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:22px; }
+        .card { background:white; border-radius:20px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.08); margin-bottom:16px; }
+        .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 14px; border-radius:999px; text-decoration:none; font-weight:900; border:0; cursor:pointer; background:#111827; color:white; }
+        .btn-blue { background:#2563eb; }
+        .btn-orange { background:#f59e0b; }
+        .label { color:#6b7280; font-size:13px; font-weight:900; margin-bottom:5px; }
+        .value { font-size:18px; font-weight:900; word-break:break-word; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+        .pill { display:inline-flex; padding:7px 11px; border-radius:999px; font-size:13px; font-weight:900; background:#e5e7eb; margin-top:8px; }
+        pre { white-space:pre-wrap; word-break:break-word; background:#f9fafb; border-radius:16px; padding:16px; font-weight:800; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="top">
+        <div>
+            <h1>Событие автоматизации #{{ event["id"] }}</h1>
+            <div class="pill">{{ status_labels.get(event["status"], event["status"]) }}</div>
+        </div>
+
+        <a href="/automation" class="btn">← Назад к автоматизации</a>
+    </div>
+
+    <div class="card">
+        <h2>Основное</h2>
+
+        <div class="grid">
+            <div>
+                <div class="label">Триггер</div>
+                <div class="value">{{ trigger_labels.get(event["trigger_key"], event["trigger_key"]) }}</div>
+            </div>
+
+            <div>
+                <div class="label">Правило</div>
+                <div class="value">{{ event["rule_name"] or "Не указано" }}</div>
+            </div>
+
+            <div>
+                <div class="label">Объект</div>
+                <div class="value">
+                    {{ entity_labels.get(event["entity_type"], event["entity_type"] or "Не указан") }}
+                    {% if event["entity_id"] %} #{{ event["entity_id"] }}{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Время</h2>
+
+        <div class="grid">
+            <div>
+                <div class="label">Создано</div>
+                <div class="value">{{ event["created_at"] or "—" }}</div>
+            </div>
+
+            <div>
+                <div class="label">Обработано</div>
+                <div class="value">{{ event["processed_at"] or "Ещё не обработано" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Сообщение</h2>
+        <pre>{{ event["message"] or "Сообщение не указано" }}</pre>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+            {% if event["entity_type"] == "task" and event["entity_id"] %}
+            <a href="/task/{{ event['entity_id'] }}" class="btn btn-blue">Открыть заявку</a>
+            {% endif %}
+
+            {% if event["entity_type"] == "client" and event["entity_id"] %}
+            <a href="/clients/{{ event['entity_id'] }}" class="btn btn-blue">Открыть клиента</a>
+            {% endif %}
+
+            {% if event["status"] in ("pending", "skipped") %}
+            <form method="post" action="/automation/events/{{ event['id'] }}/retry" style="margin:0;">
+                <button type="submit" class="btn btn-orange">Повторить</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

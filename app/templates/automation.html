@@ -383,6 +383,8 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         {% if event["entity_type"] or event["entity_id"] %}
         <div class="meta">Объект: {{ entity_labels.get(event["entity_type"], event["entity_type"] or "Не указан") }}{% if event["entity_id"] %} #{{ event["entity_id"] }}{% endif %}</div>
         {% endif %}
+        <a href="/automation/events/{{ event['id'] }}" class="back" style="margin-top:10px;padding:8px 11px;border-radius:999px;font-size:13px;background:#111827">Подробнее</a>
+
         {% if event["entity_type"] == "task" and event["entity_id"] %}
         <a href="/task/{{ event['entity_id'] }}" class="back" style="margin-top:10px;padding:8px 11px;border-radius:999px;font-size:13px;background:#2563eb">Открыть заявку</a>
         {% endif %}

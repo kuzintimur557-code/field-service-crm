@@ -3322,6 +3322,71 @@ async def edit_automation_rule(request: Request, rule_id: int):
 
 
 
+
+@app.get("/automation/events/{event_id}", response_class=HTMLResponse)
+async def automation_event_detail(request: Request, event_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    event = c.execute("""
+    SELECT
+        automation_events.*,
+        automation_rules.name AS rule_name
+    FROM automation_events
+    LEFT JOIN automation_rules
+      ON automation_rules.id=automation_events.rule_id
+      AND automation_rules.company_id=automation_events.company_id
+    WHERE automation_events.id=?
+      AND automation_events.company_id=?
+    """, (event_id, company_id)).fetchone()
+
+    conn.close()
+
+    if not event:
+        return RedirectResponse("/automation", status_code=302)
+
+    trigger_labels = dict(AUTOMATION_TRIGGERS)
+
+    status_labels = AUTOMATION_STATUS_LABELS
+
+    entity_labels = {
+        "task": "Заявка",
+        "client": "Клиент",
+        "company": "Компания"
+    }
+
+    return templates.TemplateResponse(
+        request,
+        "automation_event_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "event": event,
+            "trigger_labels": trigger_labels,
+            "status_labels": status_labels,
+            "entity_labels": entity_labels
+        }
+    )
+
 @app.post("/automation/events/{event_id}/retry")
 async def retry_automation_event(request: Request, event_id: int):
 
