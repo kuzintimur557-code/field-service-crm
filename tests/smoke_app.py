@@ -424,6 +424,25 @@ async def assert_automation_page():
     assert "Повторить пропущенные события" in diagnostics_html
     assert 'action="/automation/diagnostics/retry-skipped"' in diagnostics_html
 
+    assert "Включить" in diagnostics_html
+    assert "/automation/diagnostics/rules/" in diagnostics_html
+
+    disabled_rule = c.execute("""
+    SELECT id
+    FROM automation_rules
+    WHERE company_id=2
+      AND active=0
+    ORDER BY id DESC
+    """).fetchone()
+
+    if disabled_rule:
+        enable_response = await crm.enable_automation_rule_from_diagnostics(
+            make_request("owner2"),
+            disabled_rule["id"],
+        )
+        assert enable_response.status_code == 302
+        assert enable_response.headers["location"] == "/automation/diagnostics?enabled=1"
+
     retry_skipped_response = await crm.retry_skipped_automation_events(
         make_request("owner2")
     )

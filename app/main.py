@@ -3349,6 +3349,57 @@ async def edit_automation_rule(request: Request, rule_id: int):
 
 
 
+
+@app.post("/automation/diagnostics/rules/{rule_id}/enable")
+async def enable_automation_rule_from_diagnostics(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+      AND active=0
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse("/automation/diagnostics?enable_skipped=1", status_code=302)
+
+    c.execute("""
+    UPDATE automation_rules
+    SET active=1, updated_at=?
+    WHERE id=?
+      AND company_id=?
+    """, (
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        rule_id,
+        company_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/automation/diagnostics?enabled=1", status_code=302)
+
 @app.post("/automation/diagnostics/retry-skipped")
 async def retry_skipped_automation_events(request: Request):
 

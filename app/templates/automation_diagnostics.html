@@ -49,6 +49,20 @@
     </div>
     {% endif %}
 
+    {% if request.query_params.get("enabled") == "1" %}
+    <div class="card" style="background:#dcfce7;">
+        <h3>Правило включено</h3>
+        <p>Отключённое правило снова активно.</p>
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get("enable_skipped") == "1" %}
+    <div class="card" style="background:#fef3c7;">
+        <h3>Правило не включено</h3>
+        <p>Правило не найдено или уже включено.</p>
+    </div>
+    {% endif %}
+
     <div class="card">
         <h2>Обслуживание журнала</h2>
         <div class="label">Удаляет события автоматизации старше 30 дней и помогает повторить пропущенные события.</div>
@@ -151,6 +165,7 @@
                     <th>Название</th>
                     <th>Триггер</th>
                     <th>Обновлено</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -160,10 +175,17 @@
                     <td>{{ rule["name"] }}</td>
                     <td>{{ rule["trigger_key"] }}</td>
                     <td>{{ rule["updated_at"] or "—" }}</td>
+                    <td>
+                        <form method="post" action="/automation/diagnostics/rules/{{ rule['id'] }}/enable" style="margin:0;">
+                            <button type="submit" class="btn" style="background:#16a34a;border:0;cursor:pointer;">
+                                Включить
+                            </button>
+                        </form>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="label">Отключённых правил нет</td>
+                    <td colspan="5" class="label">Отключённых правил нет</td>
                 </tr>
                 {% endfor %}
             </tbody>
