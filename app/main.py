@@ -3346,6 +3346,127 @@ async def edit_automation_rule(request: Request, rule_id: int):
 
 
 
+
+@app.get("/automation/diagnostics/export")
+async def automation_diagnostics_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    disabled_rules = c.execute("""
+    SELECT id, name, trigger_key, created_by, updated_at
+    FROM automation_rules
+    WHERE company_id=?
+      AND active=0
+    ORDER BY updated_at DESC, id DESC
+    """, (company_id,)).fetchall()
+
+    rules_without_actions = c.execute("""
+    SELECT automation_rules.id, automation_rules.name, automation_rules.trigger_key, automation_rules.created_by, automation_rules.created_at
+    FROM automation_rules
+    LEFT JOIN automation_actions
+      ON automation_actions.rule_id=automation_rules.id
+      AND automation_actions.company_id=automation_rules.company_id
+      AND automation_actions.active=1
+    WHERE automation_rules.company_id=?
+      AND automation_rules.active=1
+    GROUP BY automation_rules.id
+    HAVING COUNT(automation_actions.id)=0
+    ORDER BY automation_rules.id DESC
+    """, (company_id,)).fetchall()
+
+    recent_skipped_events = c.execute("""
+    SELECT
+        automation_events.id,
+        automation_rules.name AS rule_name,
+        automation_events.trigger_key,
+        automation_events.entity_type,
+        automation_events.entity_id,
+        automation_events.message,
+        automation_events.created_at,
+        automation_events.processed_at
+    FROM automation_events
+    LEFT JOIN automation_rules
+      ON automation_rules.id=automation_events.rule_id
+      AND automation_rules.company_id=automation_events.company_id
+    WHERE automation_events.company_id=?
+      AND automation_events.status='skipped'
+    ORDER BY automation_events.id DESC
+    LIMIT 50
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["section", "id", "name_or_rule", "trigger_key", "entity_type", "entity_id", "message", "created_at", "updated_or_processed_at"])
+
+    for rule in disabled_rules:
+        writer.writerow([
+            "disabled_rule",
+            rule["id"],
+            rule["name"],
+            rule["trigger_key"],
+            "",
+            "",
+            "",
+            "",
+            rule["updated_at"] or ""
+        ])
+
+    for rule in rules_without_actions:
+        writer.writerow([
+            "rule_without_actions",
+            rule["id"],
+            rule["name"],
+            rule["trigger_key"],
+            "",
+            "",
+            "",
+            rule["created_at"] or "",
+            ""
+        ])
+
+    for event in recent_skipped_events:
+        writer.writerow([
+            "skipped_event",
+            event["id"],
+            event["rule_name"] or "",
+            event["trigger_key"],
+            event["entity_type"] or "",
+            event["entity_id"] or "",
+            event["message"] or "",
+            event["created_at"] or "",
+            event["processed_at"] or ""
+        ])
+
+    csv_data = output.getvalue()
+
+    return Response(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=automation_diagnostics.csv"
+        }
+    )
+
 @app.get("/automation/diagnostics", response_class=HTMLResponse)
 async def automation_diagnostics_page(request: Request):
 

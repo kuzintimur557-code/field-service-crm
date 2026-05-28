@@ -412,6 +412,14 @@ async def assert_automation_page():
     assert "Проблемы и рекомендации" in diagnostics_html
     assert "Активные правила без действий" in diagnostics_html
     assert "Последние пропущенные события" in diagnostics_html
+    assert 'href="/automation/diagnostics/export"' in diagnostics_html
+
+    diagnostics_export_response = await crm.automation_diagnostics_export(
+        make_request("owner2")
+    )
+    assert diagnostics_export_response.status_code == 200
+    diagnostics_export_csv = diagnostics_export_response.body.decode("utf-8")
+    assert "section,id,name_or_rule,trigger_key" in diagnostics_export_csv
 
     create_response = await crm.create_automation_rule(
         make_form_request(
