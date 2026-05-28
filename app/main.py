@@ -3347,6 +3347,53 @@ async def edit_automation_rule(request: Request, rule_id: int):
 
 
 
+
+@app.post("/automation/events/cleanup")
+async def cleanup_automation_events(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    old_events = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND created_at != ''
+      AND datetime(created_at) < datetime('now', '-30 days')
+    """, (company_id,)).fetchone()[0]
+
+    c.execute("""
+    DELETE FROM automation_events
+    WHERE company_id=?
+      AND created_at != ''
+      AND datetime(created_at) < datetime('now', '-30 days')
+    """, (company_id,))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        f"/automation/diagnostics?cleanup=1&deleted={old_events}",
+        status_code=302
+    )
+
 @app.get("/automation/diagnostics/export")
 async def automation_diagnostics_export(request: Request):
 

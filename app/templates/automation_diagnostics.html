@@ -35,6 +35,24 @@
         </div>
     </div>
 
+    {% if request.query_params.get("cleanup") == "1" %}
+    <div class="card" style="background:#dcfce7;">
+        <h3>Очистка выполнена</h3>
+        <p>Удалено старых событий: {{ request.query_params.get("deleted") or "0" }}</p>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Обслуживание журнала</h2>
+        <div class="label">Удаляет события автоматизации старше 30 дней.</div>
+
+        <form method="post" action="/automation/events/cleanup" style="margin-top:14px;">
+            <button type="submit" class="btn" style="background:#dc2626;border:0;cursor:pointer;">
+                Очистить старые события
+            </button>
+        </form>
+    </div>
+
     <div class="grid">
         <div class="card">
             <div class="label">Ожидает</div>
