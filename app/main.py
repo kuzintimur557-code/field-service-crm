@@ -3345,6 +3345,144 @@ async def edit_automation_rule(request: Request, rule_id: int):
 
 
 
+
+@app.get("/automation/diagnostics", response_class=HTMLResponse)
+async def automation_diagnostics_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    disabled_rules = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE company_id=?
+      AND active=0
+    ORDER BY updated_at DESC, id DESC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
+    rules_without_actions = c.execute("""
+    SELECT automation_rules.*
+    FROM automation_rules
+    LEFT JOIN automation_actions
+      ON automation_actions.rule_id=automation_rules.id
+      AND automation_actions.company_id=automation_rules.company_id
+      AND automation_actions.active=1
+    WHERE automation_rules.company_id=?
+      AND automation_rules.active=1
+    GROUP BY automation_rules.id
+    HAVING COUNT(automation_actions.id)=0
+    ORDER BY automation_rules.id DESC
+    """, (company_id,)).fetchall()
+
+    pending_events = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND status='pending'
+    """, (company_id,)).fetchone()[0]
+
+    skipped_events = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND status='skipped'
+    """, (company_id,)).fetchone()[0]
+
+    done_events = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=?
+      AND status='done'
+    """, (company_id,)).fetchone()[0]
+
+    recent_skipped_events = c.execute("""
+    SELECT
+        automation_events.*,
+        automation_rules.name AS rule_name
+    FROM automation_events
+    LEFT JOIN automation_rules
+      ON automation_rules.id=automation_events.rule_id
+      AND automation_rules.company_id=automation_events.company_id
+    WHERE automation_events.company_id=?
+      AND automation_events.status='skipped'
+    ORDER BY automation_events.id DESC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
+    telegram_rules = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_actions
+    WHERE company_id=?
+      AND action_key='telegram_alert'
+      AND active=1
+    """, (company_id,)).fetchone()[0]
+
+    ai_digest_rules = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_actions
+    WHERE company_id=?
+      AND action_key='ai_digest'
+      AND active=1
+    """, (company_id,)).fetchone()[0]
+
+    success_rate = round(done_events / max(done_events + skipped_events, 1) * 100, 1)
+
+    problems = []
+
+    if pending_events > 5:
+        problems.append("Много ожидающих событий автоматизации.")
+
+    if skipped_events > done_events:
+        problems.append("Пропущенных событий больше, чем выполненных.")
+
+    if rules_without_actions:
+        problems.append("Есть активные правила без активных действий.")
+
+    if success_rate < 80 and (done_events + skipped_events) > 0:
+        problems.append("Успешность автоматизации ниже 80%.")
+
+    if not problems:
+        problems.append("Критичных проблем не найдено.")
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "automation_diagnostics.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "disabled_rules": disabled_rules,
+            "rules_without_actions": rules_without_actions,
+            "pending_events": pending_events,
+            "skipped_events": skipped_events,
+            "done_events": done_events,
+            "recent_skipped_events": recent_skipped_events,
+            "telegram_rules": telegram_rules,
+            "ai_digest_rules": ai_digest_rules,
+            "success_rate": success_rate,
+            "problems": problems
+        }
+    )
+
 @app.get("/automation/events/{event_id}", response_class=HTMLResponse)
 async def automation_event_detail(request: Request, event_id: int):
 

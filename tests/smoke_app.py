@@ -401,6 +401,17 @@ async def assert_automation_page():
     assert "AUTOMATION_CRON_SECRET" in html
     assert "заголовком x-automation-secret" in html
     assert "POST /automation/cron/ai-digest" in html
+    assert 'href="/automation/diagnostics"' in html
+
+    diagnostics_response = await crm.automation_diagnostics_page(
+        make_asgi_request("owner2", "/automation/diagnostics")
+    )
+    assert diagnostics_response.status_code == 200
+    diagnostics_html = diagnostics_response.body.decode("utf-8")
+    assert "Диагностика автоматизации" in diagnostics_html
+    assert "Проблемы и рекомендации" in diagnostics_html
+    assert "Активные правила без действий" in diagnostics_html
+    assert "Последние пропущенные события" in diagnostics_html
 
     create_response = await crm.create_automation_rule(
         make_form_request(

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Диагностика автоматизации</title>
+    <style>
+        body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; }
+        .container { max-width:1200px; margin:0 auto; }
+        .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:22px; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+        .card { background:white; border-radius:20px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.08); margin-bottom:16px; }
+        .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 14px; border-radius:999px; text-decoration:none; font-weight:900; background:#111827; color:white; }
+        .label { color:#6b7280; font-size:13px; font-weight:900; }
+        .value { font-size:30px; font-weight:900; margin-top:8px; }
+        .warn { color:#d97706; }
+        .danger { color:#dc2626; }
+        .ok { color:#16a34a; }
+        table { width:100%; border-collapse:collapse; margin-top:12px; }
+        th, td { text-align:left; padding:12px; border-bottom:1px solid #e5e7eb; }
+        .pill { display:inline-flex; padding:7px 11px; border-radius:999px; font-size:13px; font-weight:900; background:#e5e7eb; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="top">
+        <div>
+            <h1>Диагностика автоматизации</h1>
+            <div class="label">Проверка правил, событий и проблем automation engine</div>
+        </div>
+
+        <a href="/automation" class="btn">← Назад</a>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="label">Ожидает</div>
+            <div class="value warn">{{ pending_events }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Пропущено</div>
+            <div class="value danger">{{ skipped_events }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Выполнено</div>
+            <div class="value ok">{{ done_events }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Успешность</div>
+            <div class="value">{{ success_rate }}%</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Telegram-правил</div>
+            <div class="value">{{ telegram_rules }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">AI-сводок</div>
+            <div class="value">{{ ai_digest_rules }}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Проблемы и рекомендации</h2>
+
+        {% for problem in problems %}
+        <p><span class="pill">{{ problem }}</span></p>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <h2>Активные правила без действий</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Триггер</th>
+                    <th>Создал</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rule in rules_without_actions %}
+                <tr>
+                    <td>{{ rule["id"] }}</td>
+                    <td>{{ rule["name"] }}</td>
+                    <td>{{ rule["trigger_key"] }}</td>
+                    <td>{{ rule["created_by"] }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="label">Нет проблем</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Отключённые правила</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Триггер</th>
+                    <th>Обновлено</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rule in disabled_rules %}
+                <tr>
+                    <td>{{ rule["id"] }}</td>
+                    <td>{{ rule["name"] }}</td>
+                    <td>{{ rule["trigger_key"] }}</td>
+                    <td>{{ rule["updated_at"] or "—" }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="label">Отключённых правил нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Последние пропущенные события</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Правило</th>
+                    <th>Триггер</th>
+                    <th>Сообщение</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in recent_skipped_events %}
+                <tr>
+                    <td>{{ event["id"] }}</td>
+                    <td>{{ event["rule_name"] or "—" }}</td>
+                    <td>{{ event["trigger_key"] }}</td>
+                    <td>{{ event["message"] or "" }}</td>
+                    <td><a href="/automation/events/{{ event['id'] }}" class="btn">Подробнее</a></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="label">Пропущенных событий нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+</body>
+</html>
