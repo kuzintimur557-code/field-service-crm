@@ -3348,6 +3348,60 @@ async def edit_automation_rule(request: Request, rule_id: int):
 
 
 
+
+@app.post("/automation/diagnostics/retry-skipped")
+async def retry_skipped_automation_events(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    skipped_events = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=?
+      AND status='skipped'
+    ORDER BY id DESC
+    LIMIT 10
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    retried = 0
+
+    for event in skipped_events:
+        created_events = run_automation_event(
+            company_id,
+            event["trigger_key"],
+            event["entity_type"] or "",
+            event["entity_id"],
+            event["message"] or "Повтор пропущенного события",
+            "/automation/diagnostics"
+        )
+
+        if created_events:
+            retried += created_events
+
+    return RedirectResponse(
+        f"/automation/diagnostics?retry_skipped=1&retried={retried}",
+        status_code=302
+    )
+
 @app.post("/automation/events/cleanup")
 async def cleanup_automation_events(request: Request):
 

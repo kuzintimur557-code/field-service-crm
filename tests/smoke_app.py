@@ -421,6 +421,17 @@ async def assert_automation_page():
     diagnostics_export_csv = diagnostics_export_response.body.decode("utf-8")
     assert "section,id,name_or_rule,trigger_key" in diagnostics_export_csv
 
+    assert "Повторить пропущенные события" in diagnostics_html
+    assert 'action="/automation/diagnostics/retry-skipped"' in diagnostics_html
+
+    retry_skipped_response = await crm.retry_skipped_automation_events(
+        make_request("owner2")
+    )
+    assert retry_skipped_response.status_code == 302
+    assert retry_skipped_response.headers["location"].startswith(
+        "/automation/diagnostics?retry_skipped=1&retried="
+    )
+
     cleanup_response = await crm.cleanup_automation_events(
         make_request("owner2")
     )
