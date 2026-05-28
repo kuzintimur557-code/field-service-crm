@@ -78,6 +78,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice warn">Правило не запущено: оно отключено или не найдено</div>
 {% endif %}
 
+{% if request.query_params.get("retry") == "1" %}
+<div class="notice ok">Событие автоматизации повторно запущено</div>
+{% endif %}
+
+{% if request.query_params.get("retry_skipped") == "1" %}
+<div class="notice warn">Событие нельзя повторить: оно уже выполнено или не найдено</div>
+{% endif %}
+
 {% if request.query_params.get("scheduler") == "1" %}
 <div class="notice ok">
     AI-планировщик: дневных {{ request.query_params.get("daily") or "0" }},
@@ -380,6 +388,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         {% endif %}
         {% if event["entity_type"] == "client" and event["entity_id"] %}
         <a href="/clients/{{ event['entity_id'] }}" class="back" style="margin-top:10px;padding:8px 11px;border-radius:999px;font-size:13px;background:#2563eb">Открыть клиента</a>
+        {% endif %}
+
+        {% if event["status"] in ("pending", "skipped") %}
+        <form method="post" action="/automation/events/{{ event['id'] }}/retry" style="margin-top:10px">
+            <button type="submit" style="background:#f59e0b;padding:8px 11px;border-radius:999px;font-size:13px">
+                Повторить
+            </button>
+        </form>
         {% endif %}
     </div>
     <span class="pill">{{ status_labels.get(event["status"], event["status"]) }}</span>

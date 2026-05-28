@@ -3321,6 +3321,56 @@ async def edit_automation_rule(request: Request, rule_id: int):
 
 
 
+
+@app.post("/automation/events/{event_id}/retry")
+async def retry_automation_event(request: Request, event_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE id=?
+      AND company_id=?
+      AND status IN ('pending', 'skipped')
+    """, (event_id, company_id)).fetchone()
+
+    conn.close()
+
+    if not event:
+        return RedirectResponse("/automation?retry_skipped=1", status_code=302)
+
+    created_events = run_automation_event(
+        company_id,
+        event["trigger_key"],
+        event["entity_type"] or "",
+        event["entity_id"],
+        event["message"] or "Повтор события автоматизации",
+        "/automation"
+    )
+
+    if created_events:
+        return RedirectResponse("/automation?retry=1", status_code=302)
+
+    return RedirectResponse("/automation?retry_skipped=1", status_code=302)
+
 @app.post("/automation/rules/{rule_id}/run")
 async def run_automation_rule_now(request: Request, rule_id: int):
 
