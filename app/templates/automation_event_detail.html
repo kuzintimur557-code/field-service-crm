@@ -42,6 +42,12 @@
             <div>
                 <div class="label">Правило</div>
                 <div class="value">{{ event["rule_name"] or "Не указано" }}</div>
+
+                {% if event["rule_id"] %}
+                <a href="/automation/rules/{{ event['rule_id'] }}" class="btn" style="margin-top:10px;background:#111827">
+                    Открыть правило
+                </a>
+                {% endif %}
             </div>
 
             <div>

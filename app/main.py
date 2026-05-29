@@ -3245,6 +3245,110 @@ async def create_automation_rule(request: Request):
     return RedirectResponse("/automation?created=1", status_code=302)
 
 
+
+@app.get("/automation/rules/{rule_id}", response_class=HTMLResponse)
+async def automation_rule_detail(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse("/automation", status_code=302)
+
+    actions = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE company_id=?
+      AND rule_id=?
+    ORDER BY sort_order, id
+    """, (company_id, rule_id)).fetchall()
+
+    events = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=?
+      AND rule_id=?
+    ORDER BY id DESC
+    LIMIT 20
+    """, (company_id, rule_id)).fetchall()
+
+    event_counts = {
+        row["status"]: row["count"]
+        for row in c.execute("""
+        SELECT status, COUNT(*) as count
+        FROM automation_events
+        WHERE company_id=?
+          AND rule_id=?
+        GROUP BY status
+        """, (company_id, rule_id)).fetchall()
+    }
+
+    conn.close()
+
+    done_count = event_counts.get("done", 0)
+    skipped_count = event_counts.get("skipped", 0)
+    pending_count = event_counts.get("pending", 0)
+    success_rate = round(done_count / max(done_count + skipped_count, 1) * 100, 1)
+
+    if not actions:
+        diagnostic_title = "Нет действий"
+        diagnostic_message = "Правило включено, но не сможет ничего выполнить без action."
+    elif not rule["active"]:
+        diagnostic_title = "Правило отключено"
+        diagnostic_message = "Правило не будет запускаться, пока его не включить."
+    elif skipped_count > done_count:
+        diagnostic_title = "Много пропусков"
+        diagnostic_message = "У этого правила больше пропущенных событий, чем выполненных."
+    else:
+        diagnostic_title = "OK"
+        diagnostic_message = "Правило выглядит рабочим."
+
+    return templates.TemplateResponse(
+        request,
+        "automation_rule_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "rule": rule,
+            "actions": actions,
+            "events": events,
+            "trigger_labels": dict(AUTOMATION_TRIGGERS),
+            "action_labels": dict(AUTOMATION_ACTIONS),
+            "status_labels": AUTOMATION_STATUS_LABELS,
+            "done_count": done_count,
+            "skipped_count": skipped_count,
+            "pending_count": pending_count,
+            "success_rate": success_rate,
+            "diagnostic_title": diagnostic_title,
+            "diagnostic_message": diagnostic_message
+        }
+    )
+
 @app.post("/automation/rules/{rule_id}/edit")
 async def edit_automation_rule(request: Request, rule_id: int):
 

@@ -561,6 +561,19 @@ async def assert_automation_page():
     assert "Создать уведомление" in list_html
     assert f"/automation/rules/{rule['id']}/toggle" in list_html
     assert f"/automation/rules/{rule['id']}/edit" in list_html
+    assert f"/automation/rules/{rule['id']}" in list_html
+    assert "Открыть правило" in list_html
+
+    rule_detail_response = await crm.automation_rule_detail(
+        make_asgi_request("owner2", f"/automation/rules/{rule['id']}"),
+        rule["id"],
+    )
+    assert rule_detail_response.status_code == 200
+    rule_detail_html = rule_detail_response.body.decode("utf-8")
+    assert "SLA smoke rule" in rule_detail_html
+    assert "Диагностика правила" in rule_detail_html
+    assert "Действия" in rule_detail_html
+    assert "Последние события правила" in rule_detail_html
 
     edit_response = await crm.edit_automation_rule(
         make_form_request(

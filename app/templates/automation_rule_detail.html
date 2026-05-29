@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Правило автоматизации</title>
+    <style>
+        body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; }
+        .container { max-width:1100px; margin:0 auto; }
+        .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:22px; }
+        .card { background:white; border-radius:20px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.08); margin-bottom:16px; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+        .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 14px; border-radius:999px; text-decoration:none; font-weight:900; border:0; cursor:pointer; background:#111827; color:white; }
+        .label { color:#6b7280; font-size:13px; font-weight:900; }
+        .value { font-size:26px; font-weight:900; margin-top:8px; }
+        table { width:100%; border-collapse:collapse; margin-top:12px; }
+        th, td { text-align:left; padding:12px; border-bottom:1px solid #e5e7eb; }
+        .pill { display:inline-flex; padding:7px 11px; border-radius:999px; font-size:13px; font-weight:900; background:#e5e7eb; }
+        pre { white-space:pre-wrap; word-break:break-word; background:#f9fafb; border-radius:16px; padding:12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="top">
+        <div>
+            <h1>{{ rule["name"] }}</h1>
+            <div class="pill">{% if rule["active"] %}Включено{% else %}Выключено{% endif %}</div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;">
+            <form method="post" action="/automation/rules/{{ rule['id'] }}/run" style="margin:0;">
+                <button type="submit" class="btn" style="background:#2563eb;">Запустить сейчас</button>
+            </form>
+            <a href="/automation" class="btn">← Назад</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Диагностика правила</h2>
+        <h3>{{ diagnostic_title }}</h3>
+        <p>{{ diagnostic_message }}</p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="label">Триггер</div>
+            <div class="value" style="font-size:18px">{{ trigger_labels.get(rule["trigger_key"], rule["trigger_key"]) }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Выполнено</div>
+            <div class="value">{{ done_count }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Пропущено</div>
+            <div class="value">{{ skipped_count }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Ожидает</div>
+            <div class="value">{{ pending_count }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Успешность</div>
+            <div class="value">{{ success_rate }}%</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Действия</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Действие</th>
+                    <th>Активно</th>
+                    <th>Payload</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for action in actions %}
+                <tr>
+                    <td>{{ action["id"] }}</td>
+                    <td>{{ action_labels.get(action["action_key"], action["action_key"]) }}</td>
+                    <td>{% if action["active"] %}Да{% else %}Нет{% endif %}</td>
+                    <td><pre>{{ action["payload_json"] or "{}" }}</pre></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="label">Действий пока нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Последние события правила</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Статус</th>
+                    <th>Сообщение</th>
+                    <th>Создано</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in events %}
+                <tr>
+                    <td>{{ event["id"] }}</td>
+                    <td>{{ status_labels.get(event["status"], event["status"]) }}</td>
+                    <td>{{ event["message"] or "" }}</td>
+                    <td>{{ event["created_at"] }}</td>
+                    <td><a href="/automation/events/{{ event['id'] }}" class="btn">Открыть</a></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="label">Событий пока нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+</body>
+</html>

@@ -304,6 +304,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         </form>
     </div>
     <div>
+    <a href="/automation/rules/{{ rule['id'] }}" class="back" style="display:flex;justify-content:center;margin-bottom:8px;background:#111827">
+        Открыть правило
+    </a>
+
     <form method="post" action="/automation/rules/{{ rule['id'] }}/run" style="margin-bottom:8px">
         <button type="submit" style="background:#2563eb">
             Запустить сейчас

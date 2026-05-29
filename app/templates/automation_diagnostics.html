@@ -238,6 +238,12 @@
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
                             <a href="/automation/events/{{ event['id'] }}" class="btn">Подробнее</a>
 
+                            {% if event["rule_id"] %}
+                            <a href="/automation/rules/{{ event['rule_id'] }}" class="btn" style="background:#111827">
+                                Открыть правило
+                            </a>
+                            {% endif %}
+
                             <form method="post" action="/automation/events/{{ event['id'] }}/retry" style="margin:0;">
                                 <button type="submit" class="btn" style="background:#f59e0b;border:0;cursor:pointer;">
                                     Повторить
