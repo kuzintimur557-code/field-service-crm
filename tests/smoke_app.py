@@ -571,6 +571,8 @@ async def assert_automation_page():
     assert rule_detail_response.status_code == 200
     rule_detail_html = rule_detail_response.body.decode("utf-8")
     assert "SLA smoke rule" in rule_detail_html
+    assert "Automation Graph" in rule_detail_html
+    assert "Визуальная цепочка" in rule_detail_html
     assert "Диагностика правила" in rule_detail_html
     assert "Действия" in rule_detail_html
     assert "Последние события правила" in rule_detail_html

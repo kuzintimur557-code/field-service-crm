@@ -71,6 +71,24 @@
     {% endif %}
 
     <div class="card">
+        <h2>Automation Graph</h2>
+
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-weight:900;">
+            <div class="pill">Триггер: {{ trigger_labels.get(rule["trigger_key"], rule["trigger_key"]) }}</div>
+            <div>→</div>
+            <div class="pill">Правило: {{ rule["name"] }}</div>
+            <div>→</div>
+            <div class="pill">Действий: {{ actions|length }}</div>
+            <div>→</div>
+            <div class="pill">Событий: {{ done_count + skipped_count + pending_count }}</div>
+        </div>
+
+        <div class="label" style="margin-top:12px;">
+            Визуальная цепочка: что запускает правило, какие действия выполняются и сколько событий уже обработано.
+        </div>
+    </div>
+
+    <div class="card">
         <h2>Диагностика правила</h2>
         <h3>{{ diagnostic_title }}</h3>
         <p>{{ diagnostic_message }}</p>
