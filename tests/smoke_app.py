@@ -586,6 +586,99 @@ async def assert_automation_page():
     rule_events_export_csv = rule_events_export_response.body.decode("utf-8")
     assert "id,rule_name,trigger_key,entity_type,entity_id,status,message,created_at,processed_at" in rule_events_export_csv
 
+    assert "/automation/actions/" in rule_detail_html
+    assert "Удалить" in rule_detail_html
+
+    conn = connect()
+    c = conn.cursor()
+
+    action_for_management = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id DESC
+    """, (rule["id"],)).fetchone()
+
+    conn.close()
+
+    assert action_for_management is not None
+
+    toggle_action_response = await crm.toggle_automation_action(
+        make_request("owner2"),
+        action_for_management["id"],
+    )
+    assert toggle_action_response.status_code == 302
+    assert toggle_action_response.headers["location"] == f"/automation/rules/{rule['id']}?action_updated=1"
+
+    conn = connect()
+    c = conn.cursor()
+
+    toggled_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE id=?
+    """, (action_for_management["id"],)).fetchone()
+
+    conn.close()
+
+    assert toggled_action is not None
+    assert toggled_action["active"] == 0
+
+    toggle_action_back_response = await crm.toggle_automation_action(
+        make_request("owner2"),
+        action_for_management["id"],
+    )
+    assert toggle_action_back_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id,
+        rule_id,
+        action_key,
+        payload_json,
+        active,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        rule["id"],
+        "notification",
+        "{}",
+        1,
+        "2026-01-01 10:00"
+    ))
+
+    delete_action_id = c.lastrowid
+
+    conn.commit()
+    conn.close()
+
+    delete_action_response = await crm.delete_automation_action(
+        make_request("owner2"),
+        delete_action_id,
+    )
+
+    assert delete_action_response.status_code == 302
+    assert delete_action_response.headers["location"] == f"/automation/rules/{rule['id']}?action_deleted=1"
+
+    conn = connect()
+    c = conn.cursor()
+
+    deleted_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE id=?
+    """, (delete_action_id,)).fetchone()
+
+    conn.close()
+
+    assert deleted_action is None
+
     retry_rule_response = await crm.retry_rule_skipped_events(
         make_request("owner2"),
         rule["id"],

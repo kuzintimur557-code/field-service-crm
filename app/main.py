@@ -4173,6 +4173,116 @@ async def retry_automation_event(request: Request, event_id: int):
     return RedirectResponse("/automation?retry_skipped=1", status_code=302)
 
 
+
+@app.post("/automation/actions/{action_id}/toggle")
+async def toggle_automation_action(request: Request, action_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE id=?
+      AND company_id=?
+    """, (action_id, company_id)).fetchone()
+
+    if not action:
+        conn.close()
+        return RedirectResponse("/automation", status_code=302)
+
+    new_active = 0 if action["active"] else 1
+
+    c.execute("""
+    UPDATE automation_actions
+    SET active=?
+    WHERE id=?
+      AND company_id=?
+    """, (
+        new_active,
+        action_id,
+        company_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        f"/automation/rules/{action['rule_id']}?action_updated=1",
+        status_code=302
+    )
+
+
+@app.post("/automation/actions/{action_id}/delete")
+async def delete_automation_action(request: Request, action_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE id=?
+      AND company_id=?
+    """, (action_id, company_id)).fetchone()
+
+    if not action:
+        conn.close()
+        return RedirectResponse("/automation", status_code=302)
+
+    rule_id = action["rule_id"]
+
+    c.execute("""
+    DELETE FROM automation_actions
+    WHERE id=?
+      AND company_id=?
+    """, (
+        action_id,
+        company_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        f"/automation/rules/{rule_id}?action_deleted=1",
+        status_code=302
+    )
+
 @app.post("/automation/rules/{rule_id}/retry-skipped")
 async def retry_rule_skipped_events(request: Request, rule_id: int):
 

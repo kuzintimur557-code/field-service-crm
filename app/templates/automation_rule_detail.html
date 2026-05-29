@@ -56,6 +56,20 @@
     </div>
     {% endif %}
 
+    {% if request.query_params.get("action_updated") == "1" %}
+    <div class="card" style="background:#dcfce7;">
+        <h3>Действие обновлено</h3>
+        <p>Статус действия изменён.</p>
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get("action_deleted") == "1" %}
+    <div class="card" style="background:#dcfce7;">
+        <h3>Действие удалено</h3>
+        <p>Action удалён из правила.</p>
+    </div>
+    {% endif %}
+
     <div class="card">
         <h2>Диагностика правила</h2>
         <h3>{{ diagnostic_title }}</h3>
@@ -109,6 +123,7 @@
                     <th>Действие</th>
                     <th>Активно</th>
                     <th>Payload</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -118,10 +133,25 @@
                     <td>{{ action_labels.get(action["action_key"], action["action_key"]) }}</td>
                     <td>{% if action["active"] %}Да{% else %}Нет{% endif %}</td>
                     <td><pre>{{ action["payload_json"] or "{}" }}</pre></td>
+                    <td>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <form method="post" action="/automation/actions/{{ action['id'] }}/toggle" style="margin:0;">
+                                <button type="submit" class="btn" style="background:#f59e0b;">
+                                    {% if action["active"] %}Выключить{% else %}Включить{% endif %}
+                                </button>
+                            </form>
+
+                            <form method="post" action="/automation/actions/{{ action['id'] }}/delete" style="margin:0;">
+                                <button type="submit" class="btn" style="background:#dc2626;">
+                                    Удалить
+                                </button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="label">Действий пока нет</td>
+                    <td colspan="5" class="label">Действий пока нет</td>
                 </tr>
                 {% endfor %}
             </tbody>
