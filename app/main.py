@@ -4194,6 +4194,7 @@ async def retry_automation_event(request: Request, event_id: int):
 
 
 
+
 @app.post("/automation/rules/{rule_id}/actions/create")
 async def create_rule_action(request: Request, rule_id: int):
 
@@ -4242,10 +4243,29 @@ async def create_rule_action(request: Request, rule_id: int):
         conn.close()
         return RedirectResponse("/automation", status_code=302)
 
+    if action_key in ("notification", "telegram_alert") and not target_username:
+        conn.close()
+        return RedirectResponse(
+            f"/automation/rules/{rule_id}?action_error=1",
+            status_code=302
+        )
+
+    if action_key in ("notification", "telegram_alert") and not message:
+        message = f"Automation: {rule['name']}"
+
+    if action_key == "ai_digest" and not target_username:
+        target_username = username
+
+    if action_key == "ai_digest" and not message:
+        message = "AI-сводка по бизнесу"
+
     payload = {
         "target_username": target_username,
         "message": message
     }
+
+    if action_key == "email":
+        payload["subject"] = f"Automation: {rule['name']}"
 
     c.execute("""
     INSERT INTO automation_actions (
@@ -4272,6 +4292,7 @@ async def create_rule_action(request: Request, rule_id: int):
         f"/automation/rules/{rule_id}?action_created=1",
         status_code=302
     )
+
 
 @app.post("/automation/actions/{action_id}/toggle")
 async def toggle_automation_action(request: Request, action_id: int):
