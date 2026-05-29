@@ -424,8 +424,10 @@ async def assert_automation_page():
     assert "Повторить пропущенные события" in diagnostics_html
     assert 'action="/automation/diagnostics/retry-skipped"' in diagnostics_html
 
-    assert "Включить" in diagnostics_html
-    assert "/automation/diagnostics/rules/" in diagnostics_html
+    assert "Отключённые правила" in diagnostics_html
+
+    conn = connect()
+    c = conn.cursor()
 
     disabled_rule = c.execute("""
     SELECT id
@@ -435,13 +437,67 @@ async def assert_automation_page():
     ORDER BY id DESC
     """).fetchone()
 
+    conn.close()
+
     if disabled_rule:
+        assert "Включить" in diagnostics_html
+        assert "/automation/diagnostics/rules/" in diagnostics_html
+
         enable_response = await crm.enable_automation_rule_from_diagnostics(
             make_request("owner2"),
             disabled_rule["id"],
         )
         assert enable_response.status_code == 302
         assert enable_response.headers["location"] == "/automation/diagnostics?enabled=1"
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Diagnostics no-action smoke",
+        "weekly_digest",
+        "{}",
+        1,
+        "owner2",
+        "2026-01-01 10:00",
+        "2026-01-01 10:00",
+    ))
+
+    no_action_rule_id = c.lastrowid
+
+    conn.commit()
+    conn.close()
+
+    add_action_response = await crm.add_default_action_to_rule(
+        make_request("owner2"),
+        no_action_rule_id,
+    )
+    assert add_action_response.status_code == 302
+    assert add_action_response.headers["location"] == "/automation/diagnostics?action_added=1"
+
+    conn = connect()
+    c = conn.cursor()
+
+    added_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE company_id=2
+      AND rule_id=?
+      AND action_key='notification'
+      AND active=1
+    """, (no_action_rule_id,)).fetchone()
+
+    conn.close()
+
+    assert added_action is not None
+    assert "Diagnostics no-action smoke" in added_action["payload_json"]
 
     retry_skipped_response = await crm.retry_skipped_automation_events(
         make_request("owner2")

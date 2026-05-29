@@ -3350,6 +3350,91 @@ async def edit_automation_rule(request: Request, rule_id: int):
 
 
 
+
+@app.post("/automation/diagnostics/rules/{rule_id}/add-default-action")
+async def add_default_action_to_rule(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse(
+            "/automation/diagnostics?action_added=0",
+            status_code=302
+        )
+
+    existing_action = c.execute("""
+    SELECT id
+    FROM automation_actions
+    WHERE company_id=?
+      AND rule_id=?
+      AND active=1
+    LIMIT 1
+    """, (company_id, rule_id)).fetchone()
+
+    if existing_action:
+        conn.close()
+        return RedirectResponse(
+            "/automation/diagnostics?action_exists=1",
+            status_code=302
+        )
+
+    payload = {
+        "target_username": username,
+        "message": f"Automation: {rule['name']}"
+    }
+
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id,
+        rule_id,
+        action_key,
+        payload_json,
+        active,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, 1, ?)
+    """, (
+        company_id,
+        rule_id,
+        "notification",
+        json.dumps(payload, ensure_ascii=False),
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        "/automation/diagnostics?action_added=1",
+        status_code=302
+    )
+
 @app.post("/automation/diagnostics/rules/{rule_id}/enable")
 async def enable_automation_rule_from_diagnostics(request: Request, rule_id: int):
 

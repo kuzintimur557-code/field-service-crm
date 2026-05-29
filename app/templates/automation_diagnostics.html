@@ -63,6 +63,20 @@
     </div>
     {% endif %}
 
+    {% if request.query_params.get("action_added") == "1" %}
+    <div class="card" style="background:#dcfce7;">
+        <h3>Действие добавлено</h3>
+        <p>К правилу добавлено действие по умолчанию: внутреннее уведомление.</p>
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get("action_exists") == "1" %}
+    <div class="card" style="background:#fef3c7;">
+        <h3>Действие уже есть</h3>
+        <p>У этого правила уже есть активное действие.</p>
+    </div>
+    {% endif %}
+
     <div class="card">
         <h2>Обслуживание журнала</h2>
         <div class="label">Удаляет события автоматизации старше 30 дней и помогает повторить пропущенные события.</div>
@@ -136,6 +150,7 @@
                     <th>Название</th>
                     <th>Триггер</th>
                     <th>Создал</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -145,10 +160,17 @@
                     <td>{{ rule["name"] }}</td>
                     <td>{{ rule["trigger_key"] }}</td>
                     <td>{{ rule["created_by"] }}</td>
+                    <td>
+                        <form method="post" action="/automation/diagnostics/rules/{{ rule['id'] }}/add-default-action" style="margin:0;">
+                            <button type="submit" class="btn" style="background:#2563eb;border:0;cursor:pointer;">
+                                Добавить действие
+                            </button>
+                        </form>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="label">Нет проблем</td>
+                    <td colspan="5" class="label">Нет проблем</td>
                 </tr>
                 {% endfor %}
             </tbody>
