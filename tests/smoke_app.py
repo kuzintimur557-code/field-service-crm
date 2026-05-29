@@ -575,6 +575,8 @@ async def assert_automation_page():
     assert "Статус цепочки" in rule_detail_html
     assert "Действия цепочки" in rule_detail_html
     assert "Последние события цепочки" in rule_detail_html
+    assert "Быстрые действия цепочки" in rule_detail_html
+    assert "Запустить правило" in rule_detail_html
     assert "Визуальная цепочка" in rule_detail_html
     assert "Диагностика правила" in rule_detail_html
     assert "Действия" in rule_detail_html

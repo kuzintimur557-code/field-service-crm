@@ -121,6 +121,22 @@
             </div>
         </div>
 
+        <div style="margin-top:16px;">
+            <div class="label">Быстрые действия цепочки</div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                <form method="post" action="/automation/rules/{{ rule['id'] }}/run" style="margin:0;">
+                    <button type="submit" class="btn" style="background:#2563eb;">Запустить правило</button>
+                </form>
+
+                <form method="post" action="/automation/rules/{{ rule['id'] }}/retry-skipped" style="margin:0;">
+                    <button type="submit" class="btn" style="background:#f59e0b;">Повторить пропущенные</button>
+                </form>
+
+                <a href="/automation/rules/{{ rule['id'] }}/events/export" class="btn" style="background:#16a34a;">Скачать CSV</a>
+            </div>
+        </div>
+
         <div class="label" style="margin-top:12px;">
             Визуальная цепочка: что запускает правило, какие действия выполняются и сколько событий уже обработано.
         </div>
