@@ -412,6 +412,7 @@ async def assert_automation_page():
     assert "Проблемы и рекомендации" in diagnostics_html
     assert "Активные правила без действий" in diagnostics_html
     assert "Последние пропущенные события" in diagnostics_html
+    assert "Повторить" in diagnostics_html
     assert 'href="/automation/diagnostics/export"' in diagnostics_html
 
     diagnostics_export_response = await crm.automation_diagnostics_export(

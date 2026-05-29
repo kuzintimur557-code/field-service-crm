@@ -234,7 +234,17 @@
                     <td>{{ event["rule_name"] or "—" }}</td>
                     <td>{{ event["trigger_key"] }}</td>
                     <td>{{ event["message"] or "" }}</td>
-                    <td><a href="/automation/events/{{ event['id'] }}" class="btn">Подробнее</a></td>
+                    <td>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <a href="/automation/events/{{ event['id'] }}" class="btn">Подробнее</a>
+
+                            <form method="post" action="/automation/events/{{ event['id'] }}/retry" style="margin:0;">
+                                <button type="submit" class="btn" style="background:#f59e0b;border:0;cursor:pointer;">
+                                    Повторить
+                                </button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
