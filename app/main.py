@@ -3416,15 +3416,26 @@ async def automation_rule_detail(request: Request, rule_id: int):
     if not actions:
         diagnostic_title = "Нет действий"
         diagnostic_message = "Правило включено, но не сможет ничего выполнить без action."
+        graph_status = "Проблема"
+        graph_status_color = "#dc2626"
+
     elif not rule["active"]:
         diagnostic_title = "Правило отключено"
         diagnostic_message = "Правило не будет запускаться, пока его не включить."
-    elif skipped_count > done_count:
-        diagnostic_title = "Много пропусков"
-        diagnostic_message = "У этого правила больше пропущенных событий, чем выполненных."
+        graph_status = "Проблема"
+        graph_status_color = "#dc2626"
+
+    elif skipped_count > 0 or pending_count > 0:
+        diagnostic_title = "Нужно внимание"
+        diagnostic_message = "У правила есть пропущенные или ожидающие события."
+        graph_status = "Нужно внимание"
+        graph_status_color = "#f59e0b"
+
     else:
         diagnostic_title = "OK"
         diagnostic_message = "Правило выглядит рабочим."
+        graph_status = "OK"
+        graph_status_color = "#16a34a"
 
     return templates.TemplateResponse(
         request,
@@ -3444,7 +3455,9 @@ async def automation_rule_detail(request: Request, rule_id: int):
             "pending_count": pending_count,
             "success_rate": success_rate,
             "diagnostic_title": diagnostic_title,
-            "diagnostic_message": diagnostic_message
+            "diagnostic_message": diagnostic_message,
+            "graph_status": graph_status,
+            "graph_status_color": graph_status_color
         }
     )
 

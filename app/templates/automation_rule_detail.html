@@ -73,6 +73,10 @@
     <div class="card">
         <h2>Automation Graph</h2>
 
+        <div class="pill" style="background:{{ graph_status_color }};color:white;margin-bottom:12px;">
+            Статус цепочки: {{ graph_status }}
+        </div>
+
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-weight:900;">
             <div class="pill">Триггер: {{ trigger_labels.get(rule["trigger_key"], rule["trigger_key"]) }}</div>
             <div>→</div>
