@@ -588,6 +588,39 @@ async def assert_automation_page():
 
     assert "/automation/actions/" in rule_detail_html
     assert "Удалить" in rule_detail_html
+    assert "Добавить действие" in rule_detail_html
+    assert f"/automation/rules/{rule['id']}/actions/create" in rule_detail_html
+
+    builder_response = await crm.create_rule_action(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/actions/create",
+            {
+                "action_key": "notification",
+                "target_username": "owner2",
+                "message": "Builder action message",
+            },
+        ),
+        rule["id"],
+    )
+    assert builder_response.status_code == 302
+    assert builder_response.headers["location"] == f"/automation/rules/{rule['id']}?action_created=1"
+
+    conn = connect()
+    c = conn.cursor()
+
+    builder_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE company_id=2
+      AND rule_id=?
+      AND payload_json LIKE '%Builder action message%'
+    ORDER BY id DESC
+    """, (rule["id"],)).fetchone()
+
+    conn.close()
+
+    assert builder_action is not None
 
     conn = connect()
     c = conn.cursor()

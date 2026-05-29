@@ -4174,6 +4174,86 @@ async def retry_automation_event(request: Request, event_id: int):
 
 
 
+
+@app.post("/automation/rules/{rule_id}/actions/create")
+async def create_rule_action(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    form = await request.form()
+
+    action_key = str(form.get("action_key") or "").strip()
+    target_username = str(form.get("target_username") or "").strip()
+    message = str(form.get("message") or "").strip()
+
+    action_keys = {key for key, _ in AUTOMATION_ACTIONS}
+
+    if action_key not in action_keys:
+        return RedirectResponse(
+            f"/automation/rules/{rule_id}?action_error=1",
+            status_code=302
+        )
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse("/automation", status_code=302)
+
+    payload = {
+        "target_username": target_username,
+        "message": message
+    }
+
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id,
+        rule_id,
+        action_key,
+        payload_json,
+        active,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, 1, ?)
+    """, (
+        company_id,
+        rule_id,
+        action_key,
+        json.dumps(payload, ensure_ascii=False),
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        f"/automation/rules/{rule_id}?action_created=1",
+        status_code=302
+    )
+
 @app.post("/automation/actions/{action_id}/toggle")
 async def toggle_automation_action(request: Request, action_id: int):
 

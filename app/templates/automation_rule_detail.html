@@ -103,6 +103,51 @@
         </div>
     </div>
 
+    {% if request.query_params.get("action_created") == "1" %}
+    <div class="card" style="background:#dcfce7;">
+        <h3>Действие создано</h3>
+        <p>Новое действие добавлено к правилу.</p>
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get("action_error") == "1" %}
+    <div class="card" style="background:#fef3c7;">
+        <h3>Действие не создано</h3>
+        <p>Проверьте тип действия.</p>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Добавить действие</h2>
+
+        <form method="post" action="/automation/rules/{{ rule['id'] }}/actions/create">
+            <div class="grid">
+                <div>
+                    <div class="label">Тип действия</div>
+                    <select name="action_key" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
+                        {% for key, label in action_labels.items() %}
+                        <option value="{{ key }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <div class="label">Получатель</div>
+                    <input name="target_username" value="{{ username }}" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
+                </div>
+            </div>
+
+            <div style="margin-top:12px;">
+                <div class="label">Сообщение</div>
+                <textarea name="message" style="width:100%;min-height:90px;padding:12px;border:1px solid #d1d5db;border-radius:12px;">Automation: {{ rule["name"] }}</textarea>
+            </div>
+
+            <button type="submit" class="btn" style="margin-top:12px;background:#2563eb;">
+                Добавить действие
+            </button>
+        </form>
+    </div>
+
     <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
             <h2>Действия</h2>
