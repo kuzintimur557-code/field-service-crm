@@ -87,6 +87,21 @@
             <div class="pill">Событий: {{ done_count + skipped_count + pending_count }}</div>
         </div>
 
+        <div style="margin-top:16px;">
+            <div class="label">Действия цепочки</div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                {% for action in actions %}
+                <div class="pill" style="{% if not action['active'] %}opacity:.55;{% endif %}">
+                    {{ action_labels.get(action["action_key"], action["action_key"]) }}
+                    {% if not action["active"] %} · выключено{% endif %}
+                </div>
+                {% else %}
+                <div class="pill" style="background:#fee2e2;color:#991b1b;">Нет действий</div>
+                {% endfor %}
+            </div>
+        </div>
+
         <div class="label" style="margin-top:12px;">
             Визуальная цепочка: что запускает правило, какие действия выполняются и сколько событий уже обработано.
         </div>
