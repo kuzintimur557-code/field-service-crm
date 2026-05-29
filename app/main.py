@@ -3188,10 +3188,29 @@ async def create_automation_rule(request: Request):
         return RedirectResponse("/automation?error=invalid", status_code=302)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if action_key in ("notification", "telegram_alert") and not target_username:
+        conn.close()
+        return RedirectResponse(
+            f"/automation/rules/{rule_id}?action_error=1",
+            status_code=302
+        )
+
+    if action_key in ("notification", "telegram_alert") and not message:
+        message = f"Automation: {rule['name']}"
+
+    if action_key == "ai_digest" and not target_username:
+        target_username = username
+
+    if action_key == "ai_digest" and not message:
+        message = "AI-сводка по бизнесу"
+
     payload = {
         "target_username": target_username,
         "message": message
     }
+
+    if action_key == "email":
+        payload["subject"] = f"Automation: {rule['name']}"
 
     conn = connect()
     c = conn.cursor()

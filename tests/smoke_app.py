@@ -622,6 +622,39 @@ async def assert_automation_page():
 
     assert builder_action is not None
 
+    ai_digest_builder_response = await crm.create_rule_action(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/actions/create",
+            {
+                "action_key": "ai_digest",
+                "target_username": "",
+                "message": "",
+            },
+        ),
+        rule["id"],
+    )
+    assert ai_digest_builder_response.status_code == 302
+    assert ai_digest_builder_response.headers["location"] == f"/automation/rules/{rule['id']}?action_created=1"
+
+    conn = connect()
+    c = conn.cursor()
+
+    ai_digest_builder_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE company_id=2
+      AND rule_id=?
+      AND action_key='ai_digest'
+    ORDER BY id DESC
+    """, (rule["id"],)).fetchone()
+
+    conn.close()
+
+    assert ai_digest_builder_action is not None
+    assert "owner2" in ai_digest_builder_action["payload_json"]
+    assert "AI-сводка по бизнесу" in ai_digest_builder_action["payload_json"]
+
     conn = connect()
     c = conn.cursor()
 
