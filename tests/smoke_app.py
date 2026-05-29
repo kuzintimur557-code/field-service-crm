@@ -576,6 +576,15 @@ async def assert_automation_page():
     assert "Последние события правила" in rule_detail_html
     assert "Запустить сейчас" in rule_detail_html
     assert "Повторить пропущенные" in rule_detail_html
+    assert f"/automation/rules/{rule['id']}/events/export" in rule_detail_html
+
+    rule_events_export_response = await crm.automation_rule_events_export(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert rule_events_export_response.status_code == 200
+    rule_events_export_csv = rule_events_export_response.body.decode("utf-8")
+    assert "id,rule_name,trigger_key,entity_type,entity_id,status,message,created_at,processed_at" in rule_events_export_csv
 
     retry_rule_response = await crm.retry_rule_skipped_events(
         make_request("owner2"),

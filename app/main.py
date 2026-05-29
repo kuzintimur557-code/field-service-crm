@@ -3246,6 +3246,86 @@ async def create_automation_rule(request: Request):
 
 
 
+
+@app.get("/automation/rules/{rule_id}/events/export")
+async def automation_rule_events_export(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse("/automation", status_code=302)
+
+    events = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=?
+      AND rule_id=?
+    ORDER BY id DESC
+    """, (company_id, rule_id)).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "id",
+        "rule_name",
+        "trigger_key",
+        "entity_type",
+        "entity_id",
+        "status",
+        "message",
+        "created_at",
+        "processed_at"
+    ])
+
+    for event in events:
+        writer.writerow([
+            event["id"],
+            rule["name"],
+            event["trigger_key"],
+            event["entity_type"] or "",
+            event["entity_id"] or "",
+            event["status"],
+            event["message"] or "",
+            event["created_at"] or "",
+            event["processed_at"] or ""
+        ])
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=automation_rule_{rule_id}_events.csv"
+        }
+    )
+
 @app.get("/automation/rules/{rule_id}", response_class=HTMLResponse)
 async def automation_rule_detail(request: Request, rule_id: int):
 
