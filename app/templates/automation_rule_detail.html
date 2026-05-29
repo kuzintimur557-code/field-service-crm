@@ -28,12 +28,29 @@
         </div>
 
         <div style="display:flex;gap:10px;align-items:center;">
+            {% if not rule["active"] %}
+            <form method="post" action="/automation/diagnostics/rules/{{ rule['id'] }}/enable" style="margin:0;">
+                <button type="submit" class="btn" style="background:#16a34a;">Включить</button>
+            </form>
+            {% endif %}
+
+            <form method="post" action="/automation/rules/{{ rule['id'] }}/retry-skipped" style="margin:0;">
+                <button type="submit" class="btn" style="background:#f59e0b;">Повторить пропущенные</button>
+            </form>
+
             <form method="post" action="/automation/rules/{{ rule['id'] }}/run" style="margin:0;">
                 <button type="submit" class="btn" style="background:#2563eb;">Запустить сейчас</button>
             </form>
             <a href="/automation" class="btn">← Назад</a>
         </div>
     </div>
+
+    {% if request.query_params.get("retry_skipped") == "1" %}
+    <div class="card" style="background:#dcfce7;">
+        <h3>Повтор выполнен</h3>
+        <p>Создано повторных событий: {{ request.query_params.get("retried") or "0" }}</p>
+    </div>
+    {% endif %}
 
     <div class="card">
         <h2>Диагностика правила</h2>
@@ -69,7 +86,17 @@
     </div>
 
     <div class="card">
-        <h2>Действия</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+            <h2>Действия</h2>
+
+            {% if not actions %}
+            <form method="post" action="/automation/diagnostics/rules/{{ rule['id'] }}/add-default-action" style="margin:0;">
+                <button type="submit" class="btn" style="background:#2563eb;">
+                    Добавить действие
+                </button>
+            </form>
+            {% endif %}
+        </div>
 
         <table>
             <thead>

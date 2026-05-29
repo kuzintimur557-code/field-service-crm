@@ -574,6 +574,17 @@ async def assert_automation_page():
     assert "Диагностика правила" in rule_detail_html
     assert "Действия" in rule_detail_html
     assert "Последние события правила" in rule_detail_html
+    assert "Запустить сейчас" in rule_detail_html
+    assert "Повторить пропущенные" in rule_detail_html
+
+    retry_rule_response = await crm.retry_rule_skipped_events(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert retry_rule_response.status_code == 302
+    assert retry_rule_response.headers["location"].startswith(
+        f"/automation/rules/{rule['id']}?retry_skipped=1&retried="
+    )
 
     edit_response = await crm.edit_automation_rule(
         make_form_request(
