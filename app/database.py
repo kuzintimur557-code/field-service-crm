@@ -355,6 +355,23 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS system_health_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        score INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        skipped_count INTEGER NOT NULL DEFAULT 0,
+        disabled_rules_count INTEGER NOT NULL DEFAULT 0,
+        stale_rules_count INTEGER NOT NULL DEFAULT 0,
+        retry_risk_count INTEGER NOT NULL DEFAULT 0,
+        unhealthy_rules_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS ai_assistant_notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER,
@@ -596,6 +613,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_automation_events_company_status
     ON automation_events(company_id, status, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_system_health_snapshots_company_created
+    ON system_health_snapshots(company_id, created_at)
     """)
 
     c.execute("""

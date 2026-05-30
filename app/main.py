@@ -14439,6 +14439,38 @@ async def task_pdf(request: Request, task_id: int):
     )
 
 
+def save_system_health_snapshot(company_id, data):
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO system_health_snapshots (
+            company_id,
+            score,
+            status,
+            failed_count,
+            skipped_count,
+            disabled_rules_count,
+            stale_rules_count,
+            retry_risk_count,
+            unhealthy_rules_count,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        data.get("score", 100),
+        data.get("status", "healthy"),
+        data.get("failed_count", 0),
+        data.get("skipped_count", 0),
+        data.get("disabled_rules_count", 0),
+        data.get("stale_rules_count", 0),
+        data.get("retry_risk_count", 0),
+        data.get("unhealthy_rules_count", 0),
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    conn.commit()
+    conn.close()
+
+
 @app.get("/api/a3/system-health")
 def api_a3_system_health():
     rules = []
@@ -14470,5 +14502,9 @@ def api_a3_system_health():
     else:
         data["status_title"] = "System Critical"
         data["status_message"] = "Automation engine requires immediate attention."
+
+    snapshot_company_id = locals().get("company_id", 1)
+
+    save_system_health_snapshot(snapshot_company_id, data)
 
     return data
