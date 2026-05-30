@@ -4040,6 +4040,35 @@ async def automation_diagnostics_page(request: Request):
 
     success_rate = round(done_events / max(done_events + skipped_events, 1) * 100, 1)
 
+    a3_system_health_score = 100
+
+    if pending_events > 0:
+        a3_system_health_score -= min(pending_events * 5, 25)
+
+    if skipped_events > 0:
+        a3_system_health_score -= min(skipped_events * 5, 30)
+
+    if rules_without_actions:
+        a3_system_health_score -= 20
+
+    if disabled_rules:
+        a3_system_health_score -= 10
+
+    if success_rate < 80 and (done_events + skipped_events) > 0:
+        a3_system_health_score -= 15
+
+    a3_system_health_score = max(a3_system_health_score, 0)
+
+    if a3_system_health_score >= 85:
+        a3_system_health_level = "Отлично"
+        a3_system_recommendation = "Automation-система работает стабильно."
+    elif a3_system_health_score >= 60:
+        a3_system_health_level = "Нужно внимание"
+        a3_system_recommendation = "Проверьте skipped/pending события и правила без действий."
+    else:
+        a3_system_health_level = "Проблема"
+        a3_system_recommendation = "Нужно срочно проверить диагностику, правила и действия автоматизации."
+
     problems = []
 
     if pending_events > 5:
@@ -4109,6 +4138,9 @@ async def automation_diagnostics_page(request: Request):
             "telegram_rules": telegram_rules,
             "ai_digest_rules": ai_digest_rules,
             "success_rate": success_rate,
+            "a3_system_health_score": a3_system_health_score,
+            "a3_system_health_level": a3_system_health_level,
+            "a3_system_recommendation": a3_system_recommendation,
             "problems": problems
         }
     )

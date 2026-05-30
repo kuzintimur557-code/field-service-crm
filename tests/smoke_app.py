@@ -409,6 +409,8 @@ async def assert_automation_page():
     assert diagnostics_response.status_code == 200
     diagnostics_html = diagnostics_response.body.decode("utf-8")
     assert "Диагностика автоматизации" in diagnostics_html
+    assert "A3 System Health Score" in diagnostics_html
+    assert "Рекомендация:" in diagnostics_html
     assert "Проблемы и рекомендации" in diagnostics_html
     assert "Активные правила без действий" in diagnostics_html
     assert "Последние пропущенные события" in diagnostics_html
