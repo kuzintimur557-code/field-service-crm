@@ -14508,3 +14508,32 @@ def api_a3_system_health():
     save_system_health_snapshot(snapshot_company_id, data)
 
     return data
+
+
+@app.get("/api/a3/system-health/history")
+def api_a3_system_health_history():
+    snapshot_company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+    rows = c.execute("""
+        SELECT
+            score,
+            status,
+            failed_count,
+            skipped_count,
+            disabled_rules_count,
+            stale_rules_count,
+            retry_risk_count,
+            unhealthy_rules_count,
+            created_at
+        FROM system_health_snapshots
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 30
+    """, (snapshot_company_id,)).fetchall()
+    conn.close()
+
+    return {
+        "items": [dict(row) for row in rows][::-1]
+    }
