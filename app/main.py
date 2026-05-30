@@ -14440,6 +14440,39 @@ async def task_pdf(request: Request, task_id: int):
 
 
 
+
+def enqueue_autonomous_action(
+    company_id,
+    action_type,
+    target_type,
+    target_id=None,
+    payload_json=None,
+):
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+        INSERT INTO autonomous_action_queue (
+            company_id,
+            action_type,
+            target_type,
+            target_id,
+            payload_json,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        action_type,
+        target_type,
+        target_id,
+        payload_json,
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 def create_ops_timeline_event(
     company_id,
     event_type,
@@ -15069,6 +15102,21 @@ def api_a3_decision_engine():
 
         if failed >= 10:
             recommendation = "disable_rule"
+
+            enqueue_autonomous_action(
+                company_id=company_id,
+                action_type="disable_rule",
+                target_type="automation_rule",
+                target_id=row["id"],
+            )
+
+        elif skipped >= 5:
+            enqueue_autonomous_action(
+                company_id=company_id,
+                action_type="retry_events",
+                target_type="automation_rule",
+                target_id=row["id"],
+            )
 
         decisions.append({
             "rule_id": row["id"],
