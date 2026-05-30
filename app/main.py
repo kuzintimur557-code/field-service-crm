@@ -14662,3 +14662,80 @@ def api_a3_unhealthy_rules():
         "count": len(items),
         "items": items[:20],
     }
+
+
+@app.get("/api/a3/operations-insights")
+def api_a3_operations_insights():
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT status, COUNT(*) AS count
+        FROM automation_events
+        WHERE company_id=?
+        GROUP BY status
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    counts = {row["status"]: row["count"] for row in rows}
+
+    done_total = counts.get("done", 0)
+    skipped_total = counts.get("skipped", 0)
+    failed_total = counts.get("failed", 0)
+    pending_total = counts.get("pending", 0)
+
+    total = done_total + skipped_total + failed_total + pending_total
+
+    insights = []
+
+    if total >= 100:
+        insights.append({
+            "level": "info",
+            "title": "High automation activity",
+            "message": "Automation engine is processing a large execution volume.",
+        })
+
+    if skipped_total >= 10:
+        insights.append({
+            "level": "warning",
+            "title": "Skipped execution pressure",
+            "message": "Multiple automation events were skipped recently.",
+        })
+
+    if failed_total >= 5:
+        insights.append({
+            "level": "critical",
+            "title": "Execution instability detected",
+            "message": "Several automation executions failed.",
+        })
+
+    if pending_total >= 15:
+        insights.append({
+            "level": "warning",
+            "title": "Pending automation backlog",
+            "message": "Automation queue contains a large pending volume.",
+        })
+
+    success_rate = round((done_total / total) * 100) if total else 100
+
+    if success_rate < 70:
+        insights.append({
+            "level": "critical",
+            "title": "Low automation reliability",
+            "message": "Automation success rate is below healthy threshold.",
+        })
+
+    if not insights:
+        insights.append({
+            "level": "healthy",
+            "title": "Operations stable",
+            "message": "Automation platform is operating normally.",
+        })
+
+    return {
+        "count": len(insights),
+        "items": insights,
+    }
