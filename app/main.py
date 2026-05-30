@@ -14666,6 +14666,8 @@ def api_a3_unhealthy_rules():
 
 
 def run_self_healing_cycle(company_id=1):
+    started_at = time.time()
+
     conn = connect()
     c = conn.cursor()
 
@@ -14706,12 +14708,33 @@ def run_self_healing_cycle(company_id=1):
         """, (row["id"],))
         reenabled_rules += 1
 
+    duration_ms = int((time.time() - started_at) * 1000)
+
+    c.execute("""
+        INSERT INTO self_healing_runs (
+            company_id,
+            retried_events,
+            reenabled_rules,
+            status,
+            duration_ms,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        retried_events,
+        reenabled_rules,
+        "done",
+        duration_ms,
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+
     conn.commit()
     conn.close()
 
     return {
         "retried_events": retried_events,
         "reenabled_rules": reenabled_rules,
+        "duration_ms": duration_ms,
     }
 
 
