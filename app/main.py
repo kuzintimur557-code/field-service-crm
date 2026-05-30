@@ -14823,3 +14823,30 @@ def api_a3_self_healing_run():
         "ok": True,
         "result": result,
     }
+
+
+@app.get("/api/a3/recovery-history")
+def api_a3_recovery_history():
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT
+            retried_events,
+            reenabled_rules,
+            status,
+            duration_ms,
+            created_at
+        FROM self_healing_runs
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 20
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    return {
+        "items": [dict(row) for row in rows]
+    }
