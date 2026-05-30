@@ -355,6 +355,20 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS autonomous_action_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        action_type TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'pending',
+        payload_json TEXT,
+        created_at TEXT NOT NULL,
+        processed_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS ops_timeline_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -648,6 +662,12 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_ops_timeline_events_company_created
     ON ops_timeline_events(company_id, created_at)
+    """)
+
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_autonomous_action_queue_company_status
+    ON autonomous_action_queue(company_id, status, created_at)
     """)
 
     c.execute("""
