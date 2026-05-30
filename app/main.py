@@ -15133,3 +15133,32 @@ def api_a3_decision_engine():
         "count": len(decisions),
         "items": decisions[:20],
     }
+
+
+@app.get("/api/a3/autonomous-actions")
+def api_a3_autonomous_actions():
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT
+            action_type,
+            target_type,
+            target_id,
+            status,
+            payload_json,
+            created_at,
+            processed_at
+        FROM autonomous_action_queue
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 50
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    return {
+        "items": [dict(row) for row in rows]
+    }
