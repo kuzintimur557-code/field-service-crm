@@ -61,6 +61,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">Правило создано</div>
 {% endif %}
 
+</div>
+</div>
+
 {% if request.query_params.get("toggled") == "1" %}
 <div class="notice ok">Статус правила обновлён</div>
 {% endif %}
@@ -351,6 +354,10 @@ setInterval(loadA3SystemHealth, 30000);
     <button type="submit">Запустить AI-планировщик</button>
 </form>
 </div>
+
+</div>
+
+<div style="display:flex;flex-direction:column;gap:24px">
 
 <div class="card">
 <h2>Cron-запуск</h2>
@@ -805,8 +812,14 @@ setInterval(loadA3OpsTimeline, 30000);
 </script>
 
 
+
+<div style="display:grid;grid-template-columns:1.2fr .8fr;gap:24px;align-items:start;margin-top:24px">
+
+<div style="display:flex;flex-direction:column;gap:24px">
+
 <div class="card">
 <h2>Новое правило</h2>
+
 
 <form method="post" action="/automation/rules">
     <div class="grid">
