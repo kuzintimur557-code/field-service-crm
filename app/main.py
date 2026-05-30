@@ -15285,3 +15285,54 @@ def api_a3_process_autonomous_actions():
         "ok": True,
         "result": result,
     }
+
+
+@app.get("/api/a3/governance-settings")
+def api_a3_governance_settings():
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    row = c.execute("""
+        SELECT *
+        FROM autonomous_governance_settings
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (company_id,)).fetchone()
+
+    if not row:
+        c.execute("""
+            INSERT INTO autonomous_governance_settings (
+                company_id,
+                autonomous_enabled,
+                max_actions_per_cycle,
+                require_critical_approval,
+                confidence_threshold,
+                protected_rules_json,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            1,
+            20,
+            1,
+            70,
+            "[]",
+            datetime.now().isoformat(timespec="seconds"),
+        ))
+
+        conn.commit()
+
+        row = c.execute("""
+            SELECT *
+            FROM autonomous_governance_settings
+            WHERE company_id=?
+            ORDER BY id DESC
+            LIMIT 1
+        """, (company_id,)).fetchone()
+
+    conn.close()
+
+    return dict(row)
