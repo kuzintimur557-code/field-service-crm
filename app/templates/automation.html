@@ -284,6 +284,28 @@ setInterval(loadA3SystemHealth, 30000);
 </script>
 
 
+{% if unhealthy_rules %}
+<div class="card">
+    <h2>Unhealthy Rules</h2>
+    <div class="meta" style="margin-bottom:14px">
+        Правила, которым требуется внимание: отключены, без actions или с признаками нестабильности.
+    </div>
+
+    {% for rule in unhealthy_rules[:5] %}
+    <div class="rule">
+        <div>
+            <div class="rule-title">{{ rule["name"] }}</div>
+            {% for issue in rule["issues"] %}
+            <span class="pill off">{{ issue }}</span>
+            {% endfor %}
+        </div>
+        <a class="back" href="/automation/rules/{{ rule["id"] }}">Открыть</a>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+
 <div class="card">
 <h2>AI-планировщик</h2>
 <div class="meta">Ручной запуск дневных и недельных AI-сводок, а также AI-контроля. Повторный запуск за тот же день или неделю не создаёт дубли.</div>

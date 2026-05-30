@@ -2714,9 +2714,31 @@ async def automation_page(
     conn.close()
 
     rules = []
+    unhealthy_rules = []
 
     for rule_row in rule_rows:
         rule = dict(rule_row)
+
+        health_issues = []
+
+        if not rule.get("enabled", 1):
+            health_issues.append("Rule disabled")
+
+        if not rule.get("action_count"):
+            health_issues.append("No actions configured")
+
+        if (rule.get("success_rate") or 100) < 60:
+            health_issues.append("Low success rate")
+
+        if (rule.get("skipped_runs") or 0) >= 5:
+            health_issues.append("High skipped executions")
+
+        if health_issues:
+            unhealthy_rules.append({
+                "id": rule.get("id"),
+                "name": rule.get("name"),
+                "issues": health_issues,
+            })
 
         try:
             payload = json.loads(rule.get("primary_payload_json") or "{}")
@@ -2798,6 +2820,7 @@ async def automation_page(
             "username": username,
             "role": role,
             "rules": rules,
+            "unhealthy_rules": unhealthy_rules,
             "events": events,
             "shown_events_count": len(events),
             "users": users,
