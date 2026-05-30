@@ -3870,7 +3870,7 @@ def main():
         data = crm.api_a3_system_health()
         assert "score" in data
         assert 0 <= data["score"] <= 100
-        assert data["status"] in {"healthy", "warning", "critical"}
+        assert data["status"] in {"healthy", "warning", "degraded", "critical"}
 
         print("Smoke checks passed.")
     finally:

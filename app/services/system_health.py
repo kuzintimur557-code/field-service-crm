@@ -129,8 +129,10 @@ class SystemHealthCalculator:
             recommendations.append("No action required. Automation system is operating normally.")
 
         status = "healthy"
-        if score < 70:
+        if score < 85:
             status = "warning"
+        if score < 70:
+            status = "degraded"
         if score < 40:
             status = "critical"
 
