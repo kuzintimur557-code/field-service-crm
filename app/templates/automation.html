@@ -704,6 +704,108 @@ setInterval(loadA3RecoveryHistory, 30000);
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Ops Timeline</h2>
+            <div class="meta">
+                Unified AI Ops timeline и autonomous operations events.
+            </div>
+        </div>
+
+        <div class="pill">
+            Live Timeline
+        </div>
+    </div>
+
+    <div id="a3-ops-timeline"
+         style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
+    </div>
+</div>
+
+<script>
+async function loadA3OpsTimeline() {
+    try {
+        const response = await fetch("/api/a3/ops-timeline");
+        const data = await response.json();
+
+        const container = document.getElementById("a3-ops-timeline");
+
+        container.innerHTML = "";
+
+        const items = data.items || [];
+
+        if (!items.length) {
+            container.innerHTML = `
+                <div class="pill">
+                    No timeline events yet
+                </div>
+            `;
+            return;
+        }
+
+        for (const item of items.slice(0, 12)) {
+            const card = document.createElement("div");
+
+            let bg = "#f9fafb";
+            let border = "#e5e7eb";
+
+            if (item.severity === "warning") {
+                bg = "#fef3c7";
+                border = "#fde68a";
+            }
+
+            if (item.severity === "critical") {
+                bg = "#fee2e2";
+                border = "#fecaca";
+            }
+
+            if (item.severity === "degraded") {
+                bg = "#ffedd5";
+                border = "#fdba74";
+            }
+
+            card.style.padding = "16px";
+            card.style.borderRadius = "18px";
+            card.style.background = bg;
+            card.style.border = "1px solid " + border;
+
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                    <div>
+                        <div style="font-weight:900;font-size:15px">
+                            ${item.title}
+                        </div>
+
+                        <div style="margin-top:6px;color:#374151">
+                            ${item.message}
+                        </div>
+                    </div>
+
+                    <div style="text-align:right">
+                        <div class="pill">
+                            ${item.event_type}
+                        </div>
+
+                        <div class="meta" style="margin-top:8px">
+                            ${item.created_at}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+    } catch (err) {
+        console.error("Ops timeline load failed", err);
+    }
+}
+
+loadA3OpsTimeline();
+setInterval(loadA3OpsTimeline, 30000);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 <form method="post" action="/automation/rules">
