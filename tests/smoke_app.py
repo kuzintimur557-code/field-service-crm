@@ -573,6 +573,9 @@ async def assert_automation_page():
     assert "SLA smoke rule" in rule_detail_html
     assert "Граф автоматизации A3" in rule_detail_html
     assert "Статус цепочки" in rule_detail_html
+    assert "A3 Health Score" in rule_detail_html
+    assert "A3 Intelligence" in rule_detail_html
+    assert "Рекомендация:" in rule_detail_html
     assert "Действия цепочки" in rule_detail_html
     assert "Последние события цепочки" in rule_detail_html
     assert "Быстрые действия цепочки" in rule_detail_html

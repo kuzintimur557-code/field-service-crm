@@ -73,8 +73,19 @@
     <div class="card">
         <h2>Граф автоматизации A3</h2>
 
-        <div class="pill" style="background:{{ graph_status_color }};color:white;margin-bottom:12px;">
-            Статус цепочки: {{ graph_status }}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+            <div class="pill" style="background:{{ graph_status_color }};color:white;">
+                Статус цепочки: {{ graph_status }}
+            </div>
+
+            <div class="pill" style="background:#111827;color:white;">
+                A3 Health Score: {{ a3_health_score }}%
+            </div>
+        </div>
+
+        <div class="card" style="box-shadow:none;border:1px solid #e5e7eb;background:#f9fafb;">
+            <h3>A3 Intelligence</h3>
+            <p><b>Рекомендация:</b> {{ a3_recommendation }}</p>
         </div>
 
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-weight:900;">

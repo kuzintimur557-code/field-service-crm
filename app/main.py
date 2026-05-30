@@ -3413,29 +3413,49 @@ async def automation_rule_detail(request: Request, rule_id: int):
     pending_count = event_counts.get("pending", 0)
     success_rate = round(done_count / max(done_count + skipped_count, 1) * 100, 1)
 
+    a3_health_score = 100
+
+    if not rule["active"]:
+        a3_health_score -= 30
+
+    if not actions:
+        a3_health_score -= 30
+
+    if skipped_count > 0:
+        a3_health_score -= 15
+
+    if pending_count > 0:
+        a3_health_score -= 10
+
+    a3_health_score = max(a3_health_score, 0)
+
     if not actions:
         diagnostic_title = "Нет действий"
         diagnostic_message = "Правило включено, но не сможет ничего выполнить без action."
         graph_status = "Проблема"
         graph_status_color = "#dc2626"
+        a3_recommendation = "Добавьте хотя бы одно действие: уведомление, Telegram или AI-сводку."
 
     elif not rule["active"]:
         diagnostic_title = "Правило отключено"
         diagnostic_message = "Правило не будет запускаться, пока его не включить."
         graph_status = "Проблема"
         graph_status_color = "#dc2626"
+        a3_recommendation = "Включите правило, если оно должно работать в автоматизации."
 
     elif skipped_count > 0 or pending_count > 0:
         diagnostic_title = "Нужно внимание"
         diagnostic_message = "У правила есть пропущенные или ожидающие события."
         graph_status = "Нужно внимание"
         graph_status_color = "#f59e0b"
+        a3_recommendation = "Проверьте последние события цепочки и повторите пропущенные."
 
     else:
         diagnostic_title = "OK"
         diagnostic_message = "Правило выглядит рабочим."
         graph_status = "OK"
         graph_status_color = "#16a34a"
+        a3_recommendation = "Правило работает стабильно. Продолжайте мониторинг."
 
     return templates.TemplateResponse(
         request,
@@ -3457,7 +3477,9 @@ async def automation_rule_detail(request: Request, rule_id: int):
             "diagnostic_title": diagnostic_title,
             "diagnostic_message": diagnostic_message,
             "graph_status": graph_status,
-            "graph_status_color": graph_status_color
+            "graph_status_color": graph_status_color,
+            "a3_health_score": a3_health_score,
+            "a3_recommendation": a3_recommendation
         }
     )
 
