@@ -211,6 +211,11 @@ async function loadA3SystemHealth() {
             badgeText = "#92400e";
         }
 
+        if (data.status === "degraded") {
+            badgeColor = "#ffedd5";
+            badgeText = "#9a3412";
+        }
+
         if (data.status === "critical") {
             badgeColor = "#fee2e2";
             badgeText = "#991b1b";
