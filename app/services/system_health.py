@@ -30,6 +30,38 @@ class SystemHealthCalculator:
         self.rules = rules or []
         self.events = events or []
 
+    def _value(self, item, key, default=None):
+        if isinstance(item, dict):
+            return item.get(key, default)
+
+        try:
+            if hasattr(item, "keys") and key in item.keys():
+                return item[key]
+        except Exception:
+            pass
+
+        return getattr(item, key, default)
+
+    def _datetime_value(self, value):
+        if not value:
+            return None
+
+        if isinstance(value, str):
+            normalized = value.replace("Z", "+00:00")
+            try:
+                parsed = datetime.fromisoformat(normalized)
+            except ValueError:
+                try:
+                    parsed = datetime.strptime(value[:16], "%Y-%m-%d %H:%M")
+                except ValueError:
+                    return None
+            value = parsed
+
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+
+        return value
+
     def calculate(self) -> SystemHealthResult:
         now = datetime.now(timezone.utc)
         since_24h = now - timedelta(hours=24)
@@ -40,11 +72,8 @@ class SystemHealthCalculator:
         retry_risk_count = 0
 
         for event in self.events:
-            status = getattr(event, "status", "") or ""
-            created_at = getattr(event, "created_at", None)
-
-            if created_at and created_at.tzinfo is None:
-                created_at = created_at.replace(tzinfo=timezone.utc)
+            status = self._value(event, "status", "") or ""
+            created_at = self._datetime_value(self._value(event, "created_at"))
 
             is_recent = created_at is None or created_at >= since_24h
 
@@ -54,7 +83,7 @@ class SystemHealthCalculator:
             if is_recent and status == "skipped":
                 skipped_count += 1
 
-            retry_count = getattr(event, "retry_count", 0) or 0
+            retry_count = self._value(event, "retry_count", 0) or 0
             if retry_count >= 3:
                 retry_risk_count += 1
 
@@ -62,16 +91,14 @@ class SystemHealthCalculator:
         stale_rules_count = 0
 
         for rule in self.rules:
-            enabled = getattr(rule, "enabled", True)
-            is_active = getattr(rule, "is_active", True)
+            enabled = self._value(rule, "enabled", True)
+            is_active = self._value(rule, "is_active", self._value(rule, "active", True))
 
-            if enabled is False or is_active is False:
+            if enabled in (False, 0) or is_active in (False, 0):
                 disabled_rules_count += 1
 
-            last_run_at = getattr(rule, "last_run_at", None)
+            last_run_at = self._datetime_value(self._value(rule, "last_run_at"))
             if last_run_at:
-                if last_run_at.tzinfo is None:
-                    last_run_at = last_run_at.replace(tzinfo=timezone.utc)
                 if last_run_at < stale_cutoff:
                     stale_rules_count += 1
 

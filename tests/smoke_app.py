@@ -91,6 +91,33 @@ def make_form_request(username, path, data):
     }, receive)
 
 
+def make_json_request(username, path, data):
+    body = json.dumps(data).encode("utf-8")
+    cookie = f"{crm.SESSION_COOKIE_NAME}={crm.sign_session_value(username)}"
+
+    async def receive():
+        return {
+            "type": "http.request",
+            "body": body,
+            "more_body": False,
+        }
+
+    return Request({
+        "type": "http",
+        "method": "POST",
+        "path": path,
+        "headers": [
+            (b"cookie", cookie.encode("utf-8")),
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(body)).encode("utf-8")),
+        ],
+        "query_string": b"",
+        "scheme": "http",
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    }, receive)
+
+
 def make_multipart_request(username, path, data):
     boundary = "----smoke-boundary"
     parts = []
@@ -3841,6 +3868,67 @@ async def assert_required_custom_fields():
     assert update_task_response.headers["location"] == f"/task/{task['id']}?error=custom_required"
 
 
+async def assert_a3_api_layer():
+    request = make_request("owner2")
+
+    data = crm.api_a3_system_health(request)
+    assert "score" in data
+    assert 0 <= data["score"] <= 100
+    assert data["status"] in {"healthy", "warning", "degraded", "critical"}
+
+    history = crm.api_a3_system_health_history(request)
+    assert "items" in history
+
+    analytics = crm.api_a3_automation_analytics(request)
+    assert "events_total" in analytics
+    assert "done_total" in analytics
+    assert "pending_total" in analytics
+
+    insights = crm.api_a3_operations_insights(request)
+    assert "items" in insights
+
+    recovery_result = crm.api_a3_self_healing_run(request)
+    assert recovery_result["ok"] is True
+    assert "result" in recovery_result
+
+    recovery_history = crm.api_a3_recovery_history(request)
+    assert "items" in recovery_history
+
+    timeline = crm.api_a3_ops_timeline(request)
+    assert "items" in timeline
+
+    predictive = crm.api_a3_predictive_signals(request)
+    assert "items" in predictive
+
+    decisions = crm.api_a3_decision_engine(request)
+    assert "items" in decisions
+
+    actions = crm.api_a3_autonomous_actions(request)
+    assert "items" in actions
+
+    process_result = crm.api_a3_process_autonomous_actions(request)
+    assert process_result["ok"] is True
+    assert "result" in process_result
+
+    governance = crm.api_a3_governance_settings(request)
+    assert "autonomous_enabled" in governance
+    assert "require_critical_approval" in governance
+
+    update_result = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "autonomous_enabled": True,
+                "require_critical_approval": True,
+                "confidence_threshold": 75,
+                "max_actions_per_cycle": 5,
+            },
+        )
+    )
+    assert update_result["ok"] is True
+
+
 def main():
     try:
         task = seed_data()
@@ -3865,12 +3953,7 @@ def main():
         asyncio.run(assert_task_custom_fields())
         asyncio.run(assert_required_custom_fields())
         assert_company_features()
-
-
-        data = crm.api_a3_system_health()
-        assert "score" in data
-        assert 0 <= data["score"] <= 100
-        assert data["status"] in {"healthy", "warning", "degraded", "critical"}
+        asyncio.run(assert_a3_api_layer())
 
         print("Smoke checks passed.")
     finally:

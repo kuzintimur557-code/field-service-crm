@@ -157,7 +157,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <div class="card" id="a3-system-health-card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 System Health</h2>
+            <h2 style="margin-bottom:8px">A3 Состояние системы</h2>
             <div class="meta">
                 Глобальное состояние automation engine, retries и execution stability.
             </div>
@@ -195,7 +195,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
             <div id="a3-health-warning-list"
                  style="display:flex;flex-direction:column;gap:10px">
-                <div class="pill">System healthy</div>
+                <div class="pill">Система стабильна</div>
             </div>
         </div>
     </div>
@@ -233,7 +233,13 @@ async function loadA3SystemHealth() {
 
         badgeEl.style.background = badgeColor;
         badgeEl.style.color = badgeText;
-        badgeEl.textContent = data.status.toUpperCase();
+        const statusLabels = {
+            healthy: "СТАБИЛЬНО",
+            warning: "ВНИМАНИЕ",
+            degraded: "СНИЖЕНО",
+            critical: "КРИТИЧНО"
+        };
+        badgeEl.textContent = statusLabels[data.status] || data.status.toUpperCase();
 
         const breakdownEl = document.getElementById("a3-health-breakdown");
         breakdownEl.innerHTML = "";
@@ -243,7 +249,7 @@ async function loadA3SystemHealth() {
             ["Skipped", data.skipped_health],
             ["Automation", data.automation_health],
             ["Stale", data.stale_health],
-            ["Retry", data.retry_health],
+            ["Повтор", data.retry_health],
         ];
 
         for (const [label, value] of breakdownItems) {
@@ -293,7 +299,7 @@ async function loadA3SystemHealth() {
 
         if (!issues.length && !recommendations.length) {
             warningsEl.innerHTML =
-                '<div class="pill">System healthy</div>';
+                '<div class="pill">Система стабильна</div>';
         } else {
             for (const issue of issues) {
                 const div = document.createElement("div");
@@ -316,7 +322,7 @@ async function loadA3SystemHealth() {
             }
         }
     } catch (err) {
-        console.error("A3 system health load failed", err);
+        console.error("A3 system health load ошибка", err);
     }
 }
 
@@ -327,7 +333,7 @@ setInterval(loadA3SystemHealth, 30000);
 
 {% if unhealthy_rules %}
 <div class="card">
-    <h2>Unhealthy Rules</h2>
+    <h2>Проблемные правила</h2>
     <div class="meta" style="margin-bottom:14px">
         Правила, которым требуется внимание: отключены, без actions или с признаками нестабильности.
     </div>
@@ -370,7 +376,7 @@ setInterval(loadA3SystemHealth, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Automation Analytics</h2>
+            <h2 style="margin-bottom:8px">A3 Аналитика автоматизации</h2>
             <div class="meta">
                 Execution volume, success rate и operational activity.
             </div>
@@ -413,10 +419,10 @@ async function loadA3Analytics() {
 
         const stats = [
             ["Events", data.events_total],
-            ["Done", data.done_total],
+            ["Выполнено", data.done_total],
             ["Skipped", data.skipped_total],
-            ["Failed", data.failed_total],
-            ["Pending", data.pending_total],
+            ["Ошибки", data.failed_total],
+            ["Ожидает", data.pending_total],
         ];
 
         for (const [label, value] of stats) {
@@ -459,7 +465,7 @@ async function loadA3Analytics() {
             trendEl.appendChild(bar);
         }
     } catch (err) {
-        console.error("Analytics load failed", err);
+        console.error("Analytics load ошибка", err);
     }
 }
 
@@ -471,14 +477,14 @@ setInterval(loadA3Analytics, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Operations Insights</h2>
+            <h2 style="margin-bottom:8px">A3 Операционные инсайты</h2>
             <div class="meta">
-                AI operational monitoring и automation intelligence.
+                AI-мониторинг системы и интеллект автоматизации.
             </div>
         </div>
 
         <div class="pill">
-            AI Ops Center
+            AI Ops Центр
         </div>
     </div>
 
@@ -536,7 +542,7 @@ async function loadA3OperationsInsights() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Operations insights load failed", err);
+        console.error("Operations insights load ошибка", err);
     }
 }
 
@@ -548,22 +554,22 @@ setInterval(loadA3OperationsInsights, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Self-Healing</h2>
+            <h2 style="margin-bottom:8px">A3 Самовосстановление</h2>
             <div class="meta">
-                Autonomous retry, recovery и automation repair operations.
+                Автоматическое восстановление и ремонт автоматизаций.
             </div>
         </div>
 
         <button id="a3-run-self-healing"
                 class="btn">
-            Run Self-Healing
+            Запустить восстановление
         </button>
     </div>
 
     <div id="a3-self-healing-status"
          style="margin-top:18px">
         <div class="pill">
-            Waiting for execution
+            Ожидание запуска
         </div>
     </div>
 </div>
@@ -575,11 +581,11 @@ async function runA3SelfHealing() {
 
     try {
         button.disabled = true;
-        button.textContent = "Running...";
+        button.textContent = "Выполняется...";
 
         status.innerHTML = `
             <div class="pill">
-                Self-healing cycle running...
+                Запущен цикл восстановления...
             </div>
         `;
 
@@ -594,11 +600,11 @@ async function runA3SelfHealing() {
         status.innerHTML = `
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <div class="pill">
-                    Retried events: ${result.retried_events || 0}
+                    Повторно запущено: ${result.retried_events || 0}
                 </div>
 
                 <div class="pill">
-                    Re-enabled rules: ${result.reenabled_rules || 0}
+                    Повторно включено правил: ${result.reenabled_rules || 0}
                 </div>
             </div>
         `;
@@ -607,12 +613,12 @@ async function runA3SelfHealing() {
 
         status.innerHTML = `
             <div class="pill off">
-                Self-healing execution failed
+                Ошибка самовосстановления
             </div>
         `;
     } finally {
         button.disabled = false;
-        button.textContent = "Run Self-Healing";
+        button.textContent = "Запустить восстановление";
     }
 }
 
@@ -625,14 +631,14 @@ document
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Recovery History</h2>
+            <h2 style="margin-bottom:8px">A3 История восстановления</h2>
             <div class="meta">
-                Autonomous recovery execution history и repair operations.
+                История восстановлений и операций ремонта.
             </div>
         </div>
 
         <div class="pill">
-            Recovery Logs
+            Логи восстановления
         </div>
     </div>
 
@@ -656,7 +662,7 @@ async function loadA3RecoveryHistory() {
         if (!items.length) {
             container.innerHTML = `
                 <div class="pill">
-                    No recovery runs yet
+                    История восстановления пуста
                 </div>
             `;
             return;
@@ -684,11 +690,11 @@ async function loadA3RecoveryHistory() {
 
                     <div style="display:flex;gap:12px;flex-wrap:wrap">
                         <div class="pill">
-                            Retried: ${item.retried_events}
+                            Повторно: ${item.retried_events}
                         </div>
 
                         <div class="pill">
-                            Re-enabled: ${item.reenabled_rules}
+                            Включено: ${item.reenabled_rules}
                         </div>
 
                         <div class="pill">
@@ -701,7 +707,7 @@ async function loadA3RecoveryHistory() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Recovery history load failed", err);
+        console.error("Recovery history load ошибка", err);
     }
 }
 
@@ -713,14 +719,14 @@ setInterval(loadA3RecoveryHistory, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Ops Timeline</h2>
+            <h2 style="margin-bottom:8px">A3 Лента операций</h2>
             <div class="meta">
-                Unified AI Ops timeline и autonomous operations events.
+                Единая лента AI Ops и автономных событий.
             </div>
         </div>
 
         <div class="pill">
-            Live Timeline
+            Живая лента
         </div>
     </div>
 
@@ -744,7 +750,7 @@ async function loadA3OpsTimeline() {
         if (!items.length) {
             container.innerHTML = `
                 <div class="pill">
-                    No timeline events yet
+                    Событий пока нет
                 </div>
             `;
             return;
@@ -803,7 +809,7 @@ async function loadA3OpsTimeline() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Ops timeline load failed", err);
+        console.error("Ops timeline load ошибка", err);
     }
 }
 
@@ -820,14 +826,14 @@ setInterval(loadA3OpsTimeline, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Predictive Signals</h2>
+            <h2 style="margin-bottom:8px">A3 Прогнозирование</h2>
             <div class="meta">
-                Predictive AI monitoring и operational forecasting.
+                Прогнозирование рисков и AI-мониторинг.
             </div>
         </div>
 
         <div class="pill">
-            Predictive Ops
+            AI-прогнозы
         </div>
     </div>
 
@@ -900,7 +906,7 @@ async function loadA3PredictiveSignals() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Predictive signals load failed", err);
+        console.error("Predictive signals load ошибка", err);
     }
 }
 
@@ -912,14 +918,14 @@ setInterval(loadA3PredictiveSignals, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Decision Engine</h2>
+            <h2 style="margin-bottom:8px">A3 Центр решений</h2>
             <div class="meta">
-                Autonomous operational recommendations и confidence scoring.
+                Автономные рекомендации и оценка надежности.
             </div>
         </div>
 
         <div class="pill">
-            Autonomous Decisions
+            AI-решения
         </div>
     </div>
 
@@ -943,7 +949,7 @@ async function loadA3DecisionEngine() {
         if (!items.length) {
             container.innerHTML = `
                 <div class="pill">
-                    No decision insights available
+                    Нет AI-инсайтов
                 </div>
             `;
             return;
@@ -988,7 +994,7 @@ async function loadA3DecisionEngine() {
                             </div>
 
                             <div class="pill">
-                                Failed: ${item.failed_events}
+                                Ошибки: ${item.failed_events}
                             </div>
 
                             <div class="pill">
@@ -1012,7 +1018,7 @@ async function loadA3DecisionEngine() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Decision engine load failed", err);
+        console.error("Decision engine load ошибка", err);
     }
 }
 
@@ -1024,14 +1030,14 @@ setInterval(loadA3DecisionEngine, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Autonomous Actions</h2>
+            <h2 style="margin-bottom:8px">A3 Автономные действия</h2>
             <div class="meta">
-                AI-generated autonomous operational actions queue.
+                Очередь автономных AI-действий.
             </div>
         </div>
 
         <div class="pill">
-            Autonomous Queue
+            Автономная очередь
         </div>
     </div>
 
@@ -1055,7 +1061,7 @@ async function loadA3AutonomousActions() {
         if (!items.length) {
             container.innerHTML = `
                 <div class="pill">
-                    No autonomous actions queued
+                    Очередь автономных действий пуста
                 </div>
             `;
             return;
@@ -1114,7 +1120,7 @@ async function loadA3AutonomousActions() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Autonomous actions load failed", err);
+        console.error("Autonomous actions load ошибка", err);
     }
 }
 
@@ -1126,22 +1132,22 @@ setInterval(loadA3AutonomousActions, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Autonomous Execution</h2>
+            <h2 style="margin-bottom:8px">A3 Автономное выполнение</h2>
             <div class="meta">
-                Execute queued AI operational actions и autonomous recovery tasks.
+                Выполнение AI-действий и задач восстановления.
             </div>
         </div>
 
         <button id="a3-process-autonomous-actions"
                 class="btn">
-            Process Autonomous Actions
+            Выполнить AI-действия
         </button>
     </div>
 
     <div id="a3-autonomous-execution-status"
          style="margin-top:18px">
         <div class="pill">
-            Waiting for execution
+            Ожидание запуска
         </div>
     </div>
 </div>
@@ -1153,11 +1159,11 @@ async function processA3AutonomousActions() {
 
     try {
         button.disabled = true;
-        button.textContent = "Processing...";
+        button.textContent = "Обработка...";
 
         status.innerHTML = `
             <div class="pill">
-                Autonomous execution engine running...
+                Запущен AI-движок выполнения...
             </div>
         `;
 
@@ -1175,11 +1181,11 @@ async function processA3AutonomousActions() {
         status.innerHTML = `
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <div class="pill">
-                    Processed actions: ${result.processed || 0}
+                    Обработано действий: ${result.processed || 0}
                 </div>
 
                 <div class="pill">
-                    Autonomous execution complete
+                    AI-выполнение завершено
                 </div>
             </div>
         `;
@@ -1193,12 +1199,12 @@ async function processA3AutonomousActions() {
 
         status.innerHTML = `
             <div class="pill off">
-                Autonomous execution failed
+                Ошибка AI-выполнения
             </div>
         `;
     } finally {
         button.disabled = false;
-        button.textContent = "Process Autonomous Actions";
+        button.textContent = "Выполнить AI-действия";
     }
 }
 
@@ -1211,14 +1217,14 @@ document
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
-            <h2 style="margin-bottom:8px">A3 Governance</h2>
+            <h2 style="margin-bottom:8px">A3 Управление ИИ</h2>
             <div class="meta">
-                Autonomous safety controls и operational governance layer.
+                Контроль безопасности и управление автономным ИИ.
             </div>
         </div>
 
         <div class="pill">
-            AI Safety Controls
+            Контроль безопасности
         </div>
     </div>
 
@@ -1228,7 +1234,7 @@ document
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:20px">
         <label style="display:flex;flex-direction:column;gap:8px">
-            <span class="meta">Confidence threshold</span>
+            <span class="meta">Порог уверенности</span>
 
             <input
                 id="a3-governance-confidence"
@@ -1241,7 +1247,7 @@ document
         </label>
 
         <label style="display:flex;flex-direction:column;gap:8px">
-            <span class="meta">Max actions / cycle</span>
+            <span class="meta">Макс. действий / цикл</span>
 
             <input
                 id="a3-governance-max-actions"
@@ -1257,17 +1263,17 @@ document
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
         <button id="a3-toggle-autonomous-mode"
                 class="btn">
-            Toggle Autonomous Mode
+            Переключить автономный режим
         </button>
 
         <button id="a3-toggle-critical-approval"
                 class="btn">
-            Toggle Critical Approval
+            Переключить критическое подтверждение
         </button>
 
         <button id="a3-save-governance"
                 class="btn btn-primary">
-            Save Governance Settings
+            Сохранить настройки
         </button>
     </div>
 
@@ -1296,19 +1302,19 @@ async function loadA3GovernanceSettings() {
 
         const items = [
             [
-                "Autonomous Mode",
-                data.autonomous_enabled ? "Enabled" : "Disabled"
+                "Автономный режим",
+                data.autonomous_enabled ? "Включен" : "Выключен"
             ],
             [
-                "Critical Approval",
-                data.require_critical_approval ? "Required" : "Disabled"
+                "Критическое подтверждение",
+                data.require_critical_approval ? "Требуется" : "Выключен"
             ],
             [
-                "Confidence Threshold",
+                "Порог уверенности",
                 (data.confidence_threshold || 0) + "%"
             ],
             [
-                "Max Actions / Cycle",
+                "Макс. действий / цикл",
                 data.max_actions_per_cycle || 0
             ]
         ];
@@ -1334,7 +1340,7 @@ async function loadA3GovernanceSettings() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Governance settings load failed", err);
+        console.error("Governance settings load ошибка", err);
     }
 }
 
@@ -1601,10 +1607,7 @@ setInterval(loadA3GovernanceSettings, 30000);
 </div>
 
 {% include 'mobile_nav.html' %}
-</body>
-</html>
-
-
+<script>
 async function saveA3GovernanceSettings() {
     try {
         const current = window.a3GovernanceState || {};
@@ -1635,7 +1638,7 @@ async function saveA3GovernanceSettings() {
 
         document.getElementById("a3-governance-save-status").innerHTML = `
             <div class="pill">
-                Governance settings updated
+                Настройки сохранены
             </div>
         `;
 
@@ -1646,7 +1649,7 @@ async function saveA3GovernanceSettings() {
 
         document.getElementById("a3-governance-save-status").innerHTML = `
             <div class="pill off">
-                Governance update failed
+                Ошибка сохранения
             </div>
         `;
     }
@@ -1673,3 +1676,6 @@ document
 
         saveA3GovernanceSettings();
     });
+</script>
+</body>
+</html>

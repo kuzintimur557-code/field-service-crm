@@ -1,3 +1,4 @@
+import time
 from app.services.system_health import SystemHealthCalculator
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
@@ -14564,6 +14565,26 @@ def enqueue_autonomous_action(
     conn = connect()
     c = conn.cursor()
 
+    existing = c.execute("""
+        SELECT id
+        FROM autonomous_action_queue
+        WHERE company_id=?
+          AND action_type=?
+          AND target_type=?
+          AND COALESCE(target_id, 0)=COALESCE(?, 0)
+          AND status IN ('pending', 'awaiting_approval')
+        LIMIT 1
+    """, (
+        company_id,
+        action_type,
+        target_type,
+        target_id,
+    )).fetchone()
+
+    if existing:
+        conn.close()
+        return existing["id"]
+
     c.execute("""
         INSERT INTO autonomous_action_queue (
             company_id,
@@ -14583,7 +14604,10 @@ def enqueue_autonomous_action(
     ))
 
     conn.commit()
+    action_id = c.lastrowid
     conn.close()
+
+    return action_id
 
 
 def create_ops_timeline_event(
@@ -14650,24 +14674,60 @@ def save_system_health_snapshot(company_id, data):
     conn.close()
 
 
+def get_a3_company_id(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return None
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return None
+
+    return get_user_company_id(username)
+
+
 @app.get("/api/a3/system-health")
-def api_a3_system_health():
-    rules = []
-    events = []
+def api_a3_system_health(request: Request):
+    company_id = get_a3_company_id(request)
 
-    if "automation_rules" in globals():
-        rules = automation_rules
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    if "automation_events" in globals():
-        events = automation_events
+    conn = connect()
+    c = conn.cursor()
+
+    rules = c.execute("""
+        SELECT
+            automation_rules.*,
+            MAX(automation_events.created_at) AS last_run_at
+        FROM automation_rules
+        LEFT JOIN automation_events
+          ON automation_events.rule_id=automation_rules.id
+          AND automation_events.company_id=automation_rules.company_id
+        WHERE automation_rules.company_id=?
+        GROUP BY automation_rules.id
+    """, (company_id,)).fetchall()
+
+    events = c.execute("""
+        SELECT *
+        FROM automation_events
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 500
+    """, (company_id,)).fetchall()
+
+    conn.close()
 
     result = SystemHealthCalculator(rules=rules, events=events).calculate()
     data = result.to_dict()
 
-    if "unhealthy_rules" in globals():
-        data["unhealthy_rules_count"] = len(unhealthy_rules)
-    else:
-        data["unhealthy_rules_count"] = 0
+    data["unhealthy_rules_count"] = (
+        data.get("disabled_rules_count", 0)
+        + data.get("stale_rules_count", 0)
+        + data.get("retry_risk_count", 0)
+    )
 
     if data["status"] == "healthy":
         data["status_title"] = "System Healthy"
@@ -14682,13 +14742,11 @@ def api_a3_system_health():
         data["status_title"] = "System Critical"
         data["status_message"] = "Automation engine requires immediate attention."
 
-    snapshot_company_id = locals().get("company_id", 1)
-
-    save_system_health_snapshot(snapshot_company_id, data)
+    save_system_health_snapshot(company_id, data)
 
     if data["status"] in {"degraded", "critical"}:
         create_ops_timeline_event(
-            company_id=snapshot_company_id,
+            company_id=company_id,
             event_type="system_health",
             severity=data["status"],
             title="Automation health degraded",
@@ -14699,8 +14757,11 @@ def api_a3_system_health():
 
 
 @app.get("/api/a3/system-health/history")
-def api_a3_system_health_history():
-    snapshot_company_id = 1
+def api_a3_system_health_history(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -14719,7 +14780,7 @@ def api_a3_system_health_history():
         WHERE company_id=?
         ORDER BY id DESC
         LIMIT 30
-    """, (snapshot_company_id,)).fetchall()
+    """, (company_id,)).fetchall()
     conn.close()
 
     return {
@@ -14728,8 +14789,11 @@ def api_a3_system_health_history():
 
 
 @app.get("/api/a3/automation-analytics")
-def api_a3_automation_analytics():
-    company_id = 1
+def api_a3_automation_analytics(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -14799,8 +14863,11 @@ def api_a3_automation_analytics():
 
 
 @app.get("/api/a3/unhealthy-rules")
-def api_a3_unhealthy_rules():
-    company_id = 1
+def api_a3_unhealthy_rules(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -14935,8 +15002,11 @@ def run_self_healing_cycle(company_id=1):
 
 
 @app.get("/api/a3/operations-insights")
-def api_a3_operations_insights():
-    company_id = 1
+def api_a3_operations_insights(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -15012,8 +15082,13 @@ def api_a3_operations_insights():
 
 
 @app.post("/api/a3/self-healing/run")
-def api_a3_self_healing_run():
-    result = run_self_healing_cycle(company_id=1)
+def api_a3_self_healing_run(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    result = run_self_healing_cycle(company_id=company_id)
 
     return {
         "ok": True,
@@ -15022,8 +15097,11 @@ def api_a3_self_healing_run():
 
 
 @app.get("/api/a3/recovery-history")
-def api_a3_recovery_history():
-    company_id = 1
+def api_a3_recovery_history(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -15049,8 +15127,11 @@ def api_a3_recovery_history():
 
 
 @app.get("/api/a3/ops-timeline")
-def api_a3_ops_timeline():
-    company_id = 1
+def api_a3_ops_timeline(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -15076,8 +15157,11 @@ def api_a3_ops_timeline():
 
 
 @app.get("/api/a3/predictive-signals")
-def api_a3_predictive_signals():
-    company_id = 1
+def api_a3_predictive_signals(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -15166,8 +15250,11 @@ def api_a3_predictive_signals():
 
 
 @app.get("/api/a3/decision-engine")
-def api_a3_decision_engine():
-    company_id = 1
+def api_a3_decision_engine(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -15249,8 +15336,11 @@ def api_a3_decision_engine():
 
 
 @app.get("/api/a3/autonomous-actions")
-def api_a3_autonomous_actions():
-    company_id = 1
+def api_a3_autonomous_actions(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -15278,8 +15368,13 @@ def api_a3_autonomous_actions():
 
 
 @app.post("/api/a3/autonomous-actions/process")
-def api_a3_process_autonomous_actions():
-    result = process_autonomous_actions(company_id=1)
+def api_a3_process_autonomous_actions(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    result = process_autonomous_actions(company_id=company_id)
 
     return {
         "ok": True,
@@ -15288,8 +15383,11 @@ def api_a3_process_autonomous_actions():
 
 
 @app.get("/api/a3/governance-settings")
-def api_a3_governance_settings():
-    company_id = 1
+def api_a3_governance_settings(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -15339,8 +15437,11 @@ def api_a3_governance_settings():
 
 
 @app.post("/api/a3/governance-settings/update")
-def api_a3_governance_settings_update(request: Request):
-    company_id = 1
+async def api_a3_governance_settings_update(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     conn = connect()
     c = conn.cursor()
@@ -15348,7 +15449,7 @@ def api_a3_governance_settings_update(request: Request):
     payload = {}
 
     try:
-        payload = request.json()
+        payload = await request.json()
     except Exception:
         pass
 
