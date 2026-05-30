@@ -179,6 +179,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         </div>
 
         <div>
+            <div id="a3-health-breakdown"
+                 style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
+            </div>
+
             <div id="a3-health-warning-list"
                  style="display:flex;flex-direction:column;gap:10px">
                 <div class="pill">System healthy</div>
@@ -215,6 +219,27 @@ async function loadA3SystemHealth() {
         badgeEl.style.background = badgeColor;
         badgeEl.style.color = badgeText;
         badgeEl.textContent = data.status.toUpperCase();
+
+        const breakdownEl = document.getElementById("a3-health-breakdown");
+        breakdownEl.innerHTML = "";
+
+        const breakdownItems = [
+            ["Execution", data.execution_health],
+            ["Skipped", data.skipped_health],
+            ["Automation", data.automation_health],
+            ["Stale", data.stale_health],
+            ["Retry", data.retry_health],
+        ];
+
+        for (const [label, value] of breakdownItems) {
+            const item = document.createElement("div");
+            item.style.padding = "12px";
+            item.style.borderRadius = "16px";
+            item.style.background = "#f9fafb";
+            item.style.border = "1px solid #e5e7eb";
+            item.innerHTML = `<div style="font-weight:900;color:#6b7280;font-size:12px">${label}</div><div style="font-weight:900;font-size:22px;margin-top:4px">${value}</div>`;
+            breakdownEl.appendChild(item);
+        }
 
         warningsEl.innerHTML = "";
 

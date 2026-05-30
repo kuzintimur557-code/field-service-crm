@@ -11,6 +11,12 @@ class SystemHealthResult:
     disabled_rules_count: int
     stale_rules_count: int
     retry_risk_count: int
+
+    execution_health: int
+    skipped_health: int
+    automation_health: int
+    stale_health: int
+    retry_health: int
     warnings: list[str]
     critical: list[str]
     recommendations: list[str]
@@ -78,6 +84,12 @@ class SystemHealthCalculator:
 
         score = max(0, min(100, 100 - penalty))
 
+        execution_health = max(0, 100 - min(30, failed_count * 5))
+        skipped_health = max(0, 100 - min(20, skipped_count * 2))
+        automation_health = max(0, 100 - min(15, disabled_rules_count * 2))
+        stale_health = max(0, 100 - min(15, stale_rules_count * 2))
+        retry_health = max(0, 100 - min(20, retry_risk_count * 4))
+
         warnings = []
         critical = []
 
@@ -130,6 +142,13 @@ class SystemHealthCalculator:
             disabled_rules_count=disabled_rules_count,
             stale_rules_count=stale_rules_count,
             retry_risk_count=retry_risk_count,
+
+            execution_health=execution_health,
+            skipped_health=skipped_health,
+            automation_health=automation_health,
+            stale_health=stale_health,
+            retry_health=retry_health,
+
             warnings=warnings,
             critical=critical,
             recommendations=recommendations,
