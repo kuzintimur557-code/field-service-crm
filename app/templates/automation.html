@@ -616,6 +616,94 @@ document
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Recovery History</h2>
+            <div class="meta">
+                Autonomous recovery execution history и repair operations.
+            </div>
+        </div>
+
+        <div class="pill">
+            Recovery Logs
+        </div>
+    </div>
+
+    <div id="a3-recovery-history"
+         style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
+    </div>
+</div>
+
+<script>
+async function loadA3RecoveryHistory() {
+    try {
+        const response = await fetch("/api/a3/recovery-history");
+        const data = await response.json();
+
+        const container = document.getElementById("a3-recovery-history");
+
+        container.innerHTML = "";
+
+        const items = data.items || [];
+
+        if (!items.length) {
+            container.innerHTML = `
+                <div class="pill">
+                    No recovery runs yet
+                </div>
+            `;
+            return;
+        }
+
+        for (const item of items.slice(0, 8)) {
+            const card = document.createElement("div");
+
+            card.style.padding = "16px";
+            card.style.borderRadius = "18px";
+            card.style.background = "#f9fafb";
+            card.style.border = "1px solid #e5e7eb";
+
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                    <div>
+                        <div style="font-weight:900">
+                            ${item.status.toUpperCase()}
+                        </div>
+
+                        <div class="meta" style="margin-top:4px">
+                            ${item.created_at}
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:12px;flex-wrap:wrap">
+                        <div class="pill">
+                            Retried: ${item.retried_events}
+                        </div>
+
+                        <div class="pill">
+                            Re-enabled: ${item.reenabled_rules}
+                        </div>
+
+                        <div class="pill">
+                            ${item.duration_ms} ms
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+    } catch (err) {
+        console.error("Recovery history load failed", err);
+    }
+}
+
+loadA3RecoveryHistory();
+setInterval(loadA3RecoveryHistory, 30000);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 <form method="post" action="/automation/rules">
