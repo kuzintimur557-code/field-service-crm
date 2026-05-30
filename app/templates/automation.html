@@ -361,6 +361,107 @@ setInterval(loadA3SystemHealth, 30000);
 </div>
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Automation Analytics</h2>
+            <div class="meta">
+                Execution volume, success rate и operational activity.
+            </div>
+        </div>
+
+        <div style="text-align:right">
+            <div id="a3-analytics-success-rate"
+                 style="font-size:42px;font-weight:900">
+                100%
+            </div>
+            <div class="meta">Success rate</div>
+        </div>
+    </div>
+
+    <div id="a3-analytics-stats"
+         style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:20px">
+    </div>
+
+    <div style="margin-top:20px">
+        <div class="meta" style="margin-bottom:8px">Daily execution trend</div>
+
+        <div id="a3-analytics-trend"
+             style="display:flex;gap:6px;align-items:end;height:70px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:10px">
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadA3Analytics() {
+    try {
+        const response = await fetch("/api/a3/automation-analytics");
+        const data = await response.json();
+
+        document.getElementById("a3-analytics-success-rate").textContent =
+            data.success_rate + "%";
+
+        const statsEl = document.getElementById("a3-analytics-stats");
+
+        statsEl.innerHTML = "";
+
+        const stats = [
+            ["Events", data.events_total],
+            ["Done", data.done_total],
+            ["Skipped", data.skipped_total],
+            ["Failed", data.failed_total],
+            ["Pending", data.pending_total],
+        ];
+
+        for (const [label, value] of stats) {
+            const card = document.createElement("div");
+
+            card.style.padding = "14px";
+            card.style.borderRadius = "18px";
+            card.style.background = "#f9fafb";
+            card.style.border = "1px solid #e5e7eb";
+
+            card.innerHTML = `
+                <div style="font-size:12px;font-weight:900;color:#6b7280">
+                    ${label}
+                </div>
+
+                <div style="font-size:28px;font-weight:900;margin-top:6px">
+                    ${value}
+                </div>
+            `;
+
+            statsEl.appendChild(card);
+        }
+
+        const trendEl = document.getElementById("a3-analytics-trend");
+
+        trendEl.innerHTML = "";
+
+        for (const item of (data.daily || []).slice(-14)) {
+            const total = item.total || 0;
+
+            const bar = document.createElement("div");
+
+            bar.style.width = "14px";
+            bar.style.height = Math.max(8, total * 3) + "px";
+            bar.style.borderRadius = "999px";
+            bar.style.background = "#2563eb";
+
+            bar.title = `${item.day} / ${total} events`;
+
+            trendEl.appendChild(bar);
+        }
+    } catch (err) {
+        console.error("Analytics load failed", err);
+    }
+}
+
+loadA3Analytics();
+setInterval(loadA3Analytics, 30000);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 <form method="post" action="/automation/rules">
