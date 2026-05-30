@@ -14451,4 +14451,11 @@ def api_a3_system_health():
         events = automation_events
 
     result = SystemHealthCalculator(rules=rules, events=events).calculate()
-    return result.to_dict()
+    data = result.to_dict()
+
+    if "unhealthy_rules" in globals():
+        data["unhealthy_rules_count"] = len(unhealthy_rules)
+    else:
+        data["unhealthy_rules_count"] = 0
+
+    return data
