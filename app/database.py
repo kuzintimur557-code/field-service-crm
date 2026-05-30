@@ -355,6 +355,18 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS ops_timeline_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'info',
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS self_healing_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -630,6 +642,12 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_system_health_snapshots_company_created
     ON system_health_snapshots(company_id, created_at)
+    """)
+
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_ops_timeline_events_company_created
+    ON ops_timeline_events(company_id, created_at)
     """)
 
     c.execute("""
