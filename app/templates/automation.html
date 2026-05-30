@@ -910,6 +910,118 @@ setInterval(loadA3PredictiveSignals, 30000);
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Decision Engine</h2>
+            <div class="meta">
+                Autonomous operational recommendations и confidence scoring.
+            </div>
+        </div>
+
+        <div class="pill">
+            Autonomous Decisions
+        </div>
+    </div>
+
+    <div id="a3-decision-engine"
+         style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
+    </div>
+</div>
+
+<script>
+async function loadA3DecisionEngine() {
+    try {
+        const response = await fetch("/api/a3/decision-engine");
+        const data = await response.json();
+
+        const container = document.getElementById("a3-decision-engine");
+
+        container.innerHTML = "";
+
+        const items = data.items || [];
+
+        if (!items.length) {
+            container.innerHTML = `
+                <div class="pill">
+                    No decision insights available
+                </div>
+            `;
+            return;
+        }
+
+        for (const item of items.slice(0, 10)) {
+            const card = document.createElement("div");
+
+            let bg = "#f9fafb";
+            let border = "#e5e7eb";
+
+            if (item.recommendation === "retry_recommended") {
+                bg = "#fef3c7";
+                border = "#fde68a";
+            }
+
+            if (item.recommendation === "investigate_rule") {
+                bg = "#ffedd5";
+                border = "#fdba74";
+            }
+
+            if (item.recommendation === "disable_rule") {
+                bg = "#fee2e2";
+                border = "#fecaca";
+            }
+
+            card.style.padding = "16px";
+            card.style.borderRadius = "18px";
+            card.style.background = bg;
+            card.style.border = "1px solid " + border;
+
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                    <div>
+                        <div style="font-weight:900;font-size:15px">
+                            ${item.rule_name || "Unnamed rule"}
+                        </div>
+
+                        <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
+                            <div class="pill">
+                                Confidence: ${item.confidence_score}%
+                            </div>
+
+                            <div class="pill">
+                                Failed: ${item.failed_events}
+                            </div>
+
+                            <div class="pill">
+                                Skipped: ${item.skipped_events}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="text-align:right">
+                        <div class="pill">
+                            ${item.recommendation}
+                        </div>
+
+                        <div class="meta" style="margin-top:8px">
+                            ${item.total_events} events
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+    } catch (err) {
+        console.error("Decision engine load failed", err);
+    }
+}
+
+loadA3DecisionEngine();
+setInterval(loadA3DecisionEngine, 30000);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 
