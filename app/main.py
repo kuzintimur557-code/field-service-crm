@@ -14608,3 +14608,57 @@ def api_a3_automation_analytics():
         "success_rate": success_rate,
         "daily": list(daily_map.values()),
     }
+
+
+@app.get("/api/a3/unhealthy-rules")
+def api_a3_unhealthy_rules():
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT
+            automation_rules.*,
+            COUNT(automation_actions.id) AS action_count
+        FROM automation_rules
+        LEFT JOIN automation_actions
+          ON automation_actions.rule_id=automation_rules.id
+          AND automation_actions.company_id=automation_rules.company_id
+        WHERE automation_rules.company_id=?
+        GROUP BY automation_rules.id
+        ORDER BY automation_rules.id DESC
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    items = []
+
+    for row in rows:
+        rule = dict(row)
+
+        issues = []
+
+        if not rule.get("enabled", 1):
+            issues.append("Rule disabled")
+
+        if not rule.get("action_count"):
+            issues.append("No actions configured")
+
+        if (rule.get("success_rate") or 100) < 60:
+            issues.append("Low success rate")
+
+        if (rule.get("skipped_runs") or 0) >= 5:
+            issues.append("High skipped executions")
+
+        if issues:
+            items.append({
+                "id": rule.get("id"),
+                "name": rule.get("name"),
+                "issues": issues,
+            })
+
+    return {
+        "count": len(items),
+        "items": items[:20],
+    }
