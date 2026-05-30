@@ -14664,6 +14664,57 @@ def api_a3_unhealthy_rules():
     }
 
 
+
+def run_self_healing_cycle(company_id=1):
+    conn = connect()
+    c = conn.cursor()
+
+    retried_events = 0
+    reenabled_rules = 0
+
+    skipped_events = c.execute("""
+        SELECT id
+        FROM automation_events
+        WHERE company_id=?
+          AND status='skipped'
+        ORDER BY id DESC
+        LIMIT 10
+    """, (company_id,)).fetchall()
+
+    for row in skipped_events:
+        c.execute("""
+            UPDATE automation_events
+            SET status='pending'
+            WHERE id=?
+        """, (row["id"],))
+        retried_events += 1
+
+    disabled_rules = c.execute("""
+        SELECT id
+        FROM automation_rules
+        WHERE company_id=?
+          AND active=0
+        ORDER BY id DESC
+        LIMIT 5
+    """, (company_id,)).fetchall()
+
+    for row in disabled_rules:
+        c.execute("""
+            UPDATE automation_rules
+            SET active=1
+            WHERE id=?
+        """, (row["id"],))
+        reenabled_rules += 1
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "retried_events": retried_events,
+        "reenabled_rules": reenabled_rules,
+    }
+
+
 @app.get("/api/a3/operations-insights")
 def api_a3_operations_insights():
     company_id = 1
@@ -14738,4 +14789,14 @@ def api_a3_operations_insights():
     return {
         "count": len(insights),
         "items": insights,
+    }
+
+
+@app.post("/api/a3/self-healing/run")
+def api_a3_self_healing_run():
+    result = run_self_healing_cycle(company_id=1)
+
+    return {
+        "ok": True,
+        "result": result,
     }
