@@ -1,3 +1,4 @@
+from app.services.system_health import SystemHealthCalculator
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -14413,3 +14414,18 @@ async def task_pdf(request: Request, task_id: int):
         media_type="application/pdf",
         filename=f"task_{task_id}_act.pdf"
     )
+
+
+@app.get("/api/a3/system-health")
+def api_a3_system_health():
+    rules = []
+    events = []
+
+    if "automation_rules" in globals():
+        rules = automation_rules
+
+    if "automation_events" in globals():
+        events = automation_events
+
+    result = SystemHealthCalculator(rules=rules, events=events).calculate()
+    return result.to_dict()

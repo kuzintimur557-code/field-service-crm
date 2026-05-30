@@ -3865,6 +3865,13 @@ def main():
         asyncio.run(assert_task_custom_fields())
         asyncio.run(assert_required_custom_fields())
         assert_company_features()
+
+
+        data = crm.api_a3_system_health()
+        assert "score" in data
+        assert 0 <= data["score"] <= 100
+        assert data["status"] in {"healthy", "warning", "critical"}
+
         print("Smoke checks passed.")
     finally:
         TEMP_DATA.cleanup()
