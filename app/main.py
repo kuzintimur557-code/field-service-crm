@@ -14439,6 +14439,39 @@ async def task_pdf(request: Request, task_id: int):
     )
 
 
+
+def create_ops_timeline_event(
+    company_id,
+    event_type,
+    severity,
+    title,
+    message,
+):
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+        INSERT INTO ops_timeline_events (
+            company_id,
+            event_type,
+            severity,
+            title,
+            message,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        event_type,
+        severity,
+        title,
+        message,
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 def save_system_health_snapshot(company_id, data):
     conn = connect()
     c = conn.cursor()
@@ -14506,6 +14539,15 @@ def api_a3_system_health():
     snapshot_company_id = locals().get("company_id", 1)
 
     save_system_health_snapshot(snapshot_company_id, data)
+
+    if data["status"] in {"degraded", "critical"}:
+        create_ops_timeline_event(
+            company_id=snapshot_company_id,
+            event_type="system_health",
+            severity=data["status"],
+            title="Automation health degraded",
+            message=data.get("status_message", ""),
+        )
 
     return data
 
@@ -14730,6 +14772,14 @@ def run_self_healing_cycle(company_id=1):
 
     conn.commit()
     conn.close()
+
+    create_ops_timeline_event(
+        company_id=company_id,
+        event_type="self_healing",
+        severity="info",
+        title="Self-healing cycle completed",
+        message=f"Retried {retried_events} events and re-enabled {reenabled_rules} rules.",
+    )
 
     return {
         "retried_events": retried_events,
