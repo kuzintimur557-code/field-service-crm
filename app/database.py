@@ -355,6 +355,19 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS autonomous_governance_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        autonomous_enabled INTEGER NOT NULL DEFAULT 1,
+        max_actions_per_cycle INTEGER NOT NULL DEFAULT 20,
+        require_critical_approval INTEGER NOT NULL DEFAULT 1,
+        confidence_threshold INTEGER NOT NULL DEFAULT 70,
+        protected_rules_json TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS autonomous_action_queue (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -668,6 +681,12 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_autonomous_action_queue_company_status
     ON autonomous_action_queue(company_id, status, created_at)
+    """)
+
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_autonomous_governance_company
+    ON autonomous_governance_settings(company_id)
     """)
 
     c.execute("""
