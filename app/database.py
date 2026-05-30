@@ -355,6 +355,18 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS self_healing_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        retried_events INTEGER NOT NULL DEFAULT 0,
+        reenabled_rules INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'done',
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS system_health_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
