@@ -539,6 +539,83 @@ setInterval(loadA3OperationsInsights, 30000);
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Self-Healing</h2>
+            <div class="meta">
+                Autonomous retry, recovery и automation repair operations.
+            </div>
+        </div>
+
+        <button id="a3-run-self-healing"
+                class="btn">
+            Run Self-Healing
+        </button>
+    </div>
+
+    <div id="a3-self-healing-status"
+         style="margin-top:18px">
+        <div class="pill">
+            Waiting for execution
+        </div>
+    </div>
+</div>
+
+<script>
+async function runA3SelfHealing() {
+    const button = document.getElementById("a3-run-self-healing");
+    const status = document.getElementById("a3-self-healing-status");
+
+    try {
+        button.disabled = true;
+        button.textContent = "Running...";
+
+        status.innerHTML = `
+            <div class="pill">
+                Self-healing cycle running...
+            </div>
+        `;
+
+        const response = await fetch("/api/a3/self-healing/run", {
+            method: "POST"
+        });
+
+        const data = await response.json();
+
+        const result = data.result || {};
+
+        status.innerHTML = `
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <div class="pill">
+                    Retried events: ${result.retried_events || 0}
+                </div>
+
+                <div class="pill">
+                    Re-enabled rules: ${result.reenabled_rules || 0}
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        console.error(err);
+
+        status.innerHTML = `
+            <div class="pill off">
+                Self-healing execution failed
+            </div>
+        `;
+    } finally {
+        button.disabled = false;
+        button.textContent = "Run Self-Healing";
+    }
+}
+
+document
+    .getElementById("a3-run-self-healing")
+    .addEventListener("click", runA3SelfHealing);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 <form method="post" action="/automation/rules">
