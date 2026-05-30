@@ -223,7 +223,9 @@ async function loadA3SystemHealth() {
             ...(data.warnings || []),
         ];
 
-        if (!issues.length) {
+        const recommendations = data.recommendations || [];
+
+        if (!issues.length && !recommendations.length) {
             warningsEl.innerHTML =
                 '<div class="pill">System healthy</div>';
         } else {
@@ -233,6 +235,17 @@ async function loadA3SystemHealth() {
                 div.style.display = "block";
                 div.style.marginBottom = "8px";
                 div.textContent = issue;
+                warningsEl.appendChild(div);
+            }
+
+            for (const recommendation of recommendations) {
+                const div = document.createElement("div");
+                div.className = "pill";
+                div.style.display = "block";
+                div.style.marginBottom = "8px";
+                div.style.background = "#eef2ff";
+                div.style.color = "#3730a3";
+                div.textContent = "AI: " + recommendation;
                 warningsEl.appendChild(div);
             }
         }

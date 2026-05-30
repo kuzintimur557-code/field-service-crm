@@ -13,6 +13,7 @@ class SystemHealthResult:
     retry_risk_count: int
     warnings: list[str]
     critical: list[str]
+    recommendations: list[str]
 
     def to_dict(self):
         return asdict(self)
@@ -95,6 +96,26 @@ class SystemHealthCalculator:
         if retry_risk_count:
             critical.append(f"{retry_risk_count} events with high retry count")
 
+        recommendations = []
+
+        if failed_count:
+            recommendations.append("Review failed automation events and inspect rule detail logs.")
+
+        if skipped_count:
+            recommendations.append("Check skipped events and retry valid skipped automations.")
+
+        if disabled_rules_count:
+            recommendations.append("Review disabled rules and re-enable business-critical automations.")
+
+        if stale_rules_count:
+            recommendations.append("Inspect stale rules that have not executed for more than 7 days.")
+
+        if retry_risk_count:
+            recommendations.append("Investigate high retry events and broken automation chains.")
+
+        if not recommendations:
+            recommendations.append("No action required. Automation system is operating normally.")
+
         status = "healthy"
         if score < 70:
             status = "warning"
@@ -111,4 +132,5 @@ class SystemHealthCalculator:
             retry_risk_count=retry_risk_count,
             warnings=warnings,
             critical=critical,
+            recommendations=recommendations,
         )
