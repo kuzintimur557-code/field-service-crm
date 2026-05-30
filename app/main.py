@@ -14900,3 +14900,30 @@ def api_a3_recovery_history():
     return {
         "items": [dict(row) for row in rows]
     }
+
+
+@app.get("/api/a3/ops-timeline")
+def api_a3_ops_timeline():
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT
+            event_type,
+            severity,
+            title,
+            message,
+            created_at
+        FROM ops_timeline_events
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 50
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    return {
+        "items": [dict(row) for row in rows]
+    }
