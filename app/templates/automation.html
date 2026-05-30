@@ -1124,6 +1124,91 @@ setInterval(loadA3AutonomousActions, 30000);
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Autonomous Execution</h2>
+            <div class="meta">
+                Execute queued AI operational actions и autonomous recovery tasks.
+            </div>
+        </div>
+
+        <button id="a3-process-autonomous-actions"
+                class="btn">
+            Process Autonomous Actions
+        </button>
+    </div>
+
+    <div id="a3-autonomous-execution-status"
+         style="margin-top:18px">
+        <div class="pill">
+            Waiting for execution
+        </div>
+    </div>
+</div>
+
+<script>
+async function processA3AutonomousActions() {
+    const button = document.getElementById("a3-process-autonomous-actions");
+    const status = document.getElementById("a3-autonomous-execution-status");
+
+    try {
+        button.disabled = true;
+        button.textContent = "Processing...";
+
+        status.innerHTML = `
+            <div class="pill">
+                Autonomous execution engine running...
+            </div>
+        `;
+
+        const response = await fetch(
+            "/api/a3/autonomous-actions/process",
+            {
+                method: "POST"
+            }
+        );
+
+        const data = await response.json();
+
+        const result = data.result || {};
+
+        status.innerHTML = `
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <div class="pill">
+                    Processed actions: ${result.processed || 0}
+                </div>
+
+                <div class="pill">
+                    Autonomous execution complete
+                </div>
+            </div>
+        `;
+
+        if (window.loadA3AutonomousActions) {
+            loadA3AutonomousActions();
+        }
+
+    } catch (err) {
+        console.error(err);
+
+        status.innerHTML = `
+            <div class="pill off">
+                Autonomous execution failed
+            </div>
+        `;
+    } finally {
+        button.disabled = false;
+        button.textContent = "Process Autonomous Actions";
+    }
+}
+
+document
+    .getElementById("a3-process-autonomous-actions")
+    .addEventListener("click", processA3AutonomousActions);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 
