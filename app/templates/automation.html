@@ -1022,6 +1022,108 @@ setInterval(loadA3DecisionEngine, 30000);
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Autonomous Actions</h2>
+            <div class="meta">
+                AI-generated autonomous operational actions queue.
+            </div>
+        </div>
+
+        <div class="pill">
+            Autonomous Queue
+        </div>
+    </div>
+
+    <div id="a3-autonomous-actions"
+         style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
+    </div>
+</div>
+
+<script>
+async function loadA3AutonomousActions() {
+    try {
+        const response = await fetch("/api/a3/autonomous-actions");
+        const data = await response.json();
+
+        const container = document.getElementById("a3-autonomous-actions");
+
+        container.innerHTML = "";
+
+        const items = data.items || [];
+
+        if (!items.length) {
+            container.innerHTML = `
+                <div class="pill">
+                    No autonomous actions queued
+                </div>
+            `;
+            return;
+        }
+
+        for (const item of items.slice(0, 12)) {
+            const card = document.createElement("div");
+
+            let bg = "#f9fafb";
+            let border = "#e5e7eb";
+
+            if (item.action_type.includes("retry")) {
+                bg = "#fef3c7";
+                border = "#fde68a";
+            }
+
+            if (item.action_type.includes("disable")) {
+                bg = "#fee2e2";
+                border = "#fecaca";
+            }
+
+            if (item.action_type.includes("recovery")) {
+                bg = "#dbeafe";
+                border = "#bfdbfe";
+            }
+
+            card.style.padding = "16px";
+            card.style.borderRadius = "18px";
+            card.style.background = bg;
+            card.style.border = "1px solid " + border;
+
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                    <div>
+                        <div style="font-weight:900;font-size:15px">
+                            ${item.action_type}
+                        </div>
+
+                        <div style="margin-top:6px;color:#374151">
+                            Target: ${item.target_type} #${item.target_id || "-"}
+                        </div>
+                    </div>
+
+                    <div style="text-align:right">
+                        <div class="pill">
+                            ${item.status}
+                        </div>
+
+                        <div class="meta" style="margin-top:8px">
+                            ${item.created_at}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+    } catch (err) {
+        console.error("Autonomous actions load failed", err);
+    }
+}
+
+loadA3AutonomousActions();
+setInterval(loadA3AutonomousActions, 30000);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 
