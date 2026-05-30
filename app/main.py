@@ -14446,14 +14446,42 @@ def process_autonomous_actions(company_id=1):
     conn = connect()
     c = conn.cursor()
 
+    governance = c.execute("""
+        SELECT *
+        FROM autonomous_governance_settings
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (company_id,)).fetchone()
+
+    autonomous_enabled = 1
+    max_actions_per_cycle = 20
+    require_critical_approval = 1
+    confidence_threshold = 70
+
+    if governance:
+        autonomous_enabled = governance["autonomous_enabled"]
+        max_actions_per_cycle = governance["max_actions_per_cycle"]
+        require_critical_approval = governance["require_critical_approval"]
+        confidence_threshold = governance["confidence_threshold"]
+
+    if not autonomous_enabled:
+        conn.close()
+
+        return {
+            "processed": 0,
+            "blocked": True,
+            "reason": "autonomous_disabled",
+        }
+
     rows = c.execute("""
         SELECT *
         FROM autonomous_action_queue
         WHERE company_id=?
           AND status='pending'
         ORDER BY id ASC
-        LIMIT 20
-    """, (company_id,)).fetchall()
+        LIMIT ?
+    """, (company_id, max_actions_per_cycle)).fetchall()
 
     processed = 0
 
@@ -14462,6 +14490,22 @@ def process_autonomous_actions(company_id=1):
         target_id = row["target_id"]
 
         try:
+            if (
+                require_critical_approval
+                and action_type == "disable_rule"
+            ):
+                c.execute("""
+                    UPDATE autonomous_action_queue
+                    SET status='awaiting_approval',
+                        processed_at=?
+                    WHERE id=?
+                """, (
+                    datetime.now().isoformat(timespec="seconds"),
+                    row["id"],
+                ))
+
+                continue
+
             if action_type == "retry_events":
                 c.execute("""
                     UPDATE automation_events
