@@ -14441,6 +14441,75 @@ async def task_pdf(request: Request, task_id: int):
 
 
 
+
+def process_autonomous_actions(company_id=1):
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT *
+        FROM autonomous_action_queue
+        WHERE company_id=?
+          AND status='pending'
+        ORDER BY id ASC
+        LIMIT 20
+    """, (company_id,)).fetchall()
+
+    processed = 0
+
+    for row in rows:
+        action_type = row["action_type"]
+        target_id = row["target_id"]
+
+        try:
+            if action_type == "retry_events":
+                c.execute("""
+                    UPDATE automation_events
+                    SET status='pending'
+                    WHERE company_id=?
+                      AND rule_id=?
+                      AND status='skipped'
+                """, (company_id, target_id))
+
+            elif action_type == "disable_rule":
+                c.execute("""
+                    UPDATE automation_rules
+                    SET active=0
+                    WHERE company_id=?
+                      AND id=?
+                """, (company_id, target_id))
+
+            c.execute("""
+                UPDATE autonomous_action_queue
+                SET status='completed',
+                    processed_at=?
+                WHERE id=?
+            """, (
+                datetime.now().isoformat(timespec="seconds"),
+                row["id"],
+            ))
+
+            processed += 1
+
+        except Exception:
+            c.execute("""
+                UPDATE autonomous_action_queue
+                SET status='failed',
+                    processed_at=?
+                WHERE id=?
+            """, (
+                datetime.now().isoformat(timespec="seconds"),
+                row["id"],
+            ))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "processed": processed,
+    }
+
+
 def enqueue_autonomous_action(
     company_id,
     action_type,
@@ -15161,4 +15230,14 @@ def api_a3_autonomous_actions():
 
     return {
         "items": [dict(row) for row in rows]
+    }
+
+
+@app.post("/api/a3/autonomous-actions/process")
+def api_a3_process_autonomous_actions():
+    result = process_autonomous_actions(company_id=1)
+
+    return {
+        "ok": True,
+        "result": result,
     }
