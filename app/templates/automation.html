@@ -1209,6 +1209,84 @@ document
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Governance</h2>
+            <div class="meta">
+                Autonomous safety controls и operational governance layer.
+            </div>
+        </div>
+
+        <div class="pill">
+            AI Safety Controls
+        </div>
+    </div>
+
+    <div id="a3-governance-settings"
+         style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:20px">
+    </div>
+</div>
+
+<script>
+async function loadA3GovernanceSettings() {
+    try {
+        const response = await fetch("/api/a3/governance-settings");
+        const data = await response.json();
+
+        const container = document.getElementById("a3-governance-settings");
+
+        container.innerHTML = "";
+
+        const items = [
+            [
+                "Autonomous Mode",
+                data.autonomous_enabled ? "Enabled" : "Disabled"
+            ],
+            [
+                "Critical Approval",
+                data.require_critical_approval ? "Required" : "Disabled"
+            ],
+            [
+                "Confidence Threshold",
+                (data.confidence_threshold || 0) + "%"
+            ],
+            [
+                "Max Actions / Cycle",
+                data.max_actions_per_cycle || 0
+            ]
+        ];
+
+        for (const [label, value] of items) {
+            const card = document.createElement("div");
+
+            card.style.padding = "16px";
+            card.style.borderRadius = "18px";
+            card.style.background = "#f9fafb";
+            card.style.border = "1px solid #e5e7eb";
+
+            card.innerHTML = `
+                <div style="font-size:12px;font-weight:900;color:#6b7280">
+                    ${label}
+                </div>
+
+                <div style="font-size:24px;font-weight:900;margin-top:8px">
+                    ${value}
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+    } catch (err) {
+        console.error("Governance settings load failed", err);
+    }
+}
+
+loadA3GovernanceSettings();
+setInterval(loadA3GovernanceSettings, 30000);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 
