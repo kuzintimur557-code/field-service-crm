@@ -1225,6 +1225,55 @@ document
     <div id="a3-governance-settings"
          style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:20px">
     </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:20px">
+        <label style="display:flex;flex-direction:column;gap:8px">
+            <span class="meta">Confidence threshold</span>
+
+            <input
+                id="a3-governance-confidence"
+                type="number"
+                min="1"
+                max="100"
+                value="70"
+                class="input"
+            >
+        </label>
+
+        <label style="display:flex;flex-direction:column;gap:8px">
+            <span class="meta">Max actions / cycle</span>
+
+            <input
+                id="a3-governance-max-actions"
+                type="number"
+                min="1"
+                max="100"
+                value="20"
+                class="input"
+            >
+        </label>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+        <button id="a3-toggle-autonomous-mode"
+                class="btn">
+            Toggle Autonomous Mode
+        </button>
+
+        <button id="a3-toggle-critical-approval"
+                class="btn">
+            Toggle Critical Approval
+        </button>
+
+        <button id="a3-save-governance"
+                class="btn btn-primary">
+            Save Governance Settings
+        </button>
+    </div>
+
+    <div id="a3-governance-save-status"
+         style="margin-top:14px">
+    </div>
 </div>
 
 <script>
@@ -1236,6 +1285,14 @@ async function loadA3GovernanceSettings() {
         const container = document.getElementById("a3-governance-settings");
 
         container.innerHTML = "";
+
+        window.a3GovernanceState = data;
+
+        document.getElementById("a3-governance-confidence").value =
+            data.confidence_threshold || 70;
+
+        document.getElementById("a3-governance-max-actions").value =
+            data.max_actions_per_cycle || 20;
 
         const items = [
             [
@@ -1546,3 +1603,73 @@ setInterval(loadA3GovernanceSettings, 30000);
 {% include 'mobile_nav.html' %}
 </body>
 </html>
+
+
+async function saveA3GovernanceSettings() {
+    try {
+        const current = window.a3GovernanceState || {};
+
+        const payload = {
+            autonomous_enabled: current.autonomous_enabled,
+            require_critical_approval: current.require_critical_approval,
+            confidence_threshold: Number(
+                document.getElementById("a3-governance-confidence").value
+            ),
+            max_actions_per_cycle: Number(
+                document.getElementById("a3-governance-max-actions").value
+            ),
+        };
+
+        const response = await fetch(
+            "/api/a3/governance-settings/update",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            }
+        );
+
+        await response.json();
+
+        document.getElementById("a3-governance-save-status").innerHTML = `
+            <div class="pill">
+                Governance settings updated
+            </div>
+        `;
+
+        loadA3GovernanceSettings();
+
+    } catch (err) {
+        console.error(err);
+
+        document.getElementById("a3-governance-save-status").innerHTML = `
+            <div class="pill off">
+                Governance update failed
+            </div>
+        `;
+    }
+}
+
+document
+    .getElementById("a3-save-governance")
+    .addEventListener("click", saveA3GovernanceSettings);
+
+document
+    .getElementById("a3-toggle-autonomous-mode")
+    .addEventListener("click", () => {
+        window.a3GovernanceState.autonomous_enabled =
+            !window.a3GovernanceState.autonomous_enabled;
+
+        saveA3GovernanceSettings();
+    });
+
+document
+    .getElementById("a3-toggle-critical-approval")
+    .addEventListener("click", () => {
+        window.a3GovernanceState.require_critical_approval =
+            !window.a3GovernanceState.require_critical_approval;
+
+        saveA3GovernanceSettings();
+    });
