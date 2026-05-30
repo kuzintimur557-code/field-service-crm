@@ -150,6 +150,102 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     </div>
 </div>
 
+
+<div class="card" id="a3-system-health-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 System Health</h2>
+            <div class="meta">
+                Глобальное состояние automation engine, retries и execution stability.
+            </div>
+        </div>
+
+        <div id="a3-health-badge"
+             style="padding:10px 16px;border-radius:999px;background:#dcfce7;color:#166534;font-weight:900">
+            HEALTHY
+        </div>
+    </div>
+
+    <div style="margin-top:24px;display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:center">
+        <div style="text-align:center">
+            <div id="a3-health-score"
+                 style="font-size:72px;font-weight:900;line-height:1">
+                100
+            </div>
+
+            <div class="meta" style="margin-top:10px">
+                System Score
+            </div>
+        </div>
+
+        <div>
+            <div id="a3-health-warning-list"
+                 style="display:flex;flex-direction:column;gap:10px">
+                <div class="pill">System healthy</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadA3SystemHealth() {
+    try {
+        const response = await fetch("/api/a3/system-health");
+        const data = await response.json();
+
+        const scoreEl = document.getElementById("a3-health-score");
+        const badgeEl = document.getElementById("a3-health-badge");
+        const warningsEl = document.getElementById("a3-health-warning-list");
+
+        scoreEl.textContent = data.score;
+
+        let badgeColor = "#dcfce7";
+        let badgeText = "#166534";
+
+        if (data.status === "warning") {
+            badgeColor = "#fef3c7";
+            badgeText = "#92400e";
+        }
+
+        if (data.status === "critical") {
+            badgeColor = "#fee2e2";
+            badgeText = "#991b1b";
+        }
+
+        badgeEl.style.background = badgeColor;
+        badgeEl.style.color = badgeText;
+        badgeEl.textContent = data.status.toUpperCase();
+
+        warningsEl.innerHTML = "";
+
+        const issues = [
+            ...(data.critical || []),
+            ...(data.warnings || []),
+        ];
+
+        if (!issues.length) {
+            warningsEl.innerHTML =
+                '<div class="pill">System healthy</div>';
+        } else {
+            for (const issue of issues) {
+                const div = document.createElement("div");
+                div.className = "pill";
+                div.style.display = "block";
+                div.style.marginBottom = "8px";
+                div.textContent = issue;
+                warningsEl.appendChild(div);
+            }
+        }
+    } catch (err) {
+        console.error("A3 system health load failed", err);
+    }
+}
+
+loadA3SystemHealth();
+setInterval(loadA3SystemHealth, 30000);
+</script>
+
+
 <div class="card">
 <h2>AI-планировщик</h2>
 <div class="meta">Ручной запуск дневных и недельных AI-сводок, а также AI-контроля. Повторный запуск за тот же день или неделю не создаёт дубли.</div>
