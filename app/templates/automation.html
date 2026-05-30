@@ -183,6 +183,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
                  style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
             </div>
 
+            <div style="margin-bottom:14px">
+                <div class="meta" style="margin-bottom:8px">Health trend</div>
+                <div id="a3-health-trend"
+                     style="display:flex;gap:6px;align-items:end;height:52px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:10px">
+                </div>
+            </div>
+
             <div id="a3-health-warning-list"
                  style="display:flex;flex-direction:column;gap:10px">
                 <div class="pill">System healthy</div>
@@ -244,6 +251,32 @@ async function loadA3SystemHealth() {
             item.style.border = "1px solid #e5e7eb";
             item.innerHTML = `<div style="font-weight:900;color:#6b7280;font-size:12px">${label}</div><div style="font-weight:900;font-size:22px;margin-top:4px">${value}</div>`;
             breakdownEl.appendChild(item);
+        }
+
+        const trendEl = document.getElementById("a3-health-trend");
+        trendEl.innerHTML = "";
+
+        try {
+            const historyResponse = await fetch("/api/a3/system-health/history");
+            const historyData = await historyResponse.json();
+            const items = historyData.items || [];
+
+            if (!items.length) {
+                trendEl.innerHTML = '<div class="meta">No history yet</div>';
+            } else {
+                for (const item of items.slice(-12)) {
+                    const bar = document.createElement("div");
+                    const height = Math.max(8, Math.min(40, item.score * 0.4));
+                    bar.style.width = "14px";
+                    bar.style.height = height + "px";
+                    bar.style.borderRadius = "999px";
+                    bar.style.background = "#2563eb";
+                    bar.title = item.score + " / " + item.status + " / " + item.created_at;
+                    trendEl.appendChild(bar);
+                }
+            }
+        } catch (err) {
+            trendEl.innerHTML = '<div class="meta">Trend unavailable</div>';
         }
 
         warningsEl.innerHTML = "";
