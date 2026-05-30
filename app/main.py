@@ -14458,4 +14458,17 @@ def api_a3_system_health():
     else:
         data["unhealthy_rules_count"] = 0
 
+    if data["status"] == "healthy":
+        data["status_title"] = "System Healthy"
+        data["status_message"] = "Automation engine is operating normally."
+    elif data["status"] == "warning":
+        data["status_title"] = "System Warning"
+        data["status_message"] = "Some automation signals need attention."
+    elif data["status"] == "degraded":
+        data["status_title"] = "System Degraded"
+        data["status_message"] = "Automation reliability is reduced."
+    else:
+        data["status_title"] = "System Critical"
+        data["status_message"] = "Automation engine requires immediate attention."
+
     return data
