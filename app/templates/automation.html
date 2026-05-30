@@ -462,6 +462,83 @@ setInterval(loadA3Analytics, 30000);
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Operations Insights</h2>
+            <div class="meta">
+                AI operational monitoring и automation intelligence.
+            </div>
+        </div>
+
+        <div class="pill">
+            AI Ops Center
+        </div>
+    </div>
+
+    <div id="a3-operations-insights"
+         style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
+    </div>
+</div>
+
+<script>
+async function loadA3OperationsInsights() {
+    try {
+        const response = await fetch("/api/a3/operations-insights");
+        const data = await response.json();
+
+        const container = document.getElementById("a3-operations-insights");
+
+        container.innerHTML = "";
+
+        for (const item of (data.items || [])) {
+            const card = document.createElement("div");
+
+            let bg = "#eff6ff";
+            let border = "#bfdbfe";
+
+            if (item.level === "warning") {
+                bg = "#fef3c7";
+                border = "#fde68a";
+            }
+
+            if (item.level === "critical") {
+                bg = "#fee2e2";
+                border = "#fecaca";
+            }
+
+            if (item.level === "healthy") {
+                bg = "#dcfce7";
+                border = "#bbf7d0";
+            }
+
+            card.style.padding = "16px";
+            card.style.borderRadius = "18px";
+            card.style.background = bg;
+            card.style.border = "1px solid " + border;
+
+            card.innerHTML = `
+                <div style="font-weight:900;font-size:15px">
+                    ${item.title}
+                </div>
+
+                <div style="margin-top:6px;color:#374151">
+                    ${item.message}
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+    } catch (err) {
+        console.error("Operations insights load failed", err);
+    }
+}
+
+loadA3OperationsInsights();
+setInterval(loadA3OperationsInsights, 30000);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 <form method="post" action="/automation/rules">
