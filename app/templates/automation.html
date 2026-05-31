@@ -159,13 +159,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         <div>
             <h2 style="margin-bottom:8px">A3 Состояние системы</h2>
             <div class="meta">
-                Глобальное состояние automation engine, retries и execution stability.
+                Глобальное состояние движка автоматизации, повторов и стабильности выполнения.
             </div>
         </div>
 
         <div id="a3-health-badge"
              style="padding:10px 16px;border-radius:999px;background:#dcfce7;color:#166534;font-weight:900">
-            HEALTHY
+            СТАБИЛЬНО
         </div>
     </div>
 
@@ -177,7 +177,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
             </div>
 
             <div class="meta" style="margin-top:10px">
-                System Score
+                Оценка системы
             </div>
         </div>
 
@@ -187,7 +187,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
             </div>
 
             <div style="margin-bottom:14px">
-                <div class="meta" style="margin-bottom:8px">Health trend</div>
+                <div class="meta" style="margin-bottom:8px">Динамика состояния</div>
                 <div id="a3-health-trend"
                      style="display:flex;gap:6px;align-items:end;height:52px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:10px">
                 </div>
@@ -202,6 +202,61 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 </div>
 
 <script>
+function a3StatusLabel(status) {
+    const labels = {
+        healthy: "Стабильно",
+        warning: "Внимание",
+        degraded: "Снижено",
+        critical: "Критично",
+        pending: "Ожидает",
+        done: "Выполнено",
+        skipped: "Пропущено",
+        failed: "Ошибка",
+        completed: "Завершено",
+        awaiting_approval: "Ждёт подтверждения",
+        approved: "Одобрено",
+        rejected: "Отклонено"
+    };
+    return labels[status] || status || "-";
+}
+
+function a3ActionLabel(actionType) {
+    const labels = {
+        retry_events: "Повторить события",
+        disable_rule: "Отключить правило",
+        recovery_cycle: "Запустить восстановление"
+    };
+    return labels[actionType] || actionType || "-";
+}
+
+function a3TargetLabel(targetType) {
+    const labels = {
+        automation_rule: "Правило автоматизации",
+        automation_event: "Событие автоматизации"
+    };
+    return labels[targetType] || targetType || "-";
+}
+
+function a3RecommendationLabel(recommendation) {
+    const labels = {
+        stable: "Стабильно",
+        retry_recommended: "Рекомендуется повтор",
+        investigate_rule: "Проверить правило",
+        disable_rule: "Отключить правило"
+    };
+    return labels[recommendation] || recommendation || "-";
+}
+
+function a3EventTypeLabel(eventType) {
+    const labels = {
+        system_health: "Состояние системы",
+        self_healing: "Самовосстановление",
+        autonomous_action_approved: "Действие одобрено",
+        autonomous_action_rejected: "Действие отклонено"
+    };
+    return labels[eventType] || eventType || "-";
+}
+
 async function loadA3SystemHealth() {
     try {
         const response = await fetch("/api/a3/system-health");
@@ -245,10 +300,10 @@ async function loadA3SystemHealth() {
         breakdownEl.innerHTML = "";
 
         const breakdownItems = [
-            ["Execution", data.execution_health],
-            ["Skipped", data.skipped_health],
-            ["Automation", data.automation_health],
-            ["Stale", data.stale_health],
+            ["Выполнение", data.execution_health],
+            ["Пропуски", data.skipped_health],
+            ["Автоматизация", data.automation_health],
+            ["Неактивные", data.stale_health],
             ["Повтор", data.retry_health],
         ];
 
@@ -271,7 +326,7 @@ async function loadA3SystemHealth() {
             const items = historyData.items || [];
 
             if (!items.length) {
-                trendEl.innerHTML = '<div class="meta">No history yet</div>';
+                trendEl.innerHTML = '<div class="meta">Истории пока нет</div>';
             } else {
                 for (const item of items.slice(-12)) {
                     const bar = document.createElement("div");
@@ -280,12 +335,12 @@ async function loadA3SystemHealth() {
                     bar.style.height = height + "px";
                     bar.style.borderRadius = "999px";
                     bar.style.background = "#2563eb";
-                    bar.title = item.score + " / " + item.status + " / " + item.created_at;
+                    bar.title = item.score + " / " + a3StatusLabel(item.status) + " / " + item.created_at;
                     trendEl.appendChild(bar);
                 }
             }
         } catch (err) {
-            trendEl.innerHTML = '<div class="meta">Trend unavailable</div>';
+            trendEl.innerHTML = '<div class="meta">Динамика недоступна</div>';
         }
 
         warningsEl.innerHTML = "";
@@ -335,7 +390,7 @@ setInterval(loadA3SystemHealth, 30000);
 <div class="card">
     <h2>Проблемные правила</h2>
     <div class="meta" style="margin-bottom:14px">
-        Правила, которым требуется внимание: отключены, без actions или с признаками нестабильности.
+        Правила, которым требуется внимание: отключены, без действий или с признаками нестабильности.
     </div>
 
     {% for rule in unhealthy_rules[:5] %}
@@ -378,7 +433,7 @@ setInterval(loadA3SystemHealth, 30000);
         <div>
             <h2 style="margin-bottom:8px">A3 Аналитика автоматизации</h2>
             <div class="meta">
-                Execution volume, success rate и operational activity.
+                Объём выполнений, успешность и операционная активность.
             </div>
         </div>
 
@@ -387,7 +442,7 @@ setInterval(loadA3SystemHealth, 30000);
                  style="font-size:42px;font-weight:900">
                 100%
             </div>
-            <div class="meta">Success rate</div>
+            <div class="meta">Успешность</div>
         </div>
     </div>
 
@@ -396,7 +451,7 @@ setInterval(loadA3SystemHealth, 30000);
     </div>
 
     <div style="margin-top:20px">
-        <div class="meta" style="margin-bottom:8px">Daily execution trend</div>
+        <div class="meta" style="margin-bottom:8px">Динамика выполнений по дням</div>
 
         <div id="a3-analytics-trend"
              style="display:flex;gap:6px;align-items:end;height:70px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:10px">
@@ -418,9 +473,9 @@ async function loadA3Analytics() {
         statsEl.innerHTML = "";
 
         const stats = [
-            ["Events", data.events_total],
+            ["События", data.events_total],
             ["Выполнено", data.done_total],
-            ["Skipped", data.skipped_total],
+            ["Пропущено", data.skipped_total],
             ["Ошибки", data.failed_total],
             ["Ожидает", data.pending_total],
         ];
@@ -460,7 +515,7 @@ async function loadA3Analytics() {
             bar.style.borderRadius = "999px";
             bar.style.background = "#2563eb";
 
-            bar.title = `${item.day} / ${total} events`;
+            bar.title = `${item.day} / ${total} событий`;
 
             trendEl.appendChild(bar);
         }
@@ -680,7 +735,7 @@ async function loadA3RecoveryHistory() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900">
-                            ${item.status.toUpperCase()}
+                            ${a3StatusLabel(item.status)}
                         </div>
 
                         <div class="meta" style="margin-top:4px">
@@ -698,7 +753,7 @@ async function loadA3RecoveryHistory() {
                         </div>
 
                         <div class="pill">
-                            ${item.duration_ms} ms
+                            ${item.duration_ms} мс
                         </div>
                     </div>
                 </div>
@@ -796,7 +851,7 @@ async function loadA3OpsTimeline() {
 
                     <div style="text-align:right">
                         <div class="pill">
-                            ${item.event_type}
+                            ${a3EventTypeLabel(item.event_type)}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
@@ -909,7 +964,7 @@ async function loadA3PredictiveSignals() {
                     </div>
 
                     <div class="pill">
-                        ${item.severity}
+                        ${a3StatusLabel(item.severity)}
                     </div>
                 </div>
             `;
@@ -996,12 +1051,12 @@ async function loadA3DecisionEngine() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.rule_name || "Unnamed rule"}
+                            ${item.rule_name || "Правило без названия"}
                         </div>
 
                         <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
                             <div class="pill">
-                                Confidence: ${item.confidence_score}%
+                                Уверенность: ${item.confidence_score}%
                             </div>
 
                             <div class="pill">
@@ -1009,18 +1064,18 @@ async function loadA3DecisionEngine() {
                             </div>
 
                             <div class="pill">
-                                Skipped: ${item.skipped_events}
+                                Пропущено: ${item.skipped_events}
                             </div>
                         </div>
                     </div>
 
                     <div style="text-align:right">
                         <div class="pill">
-                            ${item.recommendation}
+                            ${a3RecommendationLabel(item.recommendation)}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
-                            ${item.total_events} events
+                            ${item.total_events} событий
                         </div>
                     </div>
                 </div>
@@ -1108,17 +1163,17 @@ async function loadA3AutonomousActions() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.action_type}
+                            ${a3ActionLabel(item.action_type)}
                         </div>
 
                         <div style="margin-top:6px;color:#374151">
-                            Target: ${item.target_type} #${item.target_id || "-"}
+                            Цель: ${a3TargetLabel(item.target_type)} #${item.target_id || "-"}
                         </div>
                     </div>
 
                     <div style="text-align:right">
                         <div class="pill">
-                            ${item.status}
+                            ${a3StatusLabel(item.status)}
                         </div>
 
                         <div class="meta" style="margin-top:8px">

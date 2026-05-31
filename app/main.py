@@ -1499,8 +1499,8 @@ def ensure_ai_digest_automation_rules(company_id, username):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     created_count = 0
     defaults = [
-        ("daily_digest", "Daily AI digest"),
-        ("weekly_digest", "Weekly AI digest")
+        ("daily_digest", "Ежедневная AI-сводка"),
+        ("weekly_digest", "Еженедельная AI-сводка")
     ]
 
     conn = connect()
@@ -2723,16 +2723,16 @@ async def automation_page(
         health_issues = []
 
         if not rule.get("enabled", 1):
-            health_issues.append("Rule disabled")
+            health_issues.append("Правило отключено")
 
         if not rule.get("action_count"):
-            health_issues.append("No actions configured")
+            health_issues.append("Действия не настроены")
 
         if (rule.get("success_rate") or 100) < 60:
-            health_issues.append("Low success rate")
+            health_issues.append("Низкая успешность")
 
         if (rule.get("skipped_runs") or 0) >= 5:
-            health_issues.append("High skipped executions")
+            health_issues.append("Много пропущенных запусков")
 
         if health_issues:
             unhealthy_rules.append({
@@ -3221,7 +3221,7 @@ async def create_automation_rule(request: Request):
         )
 
     if action_key in ("notification", "telegram_alert") and not message:
-        message = f"Automation: {rule['name']}"
+        message = f"Автоматизация: {rule['name']}"
 
     if action_key == "ai_digest" and not target_username:
         target_username = username
@@ -3235,7 +3235,7 @@ async def create_automation_rule(request: Request):
     }
 
     if action_key == "email":
-        payload["subject"] = f"Automation: {rule['name']}"
+        payload["subject"] = f"Автоматизация: {rule['name']}"
 
     conn = connect()
     c = conn.cursor()
@@ -3669,7 +3669,7 @@ async def add_default_action_to_rule(request: Request, rule_id: int):
 
     payload = {
         "target_username": username,
-        "message": f"Automation: {rule['name']}"
+        "message": f"Автоматизация: {rule['name']}"
     }
 
     c.execute("""
@@ -4086,10 +4086,10 @@ async def automation_diagnostics_page(request: Request):
 
     if a3_system_health_score >= 85:
         a3_system_health_level = "Отлично"
-        a3_system_recommendation = "Automation-система работает стабильно."
+        a3_system_recommendation = "Система автоматизации работает стабильно."
     elif a3_system_health_score >= 60:
         a3_system_health_level = "Нужно внимание"
-        a3_system_recommendation = "Проверьте skipped/pending события и правила без действий."
+        a3_system_recommendation = "Проверьте пропущенные, ожидающие события и правила без действий."
     else:
         a3_system_health_level = "Проблема"
         a3_system_recommendation = "Нужно срочно проверить диагностику, правила и действия автоматизации."
@@ -4121,27 +4121,27 @@ async def automation_diagnostics_page(request: Request):
         problems.append({
             "title": "Низкая успешность автоматизации",
             "reason": "Процент выполненных событий ниже 80%.",
-            "action": "Проверьте skipped events и настройки получателей."
+            "action": "Проверьте пропущенные события и настройки получателей."
         })
 
     if telegram_rules:
         problems.append({
             "title": "Проверьте Telegram-уведомления",
-            "reason": "В системе есть Telegram automation rules.",
+            "reason": "В системе есть правила автоматизации для Telegram.",
             "action": "Убедитесь, что BOT_TOKEN и telegram_chat_id настроены."
         })
 
     if ai_digest_rules:
         problems.append({
             "title": "Проверьте AI-сводки",
-            "reason": "В системе есть AI digest automation.",
+            "reason": "В системе есть автоматизация AI-сводок.",
             "action": "Проверьте, что AI-сводки появляются в уведомлениях и в журнале событий."
         })
 
     if not problems:
         problems.append({
             "title": "Критичных проблем не найдено",
-            "reason": "Automation engine работает стабильно.",
+            "reason": "Движок автоматизации работает стабильно.",
             "action": "Продолжайте мониторить события и успешность."
         })
 
@@ -4343,7 +4343,7 @@ async def create_rule_action(request: Request, rule_id: int):
         )
 
     if action_key in ("notification", "telegram_alert") and not message:
-        message = f"Automation: {rule['name']}"
+        message = f"Автоматизация: {rule['name']}"
 
     if action_key == "ai_digest" and not target_username:
         target_username = username
@@ -4357,7 +4357,7 @@ async def create_rule_action(request: Request, rule_id: int):
     }
 
     if action_key == "email":
-        payload["subject"] = f"Automation: {rule['name']}"
+        payload["subject"] = f"Автоматизация: {rule['name']}"
 
     c.execute("""
     INSERT INTO automation_actions (
@@ -14795,17 +14795,17 @@ def api_a3_system_health(request: Request):
     )
 
     if data["status"] == "healthy":
-        data["status_title"] = "System Healthy"
-        data["status_message"] = "Automation engine is operating normally."
+        data["status_title"] = "Система стабильна"
+        data["status_message"] = "Движок автоматизации работает нормально."
     elif data["status"] == "warning":
-        data["status_title"] = "System Warning"
-        data["status_message"] = "Some automation signals need attention."
+        data["status_title"] = "Требуется внимание"
+        data["status_message"] = "Некоторые сигналы автоматизации требуют проверки."
     elif data["status"] == "degraded":
-        data["status_title"] = "System Degraded"
-        data["status_message"] = "Automation reliability is reduced."
+        data["status_title"] = "Стабильность снижена"
+        data["status_message"] = "Надёжность автоматизации снизилась."
     else:
-        data["status_title"] = "System Critical"
-        data["status_message"] = "Automation engine requires immediate attention."
+        data["status_title"] = "Критичное состояние"
+        data["status_message"] = "Движок автоматизации требует срочного внимания."
 
     save_system_health_snapshot(company_id, data)
 
@@ -14814,7 +14814,7 @@ def api_a3_system_health(request: Request):
             company_id=company_id,
             event_type="system_health",
             severity=data["status"],
-            title="Automation health degraded",
+            title="Состояние автоматизации ухудшилось",
             message=data.get("status_message", ""),
         )
 
@@ -14960,16 +14960,16 @@ def api_a3_unhealthy_rules(request: Request):
         issues = []
 
         if not rule.get("enabled", 1):
-            issues.append("Rule disabled")
+            issues.append("Правило отключено")
 
         if not rule.get("action_count"):
-            issues.append("No actions configured")
+            issues.append("Действия не настроены")
 
         if (rule.get("success_rate") or 100) < 60:
-            issues.append("Low success rate")
+            issues.append("Низкая успешность")
 
         if (rule.get("skipped_runs") or 0) >= 5:
-            issues.append("High skipped executions")
+            issues.append("Много пропущенных запусков")
 
         if issues:
             items.append({
@@ -15055,8 +15055,8 @@ def run_self_healing_cycle(company_id=1):
         company_id=company_id,
         event_type="self_healing",
         severity="info",
-        title="Self-healing cycle completed",
-        message=f"Retried {retried_events} events and re-enabled {reenabled_rules} rules.",
+        title="Цикл самовосстановления завершён",
+        message=f"Повторно запущено событий: {retried_events}. Повторно включено правил: {reenabled_rules}.",
     )
 
     return {
@@ -15099,29 +15099,29 @@ def api_a3_operations_insights(request: Request):
     if total >= 100:
         insights.append({
             "level": "info",
-            "title": "High automation activity",
-            "message": "Automation engine is processing a large execution volume.",
+            "title": "Высокая активность автоматизации",
+            "message": "Движок автоматизации обрабатывает большой объём событий.",
         })
 
     if skipped_total >= 10:
         insights.append({
             "level": "warning",
-            "title": "Skipped execution pressure",
-            "message": "Multiple automation events were skipped recently.",
+            "title": "Рост пропущенных выполнений",
+            "message": "За последнее время накопилось много пропущенных событий автоматизации.",
         })
 
     if failed_total >= 5:
         insights.append({
             "level": "critical",
-            "title": "Execution instability detected",
-            "message": "Several automation executions failed.",
+            "title": "Обнаружена нестабильность выполнения",
+            "message": "Несколько запусков автоматизации завершились ошибкой.",
         })
 
     if pending_total >= 15:
         insights.append({
             "level": "warning",
-            "title": "Pending automation backlog",
-            "message": "Automation queue contains a large pending volume.",
+            "title": "Очередь автоматизации растёт",
+            "message": "В очереди накопилось много ожидающих событий.",
         })
 
     success_rate = round((done_total / total) * 100) if total else 100
@@ -15129,15 +15129,15 @@ def api_a3_operations_insights(request: Request):
     if success_rate < 70:
         insights.append({
             "level": "critical",
-            "title": "Low automation reliability",
-            "message": "Automation success rate is below healthy threshold.",
+            "title": "Низкая надёжность автоматизации",
+            "message": "Успешность автоматизации ниже нормального уровня.",
         })
 
     if not insights:
         insights.append({
             "level": "healthy",
-            "title": "Operations stable",
-            "message": "Automation platform is operating normally.",
+            "title": "Операции стабильны",
+            "message": "Платформа автоматизации работает нормально.",
         })
 
     return {
@@ -15267,43 +15267,43 @@ def api_a3_predictive_signals(request: Request):
     if skipped >= 20:
         signals.append({
             "severity": "warning",
-            "title": "Skipped trend rising",
-            "prediction": "Automation skips may continue increasing.",
+            "title": "Растёт тренд пропусков",
+            "prediction": "Количество пропущенных событий автоматизации может продолжить расти.",
         })
 
     if failed >= 10:
         signals.append({
             "severity": "critical",
-            "title": "Failure spike detected",
-            "prediction": "Execution instability risk is increasing.",
+            "title": "Обнаружен всплеск ошибок",
+            "prediction": "Риск нестабильного выполнения растёт.",
         })
 
     if success_rate < 75:
         signals.append({
             "severity": "degraded",
-            "title": "Success rate degrading",
-            "prediction": "Platform reliability may continue declining.",
+            "title": "Успешность снижается",
+            "prediction": "Надёжность платформы может продолжить снижаться.",
         })
 
     if pending >= 25:
         signals.append({
             "severity": "warning",
-            "title": "Automation overload forecast",
-            "prediction": "Pending queue pressure is increasing.",
+            "title": "Прогноз перегрузки автоматизации",
+            "prediction": "Давление очереди ожидающих событий растёт.",
         })
 
     if skipped + failed >= 30:
         signals.append({
             "severity": "critical",
-            "title": "Recovery pressure building",
-            "prediction": "Self-healing demand likely to increase.",
+            "title": "Растёт нагрузка на восстановление",
+            "prediction": "Потребность в самовосстановлении, вероятно, увеличится.",
         })
 
     if not signals:
         signals.append({
             "severity": "healthy",
-            "title": "Operations stable",
-            "prediction": "No predictive operational risks detected.",
+            "title": "Операции стабильны",
+            "prediction": "Прогнозных операционных рисков не обнаружено.",
         })
 
     return {
@@ -15470,8 +15470,8 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
         company_id=company_id,
         event_type="autonomous_action_approved",
         severity="info",
-        title="Autonomous action approved",
-        message=f"Action #{action_id} approved by owner.",
+        title="Автономное действие одобрено",
+        message=f"Действие #{action_id} одобрено владельцем.",
     )
 
     return {"ok": True, "action_id": action_id}
@@ -15518,8 +15518,8 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
         company_id=company_id,
         event_type="autonomous_action_rejected",
         severity="warning",
-        title="Autonomous action rejected",
-        message=f"Action #{action_id} rejected by owner.",
+        title="Автономное действие отклонено",
+        message=f"Действие #{action_id} отклонено владельцем.",
     )
 
     return {"ok": True, "action_id": action_id}

@@ -121,39 +121,39 @@ class SystemHealthCalculator:
         critical = []
 
         if failed_count:
-            critical.append(f"{failed_count} failed automation events in last 24h")
+            critical.append(f"Ошибок автоматизации за последние 24 часа: {failed_count}")
 
         if skipped_count:
-            warnings.append(f"{skipped_count} skipped automation events in last 24h")
+            warnings.append(f"Пропущенных событий автоматизации за последние 24 часа: {skipped_count}")
 
         if disabled_rules_count:
-            warnings.append(f"{disabled_rules_count} disabled automation rules")
+            warnings.append(f"Отключённых правил автоматизации: {disabled_rules_count}")
 
         if stale_rules_count:
-            warnings.append(f"{stale_rules_count} stale automation rules")
+            warnings.append(f"Правил без запусков дольше 7 дней: {stale_rules_count}")
 
         if retry_risk_count:
-            critical.append(f"{retry_risk_count} events with high retry count")
+            critical.append(f"Событий с высоким числом повторов: {retry_risk_count}")
 
         recommendations = []
 
         if failed_count:
-            recommendations.append("Review failed automation events and inspect rule detail logs.")
+            recommendations.append("Проверьте ошибочные события автоматизации и логи правил.")
 
         if skipped_count:
-            recommendations.append("Check skipped events and retry valid skipped automations.")
+            recommendations.append("Проверьте пропущенные события и повторите корректные автоматизации.")
 
         if disabled_rules_count:
-            recommendations.append("Review disabled rules and re-enable business-critical automations.")
+            recommendations.append("Проверьте отключённые правила и включите важные бизнес-автоматизации.")
 
         if stale_rules_count:
-            recommendations.append("Inspect stale rules that have not executed for more than 7 days.")
+            recommendations.append("Проверьте правила, которые не запускались больше 7 дней.")
 
         if retry_risk_count:
-            recommendations.append("Investigate high retry events and broken automation chains.")
+            recommendations.append("Разберите события с частыми повторами и сломанные цепочки автоматизации.")
 
         if not recommendations:
-            recommendations.append("No action required. Automation system is operating normally.")
+            recommendations.append("Действия не требуются. Система автоматизации работает стабильно.")
 
         status = "healthy"
         if score < 85:
