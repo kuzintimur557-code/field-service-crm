@@ -14619,6 +14619,35 @@ def create_ops_timeline_event(
 ):
     conn = connect()
     c = conn.cursor()
+    now = datetime.now()
+    now_text = now.isoformat(timespec="seconds")
+
+    existing = c.execute("""
+        SELECT id, created_at
+        FROM ops_timeline_events
+        WHERE company_id=?
+          AND event_type=?
+          AND severity=?
+          AND title=?
+          AND message=?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        company_id,
+        event_type,
+        severity,
+        title,
+        message,
+    )).fetchone()
+
+    if existing:
+        try:
+            created_at = datetime.fromisoformat(existing["created_at"])
+            if (now - created_at).total_seconds() < 600:
+                conn.close()
+                return existing["id"]
+        except Exception:
+            pass
 
     c.execute("""
         INSERT INTO ops_timeline_events (
@@ -14635,16 +14664,49 @@ def create_ops_timeline_event(
         severity,
         title,
         message,
-        datetime.now().isoformat(timespec="seconds"),
+        now_text,
     ))
 
     conn.commit()
+    event_id = c.lastrowid
     conn.close()
+
+    return event_id
 
 
 def save_system_health_snapshot(company_id, data):
     conn = connect()
     c = conn.cursor()
+    now = datetime.now()
+    now_text = now.isoformat(timespec="seconds")
+    score = data.get("score", 100)
+    status = data.get("status", "healthy")
+
+    last_snapshot = c.execute("""
+        SELECT score, status, created_at
+        FROM system_health_snapshots
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (company_id,)).fetchone()
+
+    if last_snapshot:
+        should_write = (
+            last_snapshot["score"] != score
+            or last_snapshot["status"] != status
+        )
+
+        if not should_write:
+            try:
+                created_at = datetime.fromisoformat(last_snapshot["created_at"])
+                should_write = (now - created_at).total_seconds() >= 300
+            except Exception:
+                should_write = True
+
+        if not should_write:
+            conn.close()
+            return False
+
     c.execute("""
         INSERT INTO system_health_snapshots (
             company_id,
@@ -14660,18 +14722,20 @@ def save_system_health_snapshot(company_id, data):
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
-        data.get("score", 100),
-        data.get("status", "healthy"),
+        score,
+        status,
         data.get("failed_count", 0),
         data.get("skipped_count", 0),
         data.get("disabled_rules_count", 0),
         data.get("stale_rules_count", 0),
         data.get("retry_risk_count", 0),
         data.get("unhealthy_rules_count", 0),
-        datetime.now().isoformat(timespec="seconds"),
+        now_text,
     ))
     conn.commit()
     conn.close()
+
+    return True
 
 
 def get_a3_company_id(request: Request):

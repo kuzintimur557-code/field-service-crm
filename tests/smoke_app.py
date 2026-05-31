@@ -3876,6 +3876,29 @@ async def assert_a3_api_layer():
     assert 0 <= data["score"] <= 100
     assert data["status"] in {"healthy", "warning", "degraded", "critical"}
 
+    conn = connect()
+    c = conn.cursor()
+    snapshot_count_before = c.execute("""
+    SELECT COUNT(*)
+    FROM system_health_snapshots
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    second_health = crm.api_a3_system_health(request)
+    assert second_health["status"] in {"healthy", "warning", "degraded", "critical"}
+
+    conn = connect()
+    c = conn.cursor()
+    snapshot_count_after = c.execute("""
+    SELECT COUNT(*)
+    FROM system_health_snapshots
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    assert snapshot_count_after == snapshot_count_before
+
     history = crm.api_a3_system_health_history(request)
     assert "items" in history
 
@@ -3896,6 +3919,22 @@ async def assert_a3_api_layer():
 
     timeline = crm.api_a3_ops_timeline(request)
     assert "items" in timeline
+
+    first_timeline_id = crm.create_ops_timeline_event(
+        2,
+        "smoke_event",
+        "warning",
+        "Smoke timeline event",
+        "Smoke timeline dedupe",
+    )
+    second_timeline_id = crm.create_ops_timeline_event(
+        2,
+        "smoke_event",
+        "warning",
+        "Smoke timeline event",
+        "Smoke timeline dedupe",
+    )
+    assert first_timeline_id == second_timeline_id
 
     predictive = crm.api_a3_predictive_signals(request)
     assert "items" in predictive
