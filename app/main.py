@@ -14479,7 +14479,7 @@ def process_autonomous_actions(company_id=1):
         SELECT *
         FROM autonomous_action_queue
         WHERE company_id=?
-          AND status='pending'
+          AND status IN ('pending', 'approved')
         ORDER BY id ASC
         LIMIT ?
     """, (company_id, max_actions_per_cycle)).fetchall()
@@ -14494,6 +14494,7 @@ def process_autonomous_actions(company_id=1):
             if (
                 require_critical_approval
                 and action_type == "disable_rule"
+                and row["status"] != "approved"
             ):
                 c.execute("""
                     UPDATE autonomous_action_queue
@@ -15411,6 +15412,7 @@ def api_a3_autonomous_actions(request: Request):
 
     rows = c.execute("""
         SELECT
+            id,
             action_type,
             target_type,
             target_id,
@@ -15429,6 +15431,98 @@ def api_a3_autonomous_actions(request: Request):
     return {
         "items": [dict(row) for row in rows]
     }
+
+
+@app.post("/api/a3/autonomous-actions/{action_id}/approve")
+def api_a3_approve_autonomous_action(request: Request, action_id: int):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    conn = connect()
+    c = conn.cursor()
+
+    action = c.execute("""
+        SELECT id
+        FROM autonomous_action_queue
+        WHERE id=?
+          AND company_id=?
+          AND status='awaiting_approval'
+    """, (action_id, company_id)).fetchone()
+
+    if not action:
+        conn.close()
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+
+    c.execute("""
+        UPDATE autonomous_action_queue
+        SET status='approved',
+            processed_at=NULL
+        WHERE id=?
+          AND company_id=?
+    """, (action_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    create_ops_timeline_event(
+        company_id=company_id,
+        event_type="autonomous_action_approved",
+        severity="info",
+        title="Autonomous action approved",
+        message=f"Action #{action_id} approved by owner.",
+    )
+
+    return {"ok": True, "action_id": action_id}
+
+
+@app.post("/api/a3/autonomous-actions/{action_id}/reject")
+def api_a3_reject_autonomous_action(request: Request, action_id: int):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    conn = connect()
+    c = conn.cursor()
+
+    action = c.execute("""
+        SELECT id
+        FROM autonomous_action_queue
+        WHERE id=?
+          AND company_id=?
+          AND status='awaiting_approval'
+    """, (action_id, company_id)).fetchone()
+
+    if not action:
+        conn.close()
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+
+    c.execute("""
+        UPDATE autonomous_action_queue
+        SET status='rejected',
+            processed_at=?
+        WHERE id=?
+          AND company_id=?
+    """, (
+        datetime.now().isoformat(timespec="seconds"),
+        action_id,
+        company_id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    create_ops_timeline_event(
+        company_id=company_id,
+        event_type="autonomous_action_rejected",
+        severity="warning",
+        title="Autonomous action rejected",
+        message=f"Action #{action_id} rejected by owner.",
+    )
+
+    return {"ok": True, "action_id": action_id}
 
 
 @app.post("/api/a3/autonomous-actions/process")

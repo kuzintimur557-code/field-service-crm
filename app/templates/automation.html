@@ -802,6 +802,17 @@ async function loadA3OpsTimeline() {
                         <div class="meta" style="margin-top:8px">
                             ${item.created_at}
                         </div>
+
+                        ${item.status === "awaiting_approval" ? `
+                            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px">
+                                <button type="button" onclick="approveA3AutonomousAction(${item.id})" style="width:auto;padding:8px 11px;border-radius:999px;font-size:13px;background:#16a34a">
+                                    Одобрить
+                                </button>
+                                <button type="button" onclick="rejectA3AutonomousAction(${item.id})" style="width:auto;padding:8px 11px;border-radius:999px;font-size:13px;background:#991b1b">
+                                    Отклонить
+                                </button>
+                            </div>
+                        ` : ""}
                     </div>
                 </div>
             `;
@@ -1122,6 +1133,20 @@ async function loadA3AutonomousActions() {
     } catch (err) {
         console.error("Autonomous actions load ошибка", err);
     }
+}
+
+async function approveA3AutonomousAction(actionId) {
+    await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {
+        method: "POST"
+    });
+    loadA3AutonomousActions();
+}
+
+async function rejectA3AutonomousAction(actionId) {
+    await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {
+        method: "POST"
+    });
+    loadA3AutonomousActions();
 }
 
 loadA3AutonomousActions();

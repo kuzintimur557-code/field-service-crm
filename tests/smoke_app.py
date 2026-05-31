@@ -3945,6 +3945,66 @@ async def assert_a3_api_layer():
     actions = crm.api_a3_autonomous_actions(request)
     assert "items" in actions
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        0,
+        "awaiting_approval",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    approve_action_id = c.lastrowid
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        0,
+        "awaiting_approval",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    reject_action_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    approve_result = crm.api_a3_approve_autonomous_action(request, approve_action_id)
+    assert approve_result["ok"] is True
+
+    reject_result = crm.api_a3_reject_autonomous_action(request, reject_action_id)
+    assert reject_result["ok"] is True
+
+    conn = connect()
+    c = conn.cursor()
+    approved_row = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+    """, (approve_action_id,)).fetchone()
+    rejected_row = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+    """, (reject_action_id,)).fetchone()
+    conn.close()
+
+    assert approved_row["status"] == "approved"
+    assert rejected_row["status"] == "rejected"
+
     process_result = crm.api_a3_process_autonomous_actions(request)
     assert process_result["ok"] is True
     assert "result" in process_result
