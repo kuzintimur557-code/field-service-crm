@@ -4166,7 +4166,8 @@ async def automation_diagnostics_page(request: Request):
             "a3_system_health_score": a3_system_health_score,
             "a3_system_health_level": a3_system_health_level,
             "a3_system_recommendation": a3_system_recommendation,
-            "problems": problems
+            "problems": problems,
+            "trigger_labels": dict(AUTOMATION_TRIGGERS),
         }
     )
 

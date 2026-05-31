@@ -436,7 +436,7 @@ async def assert_automation_page():
     assert diagnostics_response.status_code == 200
     diagnostics_html = diagnostics_response.body.decode("utf-8")
     assert "Диагностика автоматизации" in diagnostics_html
-    assert "A3 System Health Score" in diagnostics_html
+    assert "Оценка состояния A3" in diagnostics_html
     assert "Рекомендация:" in diagnostics_html
     assert "Проблемы и рекомендации" in diagnostics_html
     assert "Активные правила без действий" in diagnostics_html
@@ -602,8 +602,8 @@ async def assert_automation_page():
     assert "SLA smoke rule" in rule_detail_html
     assert "Граф автоматизации A3" in rule_detail_html
     assert "Статус цепочки" in rule_detail_html
-    assert "A3 Health Score" in rule_detail_html
-    assert "A3 Intelligence" in rule_detail_html
+    assert "Оценка A3" in rule_detail_html
+    assert "A3 Анализ" in rule_detail_html
     assert "Рекомендация:" in rule_detail_html
     assert "Действия цепочки" in rule_detail_html
     assert "Последние события цепочки" in rule_detail_html

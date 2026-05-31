@@ -26,7 +26,7 @@
     <div class="top">
         <div>
             <h1>Диагностика автоматизации</h1>
-            <div class="label">Проверка правил, событий и проблем automation engine</div>
+            <div class="label">Проверка правил, событий и проблем движка автоматизации</div>
         </div>
 
         <div style="display:flex;gap:10px;align-items:center;">
@@ -97,7 +97,7 @@
     </div>
 
     <div class="card" style="background:#111827;color:white;">
-        <h2>A3 System Health Score</h2>
+        <h2>Оценка состояния A3</h2>
         <div style="font-size:44px;font-weight:900;">{{ a3_system_health_score }}%</div>
         <h3>{{ a3_system_health_level }}</h3>
         <p><b>Рекомендация:</b> {{ a3_system_recommendation }}</p>
@@ -165,7 +165,7 @@
                 <tr>
                     <td>{{ rule["id"] }}</td>
                     <td>{{ rule["name"] }}</td>
-                    <td>{{ rule["trigger_key"] }}</td>
+                    <td>{{ trigger_labels.get(rule["trigger_key"], rule["trigger_key"]) }}</td>
                     <td>{{ rule["created_by"] }}</td>
                     <td>
                         <form method="post" action="/automation/diagnostics/rules/{{ rule['id'] }}/add-default-action" style="margin:0;">
@@ -202,7 +202,7 @@
                 <tr>
                     <td>{{ rule["id"] }}</td>
                     <td>{{ rule["name"] }}</td>
-                    <td>{{ rule["trigger_key"] }}</td>
+                    <td>{{ trigger_labels.get(rule["trigger_key"], rule["trigger_key"]) }}</td>
                     <td>{{ rule["updated_at"] or "—" }}</td>
                     <td>
                         <form method="post" action="/automation/diagnostics/rules/{{ rule['id'] }}/enable" style="margin:0;">
@@ -239,8 +239,8 @@
                 <tr>
                     <td>{{ event["id"] }}</td>
                     <td>{{ event["rule_name"] or "—" }}</td>
-                    <td>{{ event["trigger_key"] }}</td>
-                    <td>{{ event["message"] or "" }}</td>
+                    <td>{{ trigger_labels.get(event["trigger_key"], event["trigger_key"]) }}</td>
+                    <td>{{ event["message"].replace("Automation:", "Автоматизация:") if event["message"] else "" }}</td>
                     <td>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
                             <a href="/automation/events/{{ event['id'] }}" class="btn">Подробнее</a>
