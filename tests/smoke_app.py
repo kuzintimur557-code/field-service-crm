@@ -610,6 +610,8 @@ async def assert_automation_page():
     assert "Быстрые действия цепочки" in rule_detail_html
     assert "Запустить правило" in rule_detail_html
     assert "Визуальная цепочка" in rule_detail_html
+    assert "A3 Конструктор цепочки" in rule_detail_html
+    assert f"/api/a3/workflow/rules/{rule['id']}/graph" in rule_detail_html
     assert "Диагностика правила" in rule_detail_html
     assert "Действия" in rule_detail_html
     assert "Последние события правила" in rule_detail_html

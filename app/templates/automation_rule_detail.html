@@ -154,6 +154,22 @@
     </div>
 
     <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div>
+                <h2 style="margin-bottom:8px;">A3 Конструктор цепочки</h2>
+                <div class="label">Триггер → Правило → Действия → События</div>
+            </div>
+
+            <div class="pill" id="a3-workflow-builder-status">Загрузка</div>
+        </div>
+
+        <div id="a3-workflow-builder-preview"
+             style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin-top:16px;">
+            <div class="pill">Загрузка графа</div>
+        </div>
+    </div>
+
+    <div class="card">
         <h2>Диагностика правила</h2>
         <h3>{{ diagnostic_title }}</h3>
         <p>{{ diagnostic_message }}</p>
@@ -322,5 +338,83 @@
     </div>
 
 </div>
+
+<script>
+function a3WorkflowNodeLabel(type) {
+    const labels = {
+        trigger: "Триггер",
+        rule: "Правило",
+        action: "Действие",
+        events: "События"
+    };
+
+    return labels[type] || type || "-";
+}
+
+function a3WorkflowStatusLabel(status) {
+    const labels = {
+        active: "Включено",
+        disabled: "Выключено",
+        has_events: "Есть события",
+        empty: "Нет событий"
+    };
+
+    return labels[status] || status || "-";
+}
+
+async function loadA3WorkflowBuilderPreview() {
+    const container = document.getElementById("a3-workflow-builder-preview");
+    const status = document.getElementById("a3-workflow-builder-status");
+
+    try {
+        const response = await fetch("/api/a3/workflow/rules/{{ rule['id'] }}/graph");
+        const data = await response.json();
+
+        if (!data.ok) {
+            container.innerHTML = `<div class="pill" style="background:#fee2e2;color:#991b1b;">Граф недоступен</div>`;
+            status.textContent = "Ошибка";
+            return;
+        }
+
+        status.textContent = `${data.nodes.length} узлов`;
+        container.innerHTML = "";
+
+        data.nodes.forEach((node, index) => {
+            const item = document.createElement("div");
+            const isDisabled = node.status === "disabled";
+
+            item.style.minWidth = "160px";
+            item.style.flex = "1";
+            item.style.padding = "14px";
+            item.style.borderRadius = "16px";
+            item.style.border = "1px solid #e5e7eb";
+            item.style.background = isDisabled ? "#fee2e2" : "#f9fafb";
+
+            item.innerHTML = `
+                <div class="label">${a3WorkflowNodeLabel(node.type)}</div>
+                <div style="font-weight:900;margin-top:6px;line-height:1.3;">${node.label}</div>
+                <div class="pill" style="margin-top:10px;">${a3WorkflowStatusLabel(node.status)}</div>
+            `;
+
+            container.appendChild(item);
+
+            if (index < data.nodes.length - 1) {
+                const arrow = document.createElement("div");
+                arrow.style.display = "flex";
+                arrow.style.alignItems = "center";
+                arrow.style.fontWeight = "900";
+                arrow.textContent = "→";
+                container.appendChild(arrow);
+            }
+        });
+    } catch (err) {
+        console.error("Ошибка загрузки графа A3", err);
+        container.innerHTML = `<div class="pill" style="background:#fee2e2;color:#991b1b;">Ошибка загрузки</div>`;
+        status.textContent = "Ошибка";
+    }
+}
+
+loadA3WorkflowBuilderPreview();
+</script>
 </body>
-</html>\n
+</html>
