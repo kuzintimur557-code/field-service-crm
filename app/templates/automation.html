@@ -1553,6 +1553,114 @@ setInterval(loadA3ApprovalQueue, 30000);
 
 
 <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 История подтверждений</h2>
+
+            <div class="meta">
+                Audit trail подтверждений и отклонений AI-действий.
+            </div>
+        </div>
+
+        <div class="pill">
+            Audit Trail
+        </div>
+    </div>
+
+    <div id="a3-approval-history"
+         style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
+    </div>
+</div>
+
+<script>
+async function loadA3ApprovalHistory() {
+    try {
+        const response = await fetch("/api/a3/approval-history");
+        const data = await response.json();
+
+        const container = document.getElementById("a3-approval-history");
+
+        container.innerHTML = "";
+
+        const items = data.items || [];
+
+        if (!items.length) {
+            container.innerHTML = `
+                <div class="pill">
+                    История подтверждений пуста
+                </div>
+            `;
+            return;
+        }
+
+        for (const item of items.slice(0, 20)) {
+            const card = document.createElement("div");
+
+            let bg = "#f9fafb";
+            let border = "#e5e7eb";
+
+            if (item.decision === "approved") {
+                bg = "#dcfce7";
+                border = "#86efac";
+            }
+
+            if (item.decision === "rejected") {
+                bg = "#fee2e2";
+                border = "#fca5a5";
+            }
+
+            card.style.padding = "16px";
+            card.style.borderRadius = "18px";
+            card.style.background = bg;
+            card.style.border = "1px solid " + border;
+
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                    <div>
+                        <div style="font-weight:900;font-size:15px">
+                            ${item.action_type || "AI Action"}
+                        </div>
+
+                        <div style="margin-top:8px;color:#374151">
+                            ${item.target_type || "-"} #${item.target_id || "-"}
+                        </div>
+
+                        <div style="margin-top:8px">
+                            <span class="pill">
+                                ${item.decision}
+                            </span>
+                        </div>
+
+                        <div class="meta" style="margin-top:8px">
+                            ${item.reason || "-"}
+                        </div>
+                    </div>
+
+                    <div style="text-align:right">
+                        <div class="meta">
+                            ${item.decided_by || "system"}
+                        </div>
+
+                        <div class="meta" style="margin-top:8px">
+                            ${item.created_at}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+    } catch (err) {
+        console.error("Approval history load failed", err);
+    }
+}
+
+loadA3ApprovalHistory();
+setInterval(loadA3ApprovalHistory, 30000);
+</script>
+
+
+<div class="card">
 <h2>Новое правило</h2>
 
 
