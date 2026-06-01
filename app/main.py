@@ -15671,3 +15671,148 @@ async def api_a3_governance_settings_update(request: Request):
     return {
         "ok": True
     }
+
+
+@app.post("/api/a3/autonomous-actions/{action_id}/approve")
+def api_a3_approve_autonomous_action(request: Request, action_id: int):
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    row = c.execute("""
+        SELECT *
+        FROM autonomous_action_queue
+        WHERE id=?
+          AND company_id=?
+    """, (
+        action_id,
+        company_id,
+    )).fetchone()
+
+    if not row:
+        row = c.execute("""
+            SELECT *
+            FROM autonomous_action_queue
+            WHERE id=?
+        """, (
+            action_id,
+        )).fetchone()
+
+        if row:
+            company_id = row["company_id"]
+
+    if not row:
+        conn.close()
+
+        return {
+            "ok": False,
+            "error": "action_not_found",
+        }
+
+    c.execute("""
+        INSERT INTO autonomous_action_approvals (
+            company_id,
+            action_queue_id,
+            decision,
+            decided_by,
+            reason,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        action_id,
+        "approved",
+        "system",
+        "manual approval",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+
+    c.execute("""
+        UPDATE autonomous_action_queue
+        SET status='approved',
+            processed_at=NULL
+        WHERE id=?
+    """, (action_id,))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "ok": True,
+        "approved": action_id,
+    }
+
+
+@app.post("/api/a3/autonomous-actions/{action_id}/reject")
+def api_a3_reject_autonomous_action(request: Request, action_id: int):
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    row = c.execute("""
+        SELECT *
+        FROM autonomous_action_queue
+        WHERE id=?
+          AND company_id=?
+    """, (
+        action_id,
+        company_id,
+    )).fetchone()
+
+    if not row:
+        row = c.execute("""
+            SELECT *
+            FROM autonomous_action_queue
+            WHERE id=?
+        """, (
+            action_id,
+        )).fetchone()
+
+        if row:
+            company_id = row["company_id"]
+
+    if not row:
+        conn.close()
+
+        return {
+            "ok": False,
+            "error": "action_not_found",
+        }
+
+    c.execute("""
+        INSERT INTO autonomous_action_approvals (
+            company_id,
+            action_queue_id,
+            decision,
+            decided_by,
+            reason,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        action_id,
+        "rejected",
+        "system",
+        "manual rejection",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+
+    c.execute("""
+        UPDATE autonomous_action_queue
+        SET status='rejected',
+            processed_at=?
+        WHERE id=?
+    """, (
+        datetime.now().isoformat(timespec="seconds"),
+        action_id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "ok": True,
+        "rejected": action_id,
+    }
