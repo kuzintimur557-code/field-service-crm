@@ -15735,6 +15735,24 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
         WHERE id=?
     """, (action_id,))
 
+    c.execute("""
+        INSERT INTO ops_timeline_events (
+            company_id,
+            event_type,
+            severity,
+            title,
+            message,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        "approval",
+        "info",
+        "AI-действие подтверждено",
+        f"Подтверждено действие #{action_id}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+
     conn.commit()
     conn.close()
 
@@ -15807,6 +15825,24 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
     """, (
         datetime.now().isoformat(timespec="seconds"),
         action_id,
+    ))
+
+    c.execute("""
+        INSERT INTO ops_timeline_events (
+            company_id,
+            event_type,
+            severity,
+            title,
+            message,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        "approval",
+        "warning",
+        "AI-действие отклонено",
+        f"Отклонено действие #{action_id}",
+        datetime.now().isoformat(timespec="seconds"),
     ))
 
     conn.commit()
