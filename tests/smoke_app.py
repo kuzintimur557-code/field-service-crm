@@ -617,6 +617,19 @@ async def assert_automation_page():
     assert "Повторить пропущенные" in rule_detail_html
     assert f"/automation/rules/{rule['id']}/events/export" in rule_detail_html
 
+    workflow_graph = crm.api_a3_workflow_rule_graph(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert workflow_graph["ok"] is True
+    assert workflow_graph["rule"]["id"] == rule["id"]
+    assert workflow_graph["rule"]["trigger_key"] == "sla_overdue"
+    assert workflow_graph["stats"]["actions_total"] >= 1
+    assert any(node["type"] == "trigger" for node in workflow_graph["nodes"])
+    assert any(node["type"] == "rule" for node in workflow_graph["nodes"])
+    assert any(node["type"] == "action" for node in workflow_graph["nodes"])
+    assert any(edge["label"] == "запускает" for edge in workflow_graph["edges"])
+
     rule_events_export_response = await crm.automation_rule_events_export(
         make_request("owner2"),
         rule["id"],

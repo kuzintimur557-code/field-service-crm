@@ -31,6 +31,7 @@ from app.services.system_health import (
     calculate_system_health,
     get_system_health_history,
 )
+from app.services.workflow_graph import get_rule_workflow_graph
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -14651,6 +14652,21 @@ def api_a3_decision_engine(request: Request):
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     return get_decision_engine(company_id)
+
+
+@app.get("/api/a3/workflow/rules/{rule_id}/graph")
+def api_a3_workflow_rule_graph(request: Request, rule_id: int):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    graph = get_rule_workflow_graph(company_id, rule_id)
+
+    if not graph:
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+
+    return graph
 
 
 @app.get("/api/a3/autonomous-actions")
