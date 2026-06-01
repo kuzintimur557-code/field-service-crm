@@ -15816,3 +15816,34 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
         "ok": True,
         "rejected": action_id,
     }
+
+
+@app.get("/api/a3/approval-queue")
+def api_a3_approval_queue():
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT
+            id,
+            action_type,
+            target_type,
+            target_id,
+            status,
+            payload_json,
+            created_at
+        FROM autonomous_action_queue
+        WHERE company_id=?
+          AND status='awaiting_approval'
+        ORDER BY id DESC
+        LIMIT 100
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    return {
+        "count": len(rows),
+        "items": [dict(row) for row in rows],
+    }
