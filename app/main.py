@@ -81,6 +81,28 @@ def ui_text(value):
 templates.env.globals["role_label"] = role_label
 templates.env.globals["ui_text"] = ui_text
 
+
+
+def get_current_company_id(request=None):
+    try:
+        if request and hasattr(request, "session"):
+            company_id = request.session.get("company_id")
+
+            if company_id:
+                return int(company_id)
+    except Exception:
+        pass
+
+    try:
+        user = get_current_user(request)
+
+        if user and user.get("company_id"):
+            return int(user["company_id"])
+    except Exception:
+        pass
+
+    return 1
+
 DATA_DIR = Path(os.getenv("DATA_DIR", "."))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DOCS_DIR = UPLOAD_DIR / "docs"
@@ -15856,7 +15878,7 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
 
 @app.get("/api/a3/approval-queue")
 def api_a3_approval_queue():
-    company_id = 1
+    company_id = get_current_company_id(request if 'request' in locals() else None)
 
     conn = connect()
     c = conn.cursor()
@@ -15887,7 +15909,7 @@ def api_a3_approval_queue():
 
 @app.get("/api/a3/approval-history")
 def api_a3_approval_history():
-    company_id = 1
+    company_id = get_current_company_id(request if 'request' in locals() else None)
 
     conn = connect()
     c = conn.cursor()
