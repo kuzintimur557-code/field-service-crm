@@ -78,7 +78,7 @@
 
     <div class="card">
         <h2>Сообщение</h2>
-        <pre>{{ event["message"] or "Сообщение не указано" }}</pre>
+        <pre>{{ ui_text(event["message"]) if event["message"] else "Сообщение не указано" }}</pre>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
             {% if event["entity_type"] == "task" and event["entity_id"] %}

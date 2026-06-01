@@ -51,8 +51,8 @@ h1{font-size:30px}
 <div class="container">
 
 <div class="header">
-    <h1>🚀 Field Service CRM</h1>
-    <div class="subtitle">Вы вошли как: {{ username }} / {{ role }}</div>
+    <h1>🚀 Бизнес CRM</h1>
+    <div class="subtitle">Вы вошли как: {{ username }} / {{ role_label(role) }}</div>
 
     <div class="nav">
         {% set f = features if features is defined else {} %}
@@ -108,7 +108,7 @@ h1{font-size:30px}
 
         {% if role == "boss" %}
         {% if role == "superadmin" %}
-        <a href="/admin" class="dark">🛠 Admin</a>
+        <a href="/admin" class="dark">🛠 Админ</a>
         {% endif %}
         <a href="/settings" class="dark">⚙️ Настройки</a>
         {% endif %}

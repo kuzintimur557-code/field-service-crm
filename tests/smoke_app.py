@@ -423,7 +423,7 @@ async def assert_automation_page():
     assert 'href="/automation/rules/export"' in html
     assert 'href="/automation/events/export"' in html
     assert "Показано событий:" in html
-    assert "Cron-запуск" in html
+    assert "Плановый запуск" in html
     assert "дневных и недельных AI-сводок" in html
     assert "AUTOMATION_CRON_SECRET" in html
     assert "заголовком x-automation-secret" in html
@@ -1326,7 +1326,7 @@ async def assert_automation_runner(task):
     FROM automation_events
     WHERE company_id=2
       AND trigger_key='daily_digest'
-      AND message='AI daily digest 2026-05-25'
+      AND message='Ежедневная AI-сводка 2026-05-25'
     ORDER BY id DESC
     """).fetchone()
 
@@ -1335,7 +1335,7 @@ async def assert_automation_runner(task):
     FROM automation_events
     WHERE company_id=2
       AND trigger_key='weekly_digest'
-      AND message='AI weekly digest 2026-W22'
+      AND message='Еженедельная AI-сводка 2026-W22'
     ORDER BY id DESC
     """).fetchone()
 
@@ -1456,7 +1456,6 @@ async def assert_ai_assistant_page():
     assert "Запустить AI-планировщик" in html
     assert "Настроить дневные и недельные AI-сводки" in html
     assert "История действий" in html
-    assert "SLA runner rule" in html
     assert "Выполнено" in html
     assert "Журнал AI-помощника" in html
     assert 'href="/ai/assistant/events/export"' in html

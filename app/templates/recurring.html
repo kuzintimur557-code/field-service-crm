@@ -132,6 +132,12 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 <h2>Активные шаблоны</h2>
 
 {% if jobs %}
+{% set interval_labels = {
+    "weekly": "Еженедельно",
+    "monthly": "Ежемесячно",
+    "quarterly": "Ежеквартально",
+    "yearly": "Ежегодно"
+} %}
 {% for job in jobs %}
 <div class="job">
     <div>
@@ -147,7 +153,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
         </form>
     </div>
     <div>
-        <span class="badge">{{ job["interval_type"] }}</span>
+        <span class="badge">{{ interval_labels.get(job["interval_type"], job["interval_type"]) }}</span>
         {% if job["active"] %}
         <span class="badge">Активен</span>
         {% else %}

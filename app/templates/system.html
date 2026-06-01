@@ -34,7 +34,7 @@ h1{margin:0 0 14px;font-size:34px}
 <div class="grid">
     <div class="box">
         <div class="label">Приложение</div>
-        <div class="value ok">OK</div>
+        <div class="value ok">ОК</div>
     </div>
 
     <div class="box">
@@ -50,14 +50,14 @@ h1{margin:0 0 14px;font-size:34px}
     </div>
 
     <div class="box">
-        <div class="label">Uploads</div>
+        <div class="label">Загруженные файлы</div>
         <div class="value {% if uploads_exists %}ok{% else %}bad{% endif %}">
-            {% if uploads_exists %}OK{% else %}NO{% endif %}
+            {% if uploads_exists %}ОК{% else %}Нет{% endif %}
         </div>
     </div>
 
     <div class="box">
-        <div class="label">Файлов uploads</div>
+        <div class="label">Загруженных файлов</div>
         <div class="value">{{ uploads_files }}</div>
     </div>
 

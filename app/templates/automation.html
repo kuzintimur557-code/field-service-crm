@@ -421,8 +421,8 @@ setInterval(loadA3SystemHealth, 30000);
 <div style="display:flex;flex-direction:column;gap:24px">
 
 <div class="card">
-<h2>Cron-запуск</h2>
-<div class="meta">Для Railway cron или внешнего планировщика задайте переменную AUTOMATION_CRON_SECRET и вызывайте этот адрес с заголовком x-automation-secret.</div>
+<h2>Плановый запуск</h2>
+<div class="meta">Для Railway или внешнего планировщика задайте переменную AUTOMATION_CRON_SECRET и вызывайте этот адрес с заголовком x-automation-secret.</div>
 <div style="margin-top:12px;padding:14px;border-radius:14px;background:#f9fafb;font-weight:900;word-break:break-word">
     POST /automation/cron/ai-digest
 </div>
@@ -539,7 +539,7 @@ setInterval(loadA3Analytics, 30000);
         </div>
 
         <div class="pill">
-            AI Ops Центр
+            Центр AI-операций
         </div>
     </div>
 
@@ -776,7 +776,7 @@ setInterval(loadA3RecoveryHistory, 30000);
         <div>
             <h2 style="margin-bottom:8px">A3 Лента операций</h2>
             <div class="meta">
-                Единая лента AI Ops и автономных событий.
+                Единая лента AI-операций и автономных событий.
             </div>
         </div>
 
@@ -1460,7 +1460,7 @@ setInterval(loadA3GovernanceSettings, 30000);
             <select name="target_username">
                 {% for user in users %}
                 <option value="{{ user['username'] }}" {% if user["username"] == username %}selected{% endif %}>
-                    {{ user["username"] }} / {{ user["role"] }}
+                    {{ user["username"] }} / {{ role_label(user["role"]) }}
                 </option>
                 {% endfor %}
             </select>
@@ -1554,7 +1554,7 @@ setInterval(loadA3GovernanceSettings, 30000);
                     <select name="target_username">
                         {% for user in users %}
                         <option value="{{ user['username'] }}" {% if user["username"] == rule["edit_target_username"] %}selected{% endif %}>
-                            {{ user["username"] }} / {{ user["role"] }}
+                            {{ user["username"] }} / {{ role_label(user["role"]) }}
                         </option>
                         {% endfor %}
                     </select>
@@ -1562,7 +1562,7 @@ setInterval(loadA3GovernanceSettings, 30000);
             </div>
             <div style="margin-top:10px">
                 <label>Сообщение</label>
-                <textarea name="message">{{ rule["edit_message"] }}</textarea>
+                <textarea name="message">{{ ui_text(rule["edit_message"]) }}</textarea>
             </div>
             <button type="submit" style="margin-top:10px">Сохранить</button>
         </form>
@@ -1655,7 +1655,7 @@ setInterval(loadA3GovernanceSettings, 30000);
         {% if event["rule_name"] %}
         <div class="meta">Правило: {{ event["rule_name"] }}</div>
         {% endif %}
-        <div class="meta">{{ event["message"] or "" }}</div>
+        <div class="meta">{{ ui_text(event["message"]) if event["message"] else "" }}</div>
         {% if event["entity_type"] or event["entity_id"] %}
         <div class="meta">Объект: {{ entity_labels.get(event["entity_type"], event["entity_type"] or "Не указан") }}{% if event["entity_id"] %} #{{ event["entity_id"] }}{% endif %}</div>
         {% endif %}

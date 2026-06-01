@@ -32,10 +32,18 @@ h2{margin:0 0 16px;font-size:22px}
 
 <a href="/settings" class="back">← Назад к настройкам</a>
 
+{% set plan_names = {
+    "basic": "Базовый",
+    "team": "Команда",
+    "business": "Бизнес",
+    "business_1c": "Бизнес + 1С",
+    "enterprise_1c": "Корпоративный + 1С"
+} %}
+
 <div class="card">
 <h1>💳 Тарифы</h1>
 <div class="small">
-Текущий тариф: <span class="badge">{{ plan }}</span><br>
+Текущий тариф: <span class="badge">{{ plan_names.get(plan, plan) }}</span><br>
 Лимит пользователей:
 {% if user_limit %}
 {{ user_limit }}
@@ -51,7 +59,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="grid">
 
 <div class="plan {% if plan == 'basic' %}active{% endif %}">
-    <div class="name">Basic</div>
+    <div class="name">Базовый</div>
     <div class="price">до 3 пользователей</div>
     <div class="feature">✅ Заявки</div>
     <div class="feature">✅ Фото</div>
@@ -61,9 +69,9 @@ h2{margin:0 0 16px;font-size:22px}
 </div>
 
 <div class="plan {% if plan == 'team' %}active{% endif %}">
-    <div class="name">Team</div>
+    <div class="name">Команда</div>
     <div class="price">до 10 пользователей</div>
-    <div class="feature">✅ Всё из Basic</div>
+    <div class="feature">✅ Всё из базового тарифа</div>
     <div class="feature">✅ Клиенты</div>
     <div class="feature">✅ Финансы</div>
     <div class="feature">❌ 1С</div>
@@ -71,9 +79,9 @@ h2{margin:0 0 16px;font-size:22px}
 </div>
 
 <div class="plan {% if plan == 'business' %}active{% endif %}">
-    <div class="name">Business</div>
+    <div class="name">Бизнес</div>
     <div class="price">до 30 пользователей</div>
-    <div class="feature">✅ Всё из Team</div>
+    <div class="feature">✅ Всё из тарифа Команда</div>
     <div class="feature">✅ Каталог</div>
     <div class="feature">✅ Звонки</div>
     <div class="feature">❌ 1С</div>
@@ -81,22 +89,22 @@ h2{margin:0 0 16px;font-size:22px}
 </div>
 
 <div class="plan {% if plan == 'business_1c' %}active{% endif %}">
-    <div class="name">Business + 1С</div>
+    <div class="name">Бизнес + 1С</div>
     <div class="price">до 30 пользователей</div>
-    <div class="feature">✅ Всё из Business</div>
+    <div class="feature">✅ Всё из тарифа Бизнес</div>
     <div class="feature">✅ 1С</div>
     <div class="feature">✅ Обмен клиентами</div>
     <div class="feature">✅ Счета / акты</div>
 </div>
 
 <div class="plan {% if plan == 'enterprise_1c' %}active{% endif %}">
-    <div class="name">Enterprise + 1С</div>
+    <div class="name">Корпоративный + 1С</div>
     <div class="price">без лимита</div>
     <div class="feature">✅ Всё</div>
     <div class="feature">✅ 1С</div>
     <div class="feature">✅ Звонки</div>
     <div class="feature">✅ AI-анализ звонков</div>
-    <div class="feature">✅ Enterprise support</div>
+    <div class="feature">✅ Корпоративная поддержка</div>
 </div>
 
 </div>

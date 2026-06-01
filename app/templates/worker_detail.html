@@ -35,7 +35,7 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="card">
 <h1>{{ worker["full_name"] or worker["username"] }}</h1>
 <div class="meta">Логин: {{ worker["username"] }}</div>
-<div class="meta">Роль: {{ worker["role"] }}</div>
+<div class="meta">Роль: {{ role_label(worker["role"]) }}</div>
 <div class="meta">Должность: {{ worker["position"] or "—" }}</div>
 <div class="meta">Телефон: {{ worker["phone"] or "—" }}</div>
 <div class="meta">Электронная почта: {{ worker["email"] or "—" }}</div>

@@ -53,6 +53,34 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
 
+
+def role_label(role):
+    labels = {
+        "superadmin": "Суперадмин",
+        "boss": "Владелец",
+        "manager": "Менеджер",
+        "worker": "Исполнитель",
+    }
+    return labels.get(role, role or "")
+
+
+def ui_text(value):
+    text = str(value or "")
+    replacements = {
+        "Automation:": "Автоматизация:",
+        "AI daily digest": "Ежедневная AI-сводка",
+        "AI weekly digest": "Еженедельная AI-сводка",
+        "Deadline": "Срок",
+        "deadline": "срок",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
+templates.env.globals["role_label"] = role_label
+templates.env.globals["ui_text"] = ui_text
+
 DATA_DIR = Path(os.getenv("DATA_DIR", "."))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DOCS_DIR = UPLOAD_DIR / "docs"
@@ -1391,7 +1419,7 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
     today_key = now_dt.strftime("%Y-%m-%d")
     iso_year, iso_week, _ = now_dt.isocalendar()
     week_key = f"{iso_year}-W{iso_week:02d}"
-    daily_message = f"AI daily digest {today_key}"
+    daily_message = f"Ежедневная AI-сводка {today_key}"
 
     conn = connect()
     c = conn.cursor()
@@ -1420,7 +1448,7 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
       AND message=?
     """, (company_id, daily_message)).fetchone()[0]
 
-    weekly_message = f"AI weekly digest {week_key}"
+    weekly_message = f"Еженедельная AI-сводка {week_key}"
     weekly_already_sent = c.execute("""
     SELECT COUNT(*)
     FROM automation_events
@@ -4885,7 +4913,7 @@ async def create_sla_reminders(request: Request):
                 company_id,
                 user["username"],
                 "🔴 Просрочен SLA",
-                f"Заявка #{task['id']} просрочила deadline",
+                f"Заявка #{task['id']} просрочила срок SLA",
                 f"/task/{task['id']}",
                 datetime.now().strftime("%Y-%m-%d %H:%M")
             ))
@@ -4904,7 +4932,7 @@ async def create_sla_reminders(request: Request):
             "sla_overdue",
             "task",
             task["id"],
-            f"Заявка #{task['id']} просрочила deadline",
+            f"Заявка #{task['id']} просрочила срок SLA",
             f"/task/{task['id']}"
         )
 
@@ -10280,7 +10308,7 @@ async def client_detail(
             if selected_activity_filter == "status" and "статус" not in action:
                 continue
 
-            if selected_activity_filter == "date" and "дат" not in action and "deadline" not in action:
+            if selected_activity_filter == "date" and "дат" not in action and "срок" not in action:
                 continue
 
             if selected_activity_filter == "comment" and "коммент" not in action:
@@ -11675,7 +11703,7 @@ async def favicon():
 async def health_check():
     return {
         "status": "ok",
-        "app": "Field Service CRM"
+        "app": "Бизнес CRM"
     }
 
 
@@ -13591,8 +13619,8 @@ async def update_task_deadline(request: Request, task_id: int):
         task_id,
         username,
         role,
-        "Изменён deadline",
-        deadline_at or "Deadline очищен",
+        "Изменён срок",
+        deadline_at or "Срок очищен",
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
@@ -13618,8 +13646,8 @@ async def update_task_deadline(request: Request, task_id: int):
             """, (
                 company_id,
                 owner["username"],
-                "⏰ Изменён deadline",
-                f"{username} изменил deadline заявки #{task_id}",
+                "⏰ Изменён срок",
+                f"{username} изменил срок заявки #{task_id}",
                 f"/task/{task_id}",
                 datetime.now().strftime("%Y-%m-%d %H:%M")
             ))

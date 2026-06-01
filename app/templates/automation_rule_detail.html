@@ -122,7 +122,7 @@
                     <div>
                         <b>{{ status_labels.get(event["status"], event["status"]) }}</b>
                         <div class="label">{{ event["created_at"] }}</div>
-                        <div>{{ event["message"].replace("Automation:", "Автоматизация:") if event["message"] else "Без сообщения" }}</div>
+                        <div>{{ ui_text(event["message"]) if event["message"] else "Без сообщения" }}</div>
                     </div>
                     <a href="/automation/events/{{ event['id'] }}" class="btn">Открыть</a>
                 </div>
@@ -308,7 +308,7 @@
                 <tr>
                     <td>{{ event["id"] }}</td>
                     <td>{{ status_labels.get(event["status"], event["status"]) }}</td>
-                    <td>{{ event["message"] or "" }}</td>
+                    <td>{{ ui_text(event["message"]) if event["message"] else "" }}</td>
                     <td>{{ event["created_at"] }}</td>
                     <td><a href="/automation/events/{{ event['id'] }}" class="btn">Открыть</a></td>
                 </tr>

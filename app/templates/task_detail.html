@@ -783,9 +783,9 @@ button{
 <div class="timeline-dot">⚡</div>
 
 <div>
-<div class="timeline-title">{{ item["action"] }}</div>
+<div class="timeline-title">{{ ui_text(item["action"]) }}</div>
 <div class="timeline-user">
-{{ item["username"] }} / {{ item["role"] }}
+{{ item["username"] }} / {{ role_label(item["role"]) }}
 </div>
 </div>
 
@@ -891,11 +891,11 @@ button{
 	<div class="modal" id="deadlineModal">
 <div class="modal-content">
 
-<h3>Изменить deadline</h3>
+<h3>Изменить срок</h3>
 
 <form method="post" action="/task/{{ task['id'] }}/deadline">
 <input type="datetime-local" name="deadline_at">
-<button class="btn blue">Сохранить deadline</button>
+<button class="btn blue">Сохранить срок</button>
 </form>
 
 </div>

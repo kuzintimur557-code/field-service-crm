@@ -240,7 +240,7 @@
                     <td>{{ event["id"] }}</td>
                     <td>{{ event["rule_name"] or "—" }}</td>
                     <td>{{ trigger_labels.get(event["trigger_key"], event["trigger_key"]) }}</td>
-                    <td>{{ event["message"].replace("Automation:", "Автоматизация:") if event["message"] else "" }}</td>
+                    <td>{{ ui_text(event["message"]) if event["message"] else "" }}</td>
                     <td>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
                             <a href="/automation/events/{{ event['id'] }}" class="btn">Подробнее</a>

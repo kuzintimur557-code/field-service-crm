@@ -108,6 +108,12 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 <h2>Список полей</h2>
 
 {% if fields %}
+{% set field_type_labels = {
+    "text": "Текст",
+    "number": "Число",
+    "date": "Дата",
+    "select": "Список"
+} %}
 {% for field in fields %}
 <div class="field">
     <div>
@@ -124,7 +130,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
         </div>
     </div>
 	    <div>
-	        <span class="badge">{{ field["field_type"] }}</span>
+	        <span class="badge">{{ field_type_labels.get(field["field_type"], field["field_type"]) }}</span>
 	        {% if field["is_required"] %}
 	        <span class="badge">Обязательное</span>
 	        {% endif %}
