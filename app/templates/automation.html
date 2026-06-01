@@ -251,10 +251,45 @@ function a3EventTypeLabel(eventType) {
     const labels = {
         system_health: "Состояние системы",
         self_healing: "Самовосстановление",
+        approval: "Подтверждение",
         autonomous_action_approved: "Действие одобрено",
         autonomous_action_rejected: "Действие отклонено"
     };
     return labels[eventType] || eventType || "-";
+}
+
+function a3DecisionLabel(decision) {
+    const labels = {
+        approved: "Одобрено",
+        rejected: "Отклонено"
+    };
+    return labels[decision] || decision || "-";
+}
+
+function a3ActorLabel(actor) {
+    if (!actor || actor === "system") {
+        return "Система";
+    }
+
+    return actor;
+}
+
+function refreshA3ApprovalWidgets() {
+    if (window.loadA3AutonomousActions) {
+        loadA3AutonomousActions();
+    }
+
+    if (window.loadA3ApprovalQueue) {
+        loadA3ApprovalQueue();
+    }
+
+    if (window.loadA3ApprovalHistory) {
+        loadA3ApprovalHistory();
+    }
+
+    if (window.loadA3OpsTimeline) {
+        loadA3OpsTimeline();
+    }
 }
 
 async function loadA3SystemHealth() {
@@ -858,14 +893,10 @@ async function loadA3OpsTimeline() {
                             ${item.created_at}
                         </div>
 
-                        ${item.status === "awaiting_approval" ? `
-                            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px">
-                                <button type="button" onclick="approveA3AutonomousAction(${item.id})" style="width:auto;padding:8px 11px;border-radius:999px;font-size:13px;background:#16a34a">
-                                    Одобрить
-                                </button>
-                                <button type="button" onclick="rejectA3AutonomousAction(${item.id})" style="width:auto;padding:8px 11px;border-radius:999px;font-size:13px;background:#991b1b">
-                                    Отклонить
-                                </button>
+                        ${item.target_type ? `
+                            <div class="meta" style="margin-top:8px">
+                                ${a3TargetLabel(item.target_type)}
+                                #${item.target_id || "-"}
                             </div>
                         ` : ""}
                     </div>
@@ -875,7 +906,7 @@ async function loadA3OpsTimeline() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Ops timeline load ошибка", err);
+        console.error("Ошибка загрузки A3 timeline", err);
     }
 }
 
@@ -1194,14 +1225,14 @@ async function approveA3AutonomousAction(actionId) {
     await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {
         method: "POST"
     });
-    loadA3AutonomousActions();
+    refreshA3ApprovalWidgets();
 }
 
 async function rejectA3AutonomousAction(actionId) {
     await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {
         method: "POST"
     });
-    loadA3AutonomousActions();
+    refreshA3ApprovalWidgets();
 }
 
 loadA3AutonomousActions();
@@ -1482,11 +1513,12 @@ async function loadA3ApprovalQueue() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.action_type}
+                            ${a3ActionLabel(item.action_type)}
                         </div>
 
                         <div style="margin-top:8px;color:#374151">
-                            ${item.target_type} #${item.target_id || "-"}
+                            ${a3TargetLabel(item.target_type)}
+                            #${item.target_id || "-"}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
@@ -1513,38 +1545,16 @@ async function loadA3ApprovalQueue() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Approval queue load failed", err);
+        console.error("Ошибка загрузки очереди подтверждений", err);
     }
 }
 
 async function approveA3Action(actionId) {
-    await fetch(
-        `/api/a3/autonomous-actions/${actionId}/approve`,
-        {
-            method: "POST"
-        }
-    );
-
-    loadA3ApprovalQueue();
-
-    if (window.loadA3AutonomousActions) {
-        loadA3AutonomousActions();
-    }
+    await approveA3AutonomousAction(actionId);
 }
 
 async function rejectA3Action(actionId) {
-    await fetch(
-        `/api/a3/autonomous-actions/${actionId}/reject`,
-        {
-            method: "POST"
-        }
-    );
-
-    loadA3ApprovalQueue();
-
-    if (window.loadA3AutonomousActions) {
-        loadA3AutonomousActions();
-    }
+    await rejectA3AutonomousAction(actionId);
 }
 
 loadA3ApprovalQueue();
@@ -1558,12 +1568,12 @@ setInterval(loadA3ApprovalQueue, 30000);
             <h2 style="margin-bottom:8px">A3 История подтверждений</h2>
 
             <div class="meta">
-                Audit trail подтверждений и отклонений AI-действий.
+                История решений по автономным AI-действиям.
             </div>
         </div>
 
         <div class="pill">
-            Audit Trail
+            Журнал решений
         </div>
     </div>
 
@@ -1618,16 +1628,17 @@ async function loadA3ApprovalHistory() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.action_type || "AI Action"}
+                            ${a3ActionLabel(item.action_type)}
                         </div>
 
                         <div style="margin-top:8px;color:#374151">
-                            ${item.target_type || "-"} #${item.target_id || "-"}
+                            ${a3TargetLabel(item.target_type)}
+                            #${item.target_id || "-"}
                         </div>
 
                         <div style="margin-top:8px">
                             <span class="pill">
-                                ${item.decision}
+                                ${a3DecisionLabel(item.decision)}
                             </span>
                         </div>
 
@@ -1638,7 +1649,7 @@ async function loadA3ApprovalHistory() {
 
                     <div style="text-align:right">
                         <div class="meta">
-                            ${item.decided_by || "system"}
+                            ${a3ActorLabel(item.decided_by)}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
@@ -1651,7 +1662,7 @@ async function loadA3ApprovalHistory() {
             container.appendChild(card);
         }
     } catch (err) {
-        console.error("Approval history load failed", err);
+        console.error("Ошибка загрузки истории подтверждений", err);
     }
 }
 

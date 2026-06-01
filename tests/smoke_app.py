@@ -3981,6 +3981,11 @@ async def assert_a3_api_layer():
     conn.commit()
     conn.close()
 
+    approval_queue = crm.api_a3_approval_queue(request)
+    assert "items" in approval_queue
+    assert any(item["id"] == approve_action_id for item in approval_queue["items"])
+    assert any(item["id"] == reject_action_id for item in approval_queue["items"])
+
     approve_result = crm.api_a3_approve_autonomous_action(request, approve_action_id)
     assert approve_result["ok"] is True
 
@@ -4003,6 +4008,19 @@ async def assert_a3_api_layer():
 
     assert approved_row["status"] == "approved"
     assert rejected_row["status"] == "rejected"
+
+    approval_history = crm.api_a3_approval_history(request)
+    assert "items" in approval_history
+    assert any(
+        item["action_id"] == approve_action_id
+        and item["decision"] == "approved"
+        for item in approval_history["items"]
+    )
+    assert any(
+        item["action_id"] == reject_action_id
+        and item["decision"] == "rejected"
+        for item in approval_history["items"]
+    )
 
     conn = connect()
     c = conn.cursor()

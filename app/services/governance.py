@@ -93,6 +93,7 @@ def get_approval_history(company_id):
     rows = c.execute("""
         SELECT
             autonomous_action_approvals.*,
+            autonomous_action_approvals.action_queue_id AS action_id,
             autonomous_action_queue.action_type,
             autonomous_action_queue.target_type,
             autonomous_action_queue.target_id
