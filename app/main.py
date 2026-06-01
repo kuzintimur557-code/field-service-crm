@@ -27,7 +27,10 @@ from app.services.self_healing import (
     get_recovery_history,
     run_self_healing_cycle,
 )
-from app.services.system_health import SystemHealthCalculator
+from app.services.system_health import (
+    calculate_system_health,
+    get_system_health_history,
+)
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -14519,70 +14522,6 @@ async def task_pdf(request: Request, task_id: int):
     )
 
 
-def save_system_health_snapshot(company_id, data):
-    conn = connect()
-    c = conn.cursor()
-    now = datetime.now()
-    now_text = now.isoformat(timespec="seconds")
-    score = data.get("score", 100)
-    status = data.get("status", "healthy")
-
-    last_snapshot = c.execute("""
-        SELECT score, status, created_at
-        FROM system_health_snapshots
-        WHERE company_id=?
-        ORDER BY id DESC
-        LIMIT 1
-    """, (company_id,)).fetchone()
-
-    if last_snapshot:
-        should_write = (
-            last_snapshot["score"] != score
-            or last_snapshot["status"] != status
-        )
-
-        if not should_write:
-            try:
-                created_at = datetime.fromisoformat(last_snapshot["created_at"])
-                should_write = (now - created_at).total_seconds() >= 300
-            except Exception:
-                should_write = True
-
-        if not should_write:
-            conn.close()
-            return False
-
-    c.execute("""
-        INSERT INTO system_health_snapshots (
-            company_id,
-            score,
-            status,
-            failed_count,
-            skipped_count,
-            disabled_rules_count,
-            stale_rules_count,
-            retry_risk_count,
-            unhealthy_rules_count,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        score,
-        status,
-        data.get("failed_count", 0),
-        data.get("skipped_count", 0),
-        data.get("disabled_rules_count", 0),
-        data.get("stale_rules_count", 0),
-        data.get("retry_risk_count", 0),
-        data.get("unhealthy_rules_count", 0),
-        now_text,
-    ))
-    conn.commit()
-    conn.close()
-
-    return True
-
-
 def get_a3_company_id(request: Request):
     username = get_user(request)
 
@@ -14604,65 +14543,7 @@ def api_a3_system_health(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    conn = connect()
-    c = conn.cursor()
-
-    rules = c.execute("""
-        SELECT
-            automation_rules.*,
-            MAX(automation_events.created_at) AS last_run_at
-        FROM automation_rules
-        LEFT JOIN automation_events
-          ON automation_events.rule_id=automation_rules.id
-          AND automation_events.company_id=automation_rules.company_id
-        WHERE automation_rules.company_id=?
-        GROUP BY automation_rules.id
-    """, (company_id,)).fetchall()
-
-    events = c.execute("""
-        SELECT *
-        FROM automation_events
-        WHERE company_id=?
-        ORDER BY id DESC
-        LIMIT 500
-    """, (company_id,)).fetchall()
-
-    conn.close()
-
-    result = SystemHealthCalculator(rules=rules, events=events).calculate()
-    data = result.to_dict()
-
-    data["unhealthy_rules_count"] = (
-        data.get("disabled_rules_count", 0)
-        + data.get("stale_rules_count", 0)
-        + data.get("retry_risk_count", 0)
-    )
-
-    if data["status"] == "healthy":
-        data["status_title"] = "Система стабильна"
-        data["status_message"] = "Движок автоматизации работает нормально."
-    elif data["status"] == "warning":
-        data["status_title"] = "Требуется внимание"
-        data["status_message"] = "Некоторые сигналы автоматизации требуют проверки."
-    elif data["status"] == "degraded":
-        data["status_title"] = "Стабильность снижена"
-        data["status_message"] = "Надёжность автоматизации снизилась."
-    else:
-        data["status_title"] = "Критичное состояние"
-        data["status_message"] = "Движок автоматизации требует срочного внимания."
-
-    save_system_health_snapshot(company_id, data)
-
-    if data["status"] in {"degraded", "critical"}:
-        create_ops_timeline_event(
-            company_id=company_id,
-            event_type="system_health",
-            severity=data["status"],
-            title="Состояние автоматизации ухудшилось",
-            message=data.get("status_message", ""),
-        )
-
-    return data
+    return calculate_system_health(company_id)
 
 
 @app.get("/api/a3/system-health/history")
@@ -14672,28 +14553,8 @@ def api_a3_system_health_history(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    conn = connect()
-    c = conn.cursor()
-    rows = c.execute("""
-        SELECT
-            score,
-            status,
-            failed_count,
-            skipped_count,
-            disabled_rules_count,
-            stale_rules_count,
-            retry_risk_count,
-            unhealthy_rules_count,
-            created_at
-        FROM system_health_snapshots
-        WHERE company_id=?
-        ORDER BY id DESC
-        LIMIT 30
-    """, (company_id,)).fetchall()
-    conn.close()
-
     return {
-        "items": [dict(row) for row in rows][::-1]
+        "items": get_system_health_history(company_id, limit=30)
     }
 
 
