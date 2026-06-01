@@ -9,6 +9,7 @@ from app.services.autonomous_actions import (
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
+    ensure_governance_settings,
     get_governance_settings,
     save_governance_settings,
     get_approval_queue,
@@ -14838,51 +14839,7 @@ def api_a3_governance_settings(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    conn = connect()
-    c = conn.cursor()
-
-    row = c.execute("""
-        SELECT *
-        FROM autonomous_governance_settings
-        WHERE company_id=?
-        ORDER BY id DESC
-        LIMIT 1
-    """, (company_id,)).fetchone()
-
-    if not row:
-        c.execute("""
-            INSERT INTO autonomous_governance_settings (
-                company_id,
-                autonomous_enabled,
-                max_actions_per_cycle,
-                require_critical_approval,
-                confidence_threshold,
-                protected_rules_json,
-                created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            company_id,
-            1,
-            20,
-            1,
-            70,
-            "[]",
-            datetime.now().isoformat(timespec="seconds"),
-        ))
-
-        conn.commit()
-
-        row = c.execute("""
-            SELECT *
-            FROM autonomous_governance_settings
-            WHERE company_id=?
-            ORDER BY id DESC
-            LIMIT 1
-        """, (company_id,)).fetchone()
-
-    conn.close()
-
-    return dict(row)
+    return ensure_governance_settings(company_id)
 
 
 @app.post("/api/a3/governance-settings/update")
@@ -14891,9 +14848,6 @@ async def api_a3_governance_settings_update(request: Request):
 
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
-
-    conn = connect()
-    c = conn.cursor()
 
     payload = {}
 
@@ -14907,32 +14861,14 @@ async def api_a3_governance_settings_update(request: Request):
     confidence_threshold = int(payload.get("confidence_threshold", 70))
     max_actions_per_cycle = int(payload.get("max_actions_per_cycle", 20))
 
-    c.execute("""
-        INSERT INTO autonomous_governance_settings (
-            company_id,
-            autonomous_enabled,
-            max_actions_per_cycle,
-            require_critical_approval,
-            confidence_threshold,
-            protected_rules_json,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        autonomous_enabled,
-        max_actions_per_cycle,
-        require_critical_approval,
-        confidence_threshold,
-        "[]",
-        datetime.now().isoformat(timespec="seconds"),
-    ))
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "ok": True
-    }
+    return save_governance_settings(
+        company_id=company_id,
+        autonomous_enabled=autonomous_enabled,
+        max_actions_per_cycle=max_actions_per_cycle,
+        require_critical_approval=require_critical_approval,
+        confidence_threshold=confidence_threshold,
+        protected_rules_json="[]",
+    )
 
 
 @app.post("/api/a3/autonomous-actions/{action_id}/approve")

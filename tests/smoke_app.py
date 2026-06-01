@@ -4124,6 +4124,10 @@ async def assert_a3_api_layer():
     )
     assert update_result["ok"] is True
 
+    updated_governance = crm.api_a3_governance_settings(request)
+    assert updated_governance["confidence_threshold"] == 75
+    assert updated_governance["max_actions_per_cycle"] == 5
+
 
 def main():
     try:

@@ -29,6 +29,24 @@ def get_governance_settings(company_id):
     return dict(row)
 
 
+def ensure_governance_settings(company_id):
+    settings = get_governance_settings(company_id)
+
+    if settings.get("id"):
+        return settings
+
+    save_governance_settings(
+        company_id=company_id,
+        autonomous_enabled=settings["autonomous_enabled"],
+        max_actions_per_cycle=settings["max_actions_per_cycle"],
+        require_critical_approval=settings["require_critical_approval"],
+        confidence_threshold=settings["confidence_threshold"],
+        protected_rules_json=settings["protected_rules_json"],
+    )
+
+    return get_governance_settings(company_id)
+
+
 def save_governance_settings(
     company_id,
     autonomous_enabled,
