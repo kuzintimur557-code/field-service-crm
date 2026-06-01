@@ -3947,6 +3947,36 @@ async def assert_a3_api_layer():
     conn = connect()
     c = conn.cursor()
     c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "A3 disabled unhealthy smoke",
+        "weekly_digest",
+        "{}",
+        0,
+        "owner2",
+        datetime.now().isoformat(timespec="seconds"),
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    disabled_unhealthy_rule_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    unhealthy_rules = crm.api_a3_unhealthy_rules(request)
+    assert "items" in unhealthy_rules
+    assert any(
+        item["id"] == disabled_unhealthy_rule_id
+        and "Правило отключено" in item["issues"]
+        for item in unhealthy_rules["items"]
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
     INSERT INTO autonomous_action_queue (
         company_id, action_type, target_type, target_id,
         status, payload_json, created_at

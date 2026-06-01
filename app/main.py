@@ -2788,7 +2788,7 @@ async def automation_page(
 
         health_issues = []
 
-        if not rule.get("enabled", 1):
+        if not rule.get("active", 1):
             health_issues.append("Правило отключено")
 
         if not rule.get("action_count"):
@@ -14791,7 +14791,7 @@ def api_a3_unhealthy_rules(request: Request):
 
         issues = []
 
-        if not rule.get("enabled", 1):
+        if not rule.get("active", 1):
             issues.append("Правило отключено")
 
         if not rule.get("action_count"):
