@@ -3,6 +3,7 @@ import json
 
 from app.database import connect
 from app.services.governance import get_governance_settings
+from app.services.ops_timeline import create_ops_timeline_event
 
 
 def enqueue_autonomous_action(
@@ -246,4 +247,147 @@ def process_autonomous_actions(company_id=1):
         "processed": processed,
         "awaiting_approval": awaiting_approval,
         "failed": failed,
+    }
+
+
+def approve_autonomous_action(company_id, action_id, decided_by="system"):
+    conn = connect()
+    c = conn.cursor()
+
+    row = c.execute("""
+        SELECT *
+        FROM autonomous_action_queue
+        WHERE id=?
+          AND company_id=?
+          AND status='awaiting_approval'
+    """, (
+        action_id,
+        company_id,
+    )).fetchone()
+
+    if not row:
+        conn.close()
+
+        return {
+            "ok": False,
+            "error": "not_found",
+        }
+
+    c.execute("""
+        INSERT INTO autonomous_action_approvals (
+            company_id,
+            action_queue_id,
+            decision,
+            decided_by,
+            reason,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        action_id,
+        "approved",
+        decided_by,
+        "Одобрено вручную",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+
+    c.execute("""
+        UPDATE autonomous_action_queue
+        SET status='approved',
+            processed_at=NULL
+        WHERE id=?
+          AND company_id=?
+    """, (
+        action_id,
+        company_id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    create_ops_timeline_event(
+        company_id=company_id,
+        event_type="approval",
+        severity="info",
+        title="AI-действие подтверждено",
+        message=f"Подтверждено действие #{action_id}",
+        target_type="autonomous_action",
+        target_id=action_id,
+    )
+
+    return {
+        "ok": True,
+        "action_id": action_id,
+    }
+
+
+def reject_autonomous_action(company_id, action_id, decided_by="system"):
+    conn = connect()
+    c = conn.cursor()
+
+    row = c.execute("""
+        SELECT *
+        FROM autonomous_action_queue
+        WHERE id=?
+          AND company_id=?
+          AND status='awaiting_approval'
+    """, (
+        action_id,
+        company_id,
+    )).fetchone()
+
+    if not row:
+        conn.close()
+
+        return {
+            "ok": False,
+            "error": "not_found",
+        }
+
+    c.execute("""
+        INSERT INTO autonomous_action_approvals (
+            company_id,
+            action_queue_id,
+            decision,
+            decided_by,
+            reason,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        action_id,
+        "rejected",
+        decided_by,
+        "Отклонено вручную",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+
+    c.execute("""
+        UPDATE autonomous_action_queue
+        SET status='rejected',
+            processed_at=?
+        WHERE id=?
+          AND company_id=?
+    """, (
+        datetime.now().isoformat(timespec="seconds"),
+        action_id,
+        company_id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    create_ops_timeline_event(
+        company_id=company_id,
+        event_type="approval",
+        severity="warning",
+        title="AI-действие отклонено",
+        message=f"Отклонено действие #{action_id}",
+        target_type="autonomous_action",
+        target_id=action_id,
+    )
+
+    return {
+        "ok": True,
+        "action_id": action_id,
     }

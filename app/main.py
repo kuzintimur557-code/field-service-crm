@@ -3,8 +3,10 @@ from app.services.automation_analytics import (
     get_unhealthy_rules,
 )
 from app.services.autonomous_actions import (
+    approve_autonomous_action,
     get_autonomous_actions,
     process_autonomous_actions,
+    reject_autonomous_action,
 )
 from app.services.decision_engine import get_decision_engine
 
@@ -14879,68 +14881,16 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     decided_by = get_user(request) or "system"
-
-    conn = connect()
-    c = conn.cursor()
-
-    row = c.execute("""
-        SELECT *
-        FROM autonomous_action_queue
-        WHERE id=?
-          AND company_id=?
-          AND status='awaiting_approval'
-    """, (
-        action_id,
-        company_id,
-    )).fetchone()
-
-    if not row:
-        conn.close()
-        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
-
-    c.execute("""
-        INSERT INTO autonomous_action_approvals (
-            company_id,
-            action_queue_id,
-            decision,
-            decided_by,
-            reason,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        action_id,
-        "approved",
-        decided_by,
-        "Одобрено вручную",
-        datetime.now().isoformat(timespec="seconds"),
-    ))
-
-    c.execute("""
-        UPDATE autonomous_action_queue
-        SET status='approved',
-            processed_at=NULL
-        WHERE id=?
-          AND company_id=?
-    """, (action_id, company_id))
-
-    conn.commit()
-    conn.close()
-
-    create_ops_timeline_event(
+    result = approve_autonomous_action(
         company_id=company_id,
-        event_type="approval",
-        severity="info",
-        title="AI-действие подтверждено",
-        message=f"Подтверждено действие #{action_id}",
-        target_type="autonomous_action",
-        target_id=action_id,
+        action_id=action_id,
+        decided_by=decided_by,
     )
 
-    return {
-        "ok": True,
-        "action_id": action_id,
-    }
+    if not result.get("ok"):
+        return JSONResponse(result, status_code=404)
+
+    return result
 
 
 @app.post("/api/a3/autonomous-actions/{action_id}/reject")
@@ -14951,72 +14901,16 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     decided_by = get_user(request) or "system"
-
-    conn = connect()
-    c = conn.cursor()
-
-    row = c.execute("""
-        SELECT *
-        FROM autonomous_action_queue
-        WHERE id=?
-          AND company_id=?
-          AND status='awaiting_approval'
-    """, (
-        action_id,
-        company_id,
-    )).fetchone()
-
-    if not row:
-        conn.close()
-        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
-
-    c.execute("""
-        INSERT INTO autonomous_action_approvals (
-            company_id,
-            action_queue_id,
-            decision,
-            decided_by,
-            reason,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        action_id,
-        "rejected",
-        decided_by,
-        "Отклонено вручную",
-        datetime.now().isoformat(timespec="seconds"),
-    ))
-
-    c.execute("""
-        UPDATE autonomous_action_queue
-        SET status='rejected',
-            processed_at=?
-        WHERE id=?
-          AND company_id=?
-    """, (
-        datetime.now().isoformat(timespec="seconds"),
-        action_id,
-        company_id,
-    ))
-
-    conn.commit()
-    conn.close()
-
-    create_ops_timeline_event(
+    result = reject_autonomous_action(
         company_id=company_id,
-        event_type="approval",
-        severity="warning",
-        title="AI-действие отклонено",
-        message=f"Отклонено действие #{action_id}",
-        target_type="autonomous_action",
-        target_id=action_id,
+        action_id=action_id,
+        decided_by=decided_by,
     )
 
-    return {
-        "ok": True,
-        "action_id": action_id,
-    }
+    if not result.get("ok"):
+        return JSONResponse(result, status_code=404)
+
+    return result
 
 
 @app.get("/api/a3/approval-queue")
