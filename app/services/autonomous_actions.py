@@ -89,17 +89,28 @@ def enqueue_autonomous_action(
     }
 
 
-def get_autonomous_actions(company_id):
+def get_autonomous_actions(company_id, limit=50):
     conn = connect()
     c = conn.cursor()
 
     rows = c.execute("""
-        SELECT *
+        SELECT
+            id,
+            action_type,
+            target_type,
+            target_id,
+            status,
+            payload_json,
+            created_at,
+            processed_at
         FROM autonomous_action_queue
         WHERE company_id=?
         ORDER BY id DESC
-        LIMIT 100
-    """, (company_id,)).fetchall()
+        LIMIT ?
+    """, (
+        company_id,
+        limit,
+    )).fetchall()
 
     conn.close()
 

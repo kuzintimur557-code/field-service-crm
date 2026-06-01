@@ -14811,29 +14811,8 @@ def api_a3_autonomous_actions(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    conn = connect()
-    c = conn.cursor()
-
-    rows = c.execute("""
-        SELECT
-            id,
-            action_type,
-            target_type,
-            target_id,
-            status,
-            payload_json,
-            created_at,
-            processed_at
-        FROM autonomous_action_queue
-        WHERE company_id=?
-        ORDER BY id DESC
-        LIMIT 50
-    """, (company_id,)).fetchall()
-
-    conn.close()
-
     return {
-        "items": [dict(row) for row in rows]
+        "items": get_autonomous_actions(company_id, limit=50)
     }
 
 
