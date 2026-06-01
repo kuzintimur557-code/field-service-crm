@@ -15847,3 +15847,38 @@ def api_a3_approval_queue():
         "count": len(rows),
         "items": [dict(row) for row in rows],
     }
+
+
+@app.get("/api/a3/approval-history")
+def api_a3_approval_history():
+    company_id = 1
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT
+            autonomous_action_approvals.id,
+            autonomous_action_approvals.action_queue_id,
+            autonomous_action_approvals.decision,
+            autonomous_action_approvals.decided_by,
+            autonomous_action_approvals.reason,
+            autonomous_action_approvals.created_at,
+            autonomous_action_queue.action_type,
+            autonomous_action_queue.target_type,
+            autonomous_action_queue.target_id
+        FROM autonomous_action_approvals
+        LEFT JOIN autonomous_action_queue
+          ON autonomous_action_queue.id =
+             autonomous_action_approvals.action_queue_id
+        WHERE autonomous_action_approvals.company_id=?
+        ORDER BY autonomous_action_approvals.id DESC
+        LIMIT 100
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    return {
+        "count": len(rows),
+        "items": [dict(row) for row in rows],
+    }
