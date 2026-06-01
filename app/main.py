@@ -1,4 +1,10 @@
 import time
+from app.services.governance import (
+    get_governance_settings,
+    save_governance_settings,
+    get_approval_queue,
+    get_approval_history,
+)
 from app.services.system_health import SystemHealthCalculator
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
@@ -15877,66 +15883,22 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
 
 
 @app.get("/api/a3/approval-queue")
-def api_a3_approval_queue():
-    company_id = get_current_company_id(request if 'request' in locals() else None)
-
-    conn = connect()
-    c = conn.cursor()
-
-    rows = c.execute("""
-        SELECT
-            id,
-            action_type,
-            target_type,
-            target_id,
-            status,
-            payload_json,
-            created_at
-        FROM autonomous_action_queue
-        WHERE company_id=?
-          AND status='awaiting_approval'
-        ORDER BY id DESC
-        LIMIT 100
-    """, (company_id,)).fetchall()
-
-    conn.close()
+def api_a3_approval_queue(request: Request):
+    company_id = get_current_company_id(request)
+    items = get_approval_queue(company_id)
 
     return {
-        "count": len(rows),
-        "items": [dict(row) for row in rows],
+        "count": len(items),
+        "items": items,
     }
 
 
 @app.get("/api/a3/approval-history")
-def api_a3_approval_history():
-    company_id = get_current_company_id(request if 'request' in locals() else None)
-
-    conn = connect()
-    c = conn.cursor()
-
-    rows = c.execute("""
-        SELECT
-            autonomous_action_approvals.id,
-            autonomous_action_approvals.action_queue_id,
-            autonomous_action_approvals.decision,
-            autonomous_action_approvals.decided_by,
-            autonomous_action_approvals.reason,
-            autonomous_action_approvals.created_at,
-            autonomous_action_queue.action_type,
-            autonomous_action_queue.target_type,
-            autonomous_action_queue.target_id
-        FROM autonomous_action_approvals
-        LEFT JOIN autonomous_action_queue
-          ON autonomous_action_queue.id =
-             autonomous_action_approvals.action_queue_id
-        WHERE autonomous_action_approvals.company_id=?
-        ORDER BY autonomous_action_approvals.id DESC
-        LIMIT 100
-    """, (company_id,)).fetchall()
-
-    conn.close()
+def api_a3_approval_history(request: Request):
+    company_id = get_current_company_id(request)
+    items = get_approval_history(company_id)
 
     return {
-        "count": len(rows),
-        "items": [dict(row) for row in rows],
+        "count": len(items),
+        "items": items,
     }
