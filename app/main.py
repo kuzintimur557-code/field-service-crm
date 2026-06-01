@@ -23,7 +23,10 @@ from app.services.ops_timeline import (
 )
 from app.services.operations_insights import get_operations_insights
 from app.services.predictive_signals import get_predictive_signals
-from app.services.self_healing import run_self_healing_cycle
+from app.services.self_healing import (
+    get_recovery_history,
+    run_self_healing_cycle,
+)
 from app.services.system_health import SystemHealthCalculator
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
@@ -14752,26 +14755,8 @@ def api_a3_recovery_history(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    conn = connect()
-    c = conn.cursor()
-
-    rows = c.execute("""
-        SELECT
-            retried_events,
-            reenabled_rules,
-            status,
-            duration_ms,
-            created_at
-        FROM self_healing_runs
-        WHERE company_id=?
-        ORDER BY id DESC
-        LIMIT 20
-    """, (company_id,)).fetchall()
-
-    conn.close()
-
     return {
-        "items": [dict(row) for row in rows]
+        "items": get_recovery_history(company_id, limit=20)
     }
 
 

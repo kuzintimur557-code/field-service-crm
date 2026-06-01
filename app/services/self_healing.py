@@ -84,3 +84,28 @@ def run_self_healing_cycle(company_id=1):
         "reenabled_rules": reenabled_rules,
         "duration_ms": duration_ms,
     }
+
+
+def get_recovery_history(company_id, limit=20):
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT
+            retried_events,
+            reenabled_rules,
+            status,
+            duration_ms,
+            created_at
+        FROM self_healing_runs
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT ?
+    """, (
+        company_id,
+        limit,
+    )).fetchall()
+
+    conn.close()
+
+    return [dict(row) for row in rows]
