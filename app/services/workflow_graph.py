@@ -154,3 +154,35 @@ def get_rule_workflow_graph(company_id, rule_id):
             "success_rate": success_rate,
         },
     }
+
+
+def get_company_workflow_graphs(company_id, limit=50):
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT id
+        FROM automation_rules
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT ?
+    """, (
+        company_id,
+        limit,
+    )).fetchall()
+
+    conn.close()
+
+    items = []
+
+    for row in rows:
+        graph = get_rule_workflow_graph(company_id, row["id"])
+
+        if graph:
+            items.append(graph)
+
+    return {
+        "ok": True,
+        "count": len(items),
+        "items": items,
+    }
