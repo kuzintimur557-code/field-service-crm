@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from app.database import connect
 from app.services.governance import get_governance_settings
@@ -118,11 +119,19 @@ def process_autonomous_actions(company_id=1):
     conn = connect()
     c = conn.cursor()
 
+    try:
+        protected_rules = {
+            int(rule_id)
+            for rule_id in json.loads(governance.get("protected_rules_json") or "[]")
+        }
+    except Exception:
+        protected_rules = set()
+
     rows = c.execute("""
         SELECT *
         FROM autonomous_action_queue
         WHERE company_id=?
-          AND status='pending'
+          AND status IN ('pending', 'approved')
         ORDER BY id ASC
         LIMIT ?
     """, (
@@ -131,13 +140,33 @@ def process_autonomous_actions(company_id=1):
     )).fetchall()
 
     processed = 0
+    awaiting_approval = 0
+    failed = 0
 
     for row in rows:
         action_type = row["action_type"]
+        target_type = row["target_type"]
+        target_id = row["target_id"]
+        status = row["status"]
+
+        if (
+            action_type == "disable_rule"
+            and target_type == "automation_rule"
+            and target_id in protected_rules
+            and status != "approved"
+        ):
+            c.execute("""
+                UPDATE autonomous_action_queue
+                SET status='awaiting_approval'
+                WHERE id=?
+            """, (row["id"],))
+            awaiting_approval += 1
+            continue
 
         if (
             governance.get("require_critical_approval", 1)
             and action_type == "disable_rule"
+            and status != "approved"
         ):
             c.execute("""
                 UPDATE autonomous_action_queue
@@ -145,6 +174,46 @@ def process_autonomous_actions(company_id=1):
                 WHERE id=?
             """, (row["id"],))
 
+            awaiting_approval += 1
+            continue
+
+        if action_type == "retry_events":
+            c.execute("""
+                UPDATE automation_events
+                SET status='pending',
+                    processed_at=NULL
+                WHERE company_id=?
+                  AND status='skipped'
+                  AND (
+                    ?!='automation_rule'
+                    OR rule_id=?
+                  )
+            """, (
+                company_id,
+                target_type,
+                target_id,
+            ))
+        elif action_type == "disable_rule" and target_type == "automation_rule":
+            c.execute("""
+                UPDATE automation_rules
+                SET active=0
+                WHERE company_id=?
+                  AND id=?
+            """, (
+                company_id,
+                target_id,
+            ))
+        else:
+            c.execute("""
+                UPDATE autonomous_action_queue
+                SET status='failed',
+                    processed_at=?
+                WHERE id=?
+            """, (
+                datetime.now().isoformat(timespec="seconds"),
+                row["id"],
+            ))
+            failed += 1
             continue
 
         c.execute("""
@@ -164,4 +233,6 @@ def process_autonomous_actions(company_id=1):
 
     return {
         "processed": processed,
+        "awaiting_approval": awaiting_approval,
+        "failed": failed,
     }

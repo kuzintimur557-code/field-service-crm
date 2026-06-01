@@ -4004,9 +4004,59 @@ async def assert_a3_api_layer():
     assert approved_row["status"] == "approved"
     assert rejected_row["status"] == "rejected"
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "A3 approved disable smoke",
+        "weekly_digest",
+        "{}",
+        1,
+        "owner2",
+        datetime.now().isoformat(timespec="seconds"),
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    disable_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        disable_rule_id,
+        "approved",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    conn.commit()
+    conn.close()
+
     process_result = crm.api_a3_process_autonomous_actions(request)
     assert process_result["ok"] is True
     assert "result" in process_result
+    assert process_result["result"]["processed"] >= 1
+
+    conn = connect()
+    c = conn.cursor()
+    disabled_rule = c.execute("""
+    SELECT active
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=2
+    """, (disable_rule_id,)).fetchone()
+    conn.close()
+
+    assert disabled_rule["active"] == 0
 
     governance = crm.api_a3_governance_settings(request)
     assert "autonomous_enabled" in governance

@@ -11,6 +11,10 @@ from app.services.governance import (
     get_approval_queue,
     get_approval_history,
 )
+from app.services.ops_timeline import (
+    create_ops_timeline_event,
+    get_ops_timeline,
+)
 from app.services.system_health import SystemHealthCalculator
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
@@ -14503,73 +14507,6 @@ async def task_pdf(request: Request, task_id: int):
     )
 
 
-
-
-
-def create_ops_timeline_event(
-    company_id,
-    event_type,
-    severity,
-    title,
-    message,
-):
-    conn = connect()
-    c = conn.cursor()
-    now = datetime.now()
-    now_text = now.isoformat(timespec="seconds")
-
-    existing = c.execute("""
-        SELECT id, created_at
-        FROM ops_timeline_events
-        WHERE company_id=?
-          AND event_type=?
-          AND severity=?
-          AND title=?
-          AND message=?
-        ORDER BY id DESC
-        LIMIT 1
-    """, (
-        company_id,
-        event_type,
-        severity,
-        title,
-        message,
-    )).fetchone()
-
-    if existing:
-        try:
-            created_at = datetime.fromisoformat(existing["created_at"])
-            if (now - created_at).total_seconds() < 600:
-                conn.close()
-                return existing["id"]
-        except Exception:
-            pass
-
-    c.execute("""
-        INSERT INTO ops_timeline_events (
-            company_id,
-            event_type,
-            severity,
-            title,
-            message,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        event_type,
-        severity,
-        title,
-        message,
-        now_text,
-    ))
-
-    conn.commit()
-    event_id = c.lastrowid
-    conn.close()
-
-    return event_id
-
-
 def save_system_health_snapshot(company_id, data):
     conn = connect()
     c = conn.cursor()
@@ -15093,26 +15030,8 @@ def api_a3_ops_timeline(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    conn = connect()
-    c = conn.cursor()
-
-    rows = c.execute("""
-        SELECT
-            event_type,
-            severity,
-            title,
-            message,
-            created_at
-        FROM ops_timeline_events
-        WHERE company_id=?
-        ORDER BY id DESC
-        LIMIT 50
-    """, (company_id,)).fetchall()
-
-    conn.close()
-
     return {
-        "items": [dict(row) for row in rows]
+        "items": get_ops_timeline(company_id, limit=50)
     }
 
 
@@ -15328,98 +15247,6 @@ def api_a3_autonomous_actions(request: Request):
     }
 
 
-@app.post("/api/a3/autonomous-actions/{action_id}/approve")
-def api_a3_approve_autonomous_action(request: Request, action_id: int):
-    company_id = get_a3_company_id(request)
-
-    if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
-
-    conn = connect()
-    c = conn.cursor()
-
-    action = c.execute("""
-        SELECT id
-        FROM autonomous_action_queue
-        WHERE id=?
-          AND company_id=?
-          AND status='awaiting_approval'
-    """, (action_id, company_id)).fetchone()
-
-    if not action:
-        conn.close()
-        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
-
-    c.execute("""
-        UPDATE autonomous_action_queue
-        SET status='approved',
-            processed_at=NULL
-        WHERE id=?
-          AND company_id=?
-    """, (action_id, company_id))
-
-    conn.commit()
-    conn.close()
-
-    create_ops_timeline_event(
-        company_id=company_id,
-        event_type="autonomous_action_approved",
-        severity="info",
-        title="Автономное действие одобрено",
-        message=f"Действие #{action_id} одобрено владельцем.",
-    )
-
-    return {"ok": True, "action_id": action_id}
-
-
-@app.post("/api/a3/autonomous-actions/{action_id}/reject")
-def api_a3_reject_autonomous_action(request: Request, action_id: int):
-    company_id = get_a3_company_id(request)
-
-    if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
-
-    conn = connect()
-    c = conn.cursor()
-
-    action = c.execute("""
-        SELECT id
-        FROM autonomous_action_queue
-        WHERE id=?
-          AND company_id=?
-          AND status='awaiting_approval'
-    """, (action_id, company_id)).fetchone()
-
-    if not action:
-        conn.close()
-        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
-
-    c.execute("""
-        UPDATE autonomous_action_queue
-        SET status='rejected',
-            processed_at=?
-        WHERE id=?
-          AND company_id=?
-    """, (
-        datetime.now().isoformat(timespec="seconds"),
-        action_id,
-        company_id,
-    ))
-
-    conn.commit()
-    conn.close()
-
-    create_ops_timeline_event(
-        company_id=company_id,
-        event_type="autonomous_action_rejected",
-        severity="warning",
-        title="Автономное действие отклонено",
-        message=f"Действие #{action_id} отклонено владельцем.",
-    )
-
-    return {"ok": True, "action_id": action_id}
-
-
 @app.post("/api/a3/autonomous-actions/process")
 def api_a3_process_autonomous_actions(request: Request):
     company_id = get_a3_company_id(request)
@@ -15541,7 +15368,12 @@ async def api_a3_governance_settings_update(request: Request):
 
 @app.post("/api/a3/autonomous-actions/{action_id}/approve")
 def api_a3_approve_autonomous_action(request: Request, action_id: int):
-    company_id = 1
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    decided_by = get_user(request) or "system"
 
     conn = connect()
     c = conn.cursor()
@@ -15551,30 +15383,15 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
         FROM autonomous_action_queue
         WHERE id=?
           AND company_id=?
+          AND status='awaiting_approval'
     """, (
         action_id,
         company_id,
     )).fetchone()
 
     if not row:
-        row = c.execute("""
-            SELECT *
-            FROM autonomous_action_queue
-            WHERE id=?
-        """, (
-            action_id,
-        )).fetchone()
-
-        if row:
-            company_id = row["company_id"]
-
-    if not row:
         conn.close()
-
-        return {
-            "ok": False,
-            "error": "action_not_found",
-        }
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
 
     c.execute("""
         INSERT INTO autonomous_action_approvals (
@@ -15589,8 +15406,8 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
         company_id,
         action_id,
         "approved",
-        "system",
-        "manual approval",
+        decided_by,
+        "Одобрено вручную",
         datetime.now().isoformat(timespec="seconds"),
     ))
 
@@ -15599,38 +15416,36 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
         SET status='approved',
             processed_at=NULL
         WHERE id=?
-    """, (action_id,))
-
-    c.execute("""
-        INSERT INTO ops_timeline_events (
-            company_id,
-            event_type,
-            severity,
-            title,
-            message,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        "approval",
-        "info",
-        "AI-действие подтверждено",
-        f"Подтверждено действие #{action_id}",
-        datetime.now().isoformat(timespec="seconds"),
-    ))
+          AND company_id=?
+    """, (action_id, company_id))
 
     conn.commit()
     conn.close()
 
+    create_ops_timeline_event(
+        company_id=company_id,
+        event_type="approval",
+        severity="info",
+        title="AI-действие подтверждено",
+        message=f"Подтверждено действие #{action_id}",
+        target_type="autonomous_action",
+        target_id=action_id,
+    )
+
     return {
         "ok": True,
-        "approved": action_id,
+        "action_id": action_id,
     }
 
 
 @app.post("/api/a3/autonomous-actions/{action_id}/reject")
 def api_a3_reject_autonomous_action(request: Request, action_id: int):
-    company_id = 1
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    decided_by = get_user(request) or "system"
 
     conn = connect()
     c = conn.cursor()
@@ -15640,30 +15455,15 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
         FROM autonomous_action_queue
         WHERE id=?
           AND company_id=?
+          AND status='awaiting_approval'
     """, (
         action_id,
         company_id,
     )).fetchone()
 
     if not row:
-        row = c.execute("""
-            SELECT *
-            FROM autonomous_action_queue
-            WHERE id=?
-        """, (
-            action_id,
-        )).fetchone()
-
-        if row:
-            company_id = row["company_id"]
-
-    if not row:
         conn.close()
-
-        return {
-            "ok": False,
-            "error": "action_not_found",
-        }
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
 
     c.execute("""
         INSERT INTO autonomous_action_approvals (
@@ -15678,8 +15478,8 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
         company_id,
         action_id,
         "rejected",
-        "system",
-        "manual rejection",
+        decided_by,
+        "Отклонено вручную",
         datetime.now().isoformat(timespec="seconds"),
     ))
 
@@ -15688,41 +15488,39 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
         SET status='rejected',
             processed_at=?
         WHERE id=?
+          AND company_id=?
     """, (
         datetime.now().isoformat(timespec="seconds"),
         action_id,
-    ))
-
-    c.execute("""
-        INSERT INTO ops_timeline_events (
-            company_id,
-            event_type,
-            severity,
-            title,
-            message,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    """, (
         company_id,
-        "approval",
-        "warning",
-        "AI-действие отклонено",
-        f"Отклонено действие #{action_id}",
-        datetime.now().isoformat(timespec="seconds"),
     ))
 
     conn.commit()
     conn.close()
 
+    create_ops_timeline_event(
+        company_id=company_id,
+        event_type="approval",
+        severity="warning",
+        title="AI-действие отклонено",
+        message=f"Отклонено действие #{action_id}",
+        target_type="autonomous_action",
+        target_id=action_id,
+    )
+
     return {
         "ok": True,
-        "rejected": action_id,
+        "action_id": action_id,
     }
 
 
 @app.get("/api/a3/approval-queue")
 def api_a3_approval_queue(request: Request):
-    company_id = get_current_company_id(request)
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
     items = get_approval_queue(company_id)
 
     return {
@@ -15733,7 +15531,11 @@ def api_a3_approval_queue(request: Request):
 
 @app.get("/api/a3/approval-history")
 def api_a3_approval_history(request: Request):
-    company_id = get_current_company_id(request)
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
     items = get_approval_history(company_id)
 
     return {

@@ -401,6 +401,9 @@ def init_db():
         severity TEXT NOT NULL DEFAULT 'info',
         title TEXT NOT NULL,
         message TEXT NOT NULL,
+        source TEXT,
+        target_type TEXT,
+        target_id INTEGER,
         created_at TEXT NOT NULL
     )
     """)
