@@ -3892,7 +3892,11 @@ async def assert_required_custom_fields():
 
 
 async def assert_a3_workflow_center():
-    request = make_request()
+    public_response = crm.automation_workflows_page(make_request())
+    assert public_response.status_code == 302
+    assert public_response.headers["location"] == "/login"
+
+    request = make_request("owner2")
 
     response = crm.automation_workflows_page(request)
 
@@ -3914,6 +3918,15 @@ async def assert_a3_workflow_center():
     assert "Последние события" in body
     assert "/api/a3/workflow/rules/" in body
     assert "Обновить историю" in body
+    assert "Воспроизвести" in body
+    assert "Воспроизведение:" in body
+    assert "timeline-progress-" in body
+
+    public_timeline_response = crm.api_a3_workflow_timeline(
+        make_request(),
+        1,
+    )
+    assert public_timeline_response.status_code == 403
 
     automation_response = crm.automation_page(request)
 

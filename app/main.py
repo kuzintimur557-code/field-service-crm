@@ -2630,10 +2630,30 @@ async def open_notification(request: Request, notification_id: int):
 
 @app.get("/automation/workflows", response_class=HTMLResponse)
 def automation_workflows_page(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
     return templates.TemplateResponse(
         request,
         "automation_workflows.html",
-        {},
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+        },
     )
 
 
@@ -14831,7 +14851,11 @@ def api_a3_approval_history(request: Request):
 
 @app.post("/api/a3/ops-timeline")
 async def api_a3_create_ops_timeline_event(request: Request):
-    company_id = get_current_company_id(request)
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
     payload = await request.json()
 
     result = create_ops_timeline_event(
@@ -14855,7 +14879,10 @@ def api_a3_workflow_timeline(
     request: Request,
     rule_id: int,
 ):
-    company_id = get_current_company_id(request)
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     timeline = get_workflow_timeline(
         company_id=company_id,

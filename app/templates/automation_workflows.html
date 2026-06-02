@@ -327,12 +327,16 @@ async function loadChains() {
                         Последние события
                     </div>
                     <div class="meta">Загрузка истории...</div>
+                    <div id="timeline-progress-${rule.id}"
+                         class="meta"
+                         style="margin-top:8px;font-weight:800"></div>
                 </div>
 
                 <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
                     <a class="back" href="/automation/rules/${rule.id}">Открыть</a>
                     <button class="back" onclick="runChain(${rule.id})">Запустить</button>
                     <button class="back" onclick="loadChainTimeline(${rule.id})">Обновить историю</button>
+                    <button class="back" onclick="replayChainTimeline(${rule.id})">Воспроизвести</button>
                     <a class="back" href="/automation?event_rule_id=${rule.id}">События</a>
                     <a class="back" href="/automation/diagnostics">Диагностика</a>
                     <button class="back" onclick="flagChain(${rule.id})">Проблема</button>
@@ -357,6 +361,70 @@ async function loadChains() {
     }
 }
 
+function replayChainTimeline(ruleId) {
+    const container = document.getElementById(`timeline-${ruleId}`);
+
+    if (!container) {
+        return;
+    }
+
+    const rows = container.querySelectorAll("[data-timeline-step]");
+    const progress = document.getElementById(`timeline-progress-${ruleId}`);
+
+    if (!rows.length) {
+        alert("Нет событий для воспроизведения");
+        return;
+    }
+
+    rows.forEach(row => {
+        row.style.outline = "none";
+        row.style.background = "transparent";
+    });
+
+    let index = 0;
+
+    const timer = setInterval(() => {
+        rows.forEach(row => {
+            row.style.outline = "none";
+            row.style.background = "transparent";
+        });
+
+        const active = rows[index];
+
+        if (progress) {
+            progress.textContent = `Воспроизведение: ${index + 1} / ${rows.length}`;
+        }
+
+        if (active) {
+            active.style.outline = "2px solid #2563eb";
+            active.style.background = "#eff6ff";
+            active.style.borderRadius = "12px";
+            active.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest",
+            });
+        }
+
+        index += 1;
+
+        if (index >= rows.length) {
+            clearInterval(timer);
+
+            setTimeout(() => {
+                rows.forEach(row => {
+                    row.style.outline = "none";
+                    row.style.background = "transparent";
+                });
+
+                if (progress) {
+                    progress.textContent = "Воспроизведение завершено";
+                }
+            }, 700);
+        }
+    }, 850);
+}
+
+
 async function loadChainTimeline(ruleId) {
     const container = document.getElementById(`timeline-${ruleId}`);
 
@@ -376,6 +444,9 @@ async function loadChainTimeline(ruleId) {
                     Последние события
                 </div>
                 <div class="meta">История запусков пока пуста</div>
+                <div id="timeline-progress-${ruleId}"
+                     class="meta"
+                     style="margin-top:8px;font-weight:800"></div>
             `;
             return;
         }
@@ -384,6 +455,9 @@ async function loadChainTimeline(ruleId) {
             <div style="font-weight:900;margin-bottom:10px">
                 Последние события
             </div>
+            <div id="timeline-progress-${ruleId}"
+                 class="meta"
+                 style="margin-bottom:8px;font-weight:800"></div>
 
             <div style="display:flex;flex-direction:column;gap:8px">
                 ${steps.slice(0, 5).map(step => {
@@ -398,7 +472,7 @@ async function loadChainTimeline(ruleId) {
                     }
 
                     return `
-                        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+                        <div data-timeline-step="1" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px">
                             <div>
                                 <span class="${cls}">
                                     ${step.label}
@@ -423,6 +497,9 @@ async function loadChainTimeline(ruleId) {
                 Последние события
             </div>
             <div class="meta">Не удалось загрузить историю</div>
+            <div id="timeline-progress-${ruleId}"
+                 class="meta"
+                 style="margin-top:8px;font-weight:800"></div>
         `;
     }
 }
