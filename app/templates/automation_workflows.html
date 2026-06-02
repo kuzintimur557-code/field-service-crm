@@ -414,6 +414,7 @@ async function loadChains() {
 }
 
 const a3ReplayState = {};
+const a3TimelineState = {};
 
 function clearReplayRows(rows) {
     rows.forEach(row => {
@@ -453,6 +454,17 @@ function workflowSessionStatusLabel(status) {
     };
 
     return labels[status] || status || "-";
+}
+
+function selectWorkflowSession(ruleId, sessionIndex) {
+    const state = a3TimelineState[ruleId];
+
+    if (!state) {
+        return;
+    }
+
+    state.selectedSessionIndex = sessionIndex;
+    renderChainTimeline(ruleId, state.timeline);
 }
 
 function replayChainTimeline(ruleId) {
@@ -651,86 +663,13 @@ async function loadChainTimeline(ruleId) {
         const response = await fetch(`/api/a3/workflow/rules/${ruleId}/timeline`);
         const data = await response.json();
         const timeline = data.timeline || {};
-        const sessions = timeline.sessions || [];
-        const activeSession = sessions[0] || null;
-        const steps = activeSession ? (activeSession.steps || []) : (timeline.steps || []);
 
-        if (!steps.length) {
-            container.innerHTML = `
-                <div style="font-weight:900;margin-bottom:10px">
-                    Последние события
-                </div>
-                <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
-                <div class="meta">Сессии выполнения пока пусты</div>
-                <div class="meta">История запусков пока пуста</div>
-                <div id="timeline-progress-${ruleId}"
-                     class="meta"
-                     style="margin-top:8px;font-weight:800"></div>
-            `;
-            return;
-        }
+        a3TimelineState[ruleId] = {
+            timeline,
+            selectedSessionIndex: 0,
+        };
 
-        container.innerHTML = `
-            <div style="font-weight:900;margin-bottom:10px">
-                Последние события
-            </div>
-            <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
-            <div class="meta" style="margin-bottom:8px">
-                Активная сессия: ${activeSession?.label || "не выбрана"}
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-                ${sessions.slice(0, 4).map((session, index) => {
-                    let cls = "pill";
-
-                    if (session.status === "done") {
-                        cls += " ok";
-                    } else if (session.status === "skipped") {
-                        cls += " warn";
-                    } else if (session.status === "failed") {
-                        cls += " off";
-                    }
-
-                    return `
-                        <span class="${cls}">
-                            ${session.label || `Сессия ${index + 1}`} · Статус: ${workflowSessionStatusLabel(session.status)} · Событий: ${session.total || 0}
-                        </span>
-                    `;
-                }).join("")}
-            </div>
-            <div id="timeline-progress-${ruleId}"
-                 class="meta"
-                 style="margin-bottom:8px;font-weight:800"></div>
-
-            <div style="display:flex;flex-direction:column;gap:8px">
-                ${steps.slice(0, 5).map((step, index) => {
-                    let cls = "pill";
-
-                    if (step.level === "success") {
-                        cls += " ok";
-                    } else if (step.level === "warning") {
-                        cls += " warn";
-                    } else if (step.level === "critical") {
-                        cls += " off";
-                    }
-
-                    return `
-                        <div data-timeline-step="${index + 1}" data-timeline-level="${step.level}" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px">
-                            <div>
-                                <span class="${cls}">
-                                    ${step.label}
-                                </span>
-                                <span class="meta">
-                                    ${step.message || "Без сообщения"}
-                                </span>
-                            </div>
-                            <div class="meta">
-                                ${step.created_at || ""}
-                            </div>
-                        </div>
-                    `;
-                }).join("")}
-            </div>
-        `;
+        renderChainTimeline(ruleId, timeline);
     } catch (err) {
         console.error(err);
 
@@ -744,6 +683,102 @@ async function loadChainTimeline(ruleId) {
                  style="margin-top:8px;font-weight:800"></div>
         `;
     }
+}
+
+function renderChainTimeline(ruleId, timeline) {
+    const container = document.getElementById(`timeline-${ruleId}`);
+
+    if (!container) {
+        return;
+    }
+
+    const state = a3TimelineState[ruleId] || {};
+    const sessions = timeline.sessions || [];
+    const selectedIndex = state.selectedSessionIndex || 0;
+    const activeSession = sessions[selectedIndex] || sessions[0] || null;
+    const steps = activeSession ? (activeSession.steps || []) : (timeline.steps || []);
+
+    if (!steps.length) {
+        container.innerHTML = `
+            <div style="font-weight:900;margin-bottom:10px">
+                Последние события
+            </div>
+            <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
+            <div class="meta">Сессии выполнения пока пусты</div>
+            <div class="meta">История запусков пока пуста</div>
+            <div id="timeline-progress-${ruleId}"
+                 class="meta"
+                 style="margin-top:8px;font-weight:800"></div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="font-weight:900;margin-bottom:10px">
+            Последние события
+        </div>
+        <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
+        <div class="meta" style="margin-bottom:8px">
+            Активная сессия: ${activeSession?.label || "не выбрана"}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            ${sessions.slice(0, 4).map((session, index) => {
+                let cls = "pill";
+
+                if (session.status === "done") {
+                    cls += " ok";
+                } else if (session.status === "skipped") {
+                    cls += " warn";
+                } else if (session.status === "failed") {
+                    cls += " off";
+                }
+
+                const activeStyle = index === selectedIndex ? "box-shadow:0 0 0 2px #111827 inset" : "";
+
+                return `
+                    <button class="${cls}"
+                            data-session-index="${index}"
+                            onclick="selectWorkflowSession(${ruleId}, ${index})"
+                            style="border:0;cursor:pointer;${activeStyle}">
+                        ${session.label || `Сессия ${index + 1}`} · Статус: ${workflowSessionStatusLabel(session.status)} · Событий: ${session.total || 0}
+                    </button>
+                `;
+            }).join("")}
+        </div>
+        <div id="timeline-progress-${ruleId}"
+             class="meta"
+             style="margin-bottom:8px;font-weight:800"></div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+            ${steps.slice(0, 5).map((step, index) => {
+                let cls = "pill";
+
+                if (step.level === "success") {
+                    cls += " ok";
+                } else if (step.level === "warning") {
+                    cls += " warn";
+                } else if (step.level === "critical") {
+                    cls += " off";
+                }
+
+                return `
+                    <div data-timeline-step="${index + 1}" data-timeline-level="${step.level}" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px">
+                        <div>
+                            <span class="${cls}">
+                                ${step.label}
+                            </span>
+                            <span class="meta">
+                                ${step.message || "Без сообщения"}
+                            </span>
+                        </div>
+                        <div class="meta">
+                            ${step.created_at || ""}
+                        </div>
+                    </div>
+                `;
+            }).join("")}
+        </div>
+    `;
 }
 
 
