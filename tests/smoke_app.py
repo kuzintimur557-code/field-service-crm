@@ -627,6 +627,8 @@ async def assert_automation_page():
     assert workflow_graph["rule"]["id"] == rule["id"]
     assert workflow_graph["rule"]["trigger_key"] == "sla_overdue"
     assert workflow_graph["stats"]["actions_total"] >= 1
+    assert "debug" in workflow_graph
+    assert "quick_actions" in workflow_graph["debug"]
     assert any(node["type"] == "trigger" for node in workflow_graph["nodes"])
     assert any(node["type"] == "rule" for node in workflow_graph["nodes"])
     assert any(node["type"] == "action" for node in workflow_graph["nodes"])
@@ -3928,6 +3930,8 @@ async def assert_a3_workflow_center():
     assert "Сессия: нет" in body
     assert "Сессия: активно" in body
     assert "chain.replaying" in body
+    assert "Debug цепочки" in body
+    assert "handleDebugAction" in body
 
     public_timeline_response = crm.api_a3_workflow_timeline(
         make_request(),

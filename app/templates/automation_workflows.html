@@ -250,6 +250,7 @@ async function loadChains() {
             const actions = chain.actions || [];
             const events = chain.events || [];
             const trigger = chain.trigger || {};
+            const debug = chain.debug || {};
 
             if (chainFilter === "active" && !rule.active) continue;
             if (chainFilter === "disabled" && rule.active) continue;
@@ -320,6 +321,38 @@ async function loadChains() {
                     <div style="display:flex;flex-direction:column;gap:8px">
                         ${(state.recommendations || []).slice(0, 3).map(rec => `
                             <div class="meta">• ${rec}</div>
+                        `).join("")}
+                    </div>
+                </div>
+
+                <div style="margin-top:14px;padding:14px;border-radius:16px;background:#ffffff;border:1px solid #e5e7eb">
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+                        <div style="font-weight:900">Debug цепочки</div>
+                        <span class="pill ${debug.status === "ok" ? "ok" : "warn"}">
+                            ${debug.reason || "Проблем не найдено"}
+                        </span>
+                    </div>
+
+                    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                        ${(debug.issues || []).slice(0, 3).map(issue => `
+                            <span class="pill ${debug.status === "ok" ? "ok" : "warn"}">${issue}</span>
+                        `).join("")}
+                    </div>
+
+                    ${debug.latest_problem_event ? `
+                        <div class="meta" style="margin-top:10px">
+                            Последняя проблема:
+                            ${debug.latest_problem_event.status}
+                            #${debug.latest_problem_event.id}
+                            ${debug.latest_problem_event.message || ""}
+                        </div>
+                    ` : ""}
+
+                    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                        ${(debug.quick_actions || []).slice(0, 4).map(action => `
+                            <button class="back" onclick="handleDebugAction('${action.action_type}', '${action.target}')">
+                                ${action.label}
+                            </button>
                         `).join("")}
                     </div>
                 </div>
@@ -556,6 +589,34 @@ function stopReplayChainTimeline(ruleId) {
     }
 
     delete a3ReplayState[ruleId];
+}
+
+function handleDebugAction(actionType, target) {
+    const targetId = Number(target || 0);
+
+    if (actionType === "open_rule" || actionType === "open_rule_actions") {
+        window.location.href = `/automation/rules/${targetId}`;
+        return;
+    }
+
+    if (actionType === "open_event") {
+        window.location.href = `/automation/events/${targetId}`;
+        return;
+    }
+
+    if (actionType === "run_rule") {
+        runChain(targetId);
+        return;
+    }
+
+    if (actionType === "enable_rule") {
+        enableChain(targetId);
+        return;
+    }
+
+    if (actionType === "retry_skipped") {
+        retryChain(targetId);
+    }
 }
 
 

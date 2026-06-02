@@ -13,6 +13,46 @@ def _safe_payload(payload_json):
         return {}
 
 
+def _debug_action(label, action_type, target=None):
+    return {
+        "label": label,
+        "action_type": action_type,
+        "target": target or "",
+    }
+
+
+def _workflow_debug(rule, actions, latest_problem_event):
+    issues = []
+    quick_actions = [
+        _debug_action("Запустить цепочку", "run_rule", rule["id"]),
+        _debug_action("Открыть правило", "open_rule", rule["id"]),
+    ]
+
+    if not rule["active"]:
+        issues.append("Правило выключено")
+        quick_actions.append(_debug_action("Включить правило", "enable_rule", rule["id"]))
+
+    if not actions:
+        issues.append("В цепочке нет действий")
+        quick_actions.append(_debug_action("Добавить действие", "open_rule_actions", rule["id"]))
+
+    if latest_problem_event:
+        issues.append(f"Последнее проблемное событие: {latest_problem_event['status']}")
+        quick_actions.append(_debug_action("Открыть событие", "open_event", latest_problem_event["id"]))
+        quick_actions.append(_debug_action("Повторить пропущенные", "retry_skipped", rule["id"]))
+
+    if not issues:
+        issues.append("Критических проблем не найдено")
+
+    return {
+        "status": "needs_attention" if issues[0] != "Критических проблем не найдено" else "ok",
+        "reason": issues[0],
+        "issues": issues,
+        "latest_problem_event": dict(latest_problem_event) if latest_problem_event else None,
+        "quick_actions": quick_actions,
+    }
+
+
 def get_rule_workflow_graph(company_id, rule_id):
     conn = connect()
     c = conn.cursor()
@@ -55,6 +95,24 @@ def get_rule_workflow_graph(company_id, rule_id):
             rule_id,
         )).fetchall()
     }
+
+    latest_problem_event = c.execute("""
+        SELECT
+            id,
+            status,
+            message,
+            created_at,
+            processed_at
+        FROM automation_events
+        WHERE company_id=?
+          AND rule_id=?
+          AND status IN ('failed', 'skipped')
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        company_id,
+        rule_id,
+    )).fetchone()
 
     conn.close()
 
@@ -144,6 +202,7 @@ def get_rule_workflow_graph(company_id, rule_id):
         "nodes": nodes,
         "edges": edges,
         "actions": action_items,
+        "debug": _workflow_debug(rule, action_items, latest_problem_event),
         "stats": {
             "actions_total": len(action_items),
             "events_total": total_events,
