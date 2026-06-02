@@ -2629,14 +2629,10 @@ async def open_notification(request: Request, notification_id: int):
 
 @app.get("/automation/workflows", response_class=HTMLResponse)
 def automation_workflows_page(request: Request):
-    user = require_login(request)
-
     return templates.TemplateResponse(
+        request,
         "automation_workflows.html",
-        {
-            "request": request,
-            "user": user,
-        },
+        {},
     )
 
 

@@ -11,16 +11,16 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .container{max-width:1180px;margin:auto;padding:24px}
-.header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
-.card{background:white;padding:20px;border-radius:22px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
-.back{display:inline-block;padding:12px 16px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900;border:0;cursor:pointer}
-h1{margin:0 0 8px;font-size:34px}
-h2{margin:0 0 16px;font-size:22px}
+.header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}
+.card{background:white;padding:18px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:14px}
+.back{display:inline-block;padding:10px 14px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900;border:0;cursor:pointer}
+h1{margin:0 0 8px;font-size:30px}
+h2{margin:0 0 16px;font-size:20px}
 .meta{color:#6b7280;font-weight:800;line-height:1.45}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px}
-.workflow{border:1px solid #e5e7eb;background:#f9fafb;border-radius:22px;padding:16px}
-.workflow-title{font-size:18px;font-weight:900;margin-bottom:8px}
-.pill{display:inline-block;padding:7px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;margin-right:6px;margin-top:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}
+.chain{border:1px solid #e5e7eb;background:#f9fafb;border-radius:22px;padding:14px}
+.chain-title{font-size:17px;font-weight:900;margin-bottom:8px}
+.pill{display:inline-block;padding:6px 9px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;margin-right:6px;margin-top:6px}
 .pill.ok{background:#dcfce7;color:#166534}
 .pill.warn{background:#fef3c7;color:#92400e}
 .pill.off{background:#fee2e2;color:#991b1b}
@@ -41,7 +41,7 @@ h2{margin:0 0 16px;font-size:22px}
     <div>
         <h1>A3 Цепочки автоматизации</h1>
         <div class="meta">
-            Центр визуального просмотра workflow-цепочек: триггеры, правила, действия, события и состояние.
+            Все цепочки автоматизации в одном месте.
         </div>
     </div>
 
@@ -54,231 +54,195 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="card">
     <h2>Фильтры цепочек</h2>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="back" onclick="setWorkflowFilter('all')">Все</button>
-        <button class="back" onclick="setWorkflowFilter('active')">Активные</button>
-        <button class="back" onclick="setWorkflowFilter('disabled')">Выключенные</button>
-        <button class="back" onclick="setWorkflowFilter('problematic')">Проблемные</button>
-        <button class="back" onclick="setWorkflowFilter('empty')">Без действий</button>
+        <button class="back" onclick="setChainFilter('all')">Все</button>
+        <button class="back" onclick="setChainFilter('active')">Активные</button>
+        <button class="back" onclick="setChainFilter('disabled')">Выключенные</button>
+        <button class="back" onclick="setChainFilter('problematic')">Проблемные</button>
+        <button class="back" onclick="setChainFilter('empty')">Без действий</button>
     </div>
 </div>
 
 <div class="card">
     <h2>Сводка</h2>
-    <div id="workflow-summary" class="meta">Загрузка...</div>
+    <div id="chains-summary" class="meta">Загрузка...</div>
 </div>
 
 <div class="card">
-    <div style="
-        display:flex;
-        justify-content:space-between;
-        gap:16px;
-        align-items:flex-start;
-        flex-wrap:wrap;
-    ">
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div>
             <h2>Проблемные цепочки</h2>
-
             <div class="meta">
-                Цепочки с низким health score, ошибками,
-                отсутствием действий или отключёнными правилами.
+                Цепочки, которые требуют внимания.
             </div>
         </div>
-
-        <div class="pill off">
-            Центр проблем
-        </div>
+        <div class="pill off">Центр проблем</div>
     </div>
 
-    <div id="problem-workflows"
-         style="
-            display:flex;
-            flex-direction:column;
-            gap:12px;
-            margin-top:18px;
-         ">
-    </div>
+    <div id="problem-chains" style="display:flex;flex-direction:column;gap:10px;margin-top:18px"></div>
 </div>
 
-
-<div id="workflow-list" class="grid"></div>
+<div id="chains-list" class="grid"></div>
 
 </div>
 
 <script>
-let workflowFilter = "all";
+let chainFilter = "all";
 
-function setWorkflowFilter(filter) {
-    workflowFilter = filter;
-    loadWorkflows();
+function setChainFilter(filter) {
+    chainFilter = filter;
+    loadChains();
 }
 
-function statusLabel(rule, actions) {
-    if (!rule.active) return ["Выключена", "off", "Выключено"];
-    if (!actions.length) return ["Нет действий", "warn", "Нужно действие"];
-    return ["Активна", "ok", "Хорошее"];
+function getChainStatus(rule, actions) {
+    if (!rule.active) return ["Выключена", "off"];
+    if (!actions.length) return ["Нет действий", "warn"];
+    return ["Активна", "ok"];
 }
 
-function workflowGraphSvg() {
+function renderChainGraph(chain) {
+    const trigger = chain.trigger || {};
+    const actions = chain.actions || [];
+    const events = chain.events || [];
+    const state = chain.health || {};
+
+    let ruleColor = "#dcfce7";
+    let actionColor = "#fef3c7";
+    let eventColor = "#ede9fe";
+    let edgeColor = "#9ca3af";
+
+    if (state.status === "warning") {
+        ruleColor = "#fef3c7";
+        edgeColor = "#f59e0b";
+    }
+
+    if (state.status === "degraded") {
+        ruleColor = "#ffedd5";
+        actionColor = "#fed7aa";
+        edgeColor = "#ea580c";
+    }
+
+    if (state.status === "critical") {
+        ruleColor = "#fee2e2";
+        actionColor = "#fecaca";
+        eventColor = "#fecaca";
+        edgeColor = "#dc2626";
+    }
+
+    if (!actions.length) {
+        actionColor = "#fee2e2";
+        edgeColor = "#dc2626";
+    }
+
+    const failedEvents = events.filter(event => event.status === "failed").length;
+    const skippedEvents = events.filter(event => event.status === "skipped").length;
+
+    if (failedEvents || skippedEvents) {
+        eventColor = "#fee2e2";
+    }
+
+    const nodes = [
+        {x:20,label:trigger.label || "Триггер",color:"#dbeafe"},
+        {x:250,label:`Правило ${state.score ?? 100}`,color:ruleColor},
+        {x:480,label:actions.length ? `Действия ${actions.length}` : "Нет действий",color:actionColor},
+        {x:710,label:events.length ? `События ${events.length}` : "События",color:eventColor}
+    ];
+
+    const edges = [[140,250],[370,480],[600,710]];
+
+    const edgeSvg = edges.map(edge => `
+        <line x1="${edge[0]}" y1="38" x2="${edge[1]}" y2="38"
+              stroke="${edgeColor}" stroke-width="4" stroke-linecap="round"/>
+    `).join("");
+
+    const nodeSvg = nodes.map(node => `
+        <g>
+            <rect x="${node.x}" y="16" rx="14" width="120" height="44"
+                  fill="${node.color}" stroke="#e5e7eb"/>
+            <text x="${node.x + 60}" y="43" text-anchor="middle"
+                  font-size="13" font-weight="700">${node.label}</text>
+        </g>
+    `).join("");
+
     return `
-        <svg width="100%" height="76" viewBox="0 0 760 76" preserveAspectRatio="xMidYMid meet">
-            <line x1="130" y1="38" x2="250" y2="38" stroke="#9ca3af" stroke-width="3"/>
-            <line x1="370" y1="38" x2="490" y2="38" stroke="#9ca3af" stroke-width="3"/>
-            <line x1="610" y1="38" x2="710" y2="38" stroke="#9ca3af" stroke-width="3"/>
-
-            <rect x="20" y="16" rx="14" width="110" height="44" fill="#dbeafe"/>
-            <text x="75" y="43" text-anchor="middle" font-size="13" font-weight="700">Триггер</text>
-
-            <rect x="250" y="16" rx="14" width="120" height="44" fill="#dcfce7"/>
-            <text x="310" y="43" text-anchor="middle" font-size="13" font-weight="700">Правило</text>
-
-            <rect x="490" y="16" rx="14" width="120" height="44" fill="#fef3c7"/>
-            <text x="550" y="43" text-anchor="middle" font-size="13" font-weight="700">Действия</text>
-
-            <rect x="710" y="16" rx="14" width="120" height="44" fill="#fee2e2"/>
-            <text x="770" y="43" text-anchor="middle" font-size="13" font-weight="700">События</text>
+        <svg width="100%" height="76" viewBox="0 0 860 76" preserveAspectRatio="xMidYMid meet">
+            ${edgeSvg}
+            ${nodeSvg}
         </svg>
     `;
 }
 
-async function loadWorkflows() {
-    const list = document.getElementById("workflow-list");
-    const summary = document.getElementById("workflow-summary");
+async function loadChains() {
+    const list = document.getElementById("chains-list");
+    const summary = document.getElementById("chains-summary");
 
     try {
         const response = await fetch("/api/a3/workflows/graph");
         const data = await response.json();
+        const chains = data.workflows || data.items || [];
 
-        const workflows = data.workflows || data.items || [];
         let rendered = 0;
-
         list.innerHTML = "";
 
-        for (const workflow of workflows) {
-            const rule = workflow.rule || workflow;
-            const actions = workflow.actions || [];
-            const events = workflow.events || [];
-            const trigger = workflow.trigger || {};
+        for (const chain of chains) {
+            const rule = chain.rule || chain;
+            const actions = chain.actions || [];
+            const events = chain.events || [];
+            const trigger = chain.trigger || {};
 
-            if (workflowFilter === "active" && !rule.active) continue;
-            if (workflowFilter === "disabled" && rule.active) continue;
-            if (workflowFilter === "problematic" && rule.active && actions.length > 0) continue;
-            if (workflowFilter === "empty" && actions.length > 0) continue;
+            if (chainFilter === "active" && !rule.active) continue;
+            if (chainFilter === "disabled" && rule.active) continue;
+            if (chainFilter === "problematic" && rule.active && actions.length > 0) continue;
+            if (chainFilter === "empty" && actions.length > 0) continue;
 
-            const [label, cls] = statusLabel(rule, actions);
+            const [label, cls] = getChainStatus(rule, actions);
+            const state = chain.health || {};
+            const stateTitle = state.title || "Стабильно";
+            const stateScore = state.score ?? 100;
 
-            const workflowHealth = workflow.health || {};
-
-            let healthTitle =
-                workflowHealth.title || "Стабильно";
-
-            let healthScore =
-                workflowHealth.score ?? 100;
-
-            let healthClass = "ok";
-
-            if (workflowHealth.status === "warning") {
-                healthClass = "warn";
-            }
-
-            if (
-                workflowHealth.status === "degraded"
-                || workflowHealth.status === "critical"
-            ) {
-                healthClass = "off";
-            }
+            let stateClass = "ok";
+            if (state.status === "warning") stateClass = "warn";
+            if (state.status === "degraded" || state.status === "critical") stateClass = "off";
 
             const card = document.createElement("div");
-            card.className = "workflow";
+            card.className = "chain";
 
             card.innerHTML = `
-                <div class="workflow-title">${rule.name || "Без названия"}</div>
+                <div class="chain-title">${rule.name || "Без названия"}</div>
 
                 <div>
                     <span class="pill ${cls}">${label}</span>
-                    <span class="pill ${healthClass}">
-                        Состояние: ${healthTitle} (${healthScore})
-                    </span>
+                    <span class="pill ${stateClass}">Состояние: ${stateTitle} (${stateScore})</span>
                     <span class="pill">Действий: ${actions.length || rule.actions_count || 0}</span>
                     <span class="pill">Событий: ${events.length || rule.events_count || 0}</span>
                 </div>
 
-                <div class="graph-box">${workflowGraphSvg()}</div>
+                <div class="graph-box">${renderChainGraph(chain)}</div>
 
                 <div class="meta" style="margin-top:14px">
                     ${trigger.label || rule.trigger_key || "Триггер не указан"}
                 </div>
 
                 <div style="margin-top:12px">
-                    ${(workflowHealth.issues || [])
-                        .slice(0, 3)
-                        .map(issue => `
-                            <div class="pill ${healthClass}">
-                                ${issue}
-                            </div>
-                        `)
-                        .join("")}
+                    ${(state.issues || []).slice(0, 3).map(issue => `
+                        <div class="pill ${stateClass}">${issue}</div>
+                    `).join("")}
                 </div>
 
-                <div style="
-                    margin-top:14px;
-                    padding:14px;
-                    border-radius:16px;
-                    background:#ffffff;
-                    border:1px solid #e5e7eb;
-                ">
-                    <div style="
-                        font-weight:900;
-                        margin-bottom:10px;
-                    ">
-                        AI-рекомендации
-                    </div>
-
-                    <div style="
-                        display:flex;
-                        flex-direction:column;
-                        gap:8px;
-                    ">
-                        ${(workflowHealth.recommendations || [])
-                            .slice(0, 3)
-                            .map(rec => `
-                                <div class="meta">
-                                    • ${rec}
-                                </div>
-                            `)
-                            .join("")}
+                <div style="margin-top:14px;padding:14px;border-radius:16px;background:#ffffff;border:1px solid #e5e7eb">
+                    <div style="font-weight:900;margin-bottom:10px">Рекомендации AI</div>
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                        ${(state.recommendations || []).slice(0, 3).map(rec => `
+                            <div class="meta">• ${rec}</div>
+                        `).join("")}
                     </div>
                 </div>
 
-                <div style="
-                    margin-top:16px;
-                    display:flex;
-                    gap:10px;
-                    flex-wrap:wrap;
-                ">
-                    <a class="back"
-                       href="/automation/rules/${rule.id}">
-                        Открыть
-                    </a>
-
-                    <button class="back"
-                            onclick="runWorkflowRule(${rule.id})">
-                        Запустить
-                    </button>
-
-                    <a class="back"
-                       href="/automation/events?rule_id=${rule.id}">
-                        События
-                    </a>
-
-                    <a class="back"
-                       href="/automation/diagnostics">
-                        Диагностика
-                    </a>
-
-                    <button class="back"
-                            onclick="flagWorkflow(${rule.id})">
-                        Проблема
-                    </button>
+                <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+                    <a class="back" href="/automation/rules/${rule.id}">Открыть</a>
+                    <button class="back" onclick="runChain(${rule.id})">Запустить</button>
+                    <a class="back" href="/automation/events?rule_id=${rule.id}">События</a>
+                    <a class="back" href="/automation/diagnostics">Диагностика</a>
+                    <button class="back" onclick="flagChain(${rule.id})">Проблема</button>
                 </div>
             `;
 
@@ -286,10 +250,8 @@ async function loadWorkflows() {
             rendered += 1;
         }
 
-        summary.textContent =
-            "Всего цепочек: " + workflows.length + ". Показано: " + rendered + ".";
-
-        renderProblemWorkflows(workflows);
+        summary.textContent = "Всего цепочек: " + chains.length + ". Показано: " + rendered + ".";
+        renderProblemChains(chains);
 
         if (!rendered) {
             list.innerHTML = '<div class="card empty">По выбранному фильтру цепочки не найдены</div>';
@@ -297,16 +259,13 @@ async function loadWorkflows() {
     } catch (err) {
         console.error(err);
         summary.textContent = "Не удалось загрузить цепочки";
-        list.innerHTML = '<div class="card empty">Ошибка загрузки workflow</div>';
+        list.innerHTML = '<div class="card empty">Ошибка загрузки цепочек</div>';
     }
 }
 
-async function runWorkflowRule(ruleId) {
+async function runChain(ruleId) {
     try {
-        await fetch(`/automation/rules/${ruleId}/run`, {
-            method: "POST"
-        });
-
+        await fetch(`/automation/rules/${ruleId}/run`, {method:"POST"});
         alert("Цепочка запущена");
     } catch (err) {
         console.error(err);
@@ -314,20 +273,18 @@ async function runWorkflowRule(ruleId) {
     }
 }
 
-async function flagWorkflow(ruleId) {
+async function flagChain(ruleId) {
     try {
         await fetch("/api/a3/ops-timeline", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                event_type: "workflow_flag",
-                severity: "warning",
-                title: "Workflow помечен как проблемный",
-                message: `Rule #${ruleId} требует проверки`,
-                target_type: "automation_rule",
-                target_id: ruleId
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+                event_type:"chain_flag",
+                severity:"warning",
+                title:"Цепочка помечена как проблемная",
+                message:`Правило #${ruleId} требует проверки`,
+                target_type:"automation_rule",
+                target_id:ruleId
             })
         });
 
@@ -338,15 +295,10 @@ async function flagWorkflow(ruleId) {
     }
 }
 
-
-async function enableWorkflowRule(ruleId) {
+async function enableChain(ruleId) {
     try {
-        await fetch(`/automation/rules/${ruleId}/toggle`, {
-            method: "POST"
-        });
-
-        loadWorkflows();
-
+        await fetch(`/automation/rules/${ruleId}/toggle`, {method:"POST"});
+        loadChains();
         alert("Правило включено");
     } catch (err) {
         console.error(err);
@@ -354,85 +306,61 @@ async function enableWorkflowRule(ruleId) {
     }
 }
 
-async function retryWorkflow(ruleId) {
+async function retryChain(ruleId) {
     try {
-        await fetch("/api/a3/self-healing/run", {
-            method: "POST"
-        });
-
-        alert("Self-healing запущен");
+        await fetch("/api/a3/self-healing/run", {method:"POST"});
+        alert("Повторный запуск отправлен");
     } catch (err) {
         console.error(err);
-        alert("Не удалось выполнить retry");
+        alert("Не удалось повторить запуск");
     }
 }
 
-async function markWorkflowFixed(ruleId) {
+async function markChainFixed(ruleId) {
     try {
         await fetch("/api/a3/ops-timeline", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                event_type: "workflow_fix",
-                severity: "info",
-                title: "Workflow исправлен",
-                message: `Rule #${ruleId} помечен как исправленный`,
-                target_type: "automation_rule",
-                target_id: ruleId
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+                event_type:"chain_fix",
+                severity:"info",
+                title:"Цепочка помечена как исправленная",
+                message:`Правило #${ruleId} помечено как исправленное`,
+                target_type:"automation_rule",
+                target_id:ruleId
             })
         });
 
-        alert("Workflow помечен как исправленный");
+        alert("Цепочка помечена как исправленная");
     } catch (err) {
         console.error(err);
-        alert("Ошибка обновления workflow");
+        alert("Не удалось обновить цепочку");
     }
 }
 
+function renderProblemChains(chains) {
+    const container = document.getElementById("problem-chains");
 
-function renderProblemWorkflows(workflows) {
-    const container =
-        document.getElementById("problem-workflows");
-
-    if (!container) {
-        return;
-    }
+    if (!container) return;
 
     container.innerHTML = "";
 
-    const problematic = workflows
-        .filter(workflow => {
-            const health = workflow.health || {};
-
-            return (
-                health.status === "warning"
-                || health.status === "degraded"
-                || health.status === "critical"
-            );
+    const problematic = chains
+        .filter(chain => {
+            const state = chain.health || {};
+            return ["warning", "degraded", "critical"].includes(state.status);
         })
-        .sort((a, b) => {
-            return (
-                (a.health?.score || 100)
-                - (b.health?.score || 100)
-            );
-        })
+        .sort((a, b) => (a.health?.score || 100) - (b.health?.score || 100))
         .slice(0, 8);
 
     if (!problematic.length) {
-        container.innerHTML = `
-            <div class="pill ok">
-                Критических проблем не найдено
-            </div>
-        `;
+        container.innerHTML = '<div class="pill ok">Критических проблем не найдено</div>';
         return;
     }
 
-    for (const workflow of problematic) {
-        const rule = workflow.rule || {};
-        const health = workflow.health || {};
-
+    for (const chain of problematic) {
+        const rule = chain.rule || {};
+        const state = chain.health || {};
         const card = document.createElement("div");
 
         card.style.padding = "16px";
@@ -441,77 +369,28 @@ function renderProblemWorkflows(workflows) {
         card.style.border = "1px solid #fdba74";
 
         card.innerHTML = `
-            <div style="
-                display:flex;
-                justify-content:space-between;
-                gap:16px;
-                flex-wrap:wrap;
-            ">
+            <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap">
                 <div>
-                    <div style="
-                        font-size:16px;
-                        font-weight:900;
-                    ">
-                        ${rule.name || "Без названия"}
-                    </div>
+                    <div style="font-size:16px;font-weight:900">${rule.name || "Без названия"}</div>
 
                     <div style="margin-top:10px">
-                        <span class="pill off">
-                            ${health.title || "Проблема"}
-                        </span>
-
-                        <span class="pill off">
-                            Score: ${health.score || 0}
-                        </span>
+                        <span class="pill off">${state.title || "Проблема"}</span>
+                        <span class="pill off">Оценка: ${state.score || 0}</span>
                     </div>
 
-                    <div style="
-                        margin-top:12px;
-                        display:flex;
-                        flex-wrap:wrap;
-                        gap:8px;
-                    ">
-                        ${(health.issues || [])
-                            .slice(0, 2)
-                            .map(issue => `
-                                <span class="pill off">
-                                    ${issue}
-                                </span>
-                            `)
-                            .join("")}
+                    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+                        ${(state.issues || []).slice(0, 2).map(issue => `
+                            <span class="pill off">${issue}</span>
+                        `).join("")}
                     </div>
                 </div>
 
-                <div style="
-                    display:flex;
-                    gap:10px;
-                    flex-wrap:wrap;
-                    align-items:center;
-                ">
-                    <a class="back"
-                       href="/automation/rules/${rule.id}">
-                        Открыть
-                    </a>
-
-                    <button class="back"
-                            onclick="runWorkflowRule(${rule.id})">
-                        Запустить
-                    </button>
-
-                    <button class="back"
-                            onclick="enableWorkflowRule(${rule.id})">
-                        Включить
-                    </button>
-
-                    <button class="back"
-                            onclick="retryWorkflow(${rule.id})">
-                        Повторить
-                    </button>
-
-                    <button class="back"
-                            onclick="markWorkflowFixed(${rule.id})">
-                        Исправлено
-                    </button>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                    <a class="back" href="/automation/rules/${rule.id}">Открыть</a>
+                    <button class="back" onclick="runChain(${rule.id})">Запустить</button>
+                    <button class="back" onclick="enableChain(${rule.id})">Включить</button>
+                    <button class="back" onclick="retryChain(${rule.id})">Повторить</button>
+                    <button class="back" onclick="markChainFixed(${rule.id})">Исправлено</button>
                 </div>
             </div>
         `;
@@ -520,7 +399,8 @@ function renderProblemWorkflows(workflows) {
     }
 }
 
-loadWorkflows();
+loadChains();
 </script>
+
 </body>
 </html>
