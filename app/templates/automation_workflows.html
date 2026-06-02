@@ -51,6 +51,8 @@ h2{margin:0 0 16px;font-size:20px}
 .chain.critical{border-color:#dc2626;box-shadow:0 0 0 1px rgba(220,38,38,.22)}
 .chain.problem .graph-box{animation:softPulse 1.8s ease-in-out infinite}
 .chain.critical .graph-box{animation:criticalPulse 1.4s ease-in-out infinite}
+.chain.replaying{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.18)}
+.chain.replaying .graph-box{box-shadow:0 0 18px rgba(37,99,235,.16)}
 @keyframes softPulse{
     0%,100%{box-shadow:0 0 0 rgba(249,115,22,0)}
     50%{box-shadow:0 0 18px rgba(249,115,22,.22)}
@@ -296,6 +298,7 @@ async function loadChains() {
                 <div>
                     <span class="pill ${cls}">${label}</span>
                     <span class="pill ${stateClass}">Состояние: ${stateTitle} (${stateScore})</span>
+                    <span id="replay-session-${rule.id}" class="pill">Сессия: нет</span>
                     <span class="pill">Действий: ${actions.length || rule.actions_count || 0}</span>
                     <span class="pill">Событий: ${events.length || rule.events_count || 0}</span>
                 </div>
@@ -410,6 +413,8 @@ function replayChainTimeline(ruleId) {
     const progress = document.getElementById(`timeline-progress-${ruleId}`);
     const speed = document.getElementById(`replay-speed-${ruleId}`);
     const pauseButton = document.getElementById(`replay-pause-${ruleId}`);
+    const session = document.getElementById(`replay-session-${ruleId}`);
+    const chainCard = container.closest(".chain");
 
     if (!rows.length) {
         alert("Нет событий для воспроизведения");
@@ -431,6 +436,15 @@ function replayChainTimeline(ruleId) {
 
     if (pauseButton) {
         pauseButton.textContent = "Пауза";
+    }
+
+    if (session) {
+        session.textContent = "Сессия: активно";
+        session.className = "pill ok";
+    }
+
+    if (chainCard) {
+        chainCard.classList.add("replaying");
     }
 
     a3ReplayState[ruleId].timer = setInterval(() => {
@@ -472,6 +486,15 @@ function replayChainTimeline(ruleId) {
                     progress.textContent = "Воспроизведение завершено";
                 }
 
+                if (session) {
+                    session.textContent = "Сессия: завершена";
+                    session.className = "pill";
+                }
+
+                if (chainCard) {
+                    chainCard.classList.remove("replaying");
+                }
+
                 delete a3ReplayState[ruleId];
             }, 700);
         }
@@ -481,6 +504,7 @@ function replayChainTimeline(ruleId) {
 function pauseReplayChainTimeline(ruleId) {
     const state = a3ReplayState[ruleId];
     const pauseButton = document.getElementById(`replay-pause-${ruleId}`);
+    const session = document.getElementById(`replay-session-${ruleId}`);
 
     if (!state) {
         return;
@@ -495,11 +519,17 @@ function pauseReplayChainTimeline(ruleId) {
     if (state.progress && state.paused) {
         state.progress.textContent = `Пауза: ${Math.max(state.index, 1)} / ${state.rows.length}`;
     }
+
+    if (session) {
+        session.textContent = state.paused ? "Сессия: пауза" : "Сессия: активно";
+    }
 }
 
 function stopReplayChainTimeline(ruleId) {
     const state = a3ReplayState[ruleId];
     const pauseButton = document.getElementById(`replay-pause-${ruleId}`);
+    const session = document.getElementById(`replay-session-${ruleId}`);
+    const chainCard = state?.rows?.[0]?.closest(".chain");
 
     if (!state) {
         return;
@@ -514,6 +544,15 @@ function stopReplayChainTimeline(ruleId) {
 
     if (pauseButton) {
         pauseButton.textContent = "Пауза";
+    }
+
+    if (session) {
+        session.textContent = "Сессия: остановлена";
+        session.className = "pill";
+    }
+
+    if (chainCard) {
+        chainCard.classList.remove("replaying");
     }
 
     delete a3ReplayState[ruleId];
