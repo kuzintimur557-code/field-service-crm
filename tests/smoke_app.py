@@ -3890,6 +3890,25 @@ async def assert_required_custom_fields():
     assert update_task_response.headers["location"] == f"/task/{task['id']}?error=custom_required"
 
 
+
+async def assert_a3_workflow_center():
+    request = make_request()
+
+    response = crm.automation_workflows_page(request)
+
+    body = response.body.decode()
+
+    assert "A3 Цепочки автоматизации" in body
+    assert "/api/a3/workflows/graph" in body
+    assert "Фильтры" in body
+
+    automation_response = crm.automation_page(request)
+
+    automation_body = automation_response.body.decode()
+
+    assert "/automation/workflows" in automation_body
+
+
 async def assert_a3_api_layer():
     request = make_request("owner2")
 
