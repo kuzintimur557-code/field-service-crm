@@ -3901,6 +3901,13 @@ async def assert_a3_workflow_center():
     assert "A3 Цепочки автоматизации" in body
     assert "/api/a3/workflows/graph" in body
     assert "Фильтры" in body
+    assert "Проблемные цепочки" in body
+    assert "AI-рекомендации" in body
+    assert "Состояние:" in body
+    assert "Запустить" in body
+    assert "Повторить" in body
+    assert "Исправлено" in body
+    assert "Центр проблем" in body
 
     automation_response = crm.automation_page(request)
 
