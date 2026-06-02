@@ -3921,6 +3921,10 @@ async def assert_a3_workflow_center():
     assert "Воспроизвести" in body
     assert "Воспроизведение:" in body
     assert "timeline-progress-" in body
+    assert "Пауза" in body
+    assert "Остановить" in body
+    assert "Скорость: обычно" in body
+    assert "data-timeline-level" in body
 
     public_timeline_response = crm.api_a3_workflow_timeline(
         make_request(),

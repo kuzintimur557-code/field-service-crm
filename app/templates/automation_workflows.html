@@ -337,6 +337,13 @@ async function loadChains() {
                     <button class="back" onclick="runChain(${rule.id})">Запустить</button>
                     <button class="back" onclick="loadChainTimeline(${rule.id})">Обновить историю</button>
                     <button class="back" onclick="replayChainTimeline(${rule.id})">Воспроизвести</button>
+                    <button id="replay-pause-${rule.id}" class="back" onclick="pauseReplayChainTimeline(${rule.id})">Пауза</button>
+                    <button class="back" onclick="stopReplayChainTimeline(${rule.id})">Остановить</button>
+                    <select id="replay-speed-${rule.id}" class="back" style="width:auto;border:0">
+                        <option value="1100">Скорость: медленно</option>
+                        <option value="850" selected>Скорость: обычно</option>
+                        <option value="500">Скорость: быстро</option>
+                    </select>
                     <a class="back" href="/automation?event_rule_id=${rule.id}">События</a>
                     <a class="back" href="/automation/diagnostics">Диагностика</a>
                     <button class="back" onclick="flagChain(${rule.id})">Проблема</button>
@@ -361,6 +368,37 @@ async function loadChains() {
     }
 }
 
+const a3ReplayState = {};
+
+function clearReplayRows(rows) {
+    rows.forEach(row => {
+        row.style.outline = "none";
+        row.style.background = "transparent";
+        row.style.borderRadius = "12px";
+    });
+}
+
+function replayStepStyle(level) {
+    if (level === "critical") {
+        return {
+            outline: "2px solid #dc2626",
+            background: "#fee2e2",
+        };
+    }
+
+    if (level === "warning") {
+        return {
+            outline: "2px solid #f59e0b",
+            background: "#fffbeb",
+        };
+    }
+
+    return {
+        outline: "2px solid #2563eb",
+        background: "#eff6ff",
+    };
+}
+
 function replayChainTimeline(ruleId) {
     const container = document.getElementById(`timeline-${ruleId}`);
 
@@ -370,34 +408,51 @@ function replayChainTimeline(ruleId) {
 
     const rows = container.querySelectorAll("[data-timeline-step]");
     const progress = document.getElementById(`timeline-progress-${ruleId}`);
+    const speed = document.getElementById(`replay-speed-${ruleId}`);
+    const pauseButton = document.getElementById(`replay-pause-${ruleId}`);
 
     if (!rows.length) {
         alert("Нет событий для воспроизведения");
         return;
     }
 
-    rows.forEach(row => {
-        row.style.outline = "none";
-        row.style.background = "transparent";
-    });
+    stopReplayChainTimeline(ruleId);
+    clearReplayRows(rows);
 
-    let index = 0;
+    const delay = Number(speed?.value || 850);
 
-    const timer = setInterval(() => {
-        rows.forEach(row => {
-            row.style.outline = "none";
-            row.style.background = "transparent";
-        });
+    a3ReplayState[ruleId] = {
+        index: 0,
+        paused: false,
+        rows,
+        progress,
+        timer: null,
+    };
 
-        const active = rows[index];
+    if (pauseButton) {
+        pauseButton.textContent = "Пауза";
+    }
+
+    a3ReplayState[ruleId].timer = setInterval(() => {
+        const state = a3ReplayState[ruleId];
+
+        if (!state || state.paused) {
+            return;
+        }
+
+        clearReplayRows(rows);
+
+        const active = rows[state.index];
+        const level = active?.dataset?.timelineLevel || "pending";
+        const style = replayStepStyle(level);
 
         if (progress) {
-            progress.textContent = `Воспроизведение: ${index + 1} / ${rows.length}`;
+            progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length}`;
         }
 
         if (active) {
-            active.style.outline = "2px solid #2563eb";
-            active.style.background = "#eff6ff";
+            active.style.outline = style.outline;
+            active.style.background = style.background;
             active.style.borderRadius = "12px";
             active.scrollIntoView({
                 behavior: "smooth",
@@ -405,23 +460,63 @@ function replayChainTimeline(ruleId) {
             });
         }
 
-        index += 1;
+        state.index += 1;
 
-        if (index >= rows.length) {
-            clearInterval(timer);
+        if (state.index >= rows.length) {
+            clearInterval(state.timer);
 
             setTimeout(() => {
-                rows.forEach(row => {
-                    row.style.outline = "none";
-                    row.style.background = "transparent";
-                });
+                clearReplayRows(rows);
 
                 if (progress) {
                     progress.textContent = "Воспроизведение завершено";
                 }
+
+                delete a3ReplayState[ruleId];
             }, 700);
         }
-    }, 850);
+    }, delay);
+}
+
+function pauseReplayChainTimeline(ruleId) {
+    const state = a3ReplayState[ruleId];
+    const pauseButton = document.getElementById(`replay-pause-${ruleId}`);
+
+    if (!state) {
+        return;
+    }
+
+    state.paused = !state.paused;
+
+    if (pauseButton) {
+        pauseButton.textContent = state.paused ? "Продолжить" : "Пауза";
+    }
+
+    if (state.progress && state.paused) {
+        state.progress.textContent = `Пауза: ${Math.max(state.index, 1)} / ${state.rows.length}`;
+    }
+}
+
+function stopReplayChainTimeline(ruleId) {
+    const state = a3ReplayState[ruleId];
+    const pauseButton = document.getElementById(`replay-pause-${ruleId}`);
+
+    if (!state) {
+        return;
+    }
+
+    clearInterval(state.timer);
+    clearReplayRows(state.rows);
+
+    if (state.progress) {
+        state.progress.textContent = "Воспроизведение остановлено";
+    }
+
+    if (pauseButton) {
+        pauseButton.textContent = "Пауза";
+    }
+
+    delete a3ReplayState[ruleId];
 }
 
 
@@ -460,7 +555,7 @@ async function loadChainTimeline(ruleId) {
                  style="margin-bottom:8px;font-weight:800"></div>
 
             <div style="display:flex;flex-direction:column;gap:8px">
-                ${steps.slice(0, 5).map(step => {
+                ${steps.slice(0, 5).map((step, index) => {
                     let cls = "pill";
 
                     if (step.level === "success") {
@@ -472,7 +567,7 @@ async function loadChainTimeline(ruleId) {
                     }
 
                     return `
-                        <div data-timeline-step="1" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px">
+                        <div data-timeline-step="${index + 1}" data-timeline-level="${step.level}" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px">
                             <div>
                                 <span class="${cls}">
                                     ${step.label}
