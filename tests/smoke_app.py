@@ -634,6 +634,15 @@ async def assert_automation_page():
     assert any(node["type"] == "action" for node in workflow_graph["nodes"])
     assert any(edge["label"] == "запускает" for edge in workflow_graph["edges"])
 
+    workflow_debug = crm.api_a3_workflow_rule_debug(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert workflow_debug["ok"] is True
+    assert workflow_debug["rule"]["id"] == rule["id"]
+    assert "quick_actions" in workflow_debug["debug"]
+    assert "stats" in workflow_debug
+
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
     assert workflows_graph["ok"] is True
     assert workflows_graph["count"] >= 1

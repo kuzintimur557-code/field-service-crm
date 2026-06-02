@@ -245,3 +245,17 @@ def get_company_workflow_graphs(company_id, limit=50):
         "count": len(items),
         "items": items,
     }
+
+
+def get_rule_workflow_debug(company_id, rule_id):
+    graph = get_rule_workflow_graph(company_id, rule_id)
+
+    if not graph:
+        return None
+
+    return {
+        "ok": True,
+        "rule": graph["rule"],
+        "debug": graph["debug"],
+        "stats": graph["stats"],
+    }

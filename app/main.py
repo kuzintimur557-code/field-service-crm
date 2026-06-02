@@ -34,6 +34,7 @@ from app.services.system_health import (
 )
 from app.services.workflow_graph import (
     get_company_workflow_graphs,
+    get_rule_workflow_debug,
     get_rule_workflow_graph,
 )
 from fastapi import FastAPI, Request, UploadFile, File
@@ -14701,6 +14702,21 @@ def api_a3_workflow_rule_graph(request: Request, rule_id: int):
         return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
 
     return graph
+
+
+@app.get("/api/a3/workflow/rules/{rule_id}/debug")
+def api_a3_workflow_rule_debug(request: Request, rule_id: int):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    debug = get_rule_workflow_debug(company_id, rule_id)
+
+    if not debug:
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+
+    return debug
 
 
 @app.get("/api/a3/workflows/graph")
