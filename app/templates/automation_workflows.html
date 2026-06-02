@@ -25,6 +25,40 @@ h2{margin:0 0 16px;font-size:20px}
 .pill.warn{background:#fef3c7;color:#92400e}
 .pill.off{background:#fee2e2;color:#991b1b}
 .graph-box{margin-top:12px;padding:10px;border-radius:18px;background:white;border:1px solid #e5e7eb;overflow:hidden}
+.flow-edge{stroke-dasharray:10 8;animation:flowMove 1.8s linear infinite}
+.chain:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,0,0,.09)}
+.chain{transition:.18s ease}
+.chain.active{
+    border-color:#86efac;
+    box-shadow:0 0 0 1px rgba(134,239,172,.18);
+}
+.chain.active .graph-box{
+    animation:activeGlow 2.4s ease-in-out infinite;
+}
+@keyframes activeGlow{
+    0%,100%{
+        box-shadow:0 0 0 rgba(34,197,94,0);
+    }
+    50%{
+        box-shadow:0 0 18px rgba(34,197,94,.18);
+    }
+}
+@keyframes flowMove{to{stroke-dashoffset:-36}}
+.chain.problem .flow-edge{animation-duration:1.1s}
+.chain.critical .flow-edge{animation-duration:.7s;stroke-width:5}
+.chain.active .flow-edge{animation-duration:2.2s}
+.chain.problem{border-color:#f97316;box-shadow:0 0 0 1px rgba(249,115,22,.18)}
+.chain.critical{border-color:#dc2626;box-shadow:0 0 0 1px rgba(220,38,38,.22)}
+.chain.problem .graph-box{animation:softPulse 1.8s ease-in-out infinite}
+.chain.critical .graph-box{animation:criticalPulse 1.4s ease-in-out infinite}
+@keyframes softPulse{
+    0%,100%{box-shadow:0 0 0 rgba(249,115,22,0)}
+    50%{box-shadow:0 0 18px rgba(249,115,22,.22)}
+}
+@keyframes criticalPulse{
+    0%,100%{box-shadow:0 0 0 rgba(220,38,38,0)}
+    50%{box-shadow:0 0 22px rgba(220,38,38,.28)}
+}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:24px}
 @media(max-width:760px){
     .container{padding:14px}
@@ -108,17 +142,20 @@ function renderChainGraph(chain) {
     let ruleColor = "#dcfce7";
     let actionColor = "#fef3c7";
     let eventColor = "#ede9fe";
-    let edgeColor = "#9ca3af";
+    let edgeColor = "#22c55e";
+    let glowColor = "#22c55e";
 
     if (state.status === "warning") {
         ruleColor = "#fef3c7";
         edgeColor = "#f59e0b";
+        glowColor = "#f59e0b";
     }
 
     if (state.status === "degraded") {
         ruleColor = "#ffedd5";
         actionColor = "#fed7aa";
         edgeColor = "#ea580c";
+        glowColor = "#ea580c";
     }
 
     if (state.status === "critical") {
@@ -126,11 +163,13 @@ function renderChainGraph(chain) {
         actionColor = "#fecaca";
         eventColor = "#fecaca";
         edgeColor = "#dc2626";
+        glowColor = "#dc2626";
     }
 
     if (!actions.length) {
         actionColor = "#fee2e2";
         edgeColor = "#dc2626";
+        glowColor = "#dc2626";
     }
 
     const failedEvents = events.filter(event => event.status === "failed").length;
@@ -151,7 +190,7 @@ function renderChainGraph(chain) {
 
     const edgeSvg = edges.map(edge => `
         <line x1="${edge[0]}" y1="38" x2="${edge[1]}" y2="38"
-              stroke="${edgeColor}" stroke-width="4" stroke-linecap="round"/>
+              class="flow-edge" stroke="${edgeColor}" stroke-width="4" stroke-linecap="round"/>
     `).join("");
 
     const nodeSvg = nodes.map(node => `
@@ -165,7 +204,20 @@ function renderChainGraph(chain) {
 
     return `
         <svg width="100%" height="76" viewBox="0 0 860 76" preserveAspectRatio="xMidYMid meet">
-            ${edgeSvg}
+            <defs>
+                <filter id="edge-glow-${state.status || "ok"}">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+
+            <g filter="url(#edge-glow-${state.status || "ok"})">
+                ${edgeSvg}
+            </g>
+
             ${nodeSvg}
         </svg>
     `;
@@ -204,7 +256,26 @@ async function loadChains() {
             if (state.status === "degraded" || state.status === "critical") stateClass = "off";
 
             const card = document.createElement("div");
-            card.className = "chain";
+
+            let cardClass = "chain";
+
+            if (
+                state.status !== "warning"
+                && state.status !== "degraded"
+                && state.status !== "critical"
+            ) {
+                cardClass += " active";
+            }
+
+            if (state.status === "warning" || state.status === "degraded") {
+                cardClass += " problem";
+            }
+
+            if (state.status === "critical") {
+                cardClass += " critical";
+            }
+
+            card.className = cardClass;
 
             card.innerHTML = `
                 <div class="chain-title">${rule.name || "Без названия"}</div>
