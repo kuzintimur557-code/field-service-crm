@@ -152,8 +152,36 @@ async function loadWorkflows() {
                     ${trigger.label || rule.trigger_key || "Триггер не указан"}
                 </div>
 
-                <div style="margin-top:14px">
-                    <a class="back" href="/automation/rules/${rule.id}">Открыть цепочку</a>
+                <div style="
+                    margin-top:16px;
+                    display:flex;
+                    gap:10px;
+                    flex-wrap:wrap;
+                ">
+                    <a class="back"
+                       href="/automation/rules/${rule.id}">
+                        Открыть
+                    </a>
+
+                    <button class="back"
+                            onclick="runWorkflowRule(${rule.id})">
+                        Запустить
+                    </button>
+
+                    <a class="back"
+                       href="/automation/events?rule_id=${rule.id}">
+                        События
+                    </a>
+
+                    <a class="back"
+                       href="/automation/diagnostics">
+                        Диагностика
+                    </a>
+
+                    <button class="back"
+                            onclick="flagWorkflow(${rule.id})">
+                        Проблема
+                    </button>
                 </div>
             `;
 
@@ -171,6 +199,43 @@ async function loadWorkflows() {
         console.error(err);
         summary.textContent = "Не удалось загрузить цепочки";
         list.innerHTML = '<div class="card empty">Ошибка загрузки workflow</div>';
+    }
+}
+
+async function runWorkflowRule(ruleId) {
+    try {
+        await fetch(`/automation/rules/${ruleId}/run`, {
+            method: "POST"
+        });
+
+        alert("Цепочка запущена");
+    } catch (err) {
+        console.error(err);
+        alert("Не удалось запустить цепочку");
+    }
+}
+
+async function flagWorkflow(ruleId) {
+    try {
+        await fetch("/api/a3/ops-timeline", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                event_type: "workflow_flag",
+                severity: "warning",
+                title: "Workflow помечен как проблемный",
+                message: `Rule #${ruleId} требует проверки`,
+                target_type: "automation_rule",
+                target_id: ruleId
+            })
+        });
+
+        alert("Цепочка помечена");
+    } catch (err) {
+        console.error(err);
+        alert("Не удалось пометить цепочку");
     }
 }
 
