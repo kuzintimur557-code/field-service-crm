@@ -55,6 +55,31 @@ h2{margin:0 0 16px;font-size:22px}
     <div id="workflow-summary" class="meta">Загрузка...</div>
 </div>
 
+<div class="card">
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="back" onclick="setWorkflowFilter('all')">
+            Все
+        </button>
+
+        <button class="back" onclick="setWorkflowFilter('active')">
+            Активные
+        </button>
+
+        <button class="back" onclick="setWorkflowFilter('disabled')">
+            Выключенные
+        </button>
+
+        <button class="back" onclick="setWorkflowFilter('problematic')">
+            Проблемные
+        </button>
+
+        <button class="back" onclick="setWorkflowFilter('empty')">
+            Без действий
+        </button>
+    </div>
+</div>
+
+
 <div id="workflow-list" class="grid"></div>
 
 </div>
@@ -70,6 +95,13 @@ function statusLabel(rule) {
     }
 
     return ["Активна", "ok"];
+}
+
+let workflowFilter = "all";
+
+function setWorkflowFilter(filter) {
+    workflowFilter = filter;
+    loadWorkflows();
 }
 
 async function loadWorkflows() {
@@ -96,9 +128,46 @@ async function loadWorkflows() {
             const rule = workflow.rule || workflow;
             const actions = workflow.actions || [];
             const events = workflow.events || [];
+
+            if (workflowFilter === "active" && !rule.active) {
+                continue;
+            }
+
+            if (workflowFilter === "disabled" && rule.active) {
+                continue;
+            }
+
+            if (
+                workflowFilter === "problematic"
+                && rule.active
+                && actions.length > 0
+            ) {
+                continue;
+            }
+
+            if (
+                workflowFilter === "empty"
+                && actions.length > 0
+            ) {
+                continue;
+            }
+            const rule = workflow.rule || workflow;
+            const actions = workflow.actions || [];
+            const events = workflow.events || [];
             const trigger = workflow.trigger || {};
 
             const [label, cls] = statusLabel(rule);
+
+            let workflowHealth = "Хорошее";
+            let healthClass = "ok";
+
+            if (!rule.active) {
+                workflowHealth = "Выключено";
+                healthClass = "off";
+            } else if (!actions.length) {
+                workflowHealth = "Нужно действие";
+                healthClass = "warn";
+            }
 
             const card = document.createElement("div");
             card.className = "workflow";
@@ -110,6 +179,9 @@ async function loadWorkflows() {
 
                 <div>
                     <span class="pill ${cls}">${label}</span>
+                    <span class="pill ${healthClass}">
+                        Health: ${workflowHealth}
+                    </span>
                     <span class="pill">Действий: ${actions.length || rule.actions_count || 0}</span>
                     <span class="pill">Событий: ${events.length || rule.events_count || 0}</span>
                 </div>
