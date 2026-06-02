@@ -60,6 +60,8 @@ def _ai_debug_recommendations(rule, actions, latest_problem_event):
 
 def _workflow_debug(rule, actions, latest_problem_event):
     issues = []
+    severity = "ok"
+    priority = 0
     quick_actions = [
         _debug_action("Запустить цепочку", "run_rule", rule["id"]),
         _debug_action("Открыть правило", "open_rule", rule["id"]),
@@ -67,14 +69,20 @@ def _workflow_debug(rule, actions, latest_problem_event):
 
     if not rule["active"]:
         issues.append("Правило выключено")
+        severity = "warning"
+        priority = max(priority, 40)
         quick_actions.append(_debug_action("Включить правило", "enable_rule", rule["id"]))
 
     if not actions:
         issues.append("В цепочке нет действий")
+        severity = "critical"
+        priority = max(priority, 80)
         quick_actions.append(_debug_action("Добавить действие", "open_rule_actions", rule["id"]))
 
     if latest_problem_event:
         issues.append(f"Последнее проблемное событие: {latest_problem_event['status']}")
+        severity = "critical" if latest_problem_event["status"] == "failed" else "warning"
+        priority = max(priority, 90 if latest_problem_event["status"] == "failed" else 60)
         quick_actions.append(_debug_action("Открыть событие", "open_event", latest_problem_event["id"]))
         quick_actions.append(_debug_action("Повторить пропущенные", "retry_skipped", rule["id"]))
 
@@ -83,6 +91,8 @@ def _workflow_debug(rule, actions, latest_problem_event):
 
     return {
         "status": "needs_attention" if issues[0] != "Критических проблем не найдено" else "ok",
+        "severity": severity,
+        "priority": priority,
         "reason": issues[0],
         "issues": issues,
         "ai_recommendations": _ai_debug_recommendations(rule, actions, latest_problem_event),

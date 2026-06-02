@@ -794,9 +794,21 @@ function renderProblemChains(chains) {
     const problematic = chains
         .filter(chain => {
             const state = chain.health || {};
-            return ["warning", "degraded", "critical"].includes(state.status);
+            const debug = chain.debug || {};
+            return (
+                ["warning", "degraded", "critical"].includes(state.status)
+                || debug.status === "needs_attention"
+            );
         })
-        .sort((a, b) => (a.health?.score || 100) - (b.health?.score || 100))
+        .sort((a, b) => {
+            const debugDiff = (b.debug?.priority || 0) - (a.debug?.priority || 0);
+
+            if (debugDiff) {
+                return debugDiff;
+            }
+
+            return (a.health?.score || 100) - (b.health?.score || 100);
+        })
         .slice(0, 8);
 
     if (!problematic.length) {
@@ -807,6 +819,7 @@ function renderProblemChains(chains) {
     for (const chain of problematic) {
         const rule = chain.rule || {};
         const state = chain.health || {};
+        const debug = chain.debug || {};
         const card = document.createElement("div");
 
         card.style.padding = "16px";
@@ -822,10 +835,11 @@ function renderProblemChains(chains) {
                     <div style="margin-top:10px">
                         <span class="pill off">${state.title || "Проблема"}</span>
                         <span class="pill off">Оценка: ${state.score || 0}</span>
+                        <span class="pill off">Debug: ${debug.reason || "Требует проверки"}</span>
                     </div>
 
                     <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
-                        ${(state.issues || []).slice(0, 2).map(issue => `
+                        ${[...(state.issues || []), ...(debug.issues || [])].slice(0, 3).map(issue => `
                             <span class="pill off">${issue}</span>
                         `).join("")}
                     </div>
