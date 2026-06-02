@@ -647,6 +647,14 @@ async def assert_automation_page():
     assert "ai_recommendations" in workflow_debug["debug"]
     assert "stats" in workflow_debug
 
+    workflow_timeline = crm.api_a3_workflow_timeline(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert workflow_timeline["ok"] is True
+    assert "sessions" in workflow_timeline["timeline"]
+    assert "steps" in workflow_timeline["timeline"]
+
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
     assert workflows_graph["ok"] is True
     assert workflows_graph["count"] >= 1
