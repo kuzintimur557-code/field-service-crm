@@ -444,6 +444,17 @@ function replayStepStyle(level) {
     };
 }
 
+function workflowSessionStatusLabel(status) {
+    const labels = {
+        done: "Выполнено",
+        skipped: "Пропущено",
+        failed: "Ошибка",
+        pending: "Ожидает",
+    };
+
+    return labels[status] || status || "-";
+}
+
 function replayChainTimeline(ruleId) {
     const container = document.getElementById(`timeline-${ruleId}`);
 
@@ -640,13 +651,17 @@ async function loadChainTimeline(ruleId) {
         const response = await fetch(`/api/a3/workflow/rules/${ruleId}/timeline`);
         const data = await response.json();
         const timeline = data.timeline || {};
-        const steps = timeline.steps || [];
+        const sessions = timeline.sessions || [];
+        const activeSession = sessions[0] || null;
+        const steps = activeSession ? (activeSession.steps || []) : (timeline.steps || []);
 
         if (!steps.length) {
             container.innerHTML = `
                 <div style="font-weight:900;margin-bottom:10px">
                     Последние события
                 </div>
+                <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
+                <div class="meta">Сессии выполнения пока пусты</div>
                 <div class="meta">История запусков пока пуста</div>
                 <div id="timeline-progress-${ruleId}"
                      class="meta"
@@ -658,6 +673,29 @@ async function loadChainTimeline(ruleId) {
         container.innerHTML = `
             <div style="font-weight:900;margin-bottom:10px">
                 Последние события
+            </div>
+            <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
+            <div class="meta" style="margin-bottom:8px">
+                Активная сессия: ${activeSession?.label || "не выбрана"}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+                ${sessions.slice(0, 4).map((session, index) => {
+                    let cls = "pill";
+
+                    if (session.status === "done") {
+                        cls += " ok";
+                    } else if (session.status === "skipped") {
+                        cls += " warn";
+                    } else if (session.status === "failed") {
+                        cls += " off";
+                    }
+
+                    return `
+                        <span class="${cls}">
+                            ${session.label || `Сессия ${index + 1}`} · Статус: ${workflowSessionStatusLabel(session.status)} · Событий: ${session.total || 0}
+                        </span>
+                    `;
+                }).join("")}
             </div>
             <div id="timeline-progress-${ruleId}"
                  class="meta"

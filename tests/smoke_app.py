@@ -3955,6 +3955,9 @@ async def assert_a3_workflow_center():
     assert "handleDebugAction" in body
     assert "AI debug рекомендации" in body
     assert "Debug:" in body
+    assert "Сессии выполнения" in body
+    assert "Активная сессия" in body
+    assert "workflowSessionStatusLabel" in body
 
     public_timeline_response = crm.api_a3_workflow_timeline(
         make_request(),
