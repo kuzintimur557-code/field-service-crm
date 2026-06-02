@@ -13,22 +13,24 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .container{max-width:1180px;margin:auto;padding:24px}
 .header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
 .card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
-.back{display:inline-block;padding:12px 16px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900}
+.back{display:inline-block;padding:12px 16px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900;border:0;cursor:pointer}
 h1{margin:0 0 8px;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
 .meta{color:#6b7280;font-weight:800;line-height:1.45}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px}
 .workflow{border:1px solid #e5e7eb;background:#f9fafb;border-radius:22px;padding:18px}
 .workflow-title{font-size:18px;font-weight:900;margin-bottom:8px}
 .pill{display:inline-block;padding:7px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;margin-right:6px;margin-top:6px}
 .pill.ok{background:#dcfce7;color:#166534}
 .pill.warn{background:#fef3c7;color:#92400e}
 .pill.off{background:#fee2e2;color:#991b1b}
-.flow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
-.node{padding:10px 12px;border-radius:14px;background:white;border:1px solid #e5e7eb;font-weight:900;font-size:13px}
-.arrow{font-weight:900;color:#6b7280}
+.graph-box{margin-top:16px;padding:14px;border-radius:18px;background:white;border:1px solid #e5e7eb;overflow:hidden}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:24px}
-@media(max-width:760px){.container{padding:14px}.header{flex-direction:column}.back{text-align:center;width:100%}}
+@media(max-width:760px){
+    .container{padding:14px}
+    .header{flex-direction:column}
+    .back{width:100%;text-align:center}
+}
 </style>
 </head>
 
@@ -39,8 +41,7 @@ h2{margin:0 0 16px;font-size:22px}
     <div>
         <h1>A3 Цепочки автоматизации</h1>
         <div class="meta">
-            Единый центр визуального просмотра workflow-цепочек компании:
-            триггеры, правила, действия, события и состояние.
+            Центр визуального просмотра workflow-цепочек: триггеры, правила, действия, события и состояние.
         </div>
     </div>
 
@@ -51,57 +52,59 @@ h2{margin:0 0 16px;font-size:22px}
 </div>
 
 <div class="card">
-    <h2>Обзор цепочек</h2>
-    <div id="workflow-summary" class="meta">Загрузка...</div>
-</div>
-
-<div class="card">
+    <h2>Фильтры</h2>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="back" onclick="setWorkflowFilter('all')">
-            Все
-        </button>
-
-        <button class="back" onclick="setWorkflowFilter('active')">
-            Активные
-        </button>
-
-        <button class="back" onclick="setWorkflowFilter('disabled')">
-            Выключенные
-        </button>
-
-        <button class="back" onclick="setWorkflowFilter('problematic')">
-            Проблемные
-        </button>
-
-        <button class="back" onclick="setWorkflowFilter('empty')">
-            Без действий
-        </button>
+        <button class="back" onclick="setWorkflowFilter('all')">Все</button>
+        <button class="back" onclick="setWorkflowFilter('active')">Активные</button>
+        <button class="back" onclick="setWorkflowFilter('disabled')">Выключенные</button>
+        <button class="back" onclick="setWorkflowFilter('problematic')">Проблемные</button>
+        <button class="back" onclick="setWorkflowFilter('empty')">Без действий</button>
     </div>
 </div>
 
+<div class="card">
+    <h2>Обзор</h2>
+    <div id="workflow-summary" class="meta">Загрузка...</div>
+</div>
 
 <div id="workflow-list" class="grid"></div>
 
 </div>
 
 <script>
-function statusLabel(rule) {
-    if (!rule.active) {
-        return ["Выключена", "off"];
-    }
-
-    if (!rule.actions_count) {
-        return ["Нет действий", "warn"];
-    }
-
-    return ["Активна", "ok"];
-}
-
 let workflowFilter = "all";
 
 function setWorkflowFilter(filter) {
     workflowFilter = filter;
     loadWorkflows();
+}
+
+function statusLabel(rule, actions) {
+    if (!rule.active) return ["Выключена", "off", "Выключено"];
+    if (!actions.length) return ["Нет действий", "warn", "Нужно действие"];
+    return ["Активна", "ok", "Хорошее"];
+}
+
+function workflowGraphSvg() {
+    return `
+        <svg width="100%" height="76" viewBox="0 0 760 76" preserveAspectRatio="xMidYMid meet">
+            <line x1="130" y1="38" x2="250" y2="38" stroke="#9ca3af" stroke-width="3"/>
+            <line x1="370" y1="38" x2="490" y2="38" stroke="#9ca3af" stroke-width="3"/>
+            <line x1="610" y1="38" x2="710" y2="38" stroke="#9ca3af" stroke-width="3"/>
+
+            <rect x="20" y="16" rx="14" width="110" height="44" fill="#dbeafe"/>
+            <text x="75" y="43" text-anchor="middle" font-size="13" font-weight="700">Триггер</text>
+
+            <rect x="250" y="16" rx="14" width="120" height="44" fill="#dcfce7"/>
+            <text x="310" y="43" text-anchor="middle" font-size="13" font-weight="700">Правило</text>
+
+            <rect x="490" y="16" rx="14" width="120" height="44" fill="#fef3c7"/>
+            <text x="550" y="43" text-anchor="middle" font-size="13" font-weight="700">Действия</text>
+
+            <rect x="710" y="16" rx="14" width="120" height="44" fill="#fee2e2"/>
+            <text x="770" y="43" text-anchor="middle" font-size="13" font-weight="700">События</text>
+        </svg>
+    `;
 }
 
 async function loadWorkflows() {
@@ -113,101 +116,56 @@ async function loadWorkflows() {
         const data = await response.json();
 
         const workflows = data.workflows || data.items || [];
-
-        summary.textContent =
-            "Всего цепочек: " + workflows.length;
+        let rendered = 0;
 
         list.innerHTML = "";
-
-        if (!workflows.length) {
-            list.innerHTML = '<div class="card empty">Цепочки пока не найдены</div>';
-            return;
-        }
 
         for (const workflow of workflows) {
             const rule = workflow.rule || workflow;
             const actions = workflow.actions || [];
             const events = workflow.events || [];
-
-            if (workflowFilter === "active" && !rule.active) {
-                continue;
-            }
-
-            if (workflowFilter === "disabled" && rule.active) {
-                continue;
-            }
-
-            if (
-                workflowFilter === "problematic"
-                && rule.active
-                && actions.length > 0
-            ) {
-                continue;
-            }
-
-            if (
-                workflowFilter === "empty"
-                && actions.length > 0
-            ) {
-                continue;
-            }
-            const rule = workflow.rule || workflow;
-            const actions = workflow.actions || [];
-            const events = workflow.events || [];
             const trigger = workflow.trigger || {};
 
-            const [label, cls] = statusLabel(rule);
+            if (workflowFilter === "active" && !rule.active) continue;
+            if (workflowFilter === "disabled" && rule.active) continue;
+            if (workflowFilter === "problematic" && rule.active && actions.length > 0) continue;
+            if (workflowFilter === "empty" && actions.length > 0) continue;
 
-            let workflowHealth = "Хорошее";
-            let healthClass = "ok";
-
-            if (!rule.active) {
-                workflowHealth = "Выключено";
-                healthClass = "off";
-            } else if (!actions.length) {
-                workflowHealth = "Нужно действие";
-                healthClass = "warn";
-            }
+            const [label, cls, health] = statusLabel(rule, actions);
 
             const card = document.createElement("div");
             card.className = "workflow";
 
             card.innerHTML = `
-                <div class="workflow-title">
-                    ${rule.name || "Без названия"}
-                </div>
+                <div class="workflow-title">${rule.name || "Без названия"}</div>
 
                 <div>
                     <span class="pill ${cls}">${label}</span>
-                    <span class="pill ${healthClass}">
-                        Health: ${workflowHealth}
-                    </span>
+                    <span class="pill ${cls}">Состояние: ${health}</span>
                     <span class="pill">Действий: ${actions.length || rule.actions_count || 0}</span>
                     <span class="pill">Событий: ${events.length || rule.events_count || 0}</span>
                 </div>
 
-                <div class="flow">
-                    <div class="node">Триггер</div>
-                    <div class="arrow">→</div>
-                    <div class="node">Правило</div>
-                    <div class="arrow">→</div>
-                    <div class="node">Действия</div>
-                    <div class="arrow">→</div>
-                    <div class="node">События</div>
-                </div>
+                <div class="graph-box">${workflowGraphSvg()}</div>
 
                 <div class="meta" style="margin-top:14px">
                     ${trigger.label || rule.trigger_key || "Триггер не указан"}
                 </div>
 
                 <div style="margin-top:14px">
-                    <a class="back" href="/automation/rules/${rule.id}">
-                        Открыть цепочку
-                    </a>
+                    <a class="back" href="/automation/rules/${rule.id}">Открыть цепочку</a>
                 </div>
             `;
 
             list.appendChild(card);
+            rendered += 1;
+        }
+
+        summary.textContent =
+            "Всего цепочек: " + workflows.length + ". Показано: " + rendered + ".";
+
+        if (!rendered) {
+            list.innerHTML = '<div class="card empty">По выбранному фильтру цепочки не найдены</div>';
         }
     } catch (err) {
         console.error(err);
