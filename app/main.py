@@ -2626,6 +2626,20 @@ async def open_notification(request: Request, notification_id: int):
     return RedirectResponse(link, status_code=302)
 
 
+
+@app.get("/automation/workflows", response_class=HTMLResponse)
+def automation_workflows_page(request: Request):
+    user = require_login(request)
+
+    return templates.TemplateResponse(
+        "automation_workflows.html",
+        {
+            "request": request,
+            "user": user,
+        },
+    )
+
+
 @app.get("/automation", response_class=HTMLResponse)
 async def automation_page(
     request: Request,
