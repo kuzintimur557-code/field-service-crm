@@ -14889,6 +14889,9 @@ def api_a3_workflow_timeline(
         rule_id=rule_id,
     )
 
+    if not timeline:
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+
     return {
         "ok": True,
         "timeline": timeline,

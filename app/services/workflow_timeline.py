@@ -5,6 +5,20 @@ def get_workflow_timeline(company_id, rule_id, limit=20):
     conn = connect()
     c = conn.cursor()
 
+    rule = c.execute("""
+        SELECT id
+        FROM automation_rules
+        WHERE company_id=?
+          AND id=?
+    """, (
+        company_id,
+        rule_id,
+    )).fetchone()
+
+    if not rule:
+        conn.close()
+        return None
+
     rows = c.execute("""
         SELECT
             id,

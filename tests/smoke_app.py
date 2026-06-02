@@ -3932,6 +3932,12 @@ async def assert_a3_workflow_center():
     )
     assert public_timeline_response.status_code == 403
 
+    missing_timeline_response = crm.api_a3_workflow_timeline(
+        request,
+        999999,
+    )
+    assert missing_timeline_response.status_code == 404
+
     automation_response = crm.automation_page(request)
 
     automation_body = automation_response.body.decode()
