@@ -67,6 +67,39 @@ h2{margin:0 0 16px;font-size:22px}
     <div id="workflow-summary" class="meta">Загрузка...</div>
 </div>
 
+<div class="card">
+    <div style="
+        display:flex;
+        justify-content:space-between;
+        gap:16px;
+        align-items:flex-start;
+        flex-wrap:wrap;
+    ">
+        <div>
+            <h2>Проблемные цепочки</h2>
+
+            <div class="meta">
+                Цепочки с низким health score, ошибками,
+                отсутствием действий или отключёнными правилами.
+            </div>
+        </div>
+
+        <div class="pill off">
+            AI Problem Center
+        </div>
+    </div>
+
+    <div id="problem-workflows"
+         style="
+            display:flex;
+            flex-direction:column;
+            gap:12px;
+            margin-top:18px;
+         ">
+    </div>
+</div>
+
+
 <div id="workflow-list" class="grid"></div>
 
 </div>
@@ -256,6 +289,8 @@ async function loadWorkflows() {
         summary.textContent =
             "Всего цепочек: " + workflows.length + ". Показано: " + rendered + ".";
 
+        renderProblemWorkflows(workflows);
+
         if (!rendered) {
             list.innerHTML = '<div class="card empty">По выбранному фильтру цепочки не найдены</div>';
         }
@@ -303,8 +338,121 @@ async function flagWorkflow(ruleId) {
     }
 }
 
+
+function renderProblemWorkflows(workflows) {
+    const container =
+        document.getElementById("problem-workflows");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    const problematic = workflows
+        .filter(workflow => {
+            const health = workflow.health || {};
+
+            return (
+                health.status === "warning"
+                || health.status === "degraded"
+                || health.status === "critical"
+            );
+        })
+        .sort((a, b) => {
+            return (
+                (a.health?.score || 100)
+                - (b.health?.score || 100)
+            );
+        })
+        .slice(0, 8);
+
+    if (!problematic.length) {
+        container.innerHTML = `
+            <div class="pill ok">
+                Критических проблем не найдено
+            </div>
+        `;
+        return;
+    }
+
+    for (const workflow of problematic) {
+        const rule = workflow.rule || {};
+        const health = workflow.health || {};
+
+        const card = document.createElement("div");
+
+        card.style.padding = "16px";
+        card.style.borderRadius = "18px";
+        card.style.background = "#fff7ed";
+        card.style.border = "1px solid #fdba74";
+
+        card.innerHTML = `
+            <div style="
+                display:flex;
+                justify-content:space-between;
+                gap:16px;
+                flex-wrap:wrap;
+            ">
+                <div>
+                    <div style="
+                        font-size:16px;
+                        font-weight:900;
+                    ">
+                        ${rule.name || "Без названия"}
+                    </div>
+
+                    <div style="margin-top:10px">
+                        <span class="pill off">
+                            ${health.title || "Проблема"}
+                        </span>
+
+                        <span class="pill off">
+                            Score: ${health.score || 0}
+                        </span>
+                    </div>
+
+                    <div style="
+                        margin-top:12px;
+                        display:flex;
+                        flex-wrap:wrap;
+                        gap:8px;
+                    ">
+                        ${(health.issues || [])
+                            .slice(0, 2)
+                            .map(issue => `
+                                <span class="pill off">
+                                    ${issue}
+                                </span>
+                            `)
+                            .join("")}
+                    </div>
+                </div>
+
+                <div style="
+                    display:flex;
+                    gap:10px;
+                    flex-wrap:wrap;
+                    align-items:center;
+                ">
+                    <a class="back"
+                       href="/automation/rules/${rule.id}">
+                        Открыть
+                    </a>
+
+                    <button class="back"
+                            onclick="runWorkflowRule(${rule.id})">
+                        Запустить
+                    </button>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(card);
+    }
+}
+
 loadWorkflows();
 </script>
-
 </body>
 </html>
