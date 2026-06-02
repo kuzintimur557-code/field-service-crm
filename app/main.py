@@ -1,3 +1,4 @@
+from app.services.workflow_timeline import get_workflow_timeline
 from app.services.automation_analytics import (
     get_automation_analytics,
     get_unhealthy_rules,
@@ -14846,4 +14847,22 @@ async def api_a3_create_ops_timeline_event(request: Request):
     return {
         "ok": True,
         "result": result,
+    }
+
+
+@app.get("/api/a3/workflow/rules/{rule_id}/timeline")
+def api_a3_workflow_timeline(
+    request: Request,
+    rule_id: int,
+):
+    company_id = get_current_company_id(request)
+
+    timeline = get_workflow_timeline(
+        company_id=company_id,
+        rule_id=rule_id,
+    )
+
+    return {
+        "ok": True,
+        "timeline": timeline,
     }

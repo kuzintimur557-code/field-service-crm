@@ -3908,6 +3908,12 @@ async def assert_a3_workflow_center():
     assert "Повторить" in body
     assert "Исправлено" in body
     assert "Центр проблем" in body
+    assert "Последние события" in body
+    assert "/api/a3/workflow/rules/" in body
+    assert "Обновить историю" in body
+    assert "Последние события" in body
+    assert "/api/a3/workflow/rules/" in body
+    assert "Обновить историю" in body
 
     automation_response = crm.automation_page(request)
 
