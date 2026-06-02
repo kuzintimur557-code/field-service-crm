@@ -456,6 +456,19 @@ function workflowSessionStatusLabel(status) {
     return labels[status] || status || "-";
 }
 
+function workflowSessionCounters(session) {
+    if (!session) {
+        return "Событий нет";
+    }
+
+    return [
+        `Выполнено: ${session.done || 0}`,
+        `Пропущено: ${session.skipped || 0}`,
+        `Ошибки: ${session.failed || 0}`,
+        `Ожидает: ${session.pending || 0}`,
+    ].join(" · ");
+}
+
 function selectWorkflowSession(ruleId, sessionIndex) {
     const state = a3TimelineState[ruleId];
 
@@ -720,6 +733,9 @@ function renderChainTimeline(ruleId, timeline) {
         <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
         <div class="meta" style="margin-bottom:8px">
             Активная сессия: ${activeSession?.label || "не выбрана"}
+        </div>
+        <div class="meta" style="margin-bottom:8px">
+            ${workflowSessionCounters(activeSession)}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
             ${sessions.slice(0, 4).map((session, index) => {

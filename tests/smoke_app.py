@@ -3958,6 +3958,7 @@ async def assert_a3_workflow_center():
     assert "Сессии выполнения" in body
     assert "Активная сессия" in body
     assert "workflowSessionStatusLabel" in body
+    assert "workflowSessionCounters" in body
     assert "selectWorkflowSession" in body
     assert "data-session-index" in body
 
