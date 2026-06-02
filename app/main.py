@@ -14830,3 +14830,24 @@ def api_a3_approval_history(request: Request):
         "count": len(items),
         "items": items,
     }
+
+
+@app.post("/api/a3/ops-timeline")
+async def api_a3_create_ops_timeline_event(request: Request):
+    company_id = get_current_company_id(request)
+    payload = await request.json()
+
+    result = create_ops_timeline_event(
+        company_id=company_id,
+        event_type=payload.get("event_type", "manual"),
+        severity=payload.get("severity", "info"),
+        title=payload.get("title", "Событие A3"),
+        message=payload.get("message", ""),
+        target_type=payload.get("target_type"),
+        target_id=payload.get("target_id"),
+    )
+
+    return {
+        "ok": True,
+        "result": result,
+    }
