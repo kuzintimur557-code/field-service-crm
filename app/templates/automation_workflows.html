@@ -131,7 +131,28 @@ async function loadWorkflows() {
             if (workflowFilter === "problematic" && rule.active && actions.length > 0) continue;
             if (workflowFilter === "empty" && actions.length > 0) continue;
 
-            const [label, cls, health] = statusLabel(rule, actions);
+            const [label, cls] = statusLabel(rule, actions);
+
+            const workflowHealth = workflow.health || {};
+
+            let healthTitle =
+                workflowHealth.title || "Стабильно";
+
+            let healthScore =
+                workflowHealth.score ?? 100;
+
+            let healthClass = "ok";
+
+            if (workflowHealth.status === "warning") {
+                healthClass = "warn";
+            }
+
+            if (
+                workflowHealth.status === "degraded"
+                || workflowHealth.status === "critical"
+            ) {
+                healthClass = "off";
+            }
 
             const card = document.createElement("div");
             card.className = "workflow";
@@ -141,7 +162,9 @@ async function loadWorkflows() {
 
                 <div>
                     <span class="pill ${cls}">${label}</span>
-                    <span class="pill ${cls}">Состояние: ${health}</span>
+                    <span class="pill ${healthClass}">
+                        Health: ${healthTitle} (${healthScore})
+                    </span>
                     <span class="pill">Действий: ${actions.length || rule.actions_count || 0}</span>
                     <span class="pill">Событий: ${events.length || rule.events_count || 0}</span>
                 </div>
@@ -150,6 +173,17 @@ async function loadWorkflows() {
 
                 <div class="meta" style="margin-top:14px">
                     ${trigger.label || rule.trigger_key || "Триггер не указан"}
+                </div>
+
+                <div style="margin-top:12px">
+                    ${(workflowHealth.issues || [])
+                        .slice(0, 2)
+                        .map(issue => `
+                            <div class="pill ${healthClass}">
+                                ${issue}
+                            </div>
+                        `)
+                        .join("")}
                 </div>
 
                 <div style="
