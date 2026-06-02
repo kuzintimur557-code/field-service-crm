@@ -348,6 +348,15 @@ async function loadChains() {
                         </div>
                     ` : ""}
 
+                    <div style="margin-top:12px">
+                        <div style="font-weight:900;margin-bottom:8px">AI debug рекомендации</div>
+                        <div style="display:flex;flex-direction:column;gap:7px">
+                            ${(debug.ai_recommendations || []).slice(0, 3).map(rec => `
+                                <div class="meta">• ${rec}</div>
+                            `).join("")}
+                        </div>
+                    </div>
+
                     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
                         ${(debug.quick_actions || []).slice(0, 4).map(action => `
                             <button class="back" onclick="handleDebugAction('${action.action_type}', '${action.target}')">

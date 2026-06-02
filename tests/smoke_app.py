@@ -629,6 +629,7 @@ async def assert_automation_page():
     assert workflow_graph["stats"]["actions_total"] >= 1
     assert "debug" in workflow_graph
     assert "quick_actions" in workflow_graph["debug"]
+    assert "ai_recommendations" in workflow_graph["debug"]
     assert any(node["type"] == "trigger" for node in workflow_graph["nodes"])
     assert any(node["type"] == "rule" for node in workflow_graph["nodes"])
     assert any(node["type"] == "action" for node in workflow_graph["nodes"])
@@ -641,6 +642,7 @@ async def assert_automation_page():
     assert workflow_debug["ok"] is True
     assert workflow_debug["rule"]["id"] == rule["id"]
     assert "quick_actions" in workflow_debug["debug"]
+    assert "ai_recommendations" in workflow_debug["debug"]
     assert "stats" in workflow_debug
 
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
@@ -3941,6 +3943,7 @@ async def assert_a3_workflow_center():
     assert "chain.replaying" in body
     assert "Debug цепочки" in body
     assert "handleDebugAction" in body
+    assert "AI debug рекомендации" in body
 
     public_timeline_response = crm.api_a3_workflow_timeline(
         make_request(),

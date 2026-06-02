@@ -21,6 +21,43 @@ def _debug_action(label, action_type, target=None):
     }
 
 
+def _ai_debug_recommendations(rule, actions, latest_problem_event):
+    recommendations = []
+
+    if not rule["active"]:
+        recommendations.append(
+            "Цепочка выключена. Если это рабочий процесс, включите правило и выполните тестовый запуск."
+        )
+
+    if not actions:
+        recommendations.append(
+            "У правила нет действий. Добавьте уведомление, Telegram-сообщение или AI-сводку, иначе цепочка ничего не выполнит."
+        )
+
+    if latest_problem_event:
+        status = latest_problem_event["status"]
+        message = latest_problem_event["message"] or ""
+
+        if status == "failed":
+            recommendations.append(
+                "Последний запуск завершился ошибкой. Откройте событие, проверьте сообщение ошибки и повторите цепочку после исправления."
+            )
+        elif status == "skipped":
+            recommendations.append(
+                "Последний запуск был пропущен. Проверьте условия правила и запустите повтор пропущенных событий."
+            )
+
+        if message:
+            recommendations.append(f"Контекст последней проблемы: {message}")
+
+    if not recommendations:
+        recommendations.append(
+            "Критических проблем не найдено. Для контроля можно выполнить ручной тестовый запуск цепочки."
+        )
+
+    return recommendations[:4]
+
+
 def _workflow_debug(rule, actions, latest_problem_event):
     issues = []
     quick_actions = [
@@ -48,6 +85,7 @@ def _workflow_debug(rule, actions, latest_problem_event):
         "status": "needs_attention" if issues[0] != "Критических проблем не найдено" else "ok",
         "reason": issues[0],
         "issues": issues,
+        "ai_recommendations": _ai_debug_recommendations(rule, actions, latest_problem_event),
         "latest_problem_event": dict(latest_problem_event) if latest_problem_event else None,
         "quick_actions": quick_actions,
     }
