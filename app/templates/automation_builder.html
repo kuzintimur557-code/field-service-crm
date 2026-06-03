@@ -166,8 +166,12 @@
                     <div class="node-value">{{ rule["condition_label"] }}</div>
                     <form method="post" action="/automation/rules/{{ rule['id'] }}/conditions" style="margin-top:10px">
                         <select name="condition_mode">
-                            {% for key, label in condition_presets %}
-                            <option value="{{ key }}" {% if rule["condition_mode"] == key %}selected{% endif %}>{{ label }}</option>
+                            {% for group_label, group_items in condition_groups %}
+                            <optgroup label="{{ group_label }}">
+                                {% for key, label in group_items %}
+                                <option value="{{ key }}" {% if rule["condition_mode"] == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </optgroup>
                             {% endfor %}
                         </select>
                         <button class="small-button" type="submit">Сохранить условия</button>

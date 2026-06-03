@@ -3127,6 +3127,11 @@ async def automation_builder_page(request: Request):
         ("payment_partial", "Только частично оплаченные заявки"),
         ("payment_paid", "Только оплаченные заявки"),
     ]
+    condition_groups = [
+        ("Базовые", condition_presets[:3]),
+        ("Статус заявки", condition_presets[3:6]),
+        ("Оплата", condition_presets[6:]),
+    ]
     condition_labels = dict(condition_presets)
     rules_view = []
 
@@ -3159,6 +3164,7 @@ async def automation_builder_page(request: Request):
             "trigger_labels": dict(AUTOMATION_TRIGGERS),
             "action_labels": dict(AUTOMATION_ACTIONS),
             "condition_presets": condition_presets,
+            "condition_groups": condition_groups,
         }
     )
 

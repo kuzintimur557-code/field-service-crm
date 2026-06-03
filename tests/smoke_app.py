@@ -628,6 +628,8 @@ async def assert_automation_page():
     assert "Только высокий приоритет" in builder_html
     assert "Только неоплаченные заявки" in builder_html
     assert "Только заявки в работе" in builder_html
+    assert 'optgroup label="Статус заявки"' in builder_html
+    assert 'optgroup label="Оплата"' in builder_html
     assert "Быстрые шаблоны" in builder_html
     assert "Фильтры конструктора" in builder_html
     assert "filterBuilderChains" in builder_html
