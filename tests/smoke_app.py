@@ -637,6 +637,7 @@ async def assert_automation_page():
     assert "risk" in workflow_graph["debug"]
     assert workflow_graph["debug"]["risk"]["key"] in {"low", "medium", "high", "critical"}
     assert "safe_fixes" in workflow_graph["debug"]
+    assert "dangerous_fixes" in workflow_graph["debug"]
     assert any(node["type"] == "trigger" for node in workflow_graph["nodes"])
     assert any(node["type"] == "rule" for node in workflow_graph["nodes"])
     assert any(node["type"] == "action" for node in workflow_graph["nodes"])
@@ -653,6 +654,7 @@ async def assert_automation_page():
     assert "diagnosis" in workflow_debug["debug"]
     assert "risk" in workflow_debug["debug"]
     assert "safe_fixes" in workflow_debug["debug"]
+    assert "dangerous_fixes" in workflow_debug["debug"]
     assert "stats" in workflow_debug
 
     workflow_timeline = crm.api_a3_workflow_timeline(
@@ -4007,6 +4009,10 @@ async def assert_a3_workflow_center():
     assert "Риск:" in body
     assert "Безопасные исправления" in body
     assert "Автоисправления не требуются" in body
+    assert "Требует подтверждения" in body
+    assert "requestDangerousFixApproval" in body
+    assert "/api/a3/autonomous-actions/request-approval" in body
+    assert "Действие отправлено на подтверждение" in body
     assert "Сессии выполнения" in body
     assert "Активная сессия" in body
     assert "workflowSessionStatusLabel" in body
@@ -4265,6 +4271,43 @@ async def assert_a3_api_layer():
     assert process_result["ok"] is True
     assert "result" in process_result
     assert process_result["result"]["processed"] >= 1
+
+    approval_request = await crm.api_a3_request_autonomous_action_approval(
+        make_json_request(
+            "owner2",
+            "/api/a3/autonomous-actions/request-approval",
+            {
+                "action_type": "disable_rule",
+                "target_type": "automation_rule",
+                "target_id": disable_rule_id,
+                "reason": "Smoke approval request",
+            },
+        )
+    )
+    assert approval_request["ok"] is True
+    assert approval_request["queued"] is True
+
+    approval_request_duplicate = await crm.api_a3_request_autonomous_action_approval(
+        make_json_request(
+            "owner2",
+            "/api/a3/autonomous-actions/request-approval",
+            {
+                "action_type": "disable_rule",
+                "target_type": "automation_rule",
+                "target_id": disable_rule_id,
+                "reason": "Smoke approval request duplicate",
+            },
+        )
+    )
+    assert approval_request_duplicate["ok"] is False
+    assert approval_request_duplicate["reason"] == "duplicate_pending_action"
+
+    updated_approval_queue = crm.api_a3_approval_queue(request)
+    assert any(
+        item["action_type"] == "disable_rule"
+        and item["target_id"] == disable_rule_id
+        for item in updated_approval_queue["items"]
+    )
 
     conn = connect()
     c = conn.cursor()

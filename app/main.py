@@ -5,6 +5,7 @@ from app.services.automation_analytics import (
 )
 from app.services.autonomous_actions import (
     approve_autonomous_action,
+    enqueue_autonomous_action,
     get_autonomous_actions,
     process_autonomous_actions,
     reject_autonomous_action,
@@ -14803,6 +14804,82 @@ def api_a3_process_autonomous_actions(request: Request):
     return {
         "ok": True,
         "result": result,
+    }
+
+
+@app.post("/api/a3/autonomous-actions/request-approval")
+async def api_a3_request_autonomous_action_approval(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    action_type = payload.get("action_type")
+    target_type = payload.get("target_type")
+    target_id = payload.get("target_id")
+
+    if action_type != "disable_rule" or target_type != "automation_rule" or not target_id:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unsupported_action",
+            },
+            status_code=400,
+        )
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT id
+    FROM automation_rules
+    WHERE company_id=?
+      AND id=?
+    """, (
+        company_id,
+        target_id,
+    )).fetchone()
+
+    conn.close()
+
+    if not rule:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "rule_not_found",
+            },
+            status_code=404,
+        )
+
+    result = enqueue_autonomous_action(
+        company_id=company_id,
+        action_type=action_type,
+        target_type=target_type,
+        target_id=target_id,
+        payload_json=json.dumps({
+            "requested_by": get_user(request) or "system",
+            "reason": payload.get("reason") or "Запрошено из A3 workflow debug",
+        }, ensure_ascii=False),
+    )
+
+    if not result.get("queued"):
+        return {
+            "ok": False,
+            "queued": False,
+            "reason": result.get("reason"),
+        }
+
+    process_result = process_autonomous_actions(company_id=company_id)
+
+    return {
+        "ok": True,
+        "queued": True,
+        "process_result": process_result,
     }
 
 

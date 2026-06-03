@@ -381,6 +381,19 @@ async function loadChains() {
                     </div>
 
                     <div style="margin-top:12px">
+                        <div style="font-weight:900;margin-bottom:8px">Требует подтверждения</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                            ${(debug.dangerous_fixes || []).length ? (debug.dangerous_fixes || []).map(fix => `
+                                <button class="back" title="${fix.description || ""}" onclick="requestDangerousFixApproval('${fix.action_type}', '${fix.target_type}', '${fix.target_id}', '${fix.label}')">
+                                    ${fix.label}
+                                </button>
+                            `).join("") : `
+                                <span class="pill ok">Опасных действий нет</span>
+                            `}
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px">
                         <div style="font-weight:900;margin-bottom:8px">AI debug рекомендации</div>
                         <div style="display:flex;flex-direction:column;gap:7px">
                             ${(debug.ai_recommendations || []).slice(0, 3).map(rec => `
@@ -718,6 +731,39 @@ function handleDebugAction(actionType, target) {
 
     if (actionType === "retry_skipped") {
         retryChain(targetId);
+    }
+}
+
+
+async function requestDangerousFixApproval(actionType, targetType, targetId, label) {
+    try {
+        const response = await fetch("/api/a3/autonomous-actions/request-approval", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+                action_type: actionType,
+                target_type: targetType,
+                target_id: Number(targetId),
+                reason: label || "Опасное исправление из A3 workflow debug",
+            })
+        });
+        const data = await response.json();
+
+        if (!data.ok && data.reason === "duplicate_pending_action") {
+            alert("Такое действие уже ждёт подтверждения");
+            return;
+        }
+
+        if (!data.ok) {
+            alert("Не удалось отправить на подтверждение");
+            return;
+        }
+
+        loadChains();
+        alert("Действие отправлено на подтверждение");
+    } catch (err) {
+        console.error(err);
+        alert("Не удалось отправить на подтверждение");
     }
 }
 

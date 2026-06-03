@@ -31,6 +31,17 @@ def _safe_fix(label, action_type, target=None, description=""):
     }
 
 
+def _dangerous_fix(label, action_type, target_type, target_id=None, description=""):
+    return {
+        "label": label,
+        "action_type": action_type,
+        "target_type": target_type,
+        "target_id": target_id,
+        "description": description,
+        "requires_approval": True,
+    }
+
+
 def _ai_debug_recommendations(rule, actions, latest_problem_event):
     recommendations = []
 
@@ -175,6 +186,21 @@ def _workflow_safe_fixes(rule, actions, latest_problem_event):
     return fixes[:3]
 
 
+def _workflow_dangerous_fixes(rule, actions, latest_problem_event):
+    fixes = []
+
+    if rule["active"] and latest_problem_event and latest_problem_event["status"] == "failed":
+        fixes.append(_dangerous_fix(
+            "Запросить отключение правила",
+            "disable_rule",
+            "automation_rule",
+            rule["id"],
+            "Отключение правила требует подтверждения владельца.",
+        ))
+
+    return fixes[:2]
+
+
 def _workflow_debug(rule, actions, latest_problem_event):
     issues = []
     severity = "ok"
@@ -218,6 +244,7 @@ def _workflow_debug(rule, actions, latest_problem_event):
         "latest_problem_event": dict(latest_problem_event) if latest_problem_event else None,
         "quick_actions": quick_actions,
         "safe_fixes": _workflow_safe_fixes(rule, actions, latest_problem_event),
+        "dangerous_fixes": _workflow_dangerous_fixes(rule, actions, latest_problem_event),
     }
 
 
