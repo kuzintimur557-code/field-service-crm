@@ -1383,6 +1383,11 @@ def run_automation_event(
         )
 
         if not condition_ok:
+            skipped_message = condition_message
+
+            if message:
+                skipped_message = f"{condition_message}. Событие: {message}"
+
             c.execute("""
             INSERT INTO automation_events (
                 company_id, rule_id, trigger_key, entity_type,
@@ -1395,7 +1400,7 @@ def run_automation_event(
                 trigger_key,
                 entity_type,
                 entity_id,
-                condition_message,
+                skipped_message,
                 now,
                 now,
             ))

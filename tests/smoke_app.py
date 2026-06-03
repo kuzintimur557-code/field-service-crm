@@ -1273,6 +1273,7 @@ async def assert_automation_runner(task):
 
     assert skipped_condition_event["status"] == "skipped"
     assert "Условие не выполнено" in skipped_condition_event["message"]
+    assert "Condition should skip" in skipped_condition_event["message"]
 
     matched_condition_events = crm.run_automation_event(
         2,
