@@ -25,6 +25,7 @@
         .pill.warn{background:#fef3c7;color:#92400e}
         .pill.off{background:#fee2e2;color:#991b1b}
         .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+        .filters{display:flex;gap:8px;flex-wrap:wrap}
         @media(max-width:820px){
             .builder{grid-template-columns:1fr}
             .arrow{display:none}
@@ -72,6 +73,16 @@
     </div>
 
     <div class="card">
+        <h2>Фильтры конструктора</h2>
+        <div class="filters">
+            <button class="back" type="button" onclick="filterBuilderChains('all')">Все</button>
+            <button class="back" type="button" onclick="filterBuilderChains('active')">Активные</button>
+            <button class="back" type="button" onclick="filterBuilderChains('disabled')">Выключенные</button>
+            <button class="back" type="button" onclick="filterBuilderChains('empty')">Без действий</button>
+        </div>
+    </div>
+
+    <div class="card">
         <h2>Быстрые шаблоны</h2>
         <div class="meta">Создайте типовую цепочку, а потом откройте её для точной настройки.</div>
 
@@ -114,7 +125,10 @@
     <div class="grid">
         {% for rule in rules %}
         {% set rule_actions = actions_by_rule.get(rule["id"], []) %}
-        <div class="chain {% if not rule['active'] %}disabled{% endif %}">
+        <div class="chain {% if not rule['active'] %}disabled{% endif %}"
+             data-builder-chain="1"
+             data-active="{% if rule['active'] %}1{% else %}0{% endif %}"
+             data-action-count="{{ rule_actions|length }}">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
                 <div>
                     <h2>{{ rule["name"] }}</h2>
@@ -175,5 +189,24 @@
         {% endfor %}
     </div>
 </div>
+<script>
+function filterBuilderChains(filter) {
+    document.querySelectorAll("[data-builder-chain]").forEach(card => {
+        const active = card.dataset.active === "1";
+        const actionCount = Number(card.dataset.actionCount || 0);
+        let visible = true;
+
+        if (filter === "active") {
+            visible = active;
+        } else if (filter === "disabled") {
+            visible = !active;
+        } else if (filter === "empty") {
+            visible = actionCount === 0;
+        }
+
+        card.style.display = visible ? "" : "none";
+    });
+}
+</script>
 </body>
 </html>

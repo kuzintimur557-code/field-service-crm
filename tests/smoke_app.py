@@ -624,6 +624,10 @@ async def assert_automation_page():
     assert "Runtime debug" in builder_html
     assert "/automation#new-rule" in builder_html
     assert "Быстрые шаблоны" in builder_html
+    assert "Фильтры конструктора" in builder_html
+    assert "filterBuilderChains" in builder_html
+    assert 'data-builder-chain="1"' in builder_html
+    assert "Без действий" in builder_html
     assert "SLA → уведомление" in builder_html
     assert "Просрочка → Telegram" in builder_html
     assert "Ежедневная AI-сводка" in builder_html
