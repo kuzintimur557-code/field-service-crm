@@ -106,6 +106,20 @@ h2{margin:0 0 16px;font-size:20px}
 <div class="card">
     <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div>
+            <h2>Очередь подтверждений</h2>
+            <div class="meta">
+                Опасные действия A3, которые ждут решения владельца.
+            </div>
+        </div>
+        <div class="pill off">Подтверждения</div>
+    </div>
+
+    <div id="workflow-approval-queue" style="display:flex;flex-direction:column;gap:10px;margin-top:18px"></div>
+</div>
+
+<div class="card">
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
+        <div>
             <h2>Проблемные цепочки</h2>
             <div class="meta">
                 Цепочки, которые требуют внимания.
@@ -127,6 +141,80 @@ let chainFilter = "all";
 function setChainFilter(filter) {
     chainFilter = filter;
     loadChains();
+}
+
+function workflowApprovalActionLabel(actionType) {
+    const labels = {
+        disable_rule: "Отключить правило",
+        retry_events: "Повторить события",
+    };
+
+    return labels[actionType] || actionType || "-";
+}
+
+function workflowApprovalTargetLabel(targetType) {
+    const labels = {
+        automation_rule: "Правило автоматизации",
+    };
+
+    return labels[targetType] || targetType || "-";
+}
+
+async function loadWorkflowApprovalQueue() {
+    const container = document.getElementById("workflow-approval-queue");
+
+    if (!container) {
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/a3/approval-queue");
+        const data = await response.json();
+        const items = data.items || [];
+
+        if (!items.length) {
+            container.innerHTML = `
+                <div class="pill ok">Нет действий, ожидающих подтверждения</div>
+            `;
+            return;
+        }
+
+        container.innerHTML = items.slice(0, 5).map(item => `
+            <div style="padding:14px;border-radius:14px;background:#fff7ed;border:1px solid #fdba74">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+                    <div>
+                        <div style="font-weight:900">
+                            ${workflowApprovalActionLabel(item.action_type)}
+                        </div>
+                        <div class="meta" style="margin-top:6px">
+                            ${workflowApprovalTargetLabel(item.target_type)} #${item.target_id || "-"} · ${item.created_at || ""}
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="back" onclick="approveWorkflowAction(${item.id})">Одобрить</button>
+                        <button class="back" onclick="rejectWorkflowAction(${item.id})">Отклонить</button>
+                    </div>
+                </div>
+            </div>
+        `).join("");
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="pill off">Не удалось загрузить очередь подтверждений</div>`;
+    }
+}
+
+async function approveWorkflowAction(actionId) {
+    await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {method:"POST"});
+    await loadWorkflowApprovalQueue();
+    loadChains();
+    alert("Действие одобрено");
+}
+
+async function rejectWorkflowAction(actionId) {
+    await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {method:"POST"});
+    await loadWorkflowApprovalQueue();
+    loadChains();
+    alert("Действие отклонено");
 }
 
 function getChainStatus(rule, actions) {
@@ -765,6 +853,7 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
         }
 
         loadChains();
+        loadWorkflowApprovalQueue();
         alert("Действие отправлено на подтверждение");
     } catch (err) {
         console.error(err);
@@ -1112,6 +1201,7 @@ function startPlaybackLoop() {
 }
 
 loadChains();
+loadWorkflowApprovalQueue();
 startPlaybackLoop();
 </script>
 
