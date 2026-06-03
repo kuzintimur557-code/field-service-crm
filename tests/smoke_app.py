@@ -4012,6 +4012,8 @@ async def assert_a3_workflow_center():
     assert "Требует подтверждения" in body
     assert "requestDangerousFixApproval" in body
     assert "/api/a3/autonomous-actions/request-approval" in body
+    assert "/api/a3/approval-queue" in body
+    assert "Ждёт подтверждения:" in body
     assert "Действие отправлено на подтверждение" in body
     assert "Сессии выполнения" in body
     assert "Активная сессия" in body

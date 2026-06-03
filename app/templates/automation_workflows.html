@@ -238,9 +238,14 @@ async function loadChains() {
     const summary = document.getElementById("chains-summary");
 
     try {
-        const response = await fetch("/api/a3/workflows/graph");
+        const [response, approvalResponse] = await Promise.all([
+            fetch("/api/a3/workflows/graph"),
+            fetch("/api/a3/approval-queue"),
+        ]);
         const data = await response.json();
+        const approvalData = await approvalResponse.json();
         const chains = data.workflows || data.items || [];
+        const approvalCount = approvalData.count || (approvalData.items || []).length || 0;
 
         let rendered = 0;
         list.innerHTML = "";
@@ -445,7 +450,7 @@ async function loadChains() {
             rendered += 1;
         }
 
-        summary.textContent = "Всего цепочек: " + chains.length + ". Показано: " + rendered + ".";
+        summary.textContent = "Всего цепочек: " + chains.length + ". Показано: " + rendered + ". Ждёт подтверждения: " + approvalCount + ".";
         renderProblemChains(chains);
 
         if (!rendered) {
