@@ -129,6 +129,19 @@ def _session_duration(session):
     return seconds
 
 
+def _session_execution_state(session):
+    if session["pending"]:
+        return "active"
+
+    if session["failed"]:
+        return "problem"
+
+    if session["skipped"]:
+        return "warning"
+
+    return "finished"
+
+
 def build_timeline_sessions(events):
     sessions = []
     session_map = {}
@@ -170,6 +183,7 @@ def build_timeline_sessions(events):
         duration_seconds = _session_duration(session)
         session["duration_seconds"] = duration_seconds
         session["duration_label"] = _format_duration(duration_seconds)
+        session["execution_state"] = _session_execution_state(session)
 
         if session["failed"]:
             session["status"] = "failed"

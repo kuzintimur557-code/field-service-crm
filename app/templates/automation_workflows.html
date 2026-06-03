@@ -456,12 +456,24 @@ function workflowSessionStatusLabel(status) {
     return labels[status] || status || "-";
 }
 
+function workflowExecutionStateLabel(state) {
+    const labels = {
+        active: "Активна",
+        finished: "Завершена",
+        warning: "Есть предупреждения",
+        problem: "Есть ошибки",
+    };
+
+    return labels[state] || state || "-";
+}
+
 function workflowSessionCounters(session) {
     if (!session) {
         return "Событий нет";
     }
 
     return [
+        `Состояние: ${workflowExecutionStateLabel(session.execution_state)}`,
         `Выполнено: ${session.done || 0}`,
         `Пропущено: ${session.skipped || 0}`,
         `Ошибки: ${session.failed || 0}`,
@@ -757,7 +769,7 @@ function renderChainTimeline(ruleId, timeline) {
                             data-session-index="${index}"
                             onclick="selectWorkflowSession(${ruleId}, ${index})"
                             style="border:0;cursor:pointer;${activeStyle}">
-                        ${session.label || `Сессия ${index + 1}`} · Статус: ${workflowSessionStatusLabel(session.status)} · Событий: ${session.total || 0} · ${session.duration_label || "-"}
+                        ${session.label || `Сессия ${index + 1}`} · ${workflowExecutionStateLabel(session.execution_state)} · Статус: ${workflowSessionStatusLabel(session.status)} · Событий: ${session.total || 0} · ${session.duration_label || "-"}
                     </button>
                 `;
             }).join("")}
