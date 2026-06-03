@@ -58,6 +58,54 @@ def _ai_debug_recommendations(rule, actions, latest_problem_event):
     return recommendations[:4]
 
 
+def _debug_diagnosis(rule, actions, latest_problem_event):
+    if not actions:
+        return {
+            "title": "Цепочка не выполняет полезных действий",
+            "details": "У правила нет активных шагов выполнения. Даже если триггер сработает, бизнес-результата не будет.",
+            "next_step": "Откройте правило и добавьте хотя бы одно действие.",
+        }
+
+    inactive_actions = [action for action in actions if not action["active"]]
+
+    if len(inactive_actions) == len(actions):
+        return {
+            "title": "Все действия цепочки выключены",
+            "details": "Правило может создавать события, но ни одно действие не будет выполнено.",
+            "next_step": "Включите нужные действия или замените их рабочими шагами.",
+        }
+
+    if not rule["active"]:
+        return {
+            "title": "Правило выключено",
+            "details": "Цепочка не будет запускаться автоматически, пока правило выключено.",
+            "next_step": "Включите правило и выполните тестовый запуск.",
+        }
+
+    if latest_problem_event:
+        message = latest_problem_event["message"] or "Без подробного сообщения"
+
+        if latest_problem_event["status"] == "failed":
+            return {
+                "title": "Последний запуск завершился ошибкой",
+                "details": message,
+                "next_step": "Откройте проблемное событие, исправьте причину и повторите запуск цепочки.",
+            }
+
+        if latest_problem_event["status"] == "skipped":
+            return {
+                "title": "Последний запуск был пропущен",
+                "details": message,
+                "next_step": "Проверьте условия правила и повторите пропущенные события.",
+            }
+
+    return {
+        "title": "Критических проблем не найдено",
+        "details": "Цепочка выглядит рабочей по текущим данным.",
+        "next_step": "Для контроля выполните ручной тестовый запуск.",
+    }
+
+
 def _workflow_debug(rule, actions, latest_problem_event):
     issues = []
     severity = "ok"
@@ -95,6 +143,7 @@ def _workflow_debug(rule, actions, latest_problem_event):
         "priority": priority,
         "reason": issues[0],
         "issues": issues,
+        "diagnosis": _debug_diagnosis(rule, actions, latest_problem_event),
         "ai_recommendations": _ai_debug_recommendations(rule, actions, latest_problem_event),
         "latest_problem_event": dict(latest_problem_event) if latest_problem_event else None,
         "quick_actions": quick_actions,

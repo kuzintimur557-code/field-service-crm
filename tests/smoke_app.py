@@ -630,6 +630,8 @@ async def assert_automation_page():
     assert "debug" in workflow_graph
     assert "quick_actions" in workflow_graph["debug"]
     assert "ai_recommendations" in workflow_graph["debug"]
+    assert "diagnosis" in workflow_graph["debug"]
+    assert "next_step" in workflow_graph["debug"]["diagnosis"]
     assert "severity" in workflow_graph["debug"]
     assert "priority" in workflow_graph["debug"]
     assert any(node["type"] == "trigger" for node in workflow_graph["nodes"])
@@ -645,6 +647,7 @@ async def assert_automation_page():
     assert workflow_debug["rule"]["id"] == rule["id"]
     assert "quick_actions" in workflow_debug["debug"]
     assert "ai_recommendations" in workflow_debug["debug"]
+    assert "diagnosis" in workflow_debug["debug"]
     assert "stats" in workflow_debug
 
     workflow_timeline = crm.api_a3_workflow_timeline(
@@ -3960,6 +3963,8 @@ async def assert_a3_workflow_center():
     assert "handleDebugAction" in body
     assert "AI debug рекомендации" in body
     assert "Debug:" in body
+    assert "Диагноз" in body
+    assert "Следующий шаг:" in body
     assert "Сессии выполнения" in body
     assert "Активная сессия" in body
     assert "workflowSessionStatusLabel" in body
