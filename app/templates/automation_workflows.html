@@ -444,6 +444,9 @@ async function loadChains() {
                 <div class="meta" style="margin-top:14px">
                     ${trigger.label || rule.trigger_key || "Триггер не указан"}
                 </div>
+                <div class="meta" style="margin-top:6px">
+                    Условие: ${rule.conditions?.label || "Без условий"}
+                </div>
 
                 <div style="margin-top:12px">
                     ${(state.issues || []).slice(0, 3).map(issue => `

@@ -13,6 +13,31 @@ def _safe_payload(payload_json):
         return {}
 
 
+def _condition_summary(conditions_json):
+    labels = {
+        "none": "Без условий",
+        "priority_high": "Только высокий приоритет",
+        "emergency": "Только срочные заявки",
+        "status_new": "Только новые заявки",
+    }
+
+    try:
+        conditions = json.loads(conditions_json or "{}")
+    except Exception:
+        conditions = {}
+
+    mode = conditions.get("mode") or "none"
+
+    if mode not in labels:
+        mode = "none"
+
+    return {
+        "mode": mode,
+        "label": labels[mode],
+        "raw": conditions,
+    }
+
+
 def _debug_action(label, action_type, target=None):
     return {
         "label": label,
@@ -317,6 +342,7 @@ def get_rule_workflow_graph(company_id, rule_id):
     failed_count = event_counts.get("failed", 0)
     total_events = done_count + skipped_count + pending_count + failed_count
     success_rate = round(done_count / max(done_count + skipped_count + failed_count, 1) * 100, 1)
+    conditions = _condition_summary(rule["conditions_json"])
 
     nodes = [
         {
@@ -393,6 +419,7 @@ def get_rule_workflow_graph(company_id, rule_id):
             "name": rule["name"],
             "trigger_key": rule["trigger_key"],
             "active": bool(rule["active"]),
+            "conditions": conditions,
         },
         "nodes": nodes,
         "edges": edges,

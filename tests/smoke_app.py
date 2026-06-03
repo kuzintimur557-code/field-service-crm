@@ -694,6 +694,13 @@ async def assert_automation_page():
     assert workflow_graph["ok"] is True
     assert workflow_graph["rule"]["id"] == rule["id"]
     assert workflow_graph["rule"]["trigger_key"] == "sla_overdue"
+    assert "conditions" in workflow_graph["rule"]
+    assert workflow_graph["rule"]["conditions"]["label"] in {
+        "Без условий",
+        "Только высокий приоритет",
+        "Только срочные заявки",
+        "Только новые заявки",
+    }
     assert workflow_graph["stats"]["actions_total"] >= 1
     assert "debug" in workflow_graph
     assert "quick_actions" in workflow_graph["debug"]
@@ -4042,6 +4049,7 @@ async def assert_a3_workflow_center():
     assert "A3 Цепочки автоматизации" in body
     assert "/automation/builder" in body
     assert "Конструктор" in body
+    assert "Условие:" in body
     assert "/api/a3/workflows/graph" in body
     assert "Фильтры" in body
     assert "Проблемные цепочки" in body
