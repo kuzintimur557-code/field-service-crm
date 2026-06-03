@@ -115,6 +115,8 @@ h2{margin:0 0 16px;font-size:20px}
     </div>
 
     <div id="workflow-approval-queue" style="display:flex;flex-direction:column;gap:10px;margin-top:18px"></div>
+    <div style="font-weight:900;margin-top:18px;margin-bottom:8px">Последние решения</div>
+    <div id="workflow-approval-history" style="display:flex;flex-direction:column;gap:8px"></div>
 </div>
 
 <div class="card">
@@ -203,9 +205,47 @@ async function loadWorkflowApprovalQueue() {
     }
 }
 
+async function loadWorkflowApprovalHistory() {
+    const container = document.getElementById("workflow-approval-history");
+
+    if (!container) {
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/a3/approval-history");
+        const data = await response.json();
+        const items = data.items || [];
+
+        if (!items.length) {
+            container.innerHTML = `<div class="meta">История решений пока пустая</div>`;
+            return;
+        }
+
+        container.innerHTML = items.slice(0, 3).map(item => {
+            const decision = item.decision === "approved" ? "Одобрено" : "Отклонено";
+            const cls = item.decision === "approved" ? "ok" : "off";
+
+            return `
+                <div class="meta">
+                    <span class="pill ${cls}">${decision}</span>
+                    ${workflowApprovalActionLabel(item.action_type)}
+                    для ${workflowApprovalTargetLabel(item.target_type)}
+                    #${item.target_id || "-"}
+                    · ${item.created_at || ""}
+                </div>
+            `;
+        }).join("");
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="meta">Не удалось загрузить историю решений</div>`;
+    }
+}
+
 async function approveWorkflowAction(actionId) {
     await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {method:"POST"});
     await loadWorkflowApprovalQueue();
+    await loadWorkflowApprovalHistory();
     loadChains();
     alert("Действие одобрено");
 }
@@ -213,6 +253,7 @@ async function approveWorkflowAction(actionId) {
 async function rejectWorkflowAction(actionId) {
     await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {method:"POST"});
     await loadWorkflowApprovalQueue();
+    await loadWorkflowApprovalHistory();
     loadChains();
     alert("Действие отклонено");
 }
@@ -854,6 +895,7 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
 
         loadChains();
         loadWorkflowApprovalQueue();
+        loadWorkflowApprovalHistory();
         alert("Действие отправлено на подтверждение");
     } catch (err) {
         console.error(err);
@@ -1202,6 +1244,7 @@ function startPlaybackLoop() {
 
 loadChains();
 loadWorkflowApprovalQueue();
+loadWorkflowApprovalHistory();
 startPlaybackLoop();
 </script>
 
