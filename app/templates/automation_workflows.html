@@ -490,6 +490,18 @@ function selectWorkflowSession(ruleId, sessionIndex) {
     }
 
     state.selectedSessionIndex = sessionIndex;
+    state.selectedStatusFilter = "all";
+    renderChainTimeline(ruleId, state.timeline);
+}
+
+function filterWorkflowTimeline(ruleId, statusFilter) {
+    const state = a3TimelineState[ruleId];
+
+    if (!state) {
+        return;
+    }
+
+    state.selectedStatusFilter = statusFilter;
     renderChainTimeline(ruleId, state.timeline);
 }
 
@@ -693,6 +705,7 @@ async function loadChainTimeline(ruleId) {
         a3TimelineState[ruleId] = {
             timeline,
             selectedSessionIndex: 0,
+            selectedStatusFilter: "all",
         };
 
         renderChainTimeline(ruleId, timeline);
@@ -721,10 +734,14 @@ function renderChainTimeline(ruleId, timeline) {
     const state = a3TimelineState[ruleId] || {};
     const sessions = timeline.sessions || [];
     const selectedIndex = state.selectedSessionIndex || 0;
+    const statusFilter = state.selectedStatusFilter || "all";
     const activeSession = sessions[selectedIndex] || sessions[0] || null;
-    const steps = activeSession ? (activeSession.steps || []) : (timeline.steps || []);
+    const sessionSteps = activeSession ? (activeSession.steps || []) : (timeline.steps || []);
+    const steps = statusFilter === "all"
+        ? sessionSteps
+        : sessionSteps.filter(step => step.status === statusFilter);
 
-    if (!steps.length) {
+    if (!sessionSteps.length) {
         container.innerHTML = `
             <div style="font-weight:900;margin-bottom:10px">
                 Последние события
@@ -774,12 +791,32 @@ function renderChainTimeline(ruleId, timeline) {
                 `;
             }).join("")}
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            ${[
+                ["all", "Все"],
+                ["failed", "Ошибки"],
+                ["skipped", "Пропущенные"],
+                ["pending", "Ожидающие"],
+                ["done", "Выполненные"],
+            ].map(([filterKey, label]) => {
+                const activeStyle = filterKey === statusFilter ? "box-shadow:0 0 0 2px #111827 inset" : "";
+
+                return `
+                    <button class="pill"
+                            data-timeline-filter="${filterKey}"
+                            onclick="filterWorkflowTimeline(${ruleId}, '${filterKey}')"
+                            style="border:0;cursor:pointer;${activeStyle}">
+                        ${label}
+                    </button>
+                `;
+            }).join("")}
+        </div>
         <div id="timeline-progress-${ruleId}"
              class="meta"
              style="margin-bottom:8px;font-weight:800"></div>
 
         <div style="display:flex;flex-direction:column;gap:8px">
-            ${steps.slice(0, 5).map((step, index) => {
+            ${steps.length ? steps.slice(0, 5).map((step, index) => {
                 let cls = "pill";
 
                 if (step.level === "success") {
@@ -804,8 +841,10 @@ function renderChainTimeline(ruleId, timeline) {
                             ${step.created_at || ""}
                         </div>
                     </div>
-                `;
-            }).join("")}
+                    `;
+            }).join("") : `
+                <div class="meta">По выбранному фильтру событий нет</div>
+            `}
         </div>
     `;
 }

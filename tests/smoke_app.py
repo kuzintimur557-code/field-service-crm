@@ -3969,6 +3969,9 @@ async def assert_a3_workflow_center():
     assert "Длительность:" in body
     assert "selectWorkflowSession" in body
     assert "data-session-index" in body
+    assert "filterWorkflowTimeline" in body
+    assert "data-timeline-filter" in body
+    assert "По выбранному фильтру событий нет" in body
 
     public_timeline_response = crm.api_a3_workflow_timeline(
         make_request(),
