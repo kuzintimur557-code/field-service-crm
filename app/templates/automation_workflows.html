@@ -331,6 +331,12 @@ async function loadChains() {
                         <span class="pill ${debug.status === "ok" ? "ok" : "warn"}">
                             ${debug.reason || "Проблем не найдено"}
                         </span>
+                        <span class="pill ${debug.risk?.key === "critical" || debug.risk?.key === "high" ? "off" : debug.risk?.key === "medium" ? "warn" : "ok"}">
+                            Риск: ${debug.risk?.label || "Низкий"}
+                        </span>
+                    </div>
+                    <div class="meta" style="margin-top:8px">
+                        ${debug.risk?.description || "Критических проблем не найдено."}
                     </div>
 
                     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">

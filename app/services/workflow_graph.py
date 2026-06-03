@@ -106,6 +106,35 @@ def _debug_diagnosis(rule, actions, latest_problem_event):
     }
 
 
+def _risk_level(priority):
+    if priority >= 90:
+        return {
+            "key": "critical",
+            "label": "Критический",
+            "description": "Нужно проверить в первую очередь.",
+        }
+
+    if priority >= 60:
+        return {
+            "key": "high",
+            "label": "Высокий",
+            "description": "Есть риск сбоя автоматизации.",
+        }
+
+    if priority >= 40:
+        return {
+            "key": "medium",
+            "label": "Средний",
+            "description": "Есть настройка, которая требует внимания.",
+        }
+
+    return {
+        "key": "low",
+        "label": "Низкий",
+        "description": "Критических проблем не найдено.",
+    }
+
+
 def _workflow_debug(rule, actions, latest_problem_event):
     issues = []
     severity = "ok"
@@ -141,6 +170,7 @@ def _workflow_debug(rule, actions, latest_problem_event):
         "status": "needs_attention" if issues[0] != "Критических проблем не найдено" else "ok",
         "severity": severity,
         "priority": priority,
+        "risk": _risk_level(priority),
         "reason": issues[0],
         "issues": issues,
         "diagnosis": _debug_diagnosis(rule, actions, latest_problem_event),
