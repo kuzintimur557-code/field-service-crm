@@ -623,6 +623,13 @@ async def assert_automation_page():
     assert "Проверка" in builder_html
     assert "Runtime debug" in builder_html
     assert "/automation#new-rule" in builder_html
+    assert "Быстрые шаблоны" in builder_html
+    assert "SLA → уведомление" in builder_html
+    assert "Просрочка → Telegram" in builder_html
+    assert "Ежедневная AI-сводка" in builder_html
+    assert 'name="trigger_key" value="sla_overdue"' in builder_html
+    assert 'name="action_key" value="telegram_alert"' in builder_html
+    assert 'name="action_key" value="ai_digest"' in builder_html
     assert f"/automation/rules/{rule['id']}" in builder_html
     assert "Запустить правило" in rule_detail_html
     assert "Визуальная цепочка" in rule_detail_html

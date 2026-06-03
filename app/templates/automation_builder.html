@@ -71,6 +71,46 @@
         </div>
     </div>
 
+    <div class="card">
+        <h2>Быстрые шаблоны</h2>
+        <div class="meta">Создайте типовую цепочку, а потом откройте её для точной настройки.</div>
+
+        <div class="grid" style="margin-top:16px">
+            <form method="post" action="/automation/rules" class="chain">
+                <h2>SLA → уведомление</h2>
+                <div class="meta">Если SLA просрочен, владелец получает уведомление в системе.</div>
+                <input type="hidden" name="name" value="SLA просрочен → уведомить владельца">
+                <input type="hidden" name="trigger_key" value="sla_overdue">
+                <input type="hidden" name="action_key" value="notification">
+                <input type="hidden" name="target_username" value="{{ username }}">
+                <input type="hidden" name="message" value="SLA просрочен. Проверьте заявку и исполнителя.">
+                <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
+            </form>
+
+            <form method="post" action="/automation/rules" class="chain">
+                <h2>Просрочка → Telegram</h2>
+                <div class="meta">Если задача просрочена, отправить Telegram-уведомление ответственному.</div>
+                <input type="hidden" name="name" value="Просрочена задача → Telegram">
+                <input type="hidden" name="trigger_key" value="overdue_task">
+                <input type="hidden" name="action_key" value="telegram_alert">
+                <input type="hidden" name="target_username" value="{{ username }}">
+                <input type="hidden" name="message" value="Есть просроченная задача. Проверьте календарь и исполнителя.">
+                <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
+            </form>
+
+            <form method="post" action="/automation/rules" class="chain">
+                <h2>Ежедневная AI-сводка</h2>
+                <div class="meta">Каждый день готовить AI-сводку по рискам, задачам и деньгам.</div>
+                <input type="hidden" name="name" value="Ежедневная AI-сводка владельцу">
+                <input type="hidden" name="trigger_key" value="daily_digest">
+                <input type="hidden" name="action_key" value="ai_digest">
+                <input type="hidden" name="target_username" value="{{ username }}">
+                <input type="hidden" name="message" value="Подготовь ежедневную сводку владельца по рискам, задачам и финансам.">
+                <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
+            </form>
+        </div>
+    </div>
+
     <div class="grid">
         {% for rule in rules %}
         {% set rule_actions = actions_by_rule.get(rule["id"], []) %}
