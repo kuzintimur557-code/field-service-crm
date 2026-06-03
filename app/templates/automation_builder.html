@@ -26,6 +26,8 @@
         .pill.off{background:#fee2e2;color:#991b1b}
         .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
         .filters{display:flex;gap:8px;flex-wrap:wrap}
+        select{width:100%;padding:10px;border-radius:12px;border:1px solid #d1d5db;background:#fff}
+        .small-button{width:100%;margin-top:8px;padding:9px 10px;border-radius:12px;border:0;background:#111827;color:#fff;font-weight:900;cursor:pointer}
         @media(max-width:820px){
             .builder{grid-template-columns:1fr}
             .arrow{display:none}
@@ -46,6 +48,20 @@
             <a href="/" class="back">Главная</a>
         </div>
     </div>
+
+    {% if request.query_params.get("conditions_updated") == "1" %}
+    <div class="card" style="background:#dcfce7">
+        <h2>Условия сохранены</h2>
+        <div class="meta">Настройки условия цепочки обновлены.</div>
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get("conditions_error") == "1" %}
+    <div class="card" style="background:#fef3c7">
+        <h2>Условия не сохранены</h2>
+        <div class="meta">Проверьте выбранный режим условия.</div>
+    </div>
+    {% endif %}
 
     <div class="card">
         <h2>Как устроена цепочка</h2>
@@ -147,8 +163,16 @@
                 <div class="arrow">→</div>
                 <div class="node">
                     <div class="node-title">Условия</div>
-                    <div class="node-value">{% if rule["conditions_json"] and rule["conditions_json"] != "{}" %}Настроены{% else %}Без условий{% endif %}</div>
-                    <div class="meta">{{ rule["conditions_json"] or "{}" }}</div>
+                    <div class="node-value">{{ rule["condition_label"] }}</div>
+                    <form method="post" action="/automation/rules/{{ rule['id'] }}/conditions" style="margin-top:10px">
+                        <select name="condition_mode">
+                            {% for key, label in condition_presets %}
+                            <option value="{{ key }}" {% if rule["condition_mode"] == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="small-button" type="submit">Сохранить условия</button>
+                    </form>
+                    <div class="meta" style="margin-top:8px">{{ rule["conditions_json"] or "{}" }}</div>
                 </div>
                 <div class="arrow">→</div>
                 <div class="node">

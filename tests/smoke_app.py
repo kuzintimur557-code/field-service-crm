@@ -623,6 +623,9 @@ async def assert_automation_page():
     assert "Проверка" in builder_html
     assert "Runtime debug" in builder_html
     assert "/automation#new-rule" in builder_html
+    assert f"/automation/rules/{rule['id']}/conditions" in builder_html
+    assert "Сохранить условия" in builder_html
+    assert "Только высокий приоритет" in builder_html
     assert "Быстрые шаблоны" in builder_html
     assert "Фильтры конструктора" in builder_html
     assert "filterBuilderChains" in builder_html
@@ -635,6 +638,44 @@ async def assert_automation_page():
     assert 'name="action_key" value="telegram_alert"' in builder_html
     assert 'name="action_key" value="ai_digest"' in builder_html
     assert f"/automation/rules/{rule['id']}" in builder_html
+
+    conditions_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "priority_high",
+            },
+        ),
+        rule["id"],
+    )
+    assert conditions_response.status_code == 302
+    assert conditions_response.headers["location"] == "/automation/builder?conditions_updated=1"
+
+    conn = connect()
+    c = conn.cursor()
+    updated_conditions = c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()
+    conn.close()
+
+    assert "priority_high" in updated_conditions["conditions_json"]
+
+    invalid_conditions_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "bad_mode",
+            },
+        ),
+        rule["id"],
+    )
+    assert invalid_conditions_response.status_code == 302
+    assert invalid_conditions_response.headers["location"] == "/automation/builder?conditions_error=1"
+
     assert "Запустить правило" in rule_detail_html
     assert "Визуальная цепочка" in rule_detail_html
     assert "A3 Конструктор цепочки" in rule_detail_html

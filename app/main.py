@@ -3015,6 +3015,32 @@ async def automation_builder_page(request: Request):
     for action in actions:
         actions_by_rule.setdefault(action["rule_id"], []).append(action)
 
+    condition_presets = [
+        ("none", "Без условий"),
+        ("priority_high", "Только высокий приоритет"),
+        ("emergency", "Только срочные заявки"),
+        ("status_new", "Только новые заявки"),
+    ]
+    condition_labels = dict(condition_presets)
+    rules_view = []
+
+    for rule in rules:
+        rule_data = dict(rule)
+
+        try:
+            conditions = json.loads(rule_data.get("conditions_json") or "{}")
+        except Exception:
+            conditions = {}
+
+        condition_mode = conditions.get("mode") or "none"
+
+        if condition_mode not in condition_labels:
+            condition_mode = "none"
+
+        rule_data["condition_mode"] = condition_mode
+        rule_data["condition_label"] = condition_labels[condition_mode]
+        rules_view.append(rule_data)
+
     return templates.TemplateResponse(
         request,
         "automation_builder.html",
@@ -3022,10 +3048,11 @@ async def automation_builder_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "rules": rules,
+            "rules": rules_view,
             "actions_by_rule": actions_by_rule,
             "trigger_labels": dict(AUTOMATION_TRIGGERS),
             "action_labels": dict(AUTOMATION_ACTIONS),
+            "condition_presets": condition_presets,
         }
     )
 
@@ -3786,6 +3813,88 @@ async def edit_automation_rule(request: Request, rule_id: int):
     conn.close()
 
     return RedirectResponse("/automation?updated=1", status_code=302)
+
+
+@app.post("/automation/rules/{rule_id}/conditions")
+async def update_automation_rule_conditions(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    form = await request.form()
+    condition_mode = str(form.get("condition_mode") or "none").strip()
+    allowed_modes = {
+        "none": {},
+        "priority_high": {
+            "mode": "priority_high",
+            "field": "priority",
+            "operator": "equals",
+            "value": "Высокий",
+            "label": "Только высокий приоритет",
+        },
+        "emergency": {
+            "mode": "emergency",
+            "field": "priority",
+            "operator": "equals",
+            "value": "Срочно",
+            "label": "Только срочные заявки",
+        },
+        "status_new": {
+            "mode": "status_new",
+            "field": "status",
+            "operator": "equals",
+            "value": "Новая",
+            "label": "Только новые заявки",
+        },
+    }
+
+    if condition_mode not in allowed_modes:
+        return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT id
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+    c.execute("""
+    UPDATE automation_rules
+    SET conditions_json=?,
+        updated_at=?
+    WHERE id=?
+      AND company_id=?
+    """, (
+        json.dumps(allowed_modes[condition_mode], ensure_ascii=False),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        rule_id,
+        company_id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/automation/builder?conditions_updated=1", status_code=302)
 
 
 
