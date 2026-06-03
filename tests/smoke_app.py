@@ -654,6 +654,10 @@ async def assert_automation_page():
     assert workflow_timeline["ok"] is True
     assert "sessions" in workflow_timeline["timeline"]
     assert "steps" in workflow_timeline["timeline"]
+    if workflow_timeline["timeline"]["sessions"]:
+        session = workflow_timeline["timeline"]["sessions"][0]
+        assert "duration_seconds" in session
+        assert "duration_label" in session
 
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
     assert workflows_graph["ok"] is True
@@ -3959,6 +3963,7 @@ async def assert_a3_workflow_center():
     assert "Активная сессия" in body
     assert "workflowSessionStatusLabel" in body
     assert "workflowSessionCounters" in body
+    assert "Длительность:" in body
     assert "selectWorkflowSession" in body
     assert "data-session-index" in body
 

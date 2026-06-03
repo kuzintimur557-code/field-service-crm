@@ -466,6 +466,7 @@ function workflowSessionCounters(session) {
         `Пропущено: ${session.skipped || 0}`,
         `Ошибки: ${session.failed || 0}`,
         `Ожидает: ${session.pending || 0}`,
+        `Длительность: ${session.duration_label || "-"}`,
     ].join(" · ");
 }
 
@@ -756,7 +757,7 @@ function renderChainTimeline(ruleId, timeline) {
                             data-session-index="${index}"
                             onclick="selectWorkflowSession(${ruleId}, ${index})"
                             style="border:0;cursor:pointer;${activeStyle}">
-                        ${session.label || `Сессия ${index + 1}`} · Статус: ${workflowSessionStatusLabel(session.status)} · Событий: ${session.total || 0}
+                        ${session.label || `Сессия ${index + 1}`} · Статус: ${workflowSessionStatusLabel(session.status)} · Событий: ${session.total || 0} · ${session.duration_label || "-"}
                     </button>
                 `;
             }).join("")}

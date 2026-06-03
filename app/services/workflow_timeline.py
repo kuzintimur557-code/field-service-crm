@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.database import connect
 
 
@@ -60,6 +62,73 @@ def _session_key(event):
     return f"{event.get('rule_id')}:{day}"
 
 
+def _parse_datetime(value):
+    if not value:
+        return None
+
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            pass
+
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _format_duration(seconds):
+    if seconds is None:
+        return "-"
+
+    if seconds < 60:
+        return f"{seconds} сек"
+
+    minutes = seconds // 60
+
+    if minutes < 60:
+        return f"{minutes} мин"
+
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+
+    if remaining_minutes:
+        return f"{hours} ч {remaining_minutes} мин"
+
+    return f"{hours} ч"
+
+
+def _update_session_time(session, event):
+    created_at = event.get("created_at")
+    processed_at = event.get("processed_at") or created_at
+    created_dt = _parse_datetime(created_at)
+    processed_dt = _parse_datetime(processed_at)
+    started_dt = _parse_datetime(session.get("started_at"))
+    ended_dt = _parse_datetime(session.get("ended_at"))
+
+    if created_dt and (not started_dt or created_dt < started_dt):
+        session["started_at"] = created_at
+
+    if processed_dt and (not ended_dt or processed_dt > ended_dt):
+        session["ended_at"] = processed_at
+
+
+def _session_duration(session):
+    started_dt = _parse_datetime(session.get("started_at"))
+    ended_dt = _parse_datetime(session.get("ended_at"))
+
+    if not started_dt or not ended_dt:
+        return None
+
+    seconds = int((ended_dt - started_dt).total_seconds())
+
+    if seconds < 0:
+        return None
+
+    return seconds
+
+
 def build_timeline_sessions(events):
     sessions = []
     session_map = {}
@@ -87,6 +156,7 @@ def build_timeline_sessions(events):
 
         session = session_map[key]
         session["events"].append(event)
+        _update_session_time(session, event)
 
         status = event.get("status") or "pending"
         session["total"] += 1
@@ -95,12 +165,11 @@ def build_timeline_sessions(events):
             session[status] += 1
         else:
             session["pending"] += 1
-
-        if event.get("processed_at"):
-            session["ended_at"] = event.get("processed_at")
-
     for session in sessions:
         session["steps"] = build_timeline_steps(session["events"])
+        duration_seconds = _session_duration(session)
+        session["duration_seconds"] = duration_seconds
+        session["duration_label"] = _format_duration(duration_seconds)
 
         if session["failed"]:
             session["status"] = "failed"
