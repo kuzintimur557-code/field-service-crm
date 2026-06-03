@@ -2965,6 +2965,71 @@ async def automation_page(
     )
 
 
+@app.get("/automation/builder", response_class=HTMLResponse)
+async def automation_builder_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rules = c.execute("""
+    SELECT
+        automation_rules.*,
+        COUNT(automation_actions.id) AS action_count
+    FROM automation_rules
+    LEFT JOIN automation_actions
+      ON automation_actions.rule_id=automation_rules.id
+      AND automation_actions.company_id=automation_rules.company_id
+    WHERE automation_rules.company_id=?
+    GROUP BY automation_rules.id
+    ORDER BY automation_rules.id DESC
+    LIMIT 50
+    """, (company_id,)).fetchall()
+
+    actions = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE company_id=?
+    ORDER BY rule_id, sort_order, id
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    actions_by_rule = {}
+
+    for action in actions:
+        actions_by_rule.setdefault(action["rule_id"], []).append(action)
+
+    return templates.TemplateResponse(
+        request,
+        "automation_builder.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "rules": rules,
+            "actions_by_rule": actions_by_rule,
+            "trigger_labels": dict(AUTOMATION_TRIGGERS),
+            "action_labels": dict(AUTOMATION_ACTIONS),
+        }
+    )
+
+
 @app.get("/automation/rules/export")
 async def automation_rules_export(
     request: Request,

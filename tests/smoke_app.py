@@ -608,6 +608,19 @@ async def assert_automation_page():
     assert "Действия цепочки" in rule_detail_html
     assert "Последние события цепочки" in rule_detail_html
     assert "Быстрые действия цепочки" in rule_detail_html
+
+    builder_response = await crm.automation_builder_page(
+        make_asgi_request("owner2", "/automation/builder")
+    )
+    assert builder_response.status_code == 200
+    builder_html = builder_response.body.decode("utf-8")
+    assert "A3 Конструктор цепочек" in builder_html
+    assert "Триггер" in builder_html
+    assert "Условия" in builder_html
+    assert "Действия" in builder_html
+    assert "Проверка" in builder_html
+    assert "Runtime debug" in builder_html
+    assert f"/automation/rules/{rule['id']}" in builder_html
     assert "Запустить правило" in rule_detail_html
     assert "Визуальная цепочка" in rule_detail_html
     assert "A3 Конструктор цепочки" in rule_detail_html
@@ -3972,6 +3985,8 @@ async def assert_a3_workflow_center():
     body = response.body.decode()
 
     assert "A3 Цепочки автоматизации" in body
+    assert "/automation/builder" in body
+    assert "Конструктор" in body
     assert "/api/a3/workflows/graph" in body
     assert "Фильтры" in body
     assert "Проблемные цепочки" in body
