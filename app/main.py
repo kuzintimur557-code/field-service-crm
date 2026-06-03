@@ -1312,7 +1312,7 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         return False, f"Условие не выполнено: {conditions.get('label') or mode}"
 
     task = c.execute("""
-    SELECT id, priority, status, payment_status
+    SELECT id, priority, status, payment_status, worker, workers, task_date
     FROM tasks
     WHERE company_id=?
       AND id=?
@@ -1327,6 +1327,8 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     priority = str(task["priority"] or "").strip().lower()
     status = str(task["status"] or "").strip().lower()
     payment_status = str(task["payment_status"] or "").strip().lower()
+    task_date = str(task["task_date"] or "")[:10]
+    today = datetime.now().strftime("%Y-%m-%d")
 
     if mode == "priority_high":
         if priority in ("срочно", "высокий", "urgent", "high"):
@@ -1358,6 +1360,22 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
 
     elif mode == "payment_paid":
         if payment_status in ("оплачено", "paid"):
+            return True, ""
+
+    elif mode == "worker_assigned":
+        if get_task_worker_names(task):
+            return True, ""
+
+    elif mode == "date_today":
+        if task_date == today:
+            return True, ""
+
+    elif mode == "date_overdue":
+        if task_date and task_date < today and status not in ("завершено", "done", "completed", "отменено", "cancelled"):
+            return True, ""
+
+    elif mode == "date_future":
+        if task_date and task_date > today:
             return True, ""
 
     else:
@@ -3126,11 +3144,17 @@ async def automation_builder_page(request: Request):
         ("payment_unpaid", "Только неоплаченные заявки"),
         ("payment_partial", "Только частично оплаченные заявки"),
         ("payment_paid", "Только оплаченные заявки"),
+        ("worker_assigned", "Только задачи с исполнителем"),
+        ("date_today", "Только задачи на сегодня"),
+        ("date_overdue", "Только просроченные задачи"),
+        ("date_future", "Только будущие задачи"),
     ]
     condition_groups = [
         ("Базовые", condition_presets[:3]),
         ("Статус заявки", condition_presets[3:6]),
-        ("Оплата", condition_presets[6:]),
+        ("Оплата", condition_presets[6:9]),
+        ("Исполнители", condition_presets[9:10]),
+        ("Дата", condition_presets[10:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -4005,6 +4029,30 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "operator": "equals",
             "value": "Оплачено",
             "label": "Только оплаченные заявки",
+        },
+        "worker_assigned": {
+            "mode": "worker_assigned",
+            "field": "workers",
+            "operator": "not_empty",
+            "label": "Только задачи с исполнителем",
+        },
+        "date_today": {
+            "mode": "date_today",
+            "field": "task_date",
+            "operator": "equals_today",
+            "label": "Только задачи на сегодня",
+        },
+        "date_overdue": {
+            "mode": "date_overdue",
+            "field": "task_date",
+            "operator": "before_today",
+            "label": "Только просроченные задачи",
+        },
+        "date_future": {
+            "mode": "date_future",
+            "field": "task_date",
+            "operator": "after_today",
+            "label": "Только будущие задачи",
         },
     }
 

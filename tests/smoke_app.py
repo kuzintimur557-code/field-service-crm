@@ -628,8 +628,13 @@ async def assert_automation_page():
     assert "Только высокий приоритет" in builder_html
     assert "Только неоплаченные заявки" in builder_html
     assert "Только заявки в работе" in builder_html
+    assert "Только задачи с исполнителем" in builder_html
+    assert "Только задачи на сегодня" in builder_html
+    assert "Только просроченные задачи" in builder_html
     assert 'optgroup label="Статус заявки"' in builder_html
     assert 'optgroup label="Оплата"' in builder_html
+    assert 'optgroup label="Исполнители"' in builder_html
+    assert 'optgroup label="Дата"' in builder_html
     assert "Быстрые шаблоны" in builder_html
     assert "Фильтры конструктора" in builder_html
     assert "filterBuilderChains" in builder_html
@@ -1455,6 +1460,152 @@ async def assert_automation_runner(task):
 
     assert payment_condition_event["status"] == "done"
     assert status_condition_event["status"] == "done"
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Worker condition smoke",
+        "worker_overload",
+        json.dumps({
+            "mode": "worker_assigned",
+            "field": "workers",
+            "operator": "not_empty",
+            "label": "Только задачи с исполнителем",
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    worker_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        worker_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Worker condition matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+    conn.close()
+
+    worker_condition_events = crm.run_automation_event(
+        2,
+        "worker_overload",
+        "task",
+        task["id"],
+        "Worker condition should match",
+        f"/task/{task['id']}",
+    )
+    assert worker_condition_events == 1
+
+    conn = connect()
+    c = conn.cursor()
+    worker_condition_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id DESC
+    """, (worker_rule_id,)).fetchone()
+    today = datetime.now().strftime("%Y-%m-%d")
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Date condition smoke",
+        "new_client",
+        json.dumps({
+            "mode": "date_today",
+            "field": "task_date",
+            "operator": "equals_today",
+            "label": "Только задачи на сегодня",
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    date_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        date_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Date condition matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    c.execute("""
+    UPDATE tasks
+    SET task_date=?
+    WHERE id=?
+    """, (today, task["id"]))
+    conn.commit()
+    conn.close()
+
+    date_condition_events = crm.run_automation_event(
+        2,
+        "new_client",
+        "task",
+        task["id"],
+        "Date condition should match",
+        f"/task/{task['id']}",
+    )
+    assert date_condition_events == 1
+
+    conn = connect()
+    c = conn.cursor()
+    date_condition_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id DESC
+    """, (date_rule_id,)).fetchone()
+    c.execute("""
+    UPDATE tasks
+    SET task_date=?
+    WHERE id=?
+    """, (
+        task["task_date"],
+        task["id"],
+    ))
+    conn.commit()
+    conn.close()
+
+    assert worker_condition_event["status"] == "done"
+    assert date_condition_event["status"] == "done"
 
     done_response = await crm.automation_page(
         make_asgi_request("owner2", "/automation"),
