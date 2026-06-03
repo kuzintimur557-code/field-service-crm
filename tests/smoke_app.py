@@ -588,6 +588,8 @@ async def assert_automation_page():
     assert "SLA smoke rule" in list_html
     assert "Включено" in list_html
     assert "Создать уведомление" in list_html
+    assert "/automation/builder" in list_html
+    assert 'id="new-rule"' in list_html
     assert f"/automation/rules/{rule['id']}/toggle" in list_html
     assert f"/automation/rules/{rule['id']}/edit" in list_html
     assert f"/automation/rules/{rule['id']}" in list_html
@@ -620,6 +622,7 @@ async def assert_automation_page():
     assert "Действия" in builder_html
     assert "Проверка" in builder_html
     assert "Runtime debug" in builder_html
+    assert "/automation#new-rule" in builder_html
     assert f"/automation/rules/{rule['id']}" in builder_html
     assert "Запустить правило" in rule_detail_html
     assert "Визуальная цепочка" in rule_detail_html
