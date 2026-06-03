@@ -368,6 +368,19 @@ async function loadChains() {
                     </div>
 
                     <div style="margin-top:12px">
+                        <div style="font-weight:900;margin-bottom:8px">Безопасные исправления</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                            ${(debug.safe_fixes || []).length ? (debug.safe_fixes || []).map(fix => `
+                                <button class="back" title="${fix.description || ""}" onclick="handleDebugAction('${fix.action_type}', '${fix.target}')">
+                                    ${fix.label}
+                                </button>
+                            `).join("") : `
+                                <span class="pill ok">Автоисправления не требуются</span>
+                            `}
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px">
                         <div style="font-weight:900;margin-bottom:8px">AI debug рекомендации</div>
                         <div style="display:flex;flex-direction:column;gap:7px">
                             ${(debug.ai_recommendations || []).slice(0, 3).map(rec => `

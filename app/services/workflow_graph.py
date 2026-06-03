@@ -21,6 +21,16 @@ def _debug_action(label, action_type, target=None):
     }
 
 
+def _safe_fix(label, action_type, target=None, description=""):
+    return {
+        "label": label,
+        "action_type": action_type,
+        "target": target or "",
+        "description": description,
+        "safe": True,
+    }
+
+
 def _ai_debug_recommendations(rule, actions, latest_problem_event):
     recommendations = []
 
@@ -135,6 +145,36 @@ def _risk_level(priority):
     }
 
 
+def _workflow_safe_fixes(rule, actions, latest_problem_event):
+    fixes = []
+
+    if not rule["active"]:
+        fixes.append(_safe_fix(
+            "Включить правило",
+            "enable_rule",
+            rule["id"],
+            "Безопасно включает правило без переключения туда-сюда.",
+        ))
+
+    if latest_problem_event and latest_problem_event["status"] == "skipped":
+        fixes.append(_safe_fix(
+            "Повторить пропущенные",
+            "retry_skipped",
+            rule["id"],
+            "Повторяет только пропущенные события этой цепочки.",
+        ))
+
+    if actions and rule["active"]:
+        fixes.append(_safe_fix(
+            "Тестовый запуск",
+            "run_rule",
+            rule["id"],
+            "Создаёт ручное событие для проверки цепочки.",
+        ))
+
+    return fixes[:3]
+
+
 def _workflow_debug(rule, actions, latest_problem_event):
     issues = []
     severity = "ok"
@@ -177,6 +217,7 @@ def _workflow_debug(rule, actions, latest_problem_event):
         "ai_recommendations": _ai_debug_recommendations(rule, actions, latest_problem_event),
         "latest_problem_event": dict(latest_problem_event) if latest_problem_event else None,
         "quick_actions": quick_actions,
+        "safe_fixes": _workflow_safe_fixes(rule, actions, latest_problem_event),
     }
 
 
