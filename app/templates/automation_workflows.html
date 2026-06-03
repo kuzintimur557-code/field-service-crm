@@ -872,6 +872,8 @@ function renderChainTimeline(ruleId, timeline) {
 async function runChain(ruleId) {
     try {
         await fetch(`/automation/rules/${ruleId}/run`, {method:"POST"});
+        await loadChainTimeline(ruleId);
+        loadChains();
         alert("Цепочка запущена");
     } catch (err) {
         console.error(err);
@@ -903,7 +905,7 @@ async function flagChain(ruleId) {
 
 async function enableChain(ruleId) {
     try {
-        await fetch(`/automation/rules/${ruleId}/toggle`, {method:"POST"});
+        await fetch(`/automation/rules/${ruleId}/enable`, {method:"POST"});
         loadChains();
         alert("Правило включено");
     } catch (err) {
@@ -914,8 +916,10 @@ async function enableChain(ruleId) {
 
 async function retryChain(ruleId) {
     try {
-        await fetch("/api/a3/self-healing/run", {method:"POST"});
-        alert("Повторный запуск отправлен");
+        await fetch(`/automation/rules/${ruleId}/retry-skipped`, {method:"POST"});
+        await loadChainTimeline(ruleId);
+        loadChains();
+        alert("Повтор пропущенных событий отправлен");
     } catch (err) {
         console.error(err);
         alert("Не удалось повторить запуск");

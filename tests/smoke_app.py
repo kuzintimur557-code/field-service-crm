@@ -1018,6 +1018,37 @@ async def assert_automation_page():
     assert "SLA smoke rule updated" in action_filter_export_csv
     assert "notification" in action_filter_export_csv
 
+    enable_response = await crm.enable_automation_rule(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert enable_response.status_code == 302
+    assert enable_response.headers["location"] == "/automation?enabled=1"
+
+    second_enable_response = await crm.enable_automation_rule(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert second_enable_response.status_code == 302
+    assert second_enable_response.headers["location"] == "/automation?enabled=1"
+
+    conn = connect()
+    c = conn.cursor()
+    enabled_rule = c.execute("""
+    SELECT active
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()
+    conn.close()
+
+    assert enabled_rule["active"] == 1
+
+    cleanup_toggle_response = await crm.toggle_automation_rule(
+        make_request("owner2"),
+        rule["id"],
+    )
+    assert cleanup_toggle_response.status_code == 302
+
 
 async def assert_automation_runner(task):
     create_response = await crm.create_automation_rule(
@@ -3964,6 +3995,9 @@ async def assert_a3_workflow_center():
     assert "chain.replaying" in body
     assert "Debug цепочки" in body
     assert "handleDebugAction" in body
+    assert "/enable" in body
+    assert "/retry-skipped" in body
+    assert "Повтор пропущенных событий отправлен" in body
     assert "AI debug рекомендации" in body
     assert "Debug:" in body
     assert "Диагноз" in body
