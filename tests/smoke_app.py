@@ -626,6 +626,8 @@ async def assert_automation_page():
     assert f"/automation/rules/{rule['id']}/conditions" in builder_html
     assert "Сохранить условия" in builder_html
     assert "Только высокий приоритет" in builder_html
+    assert "Только неоплаченные заявки" in builder_html
+    assert "Только заявки в работе" in builder_html
     assert "Быстрые шаблоны" in builder_html
     assert "Фильтры конструктора" in builder_html
     assert "filterBuilderChains" in builder_html
@@ -1306,6 +1308,151 @@ async def assert_automation_runner(task):
     conn.close()
 
     assert matched_condition_event["status"] == "done"
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Payment condition smoke",
+        "unpaid_task",
+        json.dumps({
+            "mode": "payment_paid",
+            "field": "payment_status",
+            "operator": "equals",
+            "value": "Оплачено",
+            "label": "Только оплаченные заявки",
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    payment_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        payment_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Payment condition matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Status condition smoke",
+        "new_client",
+        json.dumps({
+            "mode": "status_in_progress",
+            "field": "status",
+            "operator": "equals",
+            "value": "В работе",
+            "label": "Только заявки в работе",
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    status_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        status_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Status condition matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    c.execute("""
+    UPDATE tasks
+    SET payment_status='Оплачено',
+        status='В работе'
+    WHERE id=?
+    """, (task["id"],))
+    conn.commit()
+    conn.close()
+
+    paid_condition_events = crm.run_automation_event(
+        2,
+        "unpaid_task",
+        "task",
+        task["id"],
+        "Payment condition should match",
+        f"/task/{task['id']}",
+    )
+    assert paid_condition_events == 1
+
+    status_condition_events = crm.run_automation_event(
+        2,
+        "new_client",
+        "task",
+        task["id"],
+        "Status condition should match",
+        f"/task/{task['id']}",
+    )
+    assert status_condition_events == 1
+
+    conn = connect()
+    c = conn.cursor()
+    payment_condition_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id DESC
+    """, (payment_rule_id,)).fetchone()
+    status_condition_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id DESC
+    """, (status_rule_id,)).fetchone()
+    c.execute("""
+    UPDATE tasks
+    SET priority=?,
+        payment_status='Не оплачено',
+        status='Новая'
+    WHERE id=?
+    """, (
+        task["priority"],
+        task["id"],
+    ))
+    conn.commit()
+    conn.close()
+
+    assert payment_condition_event["status"] == "done"
+    assert status_condition_event["status"] == "done"
 
     done_response = await crm.automation_page(
         make_asgi_request("owner2", "/automation"),

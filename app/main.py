@@ -1312,7 +1312,7 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         return False, f"Условие не выполнено: {conditions.get('label') or mode}"
 
     task = c.execute("""
-    SELECT id, priority, status
+    SELECT id, priority, status, payment_status
     FROM tasks
     WHERE company_id=?
       AND id=?
@@ -1326,6 +1326,7 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
 
     priority = str(task["priority"] or "").strip().lower()
     status = str(task["status"] or "").strip().lower()
+    payment_status = str(task["payment_status"] or "").strip().lower()
 
     if mode == "priority_high":
         if priority in ("срочно", "высокий", "urgent", "high"):
@@ -1337,6 +1338,26 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
 
     elif mode == "status_new":
         if status in ("новая", "new"):
+            return True, ""
+
+    elif mode == "status_in_progress":
+        if status in ("в работе", "in_progress", "working"):
+            return True, ""
+
+    elif mode == "status_done":
+        if status in ("завершено", "done", "completed"):
+            return True, ""
+
+    elif mode == "payment_unpaid":
+        if payment_status in ("не оплачено", "unpaid", "not_paid"):
+            return True, ""
+
+    elif mode == "payment_partial":
+        if payment_status in ("частично оплачено", "partial", "partially_paid"):
+            return True, ""
+
+    elif mode == "payment_paid":
+        if payment_status in ("оплачено", "paid"):
             return True, ""
 
     else:
@@ -3100,6 +3121,11 @@ async def automation_builder_page(request: Request):
         ("priority_high", "Только высокий приоритет"),
         ("emergency", "Только срочные заявки"),
         ("status_new", "Только новые заявки"),
+        ("status_in_progress", "Только заявки в работе"),
+        ("status_done", "Только завершённые заявки"),
+        ("payment_unpaid", "Только неоплаченные заявки"),
+        ("payment_partial", "Только частично оплаченные заявки"),
+        ("payment_paid", "Только оплаченные заявки"),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -3938,6 +3964,41 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "operator": "equals",
             "value": "Новая",
             "label": "Только новые заявки",
+        },
+        "status_in_progress": {
+            "mode": "status_in_progress",
+            "field": "status",
+            "operator": "equals",
+            "value": "В работе",
+            "label": "Только заявки в работе",
+        },
+        "status_done": {
+            "mode": "status_done",
+            "field": "status",
+            "operator": "equals",
+            "value": "Завершено",
+            "label": "Только завершённые заявки",
+        },
+        "payment_unpaid": {
+            "mode": "payment_unpaid",
+            "field": "payment_status",
+            "operator": "equals",
+            "value": "Не оплачено",
+            "label": "Только неоплаченные заявки",
+        },
+        "payment_partial": {
+            "mode": "payment_partial",
+            "field": "payment_status",
+            "operator": "equals",
+            "value": "Частично оплачено",
+            "label": "Только частично оплаченные заявки",
+        },
+        "payment_paid": {
+            "mode": "payment_paid",
+            "field": "payment_status",
+            "operator": "equals",
+            "value": "Оплачено",
+            "label": "Только оплаченные заявки",
         },
     }
 

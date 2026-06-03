@@ -19,6 +19,11 @@ def _condition_summary(conditions_json):
         "priority_high": "Только высокий приоритет",
         "emergency": "Только срочные заявки",
         "status_new": "Только новые заявки",
+        "status_in_progress": "Только заявки в работе",
+        "status_done": "Только завершённые заявки",
+        "payment_unpaid": "Только неоплаченные заявки",
+        "payment_partial": "Только частично оплаченные заявки",
+        "payment_paid": "Только оплаченные заявки",
     }
 
     try:
