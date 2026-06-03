@@ -676,6 +676,18 @@ async def assert_automation_page():
     assert invalid_conditions_response.status_code == 302
     assert invalid_conditions_response.headers["location"] == "/automation/builder?conditions_error=1"
 
+    reset_conditions_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "none",
+            },
+        ),
+        rule["id"],
+    )
+    assert reset_conditions_response.status_code == 302
+
     assert "Запустить правило" in rule_detail_html
     assert "Визуальная цепочка" in rule_detail_html
     assert "A3 Конструктор цепочки" in rule_detail_html
@@ -1185,6 +1197,114 @@ async def assert_automation_runner(task):
     assert notification is not None
     assert notification["message"] == "Runner notification message"
     assert notification["link"] == f"/task/{task['id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Condition engine smoke",
+        "worker_overload",
+        json.dumps({
+            "mode": "priority_high",
+            "field": "priority",
+            "operator": "equals",
+            "value": "Срочно",
+            "label": "Только высокий приоритет",
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    condition_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        condition_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Condition matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+    conn.close()
+
+    skipped_condition_events = crm.run_automation_event(
+        2,
+        "worker_overload",
+        "task",
+        task["id"],
+        "Condition should skip",
+        f"/task/{task['id']}",
+    )
+    assert skipped_condition_events == 0
+
+    conn = connect()
+    c = conn.cursor()
+    skipped_condition_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id DESC
+    """, (condition_rule_id,)).fetchone()
+    c.execute("""
+    UPDATE tasks
+    SET priority='Срочно'
+    WHERE id=?
+    """, (task["id"],))
+    conn.commit()
+    conn.close()
+
+    assert skipped_condition_event["status"] == "skipped"
+    assert "Условие не выполнено" in skipped_condition_event["message"]
+
+    matched_condition_events = crm.run_automation_event(
+        2,
+        "worker_overload",
+        "task",
+        task["id"],
+        "Condition should match",
+        f"/task/{task['id']}",
+    )
+    assert matched_condition_events == 1
+
+    conn = connect()
+    c = conn.cursor()
+    matched_condition_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id DESC
+    """, (condition_rule_id,)).fetchone()
+    c.execute("""
+    UPDATE tasks
+    SET priority=?
+    WHERE id=?
+    """, (
+        task["priority"],
+        task["id"],
+    ))
+    conn.commit()
+    conn.close()
+
+    assert matched_condition_event["status"] == "done"
 
     done_response = await crm.automation_page(
         make_asgi_request("owner2", "/automation"),

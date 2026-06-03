@@ -1297,6 +1297,54 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="",
     }
 
 
+def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
+    try:
+        conditions = json.loads(rule["conditions_json"] or "{}")
+    except Exception:
+        conditions = {}
+
+    mode = conditions.get("mode") or "none"
+
+    if mode == "none":
+        return True, ""
+
+    if entity_type != "task" or not entity_id:
+        return False, f"Условие не выполнено: {conditions.get('label') or mode}"
+
+    task = c.execute("""
+    SELECT id, priority, status
+    FROM tasks
+    WHERE company_id=?
+      AND id=?
+    """, (
+        company_id,
+        entity_id,
+    )).fetchone()
+
+    if not task:
+        return False, f"Условие не выполнено: задача #{entity_id} не найдена"
+
+    priority = str(task["priority"] or "").strip().lower()
+    status = str(task["status"] or "").strip().lower()
+
+    if mode == "priority_high":
+        if priority in ("срочно", "высокий", "urgent", "high"):
+            return True, ""
+
+    elif mode == "emergency":
+        if priority in ("срочно", "urgent", "emergency"):
+            return True, ""
+
+    elif mode == "status_new":
+        if status in ("новая", "new"):
+            return True, ""
+
+    else:
+        return False, f"Условие не поддерживается: {mode}"
+
+    return False, f"Условие не выполнено: {conditions.get('label') or mode}"
+
+
 def run_automation_event(
     company_id,
     trigger_key,
@@ -1326,6 +1374,33 @@ def run_automation_event(
     """, (company_id, trigger_key)).fetchall()
 
     for rule in rules:
+        condition_ok, condition_message = automation_condition_matches(
+            c,
+            company_id,
+            rule,
+            entity_type,
+            entity_id,
+        )
+
+        if not condition_ok:
+            c.execute("""
+            INSERT INTO automation_events (
+                company_id, rule_id, trigger_key, entity_type,
+                entity_id, status, message, created_at, processed_at
+            )
+            VALUES (?, ?, ?, ?, ?, 'skipped', ?, ?, ?)
+            """, (
+                company_id,
+                rule["id"],
+                trigger_key,
+                entity_type,
+                entity_id,
+                condition_message,
+                now,
+                now,
+            ))
+            continue
+
         c.execute("""
         INSERT INTO automation_events (
             company_id, rule_id, trigger_key, entity_type,
