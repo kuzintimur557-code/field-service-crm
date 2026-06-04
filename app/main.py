@@ -1314,6 +1314,9 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     task = c.execute("""
     SELECT
         id,
+        client_id,
+        client,
+        phone,
         priority,
         status,
         payment_status,
@@ -1352,6 +1355,41 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     today_dt = datetime.now()
     today = today_dt.strftime("%Y-%m-%d")
     next_24h = today_dt + timedelta(hours=24)
+
+    client_id = task["client_id"]
+    client = None
+
+    if client_id:
+        client = c.execute("""
+        SELECT id, name, phone, notes, created_at
+        FROM clients
+        WHERE id=?
+        """, (client_id,)).fetchone()
+
+    client_task_count = 0
+    client_unpaid_count = 0
+
+    if client_id:
+        client_task_count = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND client_id=?
+        """, (
+            company_id,
+            client_id,
+        )).fetchone()[0]
+
+        client_unpaid_count = c.execute("""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND client_id=?
+          AND payment_status IN ('Не оплачено', 'unpaid', 'not_paid')
+        """, (
+            company_id,
+            client_id,
+        )).fetchone()[0]
 
     if mode == "priority_high":
         if priority in ("срочно", "высокий", "urgent", "high"):
@@ -1425,6 +1463,27 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
                     return True, ""
             except Exception:
                 pass
+
+    elif mode == "client_new":
+        if client_task_count <= 1:
+            return True, ""
+
+    elif mode == "client_repeat":
+        if client_task_count >= 2:
+            return True, ""
+
+    elif mode == "client_vip":
+        client_notes = str(client["notes"] or "").lower() if client else ""
+        if "vip" in client_notes or "вип" in client_notes:
+            return True, ""
+
+    elif mode == "client_has_debt":
+        if client_unpaid_count > 0:
+            return True, ""
+
+    elif mode == "client_many_tasks":
+        if client_task_count >= 5:
+            return True, ""
 
     else:
         return False, f"Условие не поддерживается: {mode}"
@@ -3201,6 +3260,11 @@ async def automation_builder_page(request: Request):
         ("sla_today", "Только дедлайн сегодня"),
         ("sla_overdue", "Только просроченный SLA"),
         ("sla_due_24h", "Только дедлайн в ближайшие 24 часа"),
+        ("client_new", "Только новые клиенты"),
+        ("client_repeat", "Только постоянные клиенты"),
+        ("client_vip", "Только VIP клиенты"),
+        ("client_has_debt", "Только клиенты с долгом"),
+        ("client_many_tasks", "Только клиенты с большим количеством заявок"),
     ]
     condition_groups = [
         ("Базовые", condition_presets[:3]),
@@ -3209,7 +3273,8 @@ async def automation_builder_page(request: Request):
         ("Исполнители", condition_presets[9:10]),
         ("Дата", condition_presets[10:13]),
         ("Цена", condition_presets[13:15]),
-        ("SLA", condition_presets[15:]),
+        ("SLA", condition_presets[15:18]),
+        ("Клиенты", condition_presets[18:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -4139,6 +4204,40 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "field": "deadline_at",
             "operator": "within_24h",
             "label": "Только дедлайн в ближайшие 24 часа",
+        },
+        "client_new": {
+            "mode": "client_new",
+            "field": "client_id",
+            "operator": "task_count_lte",
+            "value": "1",
+            "label": "Только новые клиенты",
+        },
+        "client_repeat": {
+            "mode": "client_repeat",
+            "field": "client_id",
+            "operator": "task_count_gte",
+            "value": "2",
+            "label": "Только постоянные клиенты",
+        },
+        "client_vip": {
+            "mode": "client_vip",
+            "field": "client_notes",
+            "operator": "contains",
+            "value": "VIP",
+            "label": "Только VIP клиенты",
+        },
+        "client_has_debt": {
+            "mode": "client_has_debt",
+            "field": "payment_status",
+            "operator": "has_unpaid_tasks",
+            "label": "Только клиенты с долгом",
+        },
+        "client_many_tasks": {
+            "mode": "client_many_tasks",
+            "field": "client_id",
+            "operator": "task_count_gte",
+            "value": "5",
+            "label": "Только клиенты с большим количеством заявок",
         },
     }
 
