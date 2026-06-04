@@ -1584,6 +1584,195 @@ async def assert_automation_runner(task):
     )
     assert date_condition_events == 1
 
+
+    conn = connect()
+    c = conn.cursor()
+    due_today = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    c.execute("""
+    UPDATE tasks
+    SET price=?,
+        deadline_at=?,
+        status='Новая'
+    WHERE id=?
+    """, (
+        "15000",
+        due_today,
+        task["id"],
+    ))
+
+    condition_smokes = [
+        (
+            "Price high condition smoke",
+            "price_high_trigger",
+            {
+                "mode": "price_high",
+                "field": "price",
+                "operator": "gte",
+                "value": "10000",
+                "label": "Только дорогие заявки",
+            },
+        ),
+        (
+            "SLA today condition smoke",
+            "sla_today_trigger",
+            {
+                "mode": "sla_today",
+                "field": "deadline_at",
+                "operator": "date_today",
+                "label": "Только дедлайн сегодня",
+            },
+        ),
+    ]
+
+    for rule_name, trigger_key, conditions in condition_smokes:
+        c.execute("""
+        INSERT INTO automation_rules (
+            company_id, name, trigger_key, conditions_json,
+            active, created_by, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            2,
+            rule_name,
+            trigger_key,
+            json.dumps(conditions, ensure_ascii=False),
+            1,
+            "owner2",
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+
+        rule_id = c.lastrowid
+
+        c.execute("""
+        INSERT INTO automation_actions (
+            company_id, rule_id, action_key, payload_json,
+            sort_order, active, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            2,
+            rule_id,
+            "notification",
+            json.dumps({
+                "target_username": "owner2",
+                "message": f"{rule_name} matched",
+            }, ensure_ascii=False),
+            1,
+            1,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+
+        conn.commit()
+        conn.close()
+
+        matched = crm.run_automation_event(
+            2,
+            trigger_key,
+            "task",
+            task["id"],
+            f"{rule_name} should match",
+            f"/task/{task['id']}",
+        )
+
+        assert matched == 1
+
+        conn = connect()
+        c = conn.cursor()
+
+    c.execute("""
+    UPDATE tasks
+    SET price=?,
+        deadline_at=?
+    WHERE id=?
+    """, (
+        "",
+        (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"),
+        task["id"],
+    ))
+
+    missing_overdue_smokes = [
+        (
+            "Price missing condition smoke",
+            "price_missing_trigger",
+            {
+                "mode": "price_missing",
+                "field": "price",
+                "operator": "empty_or_zero",
+                "label": "Только заявки без цены",
+            },
+        ),
+        (
+            "SLA overdue condition smoke",
+            "sla_overdue_trigger",
+            {
+                "mode": "sla_overdue",
+                "field": "deadline_at",
+                "operator": "before_now",
+                "label": "Только просроченный SLA",
+            },
+        ),
+    ]
+
+    for rule_name, trigger_key, conditions in missing_overdue_smokes:
+        c.execute("""
+        INSERT INTO automation_rules (
+            company_id, name, trigger_key, conditions_json,
+            active, created_by, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            2,
+            rule_name,
+            trigger_key,
+            json.dumps(conditions, ensure_ascii=False),
+            1,
+            "owner2",
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+
+        rule_id = c.lastrowid
+
+        c.execute("""
+        INSERT INTO automation_actions (
+            company_id, rule_id, action_key, payload_json,
+            sort_order, active, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            2,
+            rule_id,
+            "notification",
+            json.dumps({
+                "target_username": "owner2",
+                "message": f"{rule_name} matched",
+            }, ensure_ascii=False),
+            1,
+            1,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+
+        conn.commit()
+        conn.close()
+
+        matched = crm.run_automation_event(
+            2,
+            trigger_key,
+            "task",
+            task["id"],
+            f"{rule_name} should match",
+            f"/task/{task['id']}",
+        )
+
+        assert matched == 1
+
+        conn = connect()
+        c = conn.cursor()
+
+    conn.commit()
+    conn.close()
+
     conn = connect()
     c = conn.cursor()
     date_condition_event = c.execute("""

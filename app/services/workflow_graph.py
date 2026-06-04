@@ -28,6 +28,11 @@ def _condition_summary(conditions_json):
         "date_today": "Только задачи на сегодня",
         "date_overdue": "Только просроченные задачи",
         "date_future": "Только будущие задачи",
+        "price_high": "Только дорогие заявки",
+        "price_missing": "Только заявки без цены",
+        "sla_today": "Только дедлайн сегодня",
+        "sla_overdue": "Только просроченный SLA",
+        "sla_due_24h": "Только дедлайн в ближайшие 24 часа",
     }
 
     try:

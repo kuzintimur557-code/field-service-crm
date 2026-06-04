@@ -1312,7 +1312,16 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         return False, f"Условие не выполнено: {conditions.get('label') or mode}"
 
     task = c.execute("""
-    SELECT id, priority, status, payment_status, worker, workers, task_date
+    SELECT
+        id,
+        priority,
+        status,
+        payment_status,
+        worker,
+        workers,
+        task_date,
+        price,
+        deadline_at
     FROM tasks
     WHERE company_id=?
       AND id=?
@@ -1328,7 +1337,21 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     status = str(task["status"] or "").strip().lower()
     payment_status = str(task["payment_status"] or "").strip().lower()
     task_date = str(task["task_date"] or "")[:10]
-    today = datetime.now().strftime("%Y-%m-%d")
+    deadline_at = str(task["deadline_at"] or "")
+    deadline_date = deadline_at[:10]
+
+    try:
+        task_price = float(
+            str(task["price"] or "0")
+            .replace(" ", "")
+            .replace(",", ".")
+        )
+    except Exception:
+        task_price = 0
+
+    today_dt = datetime.now()
+    today = today_dt.strftime("%Y-%m-%d")
+    next_24h = today_dt + timedelta(hours=24)
 
     if mode == "priority_high":
         if priority in ("срочно", "высокий", "urgent", "high"):
@@ -1377,6 +1400,31 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     elif mode == "date_future":
         if task_date and task_date > today:
             return True, ""
+
+    elif mode == "price_high":
+        if task_price >= 10000:
+            return True, ""
+
+    elif mode == "price_missing":
+        if task_price <= 0:
+            return True, ""
+
+    elif mode == "sla_today":
+        if deadline_date == today:
+            return True, ""
+
+    elif mode == "sla_overdue":
+        if deadline_at and deadline_at < today_dt.isoformat(timespec="minutes") and status not in ("завершено", "done", "completed", "отменено", "cancelled"):
+            return True, ""
+
+    elif mode == "sla_due_24h":
+        if deadline_at and status not in ("завершено", "done", "completed", "отменено", "cancelled"):
+            try:
+                deadline_dt = datetime.fromisoformat(deadline_at.replace("Z", "+00:00").replace("+00:00", ""))
+                if today_dt <= deadline_dt <= next_24h:
+                    return True, ""
+            except Exception:
+                pass
 
     else:
         return False, f"Условие не поддерживается: {mode}"
@@ -3148,13 +3196,20 @@ async def automation_builder_page(request: Request):
         ("date_today", "Только задачи на сегодня"),
         ("date_overdue", "Только просроченные задачи"),
         ("date_future", "Только будущие задачи"),
+        ("price_high", "Только дорогие заявки"),
+        ("price_missing", "Только заявки без цены"),
+        ("sla_today", "Только дедлайн сегодня"),
+        ("sla_overdue", "Только просроченный SLA"),
+        ("sla_due_24h", "Только дедлайн в ближайшие 24 часа"),
     ]
     condition_groups = [
         ("Базовые", condition_presets[:3]),
         ("Статус заявки", condition_presets[3:6]),
         ("Оплата", condition_presets[6:9]),
         ("Исполнители", condition_presets[9:10]),
-        ("Дата", condition_presets[10:]),
+        ("Дата", condition_presets[10:13]),
+        ("Цена", condition_presets[13:15]),
+        ("SLA", condition_presets[15:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -4053,6 +4108,37 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "field": "task_date",
             "operator": "after_today",
             "label": "Только будущие задачи",
+        },
+        "price_high": {
+            "mode": "price_high",
+            "field": "price",
+            "operator": "gte",
+            "value": "10000",
+            "label": "Только дорогие заявки",
+        },
+        "price_missing": {
+            "mode": "price_missing",
+            "field": "price",
+            "operator": "empty_or_zero",
+            "label": "Только заявки без цены",
+        },
+        "sla_today": {
+            "mode": "sla_today",
+            "field": "deadline_at",
+            "operator": "date_today",
+            "label": "Только дедлайн сегодня",
+        },
+        "sla_overdue": {
+            "mode": "sla_overdue",
+            "field": "deadline_at",
+            "operator": "before_now",
+            "label": "Только просроченный SLA",
+        },
+        "sla_due_24h": {
+            "mode": "sla_due_24h",
+            "field": "deadline_at",
+            "operator": "within_24h",
+            "label": "Только дедлайн в ближайшие 24 часа",
         },
     }
 
