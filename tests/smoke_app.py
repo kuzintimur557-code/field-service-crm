@@ -1584,6 +1584,156 @@ async def assert_automation_runner(task):
     )
     assert date_condition_events == 1
 
+    conn = connect()
+    c = conn.cursor()
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    c.execute("""
+    UPDATE tasks
+    SET task_date=?,
+        price=?,
+        payment_status='Не оплачено',
+        status='Новая'
+    WHERE id=?
+    """, (
+        today,
+        "15000",
+        task["id"],
+    ))
+
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Combined AND condition smoke",
+        "combined_and_trigger",
+        json.dumps({
+            "operator": "and",
+            "conditions": [
+                {
+                    "mode": "date_today",
+                    "field": "task_date",
+                    "operator": "equals_today",
+                    "label": "Только задачи на сегодня",
+                },
+                {
+                    "mode": "price_high",
+                    "field": "price",
+                    "operator": "gte",
+                    "value": "10000",
+                    "label": "Только дорогие заявки",
+                },
+            ],
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    combined_and_rule_id = c.lastrowid
+
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        combined_and_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Combined AND condition matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Combined OR condition smoke",
+        "combined_or_trigger",
+        json.dumps({
+            "operator": "or",
+            "conditions": [
+                {
+                    "mode": "client_vip",
+                    "field": "client_notes",
+                    "operator": "contains",
+                    "value": "VIP",
+                    "label": "Только VIP клиенты",
+                },
+                {
+                    "mode": "price_high",
+                    "field": "price",
+                    "operator": "gte",
+                    "value": "10000",
+                    "label": "Только дорогие заявки",
+                },
+            ],
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    combined_or_rule_id = c.lastrowid
+
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        combined_or_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Combined OR condition matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+
+    conn.commit()
+    conn.close()
+
+    combined_and_events = crm.run_automation_event(
+        2,
+        "combined_and_trigger",
+        "task",
+        task["id"],
+        "Combined AND should match",
+        f"/task/{task['id']}",
+    )
+    assert combined_and_events == 1
+
+    combined_or_events = crm.run_automation_event(
+        2,
+        "combined_or_trigger",
+        "task",
+        task["id"],
+        "Combined OR should match",
+        f"/task/{task['id']}",
+    )
+    assert combined_or_events == 1
+
 
     conn = connect()
     c = conn.cursor()

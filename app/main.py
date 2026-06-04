@@ -1297,11 +1297,67 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="",
     }
 
 
+def automation_single_condition_matches(c, company_id, rule, entity_type, entity_id, condition):
+    rule_data = dict(rule)
+    rule_data["conditions_json"] = json.dumps(condition or {}, ensure_ascii=False)
+    return automation_condition_matches(
+        c,
+        company_id,
+        rule_data,
+        entity_type,
+        entity_id,
+    )
+
+
+def automation_combined_conditions_match(c, company_id, rule, entity_type, entity_id, conditions):
+    items = conditions.get("conditions") or []
+    operator = str(conditions.get("operator") or "and").lower()
+
+    if not items:
+        return True, ""
+
+    results = [
+        automation_single_condition_matches(
+            c,
+            company_id,
+            rule,
+            entity_type,
+            entity_id,
+            item,
+        )
+        for item in items
+    ]
+
+    if operator == "or":
+        if any(result[0] for result in results):
+            return True, ""
+
+        message = "; ".join([result[1] for result in results if result[1]])
+        return False, message or "Ни одно условие не выполнено"
+
+    if all(result[0] for result in results):
+        return True, ""
+
+    message = "; ".join([result[1] for result in results if result[1]])
+    return False, message or "Не все условия выполнены"
+
+
+
 def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     try:
         conditions = json.loads(rule["conditions_json"] or "{}")
     except Exception:
         conditions = {}
+
+    if conditions.get("conditions"):
+        return automation_combined_conditions_match(
+            c,
+            company_id,
+            rule,
+            entity_type,
+            entity_id,
+            conditions,
+        )
 
     mode = conditions.get("mode") or "none"
 

@@ -45,6 +45,31 @@ def _condition_summary(conditions_json):
     except Exception:
         conditions = {}
 
+    if conditions.get("conditions"):
+        items = conditions.get("conditions") or []
+        operator = str(conditions.get("operator") or "and").lower()
+
+        item_labels = []
+
+        for item in items:
+            item_mode = item.get("mode") or "none"
+            item_labels.append(labels.get(item_mode, item.get("label") or item_mode))
+
+        if operator == "or":
+            label = "Любое условие: " + " или ".join(item_labels)
+            mode = "combined_or"
+        else:
+            label = "Все условия: " + " + ".join(item_labels)
+            mode = "combined_and"
+
+        return {
+            "mode": mode,
+            "label": label,
+            "operator": operator,
+            "items": item_labels,
+            "raw": conditions,
+        }
+
     mode = conditions.get("mode") or "none"
 
     if mode not in labels:
