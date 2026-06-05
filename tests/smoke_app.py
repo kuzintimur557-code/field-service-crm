@@ -983,6 +983,8 @@ async def assert_automation_page():
     )
     assert test_condition_response.status_code == 302
     assert "test_result=match" in test_condition_response.headers["location"]
+    assert "test_operator=" in test_condition_response.headers["location"]
+    assert "test_details=" in test_condition_response.headers["location"]
 
     conn = connect()
     c = conn.cursor()
@@ -1005,6 +1007,40 @@ async def assert_automation_page():
     test_result_html = test_result_response.body.decode("utf-8")
     assert "Подходит" in test_result_html
     assert "Условия выполнены, правило может сработать" in test_result_html
+    assert "Логика проверки: И" in test_result_html
+    assert "Выполнено" in test_result_html
+    assert "Текст содержит: Smoke" in test_result_html
+
+    conn = connect()
+    c = conn.cursor()
+    diagnostic_rule = dict(rule)
+    diagnostic_rule["conditions_json"] = json.dumps({
+        "operator": "and",
+        "conditions": [
+            {
+                "mode": "task_text_contains",
+                "value": "Smoke",
+                "label": "Текст содержит: Smoke",
+            },
+            {
+                "mode": "status_done",
+                "label": "Только завершённые заявки",
+            },
+        ],
+    }, ensure_ascii=False)
+    diagnostic_result = crm.automation_condition_diagnostics(
+        c,
+        2,
+        diagnostic_rule,
+        "task",
+        test_task["id"],
+    )
+    conn.close()
+
+    assert diagnostic_result["matched"] is False
+    assert diagnostic_result["operator_label"] == "И"
+    assert diagnostic_result["details"][0]["matched"] is True
+    assert diagnostic_result["details"][1]["matched"] is False
 
     invalid_test_response = await crm.test_automation_rule_condition(
         make_form_request(

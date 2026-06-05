@@ -313,6 +313,20 @@
                         {% endif %}
                     </div>
                     <div class="meta" style="margin-top:6px">{{ test_message }}</div>
+                    {% if test_details %}
+                    <div class="meta" style="margin-top:10px">
+                        Логика проверки: {{ test_operator or "И" }}
+                    </div>
+                    <div style="display:grid;gap:6px;margin-top:8px">
+                        {% for detail in test_details %}
+                        <div class="pill {% if detail['matched'] %}ok{% else %}warn{% endif %}"
+                             style="justify-content:flex-start">
+                            {% if detail["matched"] %}Выполнено{% else %}Не выполнено{% endif %}
+                            · {{ detail["label"] }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     {% endif %}
                 </div>
                 <div class="arrow">→</div>

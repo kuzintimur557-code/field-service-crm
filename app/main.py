@@ -1342,6 +1342,53 @@ def automation_combined_conditions_match(c, company_id, rule, entity_type, entit
     return False, message or "Не все условия выполнены"
 
 
+def automation_condition_diagnostics(c, company_id, rule, entity_type, entity_id):
+    try:
+        conditions = json.loads(rule["conditions_json"] or "{}")
+    except Exception:
+        conditions = {}
+
+    items = conditions.get("conditions") or [conditions]
+    operator = str(conditions.get("operator") or "and").lower()
+
+    if operator not in ("and", "or"):
+        operator = "and"
+
+    details = []
+
+    for condition in items:
+        mode = str(condition.get("mode") or "none")
+        matched, message = automation_single_condition_matches(
+            c,
+            company_id,
+            rule,
+            entity_type,
+            entity_id,
+            condition,
+        )
+        details.append({
+            "label": str(condition.get("label") or (
+                "Без условий" if mode == "none" else mode
+            )),
+            "matched": bool(matched),
+            "message": (
+                "Условие выполнено"
+                if matched
+                else str(message or "Условие не выполнено")
+            )[:180],
+        })
+
+    results = [item["matched"] for item in details]
+    overall = any(results) if operator == "or" else all(results)
+
+    return {
+        "matched": overall,
+        "operator": operator,
+        "operator_label": "ИЛИ" if operator == "or" else "И",
+        "details": details,
+    }
+
+
 def automation_condition_number(conditions, default, minimum=0):
     try:
         value = float(str(conditions.get("value", default)).replace(",", "."))
@@ -3446,6 +3493,16 @@ async def automation_builder_page(request: Request):
     except ValueError:
         test_task_id = 0
 
+    try:
+        test_details = json.loads(
+            str(request.query_params.get("test_details") or "[]")
+        )
+    except Exception:
+        test_details = []
+
+    if not isinstance(test_details, list):
+        test_details = []
+
     for rule in rules:
         rule_data = dict(rule)
 
@@ -3618,6 +3675,8 @@ async def automation_builder_page(request: Request):
             "test_task_id": test_task_id,
             "test_result": str(request.query_params.get("test_result") or ""),
             "test_message": str(request.query_params.get("test_message") or ""),
+            "test_operator": str(request.query_params.get("test_operator") or ""),
+            "test_details": test_details,
         }
     )
 
@@ -3679,7 +3738,7 @@ async def test_automation_rule_condition(request: Request, rule_id: int):
             status_code=302,
         )
 
-    condition_ok, condition_message = automation_condition_matches(
+    diagnostics = automation_condition_diagnostics(
         c,
         company_id,
         rule,
@@ -3688,6 +3747,12 @@ async def test_automation_rule_condition(request: Request, rule_id: int):
     )
     conn.close()
 
+    condition_ok = diagnostics["matched"]
+    failed_messages = [
+        item["message"]
+        for item in diagnostics["details"]
+        if not item["matched"]
+    ]
     params = {
         "test_rule_id": rule_id,
         "test_task_id": task_id,
@@ -3695,7 +3760,13 @@ async def test_automation_rule_condition(request: Request, rule_id: int):
         "test_message": (
             "Условия выполнены, правило может сработать"
             if condition_ok
-            else (condition_message or "Условия не выполнены")[:180]
+            else ("; ".join(failed_messages) or "Условия не выполнены")[:180]
+        ),
+        "test_operator": diagnostics["operator_label"],
+        "test_details": json.dumps(
+            diagnostics["details"],
+            ensure_ascii=False,
+            separators=(",", ":"),
         ),
     }
 
