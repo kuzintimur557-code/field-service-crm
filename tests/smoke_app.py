@@ -400,6 +400,26 @@ def assert_automation_foundation():
 
 
 async def assert_automation_page():
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO catalog_items (
+        company_id, item_type, name, unit, price, cost, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (2, "service", "Automation service", "шт", 2000, 500, 1, now))
+    automation_catalog_item_id = c.lastrowid
+    c.execute("""
+    INSERT INTO catalog_items (
+        company_id, item_type, name, unit, price, cost, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (1, "service", "Outsider service", "шт", 3000, 700, 1, now))
+    outsider_catalog_item_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
     response = await crm.automation_page(make_asgi_request("owner2", "/automation"))
     assert response.status_code == 200
     html = response.body.decode("utf-8")
@@ -637,10 +657,16 @@ async def assert_automation_page():
     assert 'name="condition_client"' in builder_html
     assert 'name="condition_secondary_client"' in builder_html
     assert 'name="condition_tertiary_client"' in builder_html
+    assert 'name="condition_catalog"' in builder_html
+    assert 'name="condition_secondary_catalog"' in builder_html
+    assert 'name="condition_tertiary_catalog"' in builder_html
     assert "Только выбранный исполнитель" in builder_html
     assert "Только выбранный клиент" in builder_html
+    assert "Только выбранная позиция каталога" in builder_html
     assert 'value="helper2"' in builder_html
     assert "Client 2" in builder_html
+    assert "Automation service" in builder_html
+    assert "Outsider service" not in builder_html
     assert "И — выполнить все" in builder_html
     assert "ИЛИ — выполнить любое" in builder_html
     assert "Только высокий приоритет" in builder_html
@@ -855,6 +881,46 @@ async def assert_automation_page():
     )
     assert outsider_client_response.status_code == 302
     assert outsider_client_response.headers["location"] == "/automation/builder?conditions_error=1"
+
+    catalog_condition_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "catalog_specific",
+                "condition_catalog": str(automation_catalog_item_id),
+            },
+        ),
+        rule["id"],
+    )
+    assert catalog_condition_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    catalog_condition = json.loads(c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()["conditions_json"])
+    conn.close()
+
+    assert catalog_condition["mode"] == "catalog_specific"
+    assert catalog_condition["value"] == str(automation_catalog_item_id)
+    assert catalog_condition["label"] == "Каталог: Automation service"
+
+    outsider_catalog_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "catalog_specific",
+                "condition_catalog": str(outsider_catalog_item_id),
+            },
+        ),
+        rule["id"],
+    )
+    assert outsider_catalog_response.status_code == 302
+    assert outsider_catalog_response.headers["location"] == "/automation/builder?conditions_error=1"
 
     invalid_conditions_response = await crm.update_automation_rule_conditions(
         make_form_request(
@@ -1748,6 +1814,64 @@ async def assert_automation_runner(task):
     assert crm.automation_condition_matches(
         c, 2, specific_client_rule, "task", task["id"]
     )[0] is False
+
+    automation_catalog_item = c.execute("""
+    SELECT id, name, item_type, unit, price, cost
+    FROM catalog_items
+    WHERE company_id=2
+      AND name='Automation service'
+    """).fetchone()
+    c.execute("""
+    INSERT INTO task_items (
+        company_id, task_id, catalog_item_id, item_name, item_type,
+        unit, qty, price, cost, total, profit, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        task["id"],
+        automation_catalog_item["id"],
+        automation_catalog_item["name"],
+        automation_catalog_item["item_type"],
+        automation_catalog_item["unit"],
+        1,
+        automation_catalog_item["price"],
+        automation_catalog_item["cost"],
+        automation_catalog_item["price"],
+        automation_catalog_item["price"] - automation_catalog_item["cost"],
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+
+    specific_catalog_rule = {
+        "conditions_json": json.dumps({
+            "mode": "catalog_specific",
+            "value": str(automation_catalog_item["id"]),
+            "label": "Каталог: Automation service",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, specific_catalog_rule, "task", task["id"]
+    )[0] is True
+
+    specific_catalog_rule["conditions_json"] = json.dumps({
+        "mode": "catalog_specific",
+        "value": "999999",
+        "label": "Каталог: другой",
+    }, ensure_ascii=False)
+    assert crm.automation_condition_matches(
+        c, 2, specific_catalog_rule, "task", task["id"]
+    )[0] is False
+    c.execute("""
+    DELETE FROM task_items
+    WHERE company_id=2
+      AND task_id=?
+      AND catalog_item_id=?
+    """, (
+        task["id"],
+        automation_catalog_item["id"],
+    ))
+    conn.commit()
 
     today = datetime.now().strftime("%Y-%m-%d")
     c.execute("""

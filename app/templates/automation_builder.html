@@ -194,6 +194,14 @@
                             </option>
                             {% endfor %}
                         </select>
+                        <select name="condition_catalog" data-condition-catalog="primary" aria-label="Позиция каталога первого условия">
+                            <option value="">Выберите позицию каталога</option>
+                            {% for item in catalog_items %}
+                            <option value="{{ item['id'] }}" {% if rule["condition_catalog"] == item["id"]|string %}selected{% endif %}>
+                                {{ item["name"] }} · {% if item["item_type"] == "service" %}услуга{% else %}материал{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
                         <select name="condition_operator" aria-label="Логика условий">
                             <option value="and" {% if rule["condition_operator"] == "and" %}selected{% endif %}>И — выполнить все</option>
                             <option value="or" {% if rule["condition_operator"] == "or" %}selected{% endif %}>ИЛИ — выполнить любое</option>
@@ -226,6 +234,14 @@
                             </option>
                             {% endfor %}
                         </select>
+                        <select name="condition_secondary_catalog" data-condition-catalog="secondary" aria-label="Позиция каталога второго условия">
+                            <option value="">Выберите позицию каталога</option>
+                            {% for item in catalog_items %}
+                            <option value="{{ item['id'] }}" {% if rule["condition_secondary_catalog"] == item["id"]|string %}selected{% endif %}>
+                                {{ item["name"] }} · {% if item["item_type"] == "service" %}услуга{% else %}материал{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
                         <select name="condition_tertiary_mode" data-condition-mode="tertiary" aria-label="Третье условие">
                             {% for group_label, group_items in condition_groups %}
                             <optgroup label="{{ group_label }}">
@@ -251,6 +267,14 @@
                             {% for client in clients %}
                             <option value="{{ client['id'] }}" {% if rule["condition_tertiary_client"] == client["id"]|string %}selected{% endif %}>
                                 {{ client["name"] }}{% if client["phone"] %} · {{ client["phone"] }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <select name="condition_tertiary_catalog" data-condition-catalog="tertiary" aria-label="Позиция каталога третьего условия">
+                            <option value="">Выберите позицию каталога</option>
+                            {% for item in catalog_items %}
+                            <option value="{{ item['id'] }}" {% if rule["condition_tertiary_catalog"] == item["id"]|string %}selected{% endif %}>
+                                {{ item["name"] }} · {% if item["item_type"] == "service" %}услуга{% else %}материал{% endif %}
                             </option>
                             {% endfor %}
                         </select>
@@ -321,6 +345,7 @@ function syncConditionInputs(form) {
         const slot = modeSelect.dataset.conditionMode;
         const workerSelect = form.querySelector(`[data-condition-worker="${slot}"]`);
         const clientSelect = form.querySelector(`[data-condition-client="${slot}"]`);
+        const catalogSelect = form.querySelector(`[data-condition-catalog="${slot}"]`);
         const valueInput = form.querySelector(`[data-condition-value="${slot}"]`);
 
         if (workerSelect) {
@@ -329,6 +354,10 @@ function syncConditionInputs(form) {
 
         if (clientSelect) {
             clientSelect.style.display = modeSelect.value === "client_specific" ? "" : "none";
+        }
+
+        if (catalogSelect) {
+            catalogSelect.style.display = modeSelect.value === "catalog_specific" ? "" : "none";
         }
 
         if (valueInput) {

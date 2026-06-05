@@ -31,6 +31,7 @@ def _condition_summary(conditions_json):
         "date_future": "Только будущие задачи",
         "price_high": "Только дорогие заявки",
         "price_missing": "Только заявки без цены",
+        "catalog_specific": "Только выбранная позиция каталога",
         "sla_today": "Только дедлайн сегодня",
         "sla_overdue": "Только просроченный SLA",
         "sla_due_24h": "Только дедлайн в ближайшие 24 часа",

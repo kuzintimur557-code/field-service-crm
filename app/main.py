@@ -1520,6 +1520,29 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         if task_price <= 0:
             return True, ""
 
+    elif mode == "catalog_specific":
+        try:
+            selected_catalog_item_id = int(conditions.get("value"))
+        except (TypeError, ValueError):
+            selected_catalog_item_id = 0
+
+        if selected_catalog_item_id:
+            task_item = c.execute("""
+            SELECT 1
+            FROM task_items
+            WHERE company_id=?
+              AND task_id=?
+              AND catalog_item_id=?
+            LIMIT 1
+            """, (
+                company_id,
+                entity_id,
+                selected_catalog_item_id,
+            )).fetchone()
+
+            if task_item:
+                return True, ""
+
     elif mode == "sla_today":
         if deadline_date == today:
             return True, ""
@@ -3331,6 +3354,14 @@ async def automation_builder_page(request: Request):
     ORDER BY name, id
     """, (company_id,)).fetchall()
 
+    catalog_items = c.execute("""
+    SELECT id, name, item_type
+    FROM catalog_items
+    WHERE company_id=?
+      AND active=1
+    ORDER BY item_type, name, id
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     actions_by_rule = {}
@@ -3355,6 +3386,7 @@ async def automation_builder_page(request: Request):
         ("date_future", "Только будущие задачи"),
         ("price_high", "Только дорогие заявки"),
         ("price_missing", "Только заявки без цены"),
+        ("catalog_specific", "Только выбранная позиция каталога"),
         ("sla_today", "Только дедлайн сегодня"),
         ("sla_overdue", "Только просроченный SLA"),
         ("sla_due_24h", "Только дедлайн в ближайшие 24 часа"),
@@ -3372,8 +3404,9 @@ async def automation_builder_page(request: Request):
         ("Исполнители", condition_presets[9:11]),
         ("Дата", condition_presets[11:14]),
         ("Цена", condition_presets[14:16]),
-        ("SLA", condition_presets[16:19]),
-        ("Клиенты", condition_presets[19:]),
+        ("Каталог", condition_presets[16:17]),
+        ("SLA", condition_presets[17:20]),
+        ("Клиенты", condition_presets[20:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -3472,6 +3505,19 @@ async def automation_builder_page(request: Request):
             if condition_tertiary_mode == "client_specific"
             else ""
         )
+        rule_data["condition_catalog"] = (
+            condition_value if condition_mode == "catalog_specific" else ""
+        )
+        rule_data["condition_secondary_catalog"] = (
+            condition_secondary_value
+            if condition_secondary_mode == "catalog_specific"
+            else ""
+        )
+        rule_data["condition_tertiary_catalog"] = (
+            condition_tertiary_value
+            if condition_tertiary_mode == "catalog_specific"
+            else ""
+        )
 
         condition_payloads = (
             condition_items
@@ -3518,6 +3564,7 @@ async def automation_builder_page(request: Request):
             "condition_groups": condition_groups,
             "workers": workers,
             "clients": clients,
+            "catalog_items": catalog_items,
         }
     )
 
@@ -4322,6 +4369,11 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         str(form.get("condition_secondary_client") or "").strip(),
         str(form.get("condition_tertiary_client") or "").strip(),
     ]
+    condition_catalog_items = [
+        str(form.get("condition_catalog") or "").strip(),
+        str(form.get("condition_secondary_catalog") or "").strip(),
+        str(form.get("condition_tertiary_catalog") or "").strip(),
+    ]
     condition_operator = str(form.get("condition_operator") or "and").strip().lower()
     allowed_modes = {
         "none": {},
@@ -4425,6 +4477,13 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "operator": "empty_or_zero",
             "label": "Только заявки без цены",
         },
+        "catalog_specific": {
+            "mode": "catalog_specific",
+            "field": "catalog_item_id",
+            "operator": "contains",
+            "value": "",
+            "label": "Только выбранная позиция каталога",
+        },
         "sla_today": {
             "mode": "sla_today",
             "field": "deadline_at",
@@ -4500,6 +4559,7 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             condition_values[index],
             condition_workers[index],
             condition_clients[index],
+            condition_catalog_items[index],
         )
         for index, mode in enumerate((
             condition_mode,
@@ -4511,7 +4571,7 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
 
     selected_conditions = []
 
-    for mode, raw_value, selected_worker, selected_client in selected_modes:
+    for mode, raw_value, selected_worker, selected_client, selected_catalog_item in selected_modes:
         condition = dict(allowed_modes[mode])
 
         if mode == "worker_specific":
@@ -4529,6 +4589,15 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
 
             condition["value"] = str(client_id)
             condition["label"] = f"Клиент #{client_id}"
+
+        elif mode == "catalog_specific":
+            try:
+                catalog_item_id = int(selected_catalog_item)
+            except (TypeError, ValueError):
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+            condition["value"] = str(catalog_item_id)
+            condition["label"] = f"Позиция каталога #{catalog_item_id}"
 
         elif mode == "price_high":
             try:
@@ -4601,6 +4670,21 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
                 return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
             condition["label"] = f"Клиент: {client_row['name']}"
+
+        elif condition.get("mode") == "catalog_specific":
+            catalog_item = c.execute("""
+            SELECT id, name
+            FROM catalog_items
+            WHERE company_id=?
+              AND id=?
+              AND active=1
+            """, (company_id, condition["value"])).fetchone()
+
+            if not catalog_item:
+                conn.close()
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+            condition["label"] = f"Каталог: {catalog_item['name']}"
 
     c.execute("""
     UPDATE automation_rules
