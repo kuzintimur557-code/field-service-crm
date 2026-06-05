@@ -1080,6 +1080,7 @@ async def assert_automation_page():
     assert "batch_matched=" in batch_test_response.headers["location"]
     assert "batch_match_rate=" in batch_test_response.headers["location"]
     assert "batch_limit=20" in batch_test_response.headers["location"]
+    assert "batch_condition_stats=" in batch_test_response.headers["location"]
 
     conn = connect()
     c = conn.cursor()
@@ -1106,6 +1107,8 @@ async def assert_automation_page():
     assert "Последние 100 заявок" in batch_result_html
     assert "Подходит" in batch_result_html
     assert "Совпадение:" in batch_result_html
+    assert "Результат каждого условия" in batch_result_html
+    assert "Текст содержит: Smoke" in batch_result_html
     assert f'href="/task/{test_task["id"]}"' in batch_result_html
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(

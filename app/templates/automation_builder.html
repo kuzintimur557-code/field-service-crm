@@ -345,6 +345,18 @@
                     <div class="meta" style="margin-top:6px">
                         Совпадение: {{ batch_match_rate }}%
                     </div>
+                    {% if batch_condition_stats %}
+                    <div class="meta" style="margin-top:10px">Результат каждого условия</div>
+                    <div style="display:grid;gap:6px;margin-top:8px">
+                        {% for item in batch_condition_stats %}
+                        <div class="pill {% if item['matched'] %}ok{% else %}warn{% endif %}"
+                             style="justify-content:flex-start">
+                            {{ item["label"] }} · {{ item["matched"] }} из {{ batch_total }}
+                            · {{ item["match_rate"] }}%
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     {% if batch_tasks %}
                     <div style="display:grid;gap:6px;margin-top:8px">
                         {% for task in batch_tasks %}

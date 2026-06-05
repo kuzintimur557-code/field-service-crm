@@ -1391,9 +1391,10 @@ def automation_condition_diagnostics(c, company_id, rule, entity_type, entity_id
 
 def automation_condition_batch_summary(c, company_id, rule, task_ids):
     matched_task_ids = []
+    condition_stats = []
 
     for task_id in task_ids:
-        matched, _ = automation_condition_matches(
+        diagnostics = automation_condition_diagnostics(
             c,
             company_id,
             rule,
@@ -1401,17 +1402,36 @@ def automation_condition_batch_summary(c, company_id, rule, task_ids):
             task_id,
         )
 
-        if matched:
+        if not condition_stats:
+            condition_stats = [
+                {
+                    "label": detail["label"],
+                    "matched": 0,
+                }
+                for detail in diagnostics["details"]
+            ]
+
+        for index, detail in enumerate(diagnostics["details"]):
+            if detail["matched"]:
+                condition_stats[index]["matched"] += 1
+
+        if diagnostics["matched"]:
             matched_task_ids.append(task_id)
 
     total = len(task_ids)
     matched_count = len(matched_task_ids)
+
+    for item in condition_stats:
+        item["match_rate"] = round(
+            (item["matched"] / total) * 100
+        ) if total else 0
 
     return {
         "total": total,
         "matched": matched_count,
         "match_rate": round((matched_count / total) * 100) if total else 0,
         "matched_task_ids": matched_task_ids[:10],
+        "condition_stats": condition_stats,
     }
 
 
@@ -3529,6 +3549,16 @@ async def automation_builder_page(request: Request):
     if not isinstance(test_details, list):
         test_details = []
 
+    try:
+        batch_condition_stats = json.loads(
+            str(request.query_params.get("batch_condition_stats") or "[]")
+        )
+    except Exception:
+        batch_condition_stats = []
+
+    if not isinstance(batch_condition_stats, list):
+        batch_condition_stats = []
+
     batch_values = {}
 
     for key in (
@@ -3739,6 +3769,7 @@ async def automation_builder_page(request: Request):
             "batch_match_rate": batch_values["batch_match_rate"],
             "batch_limit": batch_values["batch_limit"],
             "batch_tasks": batch_tasks,
+            "batch_condition_stats": batch_condition_stats,
         }
     )
 
@@ -3909,6 +3940,11 @@ async def test_automation_rule_condition_batch(request: Request, rule_id: int):
         "batch_limit": batch_limit,
         "batch_task_ids": ",".join(
             str(task_id) for task_id in summary["matched_task_ids"]
+        ),
+        "batch_condition_stats": json.dumps(
+            summary["condition_stats"],
+            ensure_ascii=False,
+            separators=(",", ":"),
         ),
     }
 
