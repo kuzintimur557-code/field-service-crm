@@ -625,6 +625,10 @@ async def assert_automation_page():
     assert "/automation#new-rule" in builder_html
     assert f"/automation/rules/{rule['id']}/conditions" in builder_html
     assert "Сохранить условия" in builder_html
+    assert 'name="condition_operator"' in builder_html
+    assert 'name="condition_secondary_mode"' in builder_html
+    assert "И — выполнить все" in builder_html
+    assert "ИЛИ — выполнить любое" in builder_html
     assert "Только высокий приоритет" in builder_html
     assert "Только неоплаченные заявки" in builder_html
     assert "Только заявки в работе" in builder_html
@@ -671,6 +675,44 @@ async def assert_automation_page():
     conn.close()
 
     assert "priority_high" in updated_conditions["conditions_json"]
+
+    combined_conditions_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "priority_high",
+                "condition_operator": "and",
+                "condition_secondary_mode": "payment_unpaid",
+            },
+        ),
+        rule["id"],
+    )
+    assert combined_conditions_response.status_code == 302
+    assert combined_conditions_response.headers["location"] == "/automation/builder?conditions_updated=1"
+
+    conn = connect()
+    c = conn.cursor()
+    combined_conditions = c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()
+    conn.close()
+
+    combined_payload = json.loads(combined_conditions["conditions_json"])
+    assert combined_payload["operator"] == "and"
+    assert [item["mode"] for item in combined_payload["conditions"]] == [
+        "priority_high",
+        "payment_unpaid",
+    ]
+
+    combined_builder_response = await crm.automation_builder_page(
+        make_asgi_request("owner2", "/automation/builder")
+    )
+    combined_builder_html = combined_builder_response.body.decode("utf-8")
+    assert "Только высокий приоритет и Только неоплаченные заявки" in combined_builder_html
+    assert '<option value="and" selected' in combined_builder_html
 
     invalid_conditions_response = await crm.update_automation_rule_conditions(
         make_form_request(

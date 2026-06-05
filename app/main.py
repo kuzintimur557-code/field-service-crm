@@ -3343,13 +3343,40 @@ async def automation_builder_page(request: Request):
         except Exception:
             conditions = {}
 
-        condition_mode = conditions.get("mode") or "none"
+        condition_items = conditions.get("conditions") or []
+        condition_mode = conditions.get("mode") or (
+            condition_items[0].get("mode") if condition_items else "none"
+        )
+        condition_secondary_mode = (
+            condition_items[1].get("mode")
+            if len(condition_items) > 1
+            else "none"
+        )
+        condition_operator = str(conditions.get("operator") or "and").lower()
 
         if condition_mode not in condition_labels:
             condition_mode = "none"
 
+        if condition_secondary_mode not in condition_labels:
+            condition_secondary_mode = "none"
+
+        if condition_operator not in ("and", "or"):
+            condition_operator = "and"
+
         rule_data["condition_mode"] = condition_mode
-        rule_data["condition_label"] = condition_labels[condition_mode]
+        rule_data["condition_secondary_mode"] = condition_secondary_mode
+        rule_data["condition_operator"] = condition_operator
+
+        if condition_secondary_mode != "none":
+            separator = " и " if condition_operator == "and" else " или "
+            rule_data["condition_label"] = (
+                condition_labels[condition_mode]
+                + separator
+                + condition_labels[condition_secondary_mode]
+            )
+        else:
+            rule_data["condition_label"] = condition_labels[condition_mode]
+
         rules_view.append(rule_data)
 
     return templates.TemplateResponse(
@@ -4148,6 +4175,10 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
 
     form = await request.form()
     condition_mode = str(form.get("condition_mode") or "none").strip()
+    condition_secondary_mode = str(
+        form.get("condition_secondary_mode") or "none"
+    ).strip()
+    condition_operator = str(form.get("condition_operator") or "and").strip().lower()
     allowed_modes = {
         "none": {},
         "priority_high": {
@@ -4297,8 +4328,27 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         },
     }
 
-    if condition_mode not in allowed_modes:
+    if (
+        condition_mode not in allowed_modes
+        or condition_secondary_mode not in allowed_modes
+        or condition_operator not in ("and", "or")
+    ):
         return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+    if condition_mode == "none" and condition_secondary_mode != "none":
+        condition_mode = condition_secondary_mode
+        condition_secondary_mode = "none"
+
+    if condition_mode != "none" and condition_secondary_mode != "none":
+        conditions_payload = {
+            "operator": condition_operator,
+            "conditions": [
+                allowed_modes[condition_mode],
+                allowed_modes[condition_secondary_mode],
+            ],
+        }
+    else:
+        conditions_payload = allowed_modes[condition_mode]
 
     conn = connect()
     c = conn.cursor()
@@ -4321,7 +4371,7 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
     WHERE id=?
       AND company_id=?
     """, (
-        json.dumps(allowed_modes[condition_mode], ensure_ascii=False),
+        json.dumps(conditions_payload, ensure_ascii=False),
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         rule_id,
         company_id,
