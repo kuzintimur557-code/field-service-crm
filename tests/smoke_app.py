@@ -1081,6 +1081,7 @@ async def assert_automation_page():
     assert "batch_match_rate=" in batch_test_response.headers["location"]
     assert "batch_limit=20" in batch_test_response.headers["location"]
     assert "batch_condition_stats=" in batch_test_response.headers["location"]
+    assert "batch_rejected=" in batch_test_response.headers["location"]
 
     conn = connect()
     c = conn.cursor()
@@ -1110,6 +1111,27 @@ async def assert_automation_page():
     assert "Результат каждого условия" in batch_result_html
     assert "Текст содержит: Smoke" in batch_result_html
     assert f'href="/task/{test_task["id"]}"' in batch_result_html
+
+    rejected_preview_response = await crm.automation_builder_page(
+        make_asgi_request(
+            "owner2",
+            "/automation/builder",
+            urlencode({
+                "batch_rule_id": rule["id"],
+                "batch_total": 1,
+                "batch_matched": 0,
+                "batch_match_rate": 0,
+                "batch_limit": 20,
+                "batch_rejected": json.dumps([{
+                    "id": test_task["id"],
+                    "failed_conditions": ["Только завершённые заявки"],
+                }], ensure_ascii=False),
+            }),
+        )
+    )
+    rejected_preview_html = rejected_preview_response.body.decode("utf-8")
+    assert "Отклонённые заявки" in rejected_preview_html
+    assert "Не выполнено: Только завершённые заявки" in rejected_preview_html
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(

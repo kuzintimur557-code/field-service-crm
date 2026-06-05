@@ -1391,6 +1391,7 @@ def automation_condition_diagnostics(c, company_id, rule, entity_type, entity_id
 
 def automation_condition_batch_summary(c, company_id, rule, task_ids):
     matched_task_ids = []
+    rejected_tasks = []
     condition_stats = []
 
     for task_id in task_ids:
@@ -1417,6 +1418,15 @@ def automation_condition_batch_summary(c, company_id, rule, task_ids):
 
         if diagnostics["matched"]:
             matched_task_ids.append(task_id)
+        elif len(rejected_tasks) < 10:
+            rejected_tasks.append({
+                "id": task_id,
+                "failed_conditions": [
+                    detail["label"]
+                    for detail in diagnostics["details"]
+                    if not detail["matched"]
+                ],
+            })
 
     total = len(task_ids)
     matched_count = len(matched_task_ids)
@@ -1431,6 +1441,7 @@ def automation_condition_batch_summary(c, company_id, rule, task_ids):
         "matched": matched_count,
         "match_rate": round((matched_count / total) * 100) if total else 0,
         "matched_task_ids": matched_task_ids[:10],
+        "rejected_tasks": rejected_tasks,
         "condition_stats": condition_stats,
     }
 
@@ -3559,6 +3570,16 @@ async def automation_builder_page(request: Request):
     if not isinstance(batch_condition_stats, list):
         batch_condition_stats = []
 
+    try:
+        batch_rejected = json.loads(
+            str(request.query_params.get("batch_rejected") or "[]")
+        )
+    except Exception:
+        batch_rejected = []
+
+    if not isinstance(batch_rejected, list):
+        batch_rejected = []
+
     batch_values = {}
 
     for key in (
@@ -3588,6 +3609,36 @@ async def automation_builder_page(request: Request):
         for task in test_tasks
         if str(task["id"]) in batch_task_id_set
     ]
+    test_tasks_by_id = {
+        int(task["id"]): dict(task)
+        for task in test_tasks
+    }
+    batch_rejected_tasks = []
+
+    for item in batch_rejected[:10]:
+        if not isinstance(item, dict):
+            continue
+
+        try:
+            rejected_task_id = int(item.get("id") or 0)
+        except (TypeError, ValueError):
+            continue
+
+        task = test_tasks_by_id.get(rejected_task_id)
+
+        if not task:
+            continue
+
+        failed_conditions = item.get("failed_conditions") or []
+
+        if not isinstance(failed_conditions, list):
+            failed_conditions = []
+
+        task["failed_conditions"] = [
+            str(label)[:120]
+            for label in failed_conditions[:3]
+        ]
+        batch_rejected_tasks.append(task)
 
     for rule in rules:
         rule_data = dict(rule)
@@ -3769,6 +3820,7 @@ async def automation_builder_page(request: Request):
             "batch_match_rate": batch_values["batch_match_rate"],
             "batch_limit": batch_values["batch_limit"],
             "batch_tasks": batch_tasks,
+            "batch_rejected_tasks": batch_rejected_tasks,
             "batch_condition_stats": batch_condition_stats,
         }
     )
@@ -3943,6 +3995,11 @@ async def test_automation_rule_condition_batch(request: Request, rule_id: int):
         ),
         "batch_condition_stats": json.dumps(
             summary["condition_stats"],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        "batch_rejected": json.dumps(
+            summary["rejected_tasks"],
             ensure_ascii=False,
             separators=(",", ":"),
         ),
