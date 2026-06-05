@@ -1014,6 +1014,8 @@ async def assert_automation_page():
     assert "Будет выполнено действий: 1" in test_result_html
     assert "Будут выполнены" in test_result_html
     assert "Создать уведомление" in test_result_html
+    assert "Получатель: owner2" in test_result_html
+    assert "SLA smoke message" in test_result_html
 
     conn = connect()
     c = conn.cursor()
@@ -1166,22 +1168,31 @@ async def assert_automation_page():
     ready_dry_run = crm.automation_dry_run_readiness(
         True,
         True,
-        [{"active": 1, "action_key": "notification"}],
+        [{
+            "active": 1,
+            "action_key": "notification",
+            "payload_json": json.dumps({
+                "target_username": "owner2",
+                "message": "Проверка",
+            }),
+        }],
     )
     assert ready_dry_run["status"] == "ready"
     assert len(ready_dry_run["active_actions"]) == 1
+    assert ready_dry_run["executable_actions"][0]["dry_run_supported"] is True
+    assert "Получатель: owner2" in ready_dry_run["executable_actions"][0]["dry_run_detail"]
 
     disabled_dry_run = crm.automation_dry_run_readiness(
         False,
         True,
-        [{"active": 1, "action_key": "notification"}],
+        [{"active": 1, "action_key": "notification", "payload_json": "{}"}],
     )
     assert disabled_dry_run["status"] == "rule_disabled"
 
     failed_dry_run = crm.automation_dry_run_readiness(
         True,
         False,
-        [{"active": 1, "action_key": "notification"}],
+        [{"active": 1, "action_key": "notification", "payload_json": "{}"}],
     )
     assert failed_dry_run["status"] == "condition_failed"
     assert len(failed_dry_run["active_actions"]) == 1
@@ -1189,10 +1200,26 @@ async def assert_automation_page():
     empty_dry_run = crm.automation_dry_run_readiness(
         True,
         True,
-        [{"active": 0, "action_key": "notification"}],
+        [{"active": 0, "action_key": "notification", "payload_json": "{}"}],
     )
     assert empty_dry_run["status"] == "no_actions"
     assert len(empty_dry_run["inactive_actions"]) == 1
+
+    unsupported_dry_run = crm.automation_dry_run_readiness(
+        True,
+        True,
+        [{
+            "active": 1,
+            "action_key": "email",
+            "payload_json": json.dumps({
+                "target_username": "owner2",
+                "subject": "Тест",
+            }),
+        }],
+    )
+    assert unsupported_dry_run["status"] == "unsupported_actions"
+    assert len(unsupported_dry_run["unsupported_actions"]) == 1
+    assert unsupported_dry_run["unsupported_actions"][0]["dry_run_supported"] is False
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(

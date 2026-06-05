@@ -1539,16 +1539,68 @@ def automation_condition_focus_assessment(condition_stats, operator="and"):
     }
 
 
+def automation_action_dry_run_preview(action):
+    action_data = dict(action)
+
+    try:
+        payload = json.loads(action_data.get("payload_json") or "{}")
+    except Exception:
+        payload = {}
+
+    action_key = str(action_data.get("action_key") or "")
+    target = str(payload.get("target_username") or "").strip()
+    message = str(payload.get("message") or "").strip()
+    subject = str(payload.get("subject") or "").strip()
+    supported = action_key in {
+        "notification",
+        "telegram_alert",
+        "ai_digest",
+    }
+
+    if action_key == "notification":
+        detail = f"Получатель: {target or 'создатель правила'}"
+    elif action_key == "telegram_alert":
+        detail = f"Telegram: {target or 'создатель правила'}"
+    elif action_key == "ai_digest":
+        detail = f"AI-сводка для: {target or 'создатель правила'}"
+    elif action_key == "email":
+        detail = f"Почта: {target or 'получатель не указан'}"
+    elif action_key == "create_task":
+        detail = "Создание задачи"
+    else:
+        detail = "Неизвестное действие"
+
+    if subject:
+        detail = f"{detail} · Тема: {subject}"
+
+    if message:
+        detail = f"{detail} · {message[:140]}"
+
+    action_data["dry_run_supported"] = supported
+    action_data["dry_run_detail"] = detail
+    return action_data
+
+
 def automation_dry_run_readiness(rule_active, condition_matched, actions):
     active_actions = [
-        dict(action)
+        automation_action_dry_run_preview(action)
         for action in (actions or [])
         if action["active"]
     ]
     inactive_actions = [
-        dict(action)
+        automation_action_dry_run_preview(action)
         for action in (actions or [])
         if not action["active"]
+    ]
+    executable_actions = [
+        action
+        for action in active_actions
+        if action["dry_run_supported"]
+    ]
+    unsupported_actions = [
+        action
+        for action in active_actions
+        if not action["dry_run_supported"]
     ]
 
     if not rule_active:
@@ -1572,15 +1624,24 @@ def automation_dry_run_readiness(rule_active, condition_matched, actions):
             "title": "Нет активных действий",
             "message": "Добавьте или включите хотя бы одно действие цепочки.",
         }
+    elif not executable_actions:
+        status = {
+            "status": "unsupported_actions",
+            "tone": "warn",
+            "title": "Действия ещё не поддерживаются",
+            "message": "Настроенные действия пока не исполняются текущим runtime.",
+        }
     else:
         status = {
             "status": "ready",
             "tone": "ok",
             "title": "Готово к запуску",
-            "message": f"Будет выполнено действий: {len(active_actions)}.",
+            "message": f"Будет выполнено действий: {len(executable_actions)}.",
         }
 
     status["active_actions"] = active_actions
+    status["executable_actions"] = executable_actions
+    status["unsupported_actions"] = unsupported_actions
     status["inactive_actions"] = inactive_actions
     return status
 

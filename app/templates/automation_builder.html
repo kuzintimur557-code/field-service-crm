@@ -343,7 +343,7 @@
                     <div class="meta" style="margin-top:6px">
                         {{ rule["dry_run"]["message"] }}
                     </div>
-                    {% if rule["dry_run"]["active_actions"] %}
+                    {% if rule["dry_run"]["executable_actions"] %}
                     <div class="meta" style="margin-top:8px">
                         {% if rule["dry_run"]["status"] == "ready" %}
                         Будут выполнены
@@ -352,9 +352,21 @@
                         {% endif %}
                     </div>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-                        {% for action in rule["dry_run"]["active_actions"] %}
+                        {% for action in rule["dry_run"]["executable_actions"] %}
                         <span class="pill ok">
                             {{ action_labels.get(action["action_key"], action["action_key"]) }}
+                            · {{ action["dry_run_detail"] }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if rule["dry_run"]["unsupported_actions"] %}
+                    <div class="meta" style="margin-top:8px">Пока не исполняются</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                        {% for action in rule["dry_run"]["unsupported_actions"] %}
+                        <span class="pill warn">
+                            {{ action_labels.get(action["action_key"], action["action_key"]) }}
+                            · {{ action["dry_run_detail"] }}
                         </span>
                         {% endfor %}
                     </div>
@@ -365,6 +377,7 @@
                         {% for action in rule["dry_run"]["inactive_actions"] %}
                         <span class="pill off">
                             {{ action_labels.get(action["action_key"], action["action_key"]) }}
+                            · {{ action["dry_run_detail"] }}
                         </span>
                         {% endfor %}
                     </div>
