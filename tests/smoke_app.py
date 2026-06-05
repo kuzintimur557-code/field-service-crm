@@ -660,9 +660,13 @@ async def assert_automation_page():
     assert 'name="condition_catalog"' in builder_html
     assert 'name="condition_secondary_catalog"' in builder_html
     assert 'name="condition_tertiary_catalog"' in builder_html
+    assert 'name="condition_text"' in builder_html
+    assert 'name="condition_secondary_text"' in builder_html
+    assert 'name="condition_tertiary_text"' in builder_html
     assert "Только выбранный исполнитель" in builder_html
     assert "Только выбранный клиент" in builder_html
     assert "Только выбранная позиция каталога" in builder_html
+    assert "Текст заявки содержит" in builder_html
     assert 'value="helper2"' in builder_html
     assert "Client 2" in builder_html
     assert "Automation service" in builder_html
@@ -921,6 +925,46 @@ async def assert_automation_page():
     )
     assert outsider_catalog_response.status_code == 302
     assert outsider_catalog_response.headers["location"] == "/automation/builder?conditions_error=1"
+
+    text_condition_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "task_text_contains",
+                "condition_text": "Smoke",
+            },
+        ),
+        rule["id"],
+    )
+    assert text_condition_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    text_condition = json.loads(c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()["conditions_json"])
+    conn.close()
+
+    assert text_condition["mode"] == "task_text_contains"
+    assert text_condition["value"] == "Smoke"
+    assert text_condition["label"] == "Текст содержит: Smoke"
+
+    empty_text_condition_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "task_text_contains",
+                "condition_text": "",
+            },
+        ),
+        rule["id"],
+    )
+    assert empty_text_condition_response.status_code == 302
+    assert empty_text_condition_response.headers["location"] == "/automation/builder?conditions_error=1"
 
     invalid_conditions_response = await crm.update_automation_rule_conditions(
         make_form_request(
@@ -1793,6 +1837,26 @@ async def assert_automation_runner(task):
     }, ensure_ascii=False)
     assert crm.automation_condition_matches(
         c, 2, specific_worker_rule, "task", task["id"]
+    )[0] is False
+
+    task_text_rule = {
+        "conditions_json": json.dumps({
+            "mode": "task_text_contains",
+            "value": "SMOKE",
+            "label": "Текст содержит: SMOKE",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, task_text_rule, "task", task["id"]
+    )[0] is True
+
+    task_text_rule["conditions_json"] = json.dumps({
+        "mode": "task_text_contains",
+        "value": "отсутствующее слово",
+        "label": "Текст содержит: отсутствующее слово",
+    }, ensure_ascii=False)
+    assert crm.automation_condition_matches(
+        c, 2, task_text_rule, "task", task["id"]
     )[0] is False
 
     specific_client_rule = {

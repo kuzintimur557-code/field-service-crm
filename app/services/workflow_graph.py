@@ -18,6 +18,7 @@ def _condition_summary(conditions_json):
         "none": "Без условий",
         "priority_high": "Только высокий приоритет",
         "emergency": "Только срочные заявки",
+        "task_text_contains": "Текст заявки содержит",
         "status_new": "Только новые заявки",
         "status_in_progress": "Только заявки в работе",
         "status_done": "Только завершённые заявки",

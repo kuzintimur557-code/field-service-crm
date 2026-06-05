@@ -1382,6 +1382,8 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         client_id,
         client,
         phone,
+        address,
+        description,
         priority,
         status,
         payment_status,
@@ -1404,6 +1406,12 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     priority = str(task["priority"] or "").strip().lower()
     status = str(task["status"] or "").strip().lower()
     payment_status = str(task["payment_status"] or "").strip().lower()
+    task_search_text = " ".join([
+        str(task["client"] or ""),
+        str(task["phone"] or ""),
+        str(task["address"] or ""),
+        str(task["description"] or ""),
+    ]).lower()
     task_date = str(task["task_date"] or "")[:10]
     deadline_at = str(task["deadline_at"] or "")
     deadline_date = deadline_at[:10]
@@ -1465,6 +1473,11 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
 
     elif mode == "emergency":
         if priority in ("срочно", "urgent", "emergency"):
+            return True, ""
+
+    elif mode == "task_text_contains":
+        keyword = str(conditions.get("value") or "").strip().lower()
+        if keyword and keyword in task_search_text:
             return True, ""
 
     elif mode == "status_new":
@@ -3373,6 +3386,7 @@ async def automation_builder_page(request: Request):
         ("none", "Без условий"),
         ("priority_high", "Только высокий приоритет"),
         ("emergency", "Только срочные заявки"),
+        ("task_text_contains", "Текст заявки содержит"),
         ("status_new", "Только новые заявки"),
         ("status_in_progress", "Только заявки в работе"),
         ("status_done", "Только завершённые заявки"),
@@ -3398,15 +3412,15 @@ async def automation_builder_page(request: Request):
         ("client_many_tasks", "Только клиенты с большим количеством заявок"),
     ]
     condition_groups = [
-        ("Базовые", condition_presets[:3]),
-        ("Статус заявки", condition_presets[3:6]),
-        ("Оплата", condition_presets[6:9]),
-        ("Исполнители", condition_presets[9:11]),
-        ("Дата", condition_presets[11:14]),
-        ("Цена", condition_presets[14:16]),
-        ("Каталог", condition_presets[16:17]),
-        ("SLA", condition_presets[17:20]),
-        ("Клиенты", condition_presets[20:]),
+        ("Базовые", condition_presets[:4]),
+        ("Статус заявки", condition_presets[4:7]),
+        ("Оплата", condition_presets[7:10]),
+        ("Исполнители", condition_presets[10:12]),
+        ("Дата", condition_presets[12:15]),
+        ("Цена", condition_presets[15:17]),
+        ("Каталог", condition_presets[17:18]),
+        ("SLA", condition_presets[18:21]),
+        ("Клиенты", condition_presets[21:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -3516,6 +3530,19 @@ async def automation_builder_page(request: Request):
         rule_data["condition_tertiary_catalog"] = (
             condition_tertiary_value
             if condition_tertiary_mode == "catalog_specific"
+            else ""
+        )
+        rule_data["condition_text"] = (
+            condition_value if condition_mode == "task_text_contains" else ""
+        )
+        rule_data["condition_secondary_text"] = (
+            condition_secondary_value
+            if condition_secondary_mode == "task_text_contains"
+            else ""
+        )
+        rule_data["condition_tertiary_text"] = (
+            condition_tertiary_value
+            if condition_tertiary_mode == "task_text_contains"
             else ""
         )
 
@@ -4374,6 +4401,11 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         str(form.get("condition_secondary_catalog") or "").strip(),
         str(form.get("condition_tertiary_catalog") or "").strip(),
     ]
+    condition_texts = [
+        str(form.get("condition_text") or "").strip(),
+        str(form.get("condition_secondary_text") or "").strip(),
+        str(form.get("condition_tertiary_text") or "").strip(),
+    ]
     condition_operator = str(form.get("condition_operator") or "and").strip().lower()
     allowed_modes = {
         "none": {},
@@ -4390,6 +4422,13 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "operator": "equals",
             "value": "Срочно",
             "label": "Только срочные заявки",
+        },
+        "task_text_contains": {
+            "mode": "task_text_contains",
+            "field": "task_text",
+            "operator": "contains",
+            "value": "",
+            "label": "Текст заявки содержит",
         },
         "status_new": {
             "mode": "status_new",
@@ -4560,6 +4599,7 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             condition_workers[index],
             condition_clients[index],
             condition_catalog_items[index],
+            condition_texts[index],
         )
         for index, mode in enumerate((
             condition_mode,
@@ -4571,10 +4611,26 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
 
     selected_conditions = []
 
-    for mode, raw_value, selected_worker, selected_client, selected_catalog_item in selected_modes:
+    for (
+        mode,
+        raw_value,
+        selected_worker,
+        selected_client,
+        selected_catalog_item,
+        condition_text,
+    ) in selected_modes:
         condition = dict(allowed_modes[mode])
 
-        if mode == "worker_specific":
+        if mode == "task_text_contains":
+            keyword = condition_text[:120].strip()
+
+            if not keyword:
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+            condition["value"] = keyword
+            condition["label"] = f"Текст содержит: {keyword}"
+
+        elif mode == "worker_specific":
             if not selected_worker:
                 return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
