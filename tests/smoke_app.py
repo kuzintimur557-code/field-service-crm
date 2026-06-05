@@ -1462,6 +1462,9 @@ async def assert_automation_page():
     assert "Удалить" in rule_detail_html
     assert "Добавить действие" in rule_detail_html
     assert f"/automation/rules/{rule['id']}/actions/create" in rule_detail_html
+    assert "Исполнитель новой задачи" in rule_detail_html
+    assert 'data-role="worker"' in rule_detail_html
+    assert "Данные клиента берутся из исходной заявки" in rule_detail_html
 
     builder_response = await crm.create_rule_action(
         make_form_request(
@@ -1526,6 +1529,56 @@ async def assert_automation_page():
     assert ai_digest_builder_action is not None
     assert "owner2" in ai_digest_builder_action["payload_json"]
     assert "AI-сводка по бизнесу" in ai_digest_builder_action["payload_json"]
+
+    invalid_create_task_action_response = await crm.create_rule_action(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/actions/create",
+            {
+                "action_key": "create_task",
+                "target_username": "manager2",
+                "message": "Нельзя назначить менеджеру",
+            },
+        ),
+        rule["id"],
+    )
+    assert invalid_create_task_action_response.status_code == 302
+    assert invalid_create_task_action_response.headers["location"] == (
+        f"/automation/rules/{rule['id']}?action_target_error=1"
+    )
+
+    valid_create_task_action_response = await crm.create_rule_action(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/actions/create",
+            {
+                "action_key": "create_task",
+                "target_username": "helper2",
+                "message": "Новая задача из правила",
+            },
+        ),
+        rule["id"],
+    )
+    assert valid_create_task_action_response.status_code == 302
+    assert valid_create_task_action_response.headers["location"] == (
+        f"/automation/rules/{rule['id']}?action_created=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    valid_create_task_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE company_id=2
+      AND rule_id=?
+      AND action_key='create_task'
+    ORDER BY id DESC
+    """, (rule["id"],)).fetchone()
+    conn.close()
+
+    assert valid_create_task_action is not None
+    assert "helper2" in valid_create_task_action["payload_json"]
+    assert "Новая задача из правила" in valid_create_task_action["payload_json"]
 
     conn = connect()
     c = conn.cursor()

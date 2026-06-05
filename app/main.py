@@ -1585,6 +1585,32 @@ def automation_action_dry_run_preview(action):
     return action_data
 
 
+def automation_action_target_is_valid(c, company_id, action_key, target_username):
+    target_username = str(target_username or "").strip()
+
+    if action_key == "create_task":
+        if not target_username:
+            return True
+
+        return bool(c.execute("""
+        SELECT id
+        FROM users
+        WHERE company_id=?
+          AND username=?
+          AND role='worker'
+        """, (company_id, target_username)).fetchone())
+
+    if not target_username:
+        return action_key not in ("notification", "telegram_alert", "email")
+
+    return bool(c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=?
+      AND username=?
+    """, (company_id, target_username)).fetchone())
+
+
 def execute_automation_create_task_action(
     c,
     company_id,
@@ -4739,15 +4765,8 @@ async def create_automation_rule(request: Request):
         return RedirectResponse("/automation?error=invalid", status_code=302)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    if action_key in ("notification", "telegram_alert") and not target_username:
-        conn.close()
-        return RedirectResponse(
-            f"/automation/rules/{rule_id}?action_error=1",
-            status_code=302
-        )
-
     if action_key in ("notification", "telegram_alert") and not message:
-        message = f"Автоматизация: {rule['name']}"
+        message = f"Автоматизация: {name}"
 
     if action_key == "ai_digest" and not target_username:
         target_username = username
@@ -4761,19 +4780,17 @@ async def create_automation_rule(request: Request):
     }
 
     if action_key == "email":
-        payload["subject"] = f"Автоматизация: {rule['name']}"
+        payload["subject"] = f"Автоматизация: {name}"
 
     conn = connect()
     c = conn.cursor()
 
-    target_exists = c.execute("""
-    SELECT id
-    FROM users
-    WHERE company_id=?
-      AND username=?
-    """, (company_id, target_username)).fetchone()
-
-    if not target_exists:
+    if not automation_action_target_is_valid(
+        c,
+        company_id,
+        action_key,
+        target_username,
+    ):
         conn.close()
         return RedirectResponse("/automation?error=target", status_code=302)
 
@@ -4946,6 +4963,20 @@ async def automation_rule_detail(request: Request, rule_id: int):
     LIMIT 20
     """, (company_id, rule_id)).fetchall()
 
+    users = c.execute("""
+    SELECT username, role
+    FROM users
+    WHERE company_id=?
+    ORDER BY
+        CASE role
+            WHEN 'worker' THEN 1
+            WHEN 'manager' THEN 2
+            WHEN 'boss' THEN 3
+            ELSE 4
+        END,
+        username
+    """, (company_id,)).fetchall()
+
     event_counts = {
         row["status"]: row["count"]
         for row in c.execute("""
@@ -5017,6 +5048,7 @@ async def automation_rule_detail(request: Request, rule_id: int):
             "role": role,
             "rule": rule,
             "actions": actions,
+            "users": users,
             "events": events,
             "trigger_labels": dict(AUTOMATION_TRIGGERS),
             "action_labels": dict(AUTOMATION_ACTIONS),
@@ -6269,10 +6301,15 @@ async def create_rule_action(request: Request, rule_id: int):
         conn.close()
         return RedirectResponse("/automation", status_code=302)
 
-    if action_key in ("notification", "telegram_alert") and not target_username:
+    if not automation_action_target_is_valid(
+        c,
+        company_id,
+        action_key,
+        target_username,
+    ):
         conn.close()
         return RedirectResponse(
-            f"/automation/rules/{rule_id}?action_error=1",
+            f"/automation/rules/{rule_id}?action_target_error=1",
             status_code=302
         )
 
@@ -6284,6 +6321,9 @@ async def create_rule_action(request: Request, rule_id: int):
 
     if action_key == "ai_digest" and not message:
         message = "AI-сводка по бизнесу"
+
+    if action_key == "create_task" and not message:
+        message = f"Автоматическая задача: {rule['name']}"
 
     payload = {
         "target_username": target_username,

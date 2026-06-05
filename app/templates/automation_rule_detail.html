@@ -216,6 +216,13 @@
     </div>
     {% endif %}
 
+    {% if request.query_params.get("action_target_error") == "1" %}
+    <div class="card" style="background:#fef3c7;">
+        <h3>Получатель не подходит</h3>
+        <p>Для создания задачи выберите исполнителя. Для остальных действий — пользователя своей компании.</p>
+    </div>
+    {% endif %}
+
     <div class="card">
         <h2>Добавить действие</h2>
 
@@ -223,7 +230,7 @@
             <div class="grid">
                 <div>
                     <div class="label">Тип действия</div>
-                    <select name="action_key" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
+                    <select name="action_key" data-action-key style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
                         {% for key, label in action_labels.items() %}
                         <option value="{{ key }}">{{ label }}</option>
                         {% endfor %}
@@ -231,13 +238,21 @@
                 </div>
 
                 <div>
-                    <div class="label">Получатель</div>
-                    <input name="target_username" value="{{ username }}" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
+                    <div class="label" data-target-label>Получатель</div>
+                    <select name="target_username" data-action-target style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
+                        <option value="">Без получателя</option>
+                        {% for user in users %}
+                        <option value="{{ user['username'] }}" data-role="{{ user['role'] }}"
+                                {% if user["username"] == username %}selected{% endif %}>
+                            {{ user["username"] }} / {{ role_label(user["role"]) }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
 
             <div style="margin-top:12px;">
-                <div class="label">Сообщение</div>
+                <div class="label" data-message-label>Сообщение</div>
                 <textarea name="message" style="width:100%;min-height:90px;padding:12px;border:1px solid #d1d5db;border-radius:12px;">Автоматизация: {{ rule["name"] }}</textarea>
             </div>
 
@@ -246,7 +261,7 @@
             </button>
 
             <div class="label" style="margin-top:12px;">
-                Для уведомлений и Telegram нужен получатель. Для AI-сводки сообщение можно оставить пустым.
+                Для создания задачи можно выбрать только исполнителя. Данные клиента берутся из исходной заявки.
             </div>
         </form>
     </div>
@@ -338,6 +353,43 @@
     </div>
 
 </div>
+<script>
+const actionKeySelect = document.querySelector("[data-action-key]");
+const actionTargetSelect = document.querySelector("[data-action-target]");
+const actionTargetLabel = document.querySelector("[data-target-label]");
+const actionMessageLabel = document.querySelector("[data-message-label]");
+
+function syncActionTargetOptions() {
+    if (!actionKeySelect || !actionTargetSelect) {
+        return;
+    }
+
+    const createsTask = actionKeySelect.value === "create_task";
+
+    actionTargetSelect.querySelectorAll("option[data-role]").forEach(option => {
+        option.hidden = createsTask && option.dataset.role !== "worker";
+    });
+
+    const selectedOption = actionTargetSelect.options[actionTargetSelect.selectedIndex];
+
+    if (createsTask && selectedOption?.dataset.role !== "worker") {
+        actionTargetSelect.value = "";
+    }
+
+    if (actionTargetLabel) {
+        actionTargetLabel.textContent = createsTask ? "Исполнитель новой задачи" : "Получатель";
+    }
+
+    if (actionMessageLabel) {
+        actionMessageLabel.textContent = createsTask ? "Описание новой задачи" : "Сообщение";
+    }
+}
+
+if (actionKeySelect) {
+    syncActionTargetOptions();
+    actionKeySelect.addEventListener("change", syncActionTargetOptions);
+}
+</script>
 
 <script>
 function a3WorkflowNodeLabel(type) {
