@@ -3536,11 +3536,28 @@ async def automation_builder_page(request: Request):
         "batch_total",
         "batch_matched",
         "batch_match_rate",
+        "batch_limit",
     ):
         try:
             batch_values[key] = int(request.query_params.get(key) or 0)
         except (TypeError, ValueError):
             batch_values[key] = 0
+
+    if batch_values["batch_limit"] not in (20, 50, 100):
+        batch_values["batch_limit"] = 20
+
+    batch_task_id_set = {
+        value
+        for value in str(
+            request.query_params.get("batch_task_ids") or ""
+        ).split(",")
+        if value
+    }
+    batch_tasks = [
+        dict(task)
+        for task in test_tasks
+        if str(task["id"]) in batch_task_id_set
+    ]
 
     for rule in rules:
         rule_data = dict(rule)
@@ -3720,13 +3737,8 @@ async def automation_builder_page(request: Request):
             "batch_total": batch_values["batch_total"],
             "batch_matched": batch_values["batch_matched"],
             "batch_match_rate": batch_values["batch_match_rate"],
-            "batch_task_ids": [
-                value
-                for value in str(
-                    request.query_params.get("batch_task_ids") or ""
-                ).split(",")
-                if value
-            ],
+            "batch_limit": batch_values["batch_limit"],
+            "batch_tasks": batch_tasks,
         }
     )
 
@@ -3845,6 +3857,16 @@ async def test_automation_rule_condition_batch(request: Request, rule_id: int):
     if disabled_response:
         return disabled_response
 
+    form = await request.form()
+
+    try:
+        batch_limit = int(form.get("batch_limit") or 20)
+    except (TypeError, ValueError):
+        batch_limit = 20
+
+    if batch_limit not in (20, 50, 100):
+        batch_limit = 20
+
     conn = connect()
     c = conn.cursor()
 
@@ -3861,8 +3883,8 @@ async def test_automation_rule_condition_batch(request: Request, rule_id: int):
     WHERE company_id=?
       AND archived=0
     ORDER BY task_date DESC, id DESC
-    LIMIT 100
-    """, (company_id,)).fetchall()
+    LIMIT ?
+    """, (company_id, batch_limit)).fetchall()
 
     if not rule:
         conn.close()
@@ -3884,6 +3906,7 @@ async def test_automation_rule_condition_batch(request: Request, rule_id: int):
         "batch_total": summary["total"],
         "batch_matched": summary["matched"],
         "batch_match_rate": summary["match_rate"],
+        "batch_limit": batch_limit,
         "batch_task_ids": ",".join(
             str(task_id) for task_id in summary["matched_task_ids"]
         ),

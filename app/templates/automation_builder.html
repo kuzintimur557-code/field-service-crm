@@ -303,6 +303,11 @@
                     </form>
                     <form method="post" action="/automation/rules/{{ rule['id'] }}/test-condition-batch"
                           style="margin-top:8px">
+                        <select name="batch_limit" aria-label="Количество заявок для проверки">
+                            <option value="20" {% if batch_rule_id == rule["id"] and batch_limit == 20 %}selected{% endif %}>Последние 20 заявок</option>
+                            <option value="50" {% if batch_rule_id == rule["id"] and batch_limit == 50 %}selected{% endif %}>Последние 50 заявок</option>
+                            <option value="100" {% if batch_rule_id == rule["id"] and batch_limit == 100 %}selected{% endif %}>Последние 100 заявок</option>
+                        </select>
                         <button class="small-button" type="submit">Проверить последние заявки</button>
                     </form>
                     {% if test_rule_id == rule["id"] and test_result %}
@@ -339,10 +344,17 @@
                     </div>
                     <div class="meta" style="margin-top:6px">
                         Совпадение: {{ batch_match_rate }}%
-                        {% if batch_task_ids %}
-                        · Заявки: #{{ batch_task_ids|join(", #") }}
-                        {% endif %}
                     </div>
+                    {% if batch_tasks %}
+                    <div style="display:grid;gap:6px;margin-top:8px">
+                        {% for task in batch_tasks %}
+                        <a class="pill ok" href="/task/{{ task['id'] }}"
+                           style="justify-content:flex-start;text-decoration:none">
+                            #{{ task["id"] }} · {{ task["client"] or "Без клиента" }} · {{ task["status"] }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     {% endif %}
                 </div>
                 <div class="arrow">→</div>

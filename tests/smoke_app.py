@@ -1068,7 +1068,9 @@ async def assert_automation_page():
         make_form_request(
             "owner2",
             f"/automation/rules/{rule['id']}/test-condition-batch",
-            {},
+            {
+                "batch_limit": "20",
+            },
         ),
         rule["id"],
     )
@@ -1077,6 +1079,7 @@ async def assert_automation_page():
     assert "batch_total=" in batch_test_response.headers["location"]
     assert "batch_matched=" in batch_test_response.headers["location"]
     assert "batch_match_rate=" in batch_test_response.headers["location"]
+    assert "batch_limit=20" in batch_test_response.headers["location"]
 
     conn = connect()
     c = conn.cursor()
@@ -1098,8 +1101,12 @@ async def assert_automation_page():
     )
     batch_result_html = batch_result_response.body.decode("utf-8")
     assert "Проверить последние заявки" in batch_result_html
+    assert "Последние 20 заявок" in batch_result_html
+    assert "Последние 50 заявок" in batch_result_html
+    assert "Последние 100 заявок" in batch_result_html
     assert "Подходит" in batch_result_html
     assert "Совпадение:" in batch_result_html
+    assert f'href="/task/{test_task["id"]}"' in batch_result_html
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(
