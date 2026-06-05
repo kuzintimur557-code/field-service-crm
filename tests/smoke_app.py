@@ -1055,6 +1055,52 @@ async def assert_automation_page():
     assert invalid_test_response.status_code == 302
     assert "test_result=error" in invalid_test_response.headers["location"]
 
+    conn = connect()
+    c = conn.cursor()
+    events_before_batch_test = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    batch_test_response = await crm.test_automation_rule_condition_batch(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/test-condition-batch",
+            {},
+        ),
+        rule["id"],
+    )
+    assert batch_test_response.status_code == 302
+    assert "batch_rule_id=" in batch_test_response.headers["location"]
+    assert "batch_total=" in batch_test_response.headers["location"]
+    assert "batch_matched=" in batch_test_response.headers["location"]
+    assert "batch_match_rate=" in batch_test_response.headers["location"]
+
+    conn = connect()
+    c = conn.cursor()
+    events_after_batch_test = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    assert events_after_batch_test == events_before_batch_test
+
+    batch_result_response = await crm.automation_builder_page(
+        make_asgi_request(
+            "owner2",
+            "/automation/builder",
+            batch_test_response.headers["location"].split("?", 1)[1],
+        )
+    )
+    batch_result_html = batch_result_response.body.decode("utf-8")
+    assert "Проверить последние заявки" in batch_result_html
+    assert "Подходит" in batch_result_html
+    assert "Совпадение:" in batch_result_html
+
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(
             "owner2",

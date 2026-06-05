@@ -1389,6 +1389,32 @@ def automation_condition_diagnostics(c, company_id, rule, entity_type, entity_id
     }
 
 
+def automation_condition_batch_summary(c, company_id, rule, task_ids):
+    matched_task_ids = []
+
+    for task_id in task_ids:
+        matched, _ = automation_condition_matches(
+            c,
+            company_id,
+            rule,
+            "task",
+            task_id,
+        )
+
+        if matched:
+            matched_task_ids.append(task_id)
+
+    total = len(task_ids)
+    matched_count = len(matched_task_ids)
+
+    return {
+        "total": total,
+        "matched": matched_count,
+        "match_rate": round((matched_count / total) * 100) if total else 0,
+        "matched_task_ids": matched_task_ids[:10],
+    }
+
+
 def automation_condition_number(conditions, default, minimum=0):
     try:
         value = float(str(conditions.get("value", default)).replace(",", "."))
@@ -3503,6 +3529,19 @@ async def automation_builder_page(request: Request):
     if not isinstance(test_details, list):
         test_details = []
 
+    batch_values = {}
+
+    for key in (
+        "batch_rule_id",
+        "batch_total",
+        "batch_matched",
+        "batch_match_rate",
+    ):
+        try:
+            batch_values[key] = int(request.query_params.get(key) or 0)
+        except (TypeError, ValueError):
+            batch_values[key] = 0
+
     for rule in rules:
         rule_data = dict(rule)
 
@@ -3677,6 +3716,17 @@ async def automation_builder_page(request: Request):
             "test_message": str(request.query_params.get("test_message") or ""),
             "test_operator": str(request.query_params.get("test_operator") or ""),
             "test_details": test_details,
+            "batch_rule_id": batch_values["batch_rule_id"],
+            "batch_total": batch_values["batch_total"],
+            "batch_matched": batch_values["batch_matched"],
+            "batch_match_rate": batch_values["batch_match_rate"],
+            "batch_task_ids": [
+                value
+                for value in str(
+                    request.query_params.get("batch_task_ids") or ""
+                ).split(",")
+                if value
+            ],
         }
     )
 
@@ -3767,6 +3817,75 @@ async def test_automation_rule_condition(request: Request, rule_id: int):
             diagnostics["details"],
             ensure_ascii=False,
             separators=(",", ":"),
+        ),
+    }
+
+    return RedirectResponse(
+        f"/automation/builder?{urlencode(params)}",
+        status_code=302,
+    )
+
+
+@app.post("/automation/rules/{rule_id}/test-condition-batch")
+async def test_automation_rule_condition_batch(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    task_rows = c.execute("""
+    SELECT id
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+    ORDER BY task_date DESC, id DESC
+    LIMIT 100
+    """, (company_id,)).fetchall()
+
+    if not rule:
+        conn.close()
+        return RedirectResponse(
+            "/automation/builder?batch_error=1",
+            status_code=302,
+        )
+
+    summary = automation_condition_batch_summary(
+        c,
+        company_id,
+        rule,
+        [row["id"] for row in task_rows],
+    )
+    conn.close()
+
+    params = {
+        "batch_rule_id": rule_id,
+        "batch_total": summary["total"],
+        "batch_matched": summary["matched"],
+        "batch_match_rate": summary["match_rate"],
+        "batch_task_ids": ",".join(
+            str(task_id) for task_id in summary["matched_task_ids"]
         ),
     }
 

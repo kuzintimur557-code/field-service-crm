@@ -301,6 +301,10 @@
                         </select>
                         <button class="small-button" type="submit">Проверить условие</button>
                     </form>
+                    <form method="post" action="/automation/rules/{{ rule['id'] }}/test-condition-batch"
+                          style="margin-top:8px">
+                        <button class="small-button" type="submit">Проверить последние заявки</button>
+                    </form>
                     {% if test_rule_id == rule["id"] and test_result %}
                     <div class="pill {% if test_result == 'match' %}ok{% elif test_result == 'no_match' %}warn{% else %}off{% endif %}"
                          style="margin-top:10px">
@@ -327,6 +331,18 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+                    {% endif %}
+                    {% if batch_rule_id == rule["id"] %}
+                    <div class="pill {% if batch_matched %}ok{% else %}warn{% endif %}"
+                         style="margin-top:10px">
+                        Подходит {{ batch_matched }} из {{ batch_total }}
+                    </div>
+                    <div class="meta" style="margin-top:6px">
+                        Совпадение: {{ batch_match_rate }}%
+                        {% if batch_task_ids %}
+                        · Заявки: #{{ batch_task_ids|join(", #") }}
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </div>
                 <div class="arrow">→</div>
