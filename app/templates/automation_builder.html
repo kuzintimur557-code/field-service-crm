@@ -345,6 +345,12 @@
                     <div class="meta" style="margin-top:6px">
                         Совпадение: {{ batch_match_rate }}%
                     </div>
+                    <div class="pill {{ batch_assessment['tone'] }}" style="margin-top:8px">
+                        {{ batch_assessment["title"] }}
+                    </div>
+                    <div class="meta" style="margin-top:6px">
+                        {{ batch_assessment["message"] }}
+                    </div>
                     {% if batch_condition_stats %}
                     <div class="meta" style="margin-top:10px">Результат каждого условия</div>
                     <div style="display:grid;gap:6px;margin-top:8px">

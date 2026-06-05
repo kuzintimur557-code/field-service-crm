@@ -1446,6 +1446,60 @@ def automation_condition_batch_summary(c, company_id, rule, task_ids):
     }
 
 
+def automation_condition_coverage_assessment(total, matched):
+    total = max(int(total or 0), 0)
+    matched = max(min(int(matched or 0), total), 0)
+
+    if total == 0:
+        return {
+            "status": "no_data",
+            "tone": "off",
+            "title": "Недостаточно данных",
+            "message": "Добавьте заявки или увеличьте период проверки.",
+        }
+
+    match_rate = round((matched / total) * 100)
+
+    if match_rate == 0:
+        return {
+            "status": "too_narrow",
+            "tone": "warn",
+            "title": "Правило слишком узкое",
+            "message": "Ни одна заявка не подходит. Проверьте значения и сочетание условий.",
+        }
+
+    if match_rate <= 15:
+        return {
+            "status": "narrow",
+            "tone": "warn",
+            "title": "Правило узкое",
+            "message": "Срабатываний мало. Убедитесь, что нужные заявки не отсеиваются.",
+        }
+
+    if match_rate <= 80:
+        return {
+            "status": "balanced",
+            "tone": "ok",
+            "title": "Правило сбалансировано",
+            "message": "Условия выделяют заметную часть заявок и не охватывают все подряд.",
+        }
+
+    if match_rate < 100:
+        return {
+            "status": "broad",
+            "tone": "warn",
+            "title": "Правило широкое",
+            "message": "Проверьте, не будет ли автоматизация срабатывать слишком часто.",
+        }
+
+    return {
+        "status": "all",
+        "tone": "warn",
+        "title": "Правило подходит всем заявкам",
+        "message": "Добавьте ограничивающее условие, если автоматизация не должна запускаться всегда.",
+    }
+
+
 def automation_condition_number(conditions, default, minimum=0):
     try:
         value = float(str(conditions.get("value", default)).replace(",", "."))
@@ -3597,6 +3651,11 @@ async def automation_builder_page(request: Request):
     if batch_values["batch_limit"] not in (20, 50, 100):
         batch_values["batch_limit"] = 20
 
+    batch_assessment = automation_condition_coverage_assessment(
+        batch_values["batch_total"],
+        batch_values["batch_matched"],
+    )
+
     batch_task_id_set = {
         value
         for value in str(
@@ -3822,6 +3881,7 @@ async def automation_builder_page(request: Request):
             "batch_tasks": batch_tasks,
             "batch_rejected_tasks": batch_rejected_tasks,
             "batch_condition_stats": batch_condition_stats,
+            "batch_assessment": batch_assessment,
         }
     )
 

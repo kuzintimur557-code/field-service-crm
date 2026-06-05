@@ -1108,6 +1108,8 @@ async def assert_automation_page():
     assert "Последние 100 заявок" in batch_result_html
     assert "Подходит" in batch_result_html
     assert "Совпадение:" in batch_result_html
+    assert "Правило подходит всем заявкам" in batch_result_html
+    assert "Добавьте ограничивающее условие" in batch_result_html
     assert "Результат каждого условия" in batch_result_html
     assert "Текст содержит: Smoke" in batch_result_html
     assert f'href="/task/{test_task["id"]}"' in batch_result_html
@@ -1132,6 +1134,14 @@ async def assert_automation_page():
     rejected_preview_html = rejected_preview_response.body.decode("utf-8")
     assert "Отклонённые заявки" in rejected_preview_html
     assert "Не выполнено: Только завершённые заявки" in rejected_preview_html
+    assert "Правило слишком узкое" in rejected_preview_html
+
+    assert crm.automation_condition_coverage_assessment(0, 0)["status"] == "no_data"
+    assert crm.automation_condition_coverage_assessment(20, 0)["status"] == "too_narrow"
+    assert crm.automation_condition_coverage_assessment(20, 2)["status"] == "narrow"
+    assert crm.automation_condition_coverage_assessment(20, 10)["status"] == "balanced"
+    assert crm.automation_condition_coverage_assessment(20, 18)["status"] == "broad"
+    assert crm.automation_condition_coverage_assessment(20, 20)["status"] == "all"
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(
