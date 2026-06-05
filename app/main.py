@@ -1393,6 +1393,7 @@ def automation_condition_batch_summary(c, company_id, rule, task_ids):
     matched_task_ids = []
     rejected_tasks = []
     condition_stats = []
+    operator = "and"
 
     for task_id in task_ids:
         diagnostics = automation_condition_diagnostics(
@@ -1402,6 +1403,7 @@ def automation_condition_batch_summary(c, company_id, rule, task_ids):
             "task",
             task_id,
         )
+        operator = diagnostics["operator"]
 
         if not condition_stats:
             condition_stats = [
@@ -1443,6 +1445,7 @@ def automation_condition_batch_summary(c, company_id, rule, task_ids):
         "matched_task_ids": matched_task_ids[:10],
         "rejected_tasks": rejected_tasks,
         "condition_stats": condition_stats,
+        "operator": operator,
     }
 
 
@@ -1497,6 +1500,42 @@ def automation_condition_coverage_assessment(total, matched):
         "tone": "warn",
         "title": "Правило подходит всем заявкам",
         "message": "Добавьте ограничивающее условие, если автоматизация не должна запускаться всегда.",
+    }
+
+
+def automation_condition_focus_assessment(condition_stats, operator="and"):
+    valid_stats = [
+        item
+        for item in (condition_stats or [])
+        if isinstance(item, dict) and item.get("label")
+    ]
+
+    if not valid_stats:
+        return {}
+
+    operator = "or" if operator == "or" else "and"
+
+    if operator == "or":
+        focus = max(
+            valid_stats,
+            key=lambda item: int(item.get("match_rate") or 0),
+        )
+        return {
+            "title": "Главная ветка условия ИЛИ",
+            "label": str(focus["label"]),
+            "match_rate": int(focus.get("match_rate") or 0),
+            "message": "Эта ветка даёт больше всего совпадений.",
+        }
+
+    focus = min(
+        valid_stats,
+        key=lambda item: int(item.get("match_rate") or 0),
+    )
+    return {
+        "title": "Главное ограничение правила",
+        "label": str(focus["label"]),
+        "match_rate": int(focus.get("match_rate") or 0),
+        "message": "Это условие сильнее остальных сокращает количество подходящих заявок.",
     }
 
 
@@ -3624,6 +3663,13 @@ async def automation_builder_page(request: Request):
     if not isinstance(batch_condition_stats, list):
         batch_condition_stats = []
 
+    batch_operator = str(
+        request.query_params.get("batch_operator") or "and"
+    ).lower()
+
+    if batch_operator not in ("and", "or"):
+        batch_operator = "and"
+
     try:
         batch_rejected = json.loads(
             str(request.query_params.get("batch_rejected") or "[]")
@@ -3654,6 +3700,10 @@ async def automation_builder_page(request: Request):
     batch_assessment = automation_condition_coverage_assessment(
         batch_values["batch_total"],
         batch_values["batch_matched"],
+    )
+    batch_focus = automation_condition_focus_assessment(
+        batch_condition_stats,
+        batch_operator,
     )
 
     batch_task_id_set = {
@@ -3882,6 +3932,7 @@ async def automation_builder_page(request: Request):
             "batch_rejected_tasks": batch_rejected_tasks,
             "batch_condition_stats": batch_condition_stats,
             "batch_assessment": batch_assessment,
+            "batch_focus": batch_focus,
         }
     )
 
@@ -4058,6 +4109,7 @@ async def test_automation_rule_condition_batch(request: Request, rule_id: int):
             ensure_ascii=False,
             separators=(",", ":"),
         ),
+        "batch_operator": summary["operator"],
         "batch_rejected": json.dumps(
             summary["rejected_tasks"],
             ensure_ascii=False,

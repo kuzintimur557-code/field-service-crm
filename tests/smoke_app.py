@@ -1081,6 +1081,7 @@ async def assert_automation_page():
     assert "batch_match_rate=" in batch_test_response.headers["location"]
     assert "batch_limit=20" in batch_test_response.headers["location"]
     assert "batch_condition_stats=" in batch_test_response.headers["location"]
+    assert "batch_operator=and" in batch_test_response.headers["location"]
     assert "batch_rejected=" in batch_test_response.headers["location"]
 
     conn = connect()
@@ -1112,6 +1113,7 @@ async def assert_automation_page():
     assert "Добавьте ограничивающее условие" in batch_result_html
     assert "Результат каждого условия" in batch_result_html
     assert "Текст содержит: Smoke" in batch_result_html
+    assert "Главное ограничение правила" in batch_result_html
     assert f'href="/task/{test_task["id"]}"' in batch_result_html
 
     rejected_preview_response = await crm.automation_builder_page(
@@ -1142,6 +1144,20 @@ async def assert_automation_page():
     assert crm.automation_condition_coverage_assessment(20, 10)["status"] == "balanced"
     assert crm.automation_condition_coverage_assessment(20, 18)["status"] == "broad"
     assert crm.automation_condition_coverage_assessment(20, 20)["status"] == "all"
+
+    and_focus = crm.automation_condition_focus_assessment([
+        {"label": "Первое", "match_rate": 80},
+        {"label": "Второе", "match_rate": 20},
+    ], "and")
+    assert and_focus["title"] == "Главное ограничение правила"
+    assert and_focus["label"] == "Второе"
+
+    or_focus = crm.automation_condition_focus_assessment([
+        {"label": "Первое", "match_rate": 80},
+        {"label": "Второе", "match_rate": 20},
+    ], "or")
+    assert or_focus["title"] == "Главная ветка условия ИЛИ"
+    assert or_focus["label"] == "Первое"
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(

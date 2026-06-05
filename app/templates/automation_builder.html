@@ -363,6 +363,15 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+                    {% if batch_focus %}
+                    <div class="pill warn" style="margin-top:8px">
+                        {{ batch_focus["title"] }}
+                    </div>
+                    <div class="meta" style="margin-top:6px">
+                        {{ batch_focus["label"] }} · {{ batch_focus["match_rate"] }}%.
+                        {{ batch_focus["message"] }}
+                    </div>
+                    {% endif %}
                     {% if batch_tasks %}
                     <div class="meta" style="margin-top:10px">Подходящие заявки</div>
                     <div style="display:grid;gap:6px;margin-top:8px">
