@@ -336,6 +336,40 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+                    {% if rule["dry_run"] %}
+                    <div class="pill {{ rule['dry_run']['tone'] }}" style="margin-top:10px">
+                        {{ rule["dry_run"]["title"] }}
+                    </div>
+                    <div class="meta" style="margin-top:6px">
+                        {{ rule["dry_run"]["message"] }}
+                    </div>
+                    {% if rule["dry_run"]["active_actions"] %}
+                    <div class="meta" style="margin-top:8px">
+                        {% if rule["dry_run"]["status"] == "ready" %}
+                        Будут выполнены
+                        {% else %}
+                        Настроенные действия — не запустятся
+                        {% endif %}
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                        {% for action in rule["dry_run"]["active_actions"] %}
+                        <span class="pill ok">
+                            {{ action_labels.get(action["action_key"], action["action_key"]) }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if rule["dry_run"]["inactive_actions"] %}
+                    <div class="meta" style="margin-top:8px">Отключённые действия</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                        {% for action in rule["dry_run"]["inactive_actions"] %}
+                        <span class="pill off">
+                            {{ action_labels.get(action["action_key"], action["action_key"]) }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endif %}
                     {% endif %}
                     {% if batch_rule_id == rule["id"] %}
                     <div class="pill {% if batch_matched %}ok{% else %}warn{% endif %}"

@@ -1010,6 +1010,10 @@ async def assert_automation_page():
     assert "Логика проверки: И" in test_result_html
     assert "Выполнено" in test_result_html
     assert "Текст содержит: Smoke" in test_result_html
+    assert "Готово к запуску" in test_result_html
+    assert "Будет выполнено действий: 1" in test_result_html
+    assert "Будут выполнены" in test_result_html
+    assert "Создать уведомление" in test_result_html
 
     conn = connect()
     c = conn.cursor()
@@ -1158,6 +1162,37 @@ async def assert_automation_page():
     ], "or")
     assert or_focus["title"] == "Главная ветка условия ИЛИ"
     assert or_focus["label"] == "Первое"
+
+    ready_dry_run = crm.automation_dry_run_readiness(
+        True,
+        True,
+        [{"active": 1, "action_key": "notification"}],
+    )
+    assert ready_dry_run["status"] == "ready"
+    assert len(ready_dry_run["active_actions"]) == 1
+
+    disabled_dry_run = crm.automation_dry_run_readiness(
+        False,
+        True,
+        [{"active": 1, "action_key": "notification"}],
+    )
+    assert disabled_dry_run["status"] == "rule_disabled"
+
+    failed_dry_run = crm.automation_dry_run_readiness(
+        True,
+        False,
+        [{"active": 1, "action_key": "notification"}],
+    )
+    assert failed_dry_run["status"] == "condition_failed"
+    assert len(failed_dry_run["active_actions"]) == 1
+
+    empty_dry_run = crm.automation_dry_run_readiness(
+        True,
+        True,
+        [{"active": 0, "action_key": "notification"}],
+    )
+    assert empty_dry_run["status"] == "no_actions"
+    assert len(empty_dry_run["inactive_actions"]) == 1
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(

@@ -1539,6 +1539,52 @@ def automation_condition_focus_assessment(condition_stats, operator="and"):
     }
 
 
+def automation_dry_run_readiness(rule_active, condition_matched, actions):
+    active_actions = [
+        dict(action)
+        for action in (actions or [])
+        if action["active"]
+    ]
+    inactive_actions = [
+        dict(action)
+        for action in (actions or [])
+        if not action["active"]
+    ]
+
+    if not rule_active:
+        status = {
+            "status": "rule_disabled",
+            "tone": "off",
+            "title": "Запуск заблокирован",
+            "message": "Правило выключено. Включите его перед реальным запуском.",
+        }
+    elif not condition_matched:
+        status = {
+            "status": "condition_failed",
+            "tone": "warn",
+            "title": "Запуск заблокирован",
+            "message": "Условия не выполнены для выбранной заявки.",
+        }
+    elif not active_actions:
+        status = {
+            "status": "no_actions",
+            "tone": "warn",
+            "title": "Нет активных действий",
+            "message": "Добавьте или включите хотя бы одно действие цепочки.",
+        }
+    else:
+        status = {
+            "status": "ready",
+            "tone": "ok",
+            "title": "Готово к запуску",
+            "message": f"Будет выполнено действий: {len(active_actions)}.",
+        }
+
+    status["active_actions"] = active_actions
+    status["inactive_actions"] = inactive_actions
+    return status
+
+
 def automation_condition_number(conditions, default, minimum=0):
     try:
         value = float(str(conditions.get("value", default)).replace(",", "."))
@@ -3632,6 +3678,7 @@ async def automation_builder_page(request: Request):
     rules_view = []
     test_rule_id = str(request.query_params.get("test_rule_id") or "")
     test_task_id = str(request.query_params.get("test_task_id") or "")
+    test_result = str(request.query_params.get("test_result") or "")
 
     try:
         test_rule_id = int(test_rule_id)
@@ -3898,6 +3945,19 @@ async def automation_builder_page(request: Request):
         else:
             rule_data["condition_label"] = condition_labels["none"]
 
+        rule_actions = actions_by_rule.get(rule_data["id"], [])
+        rule_data["dry_run"] = {}
+
+        if (
+            test_rule_id == rule_data["id"]
+            and test_result in ("match", "no_match")
+        ):
+            rule_data["dry_run"] = automation_dry_run_readiness(
+                bool(rule_data["active"]),
+                test_result == "match",
+                rule_actions,
+            )
+
         rules_view.append(rule_data)
 
     return templates.TemplateResponse(
@@ -3919,7 +3979,7 @@ async def automation_builder_page(request: Request):
             "test_tasks": test_tasks,
             "test_rule_id": test_rule_id,
             "test_task_id": test_task_id,
-            "test_result": str(request.query_params.get("test_result") or ""),
+            "test_result": test_result,
             "test_message": str(request.query_params.get("test_message") or ""),
             "test_operator": str(request.query_params.get("test_operator") or ""),
             "test_details": test_details,
