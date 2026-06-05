@@ -631,6 +631,11 @@ async def assert_automation_page():
     assert 'name="condition_value"' in builder_html
     assert 'name="condition_secondary_value"' in builder_html
     assert 'name="condition_tertiary_value"' in builder_html
+    assert 'name="condition_worker"' in builder_html
+    assert 'name="condition_secondary_worker"' in builder_html
+    assert 'name="condition_tertiary_worker"' in builder_html
+    assert "Только выбранный исполнитель" in builder_html
+    assert 'value="helper2"' in builder_html
     assert "И — выполнить все" in builder_html
     assert "ИЛИ — выполнить любое" in builder_html
     assert "Только высокий приоритет" in builder_html
@@ -755,6 +760,46 @@ async def assert_automation_page():
     assert "Цена заявки от 25000 ₽" in custom_threshold_html
     assert 'name="condition_value"' in custom_threshold_html
     assert 'value="25000"' in custom_threshold_html
+
+    worker_condition_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "worker_specific",
+                "condition_worker": "helper2",
+            },
+        ),
+        rule["id"],
+    )
+    assert worker_condition_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    worker_condition = json.loads(c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()["conditions_json"])
+    conn.close()
+
+    assert worker_condition["mode"] == "worker_specific"
+    assert worker_condition["value"] == "helper2"
+    assert worker_condition["label"] == "Исполнитель: helper2"
+
+    outsider_worker_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "worker_specific",
+                "condition_worker": "outsider_worker",
+            },
+        ),
+        rule["id"],
+    )
+    assert outsider_worker_response.status_code == 302
+    assert outsider_worker_response.headers["location"] == "/automation/builder?conditions_error=1"
 
     invalid_conditions_response = await crm.update_automation_rule_conditions(
         make_form_request(
@@ -1609,6 +1654,26 @@ async def assert_automation_runner(task):
       AND rule_id=?
     ORDER BY id DESC
     """, (worker_rule_id,)).fetchone()
+    specific_worker_rule = {
+        "conditions_json": json.dumps({
+            "mode": "worker_specific",
+            "value": "helper2",
+            "label": "Исполнитель: helper2",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, specific_worker_rule, "task", task["id"]
+    )[0] is True
+
+    specific_worker_rule["conditions_json"] = json.dumps({
+        "mode": "worker_specific",
+        "value": "outsider_worker",
+        "label": "Исполнитель: outsider_worker",
+    }, ensure_ascii=False)
+    assert crm.automation_condition_matches(
+        c, 2, specific_worker_rule, "task", task["id"]
+    )[0] is False
+
     today = datetime.now().strftime("%Y-%m-%d")
     c.execute("""
     INSERT INTO automation_rules (

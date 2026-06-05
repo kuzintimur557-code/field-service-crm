@@ -1494,6 +1494,11 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         if get_task_worker_names(task):
             return True, ""
 
+    elif mode == "worker_specific":
+        selected_worker = str(conditions.get("value") or "").strip()
+        if selected_worker and task_has_worker(selected_worker, task):
+            return True, ""
+
     elif mode == "date_today":
         if task_date == today:
             return True, ""
@@ -3301,6 +3306,14 @@ async def automation_builder_page(request: Request):
     ORDER BY rule_id, sort_order, id
     """, (company_id,)).fetchall()
 
+    workers = c.execute("""
+    SELECT username, full_name
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+    ORDER BY COALESCE(NULLIF(full_name, ''), username), username
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     actions_by_rule = {}
@@ -3319,6 +3332,7 @@ async def automation_builder_page(request: Request):
         ("payment_partial", "Только частично оплаченные заявки"),
         ("payment_paid", "Только оплаченные заявки"),
         ("worker_assigned", "Только задачи с исполнителем"),
+        ("worker_specific", "Только выбранный исполнитель"),
         ("date_today", "Только задачи на сегодня"),
         ("date_overdue", "Только просроченные задачи"),
         ("date_future", "Только будущие задачи"),
@@ -3337,11 +3351,11 @@ async def automation_builder_page(request: Request):
         ("Базовые", condition_presets[:3]),
         ("Статус заявки", condition_presets[3:6]),
         ("Оплата", condition_presets[6:9]),
-        ("Исполнители", condition_presets[9:10]),
-        ("Дата", condition_presets[10:13]),
-        ("Цена", condition_presets[13:15]),
-        ("SLA", condition_presets[15:18]),
-        ("Клиенты", condition_presets[18:]),
+        ("Исполнители", condition_presets[9:11]),
+        ("Дата", condition_presets[11:14]),
+        ("Цена", condition_presets[14:16]),
+        ("SLA", condition_presets[16:19]),
+        ("Клиенты", condition_presets[19:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -3399,9 +3413,34 @@ async def automation_builder_page(request: Request):
         rule_data["condition_secondary_mode"] = condition_secondary_mode
         rule_data["condition_tertiary_mode"] = condition_tertiary_mode
         rule_data["condition_operator"] = condition_operator
-        rule_data["condition_value"] = condition_value
-        rule_data["condition_secondary_value"] = condition_secondary_value
-        rule_data["condition_tertiary_value"] = condition_tertiary_value
+        rule_data["condition_value"] = (
+            condition_value
+            if condition_mode in ("price_high", "client_many_tasks")
+            else ""
+        )
+        rule_data["condition_secondary_value"] = (
+            condition_secondary_value
+            if condition_secondary_mode in ("price_high", "client_many_tasks")
+            else ""
+        )
+        rule_data["condition_tertiary_value"] = (
+            condition_tertiary_value
+            if condition_tertiary_mode in ("price_high", "client_many_tasks")
+            else ""
+        )
+        rule_data["condition_worker"] = (
+            condition_value if condition_mode == "worker_specific" else ""
+        )
+        rule_data["condition_secondary_worker"] = (
+            condition_secondary_value
+            if condition_secondary_mode == "worker_specific"
+            else ""
+        )
+        rule_data["condition_tertiary_worker"] = (
+            condition_tertiary_value
+            if condition_tertiary_mode == "worker_specific"
+            else ""
+        )
 
         condition_payloads = (
             condition_items
@@ -3446,6 +3485,7 @@ async def automation_builder_page(request: Request):
             "action_labels": dict(AUTOMATION_ACTIONS),
             "condition_presets": condition_presets,
             "condition_groups": condition_groups,
+            "workers": workers,
         }
     )
 
@@ -4240,6 +4280,11 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         str(form.get("condition_secondary_value") or "").strip(),
         str(form.get("condition_tertiary_value") or "").strip(),
     ]
+    condition_workers = [
+        str(form.get("condition_worker") or "").strip(),
+        str(form.get("condition_secondary_worker") or "").strip(),
+        str(form.get("condition_tertiary_worker") or "").strip(),
+    ]
     condition_operator = str(form.get("condition_operator") or "and").strip().lower()
     allowed_modes = {
         "none": {},
@@ -4304,6 +4349,13 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "field": "workers",
             "operator": "not_empty",
             "label": "Только задачи с исполнителем",
+        },
+        "worker_specific": {
+            "mode": "worker_specific",
+            "field": "workers",
+            "operator": "contains",
+            "value": "",
+            "label": "Только выбранный исполнитель",
         },
         "date_today": {
             "mode": "date_today",
@@ -4399,7 +4451,7 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
     selected_modes = [
-        (mode, condition_values[index])
+        (mode, condition_values[index], condition_workers[index])
         for index, mode in enumerate((
             condition_mode,
             condition_secondary_mode,
@@ -4410,10 +4462,17 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
 
     selected_conditions = []
 
-    for mode, raw_value in selected_modes:
+    for mode, raw_value, selected_worker in selected_modes:
         condition = dict(allowed_modes[mode])
 
-        if mode == "price_high":
+        if mode == "worker_specific":
+            if not selected_worker:
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+            condition["value"] = selected_worker
+            condition["label"] = f"Исполнитель: {selected_worker}"
+
+        elif mode == "price_high":
             try:
                 threshold = max(float(raw_value.replace(",", ".")), 0) if raw_value else 10000
             except ValueError:
@@ -4456,6 +4515,22 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
     if not rule:
         conn.close()
         return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+    for condition in selected_conditions:
+        if condition.get("mode") != "worker_specific":
+            continue
+
+        worker_exists = c.execute("""
+        SELECT 1
+        FROM users
+        WHERE company_id=?
+          AND role='worker'
+          AND username=?
+        """, (company_id, condition["value"])).fetchone()
+
+        if not worker_exists:
+            conn.close()
+            return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
     c.execute("""
     UPDATE automation_rules
