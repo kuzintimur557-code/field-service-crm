@@ -3375,6 +3375,15 @@ async def automation_builder_page(request: Request):
     ORDER BY item_type, name, id
     """, (company_id,)).fetchall()
 
+    test_tasks = c.execute("""
+    SELECT id, client, status, task_date
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+    ORDER BY task_date DESC, id DESC
+    LIMIT 100
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     actions_by_rule = {}
@@ -3424,6 +3433,18 @@ async def automation_builder_page(request: Request):
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
+    test_rule_id = str(request.query_params.get("test_rule_id") or "")
+    test_task_id = str(request.query_params.get("test_task_id") or "")
+
+    try:
+        test_rule_id = int(test_rule_id)
+    except ValueError:
+        test_rule_id = 0
+
+    try:
+        test_task_id = int(test_task_id)
+    except ValueError:
+        test_task_id = 0
 
     for rule in rules:
         rule_data = dict(rule)
@@ -3592,7 +3613,95 @@ async def automation_builder_page(request: Request):
             "workers": workers,
             "clients": clients,
             "catalog_items": catalog_items,
+            "test_tasks": test_tasks,
+            "test_rule_id": test_rule_id,
+            "test_task_id": test_task_id,
+            "test_result": str(request.query_params.get("test_result") or ""),
+            "test_message": str(request.query_params.get("test_message") or ""),
         }
+    )
+
+
+@app.post("/automation/rules/{rule_id}/test-condition")
+async def test_automation_rule_condition(request: Request, rule_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "automation")
+
+    if disabled_response:
+        return disabled_response
+
+    form = await request.form()
+
+    try:
+        task_id = int(form.get("task_id") or 0)
+    except (TypeError, ValueError):
+        task_id = 0
+
+    conn = connect()
+    c = conn.cursor()
+
+    rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=?
+    """, (rule_id, company_id)).fetchone()
+
+    task = c.execute("""
+    SELECT id
+    FROM tasks
+    WHERE id=?
+      AND company_id=?
+      AND archived=0
+    """, (task_id, company_id)).fetchone()
+
+    if not rule or not task:
+        conn.close()
+        params = {
+            "test_rule_id": rule_id,
+            "test_task_id": task_id,
+            "test_result": "error",
+            "test_message": "Правило или заявка не найдены",
+        }
+        return RedirectResponse(
+            f"/automation/builder?{urlencode(params)}",
+            status_code=302,
+        )
+
+    condition_ok, condition_message = automation_condition_matches(
+        c,
+        company_id,
+        rule,
+        "task",
+        task_id,
+    )
+    conn.close()
+
+    params = {
+        "test_rule_id": rule_id,
+        "test_task_id": task_id,
+        "test_result": "match" if condition_ok else "no_match",
+        "test_message": (
+            "Условия выполнены, правило может сработать"
+            if condition_ok
+            else (condition_message or "Условия не выполнены")[:180]
+        ),
+    }
+
+    return RedirectResponse(
+        f"/automation/builder?{urlencode(params)}",
+        status_code=302,
     )
 
 

@@ -644,7 +644,10 @@ async def assert_automation_page():
     assert "Runtime debug" in builder_html
     assert "/automation#new-rule" in builder_html
     assert f"/automation/rules/{rule['id']}/conditions" in builder_html
+    assert f"/automation/rules/{rule['id']}/test-condition" in builder_html
     assert "Сохранить условия" in builder_html
+    assert "Проверить условие" in builder_html
+    assert "Выберите заявку для теста" in builder_html
     assert 'name="condition_operator"' in builder_html
     assert 'name="condition_secondary_mode"' in builder_html
     assert 'name="condition_tertiary_mode"' in builder_html
@@ -951,6 +954,70 @@ async def assert_automation_page():
     assert text_condition["mode"] == "task_text_contains"
     assert text_condition["value"] == "Smoke"
     assert text_condition["label"] == "Текст содержит: Smoke"
+
+    conn = connect()
+    c = conn.cursor()
+    test_task = c.execute("""
+    SELECT id
+    FROM tasks
+    WHERE company_id=2
+    ORDER BY id
+    LIMIT 1
+    """).fetchone()
+    events_before_test = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    test_condition_response = await crm.test_automation_rule_condition(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/test-condition",
+            {
+                "task_id": str(test_task["id"]),
+            },
+        ),
+        rule["id"],
+    )
+    assert test_condition_response.status_code == 302
+    assert "test_result=match" in test_condition_response.headers["location"]
+
+    conn = connect()
+    c = conn.cursor()
+    events_after_test = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_events
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    assert events_after_test == events_before_test
+
+    test_result_response = await crm.automation_builder_page(
+        make_asgi_request(
+            "owner2",
+            "/automation/builder",
+            test_condition_response.headers["location"].split("?", 1)[1],
+        )
+    )
+    test_result_html = test_result_response.body.decode("utf-8")
+    assert "Подходит" in test_result_html
+    assert "Условия выполнены, правило может сработать" in test_result_html
+
+    invalid_test_response = await crm.test_automation_rule_condition(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/test-condition",
+            {
+                "task_id": "999999",
+            },
+        ),
+        rule["id"],
+    )
+    assert invalid_test_response.status_code == 302
+    assert "test_result=error" in invalid_test_response.headers["location"]
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(

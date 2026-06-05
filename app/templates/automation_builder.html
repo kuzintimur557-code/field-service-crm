@@ -290,6 +290,30 @@
                         <button class="small-button" type="submit">Сохранить условия</button>
                     </form>
                     <div class="meta" style="margin-top:8px">{{ rule["conditions_json"] or "{}" }}</div>
+                    <form method="post" action="/automation/rules/{{ rule['id'] }}/test-condition" style="margin-top:12px">
+                        <select name="task_id" aria-label="Заявка для проверки" required>
+                            <option value="">Выберите заявку для теста</option>
+                            {% for task in test_tasks %}
+                            <option value="{{ task['id'] }}" {% if test_rule_id == rule["id"] and test_task_id == task["id"] %}selected{% endif %}>
+                                #{{ task["id"] }} · {{ task["client"] or "Без клиента" }} · {{ task["status"] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button class="small-button" type="submit">Проверить условие</button>
+                    </form>
+                    {% if test_rule_id == rule["id"] and test_result %}
+                    <div class="pill {% if test_result == 'match' %}ok{% elif test_result == 'no_match' %}warn{% else %}off{% endif %}"
+                         style="margin-top:10px">
+                        {% if test_result == "match" %}
+                        Подходит
+                        {% elif test_result == "no_match" %}
+                        Не подходит
+                        {% else %}
+                        Ошибка проверки
+                        {% endif %}
+                    </div>
+                    <div class="meta" style="margin-top:6px">{{ test_message }}</div>
+                    {% endif %}
                 </div>
                 <div class="arrow">→</div>
                 <div class="node">
