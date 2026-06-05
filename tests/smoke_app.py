@@ -628,6 +628,9 @@ async def assert_automation_page():
     assert 'name="condition_operator"' in builder_html
     assert 'name="condition_secondary_mode"' in builder_html
     assert 'name="condition_tertiary_mode"' in builder_html
+    assert 'name="condition_value"' in builder_html
+    assert 'name="condition_secondary_value"' in builder_html
+    assert 'name="condition_tertiary_value"' in builder_html
     assert "И — выполнить все" in builder_html
     assert "ИЛИ — выполнить любое" in builder_html
     assert "Только высокий приоритет" in builder_html
@@ -719,6 +722,39 @@ async def assert_automation_page():
         " и Только задачи на сегодня"
     ) in combined_builder_html
     assert '<option value="and" selected' in combined_builder_html
+
+    custom_threshold_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "price_high",
+                "condition_value": "25000",
+            },
+        ),
+        rule["id"],
+    )
+    assert custom_threshold_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    custom_threshold = json.loads(c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()["conditions_json"])
+    conn.close()
+
+    assert custom_threshold["value"] == "25000"
+    assert custom_threshold["label"] == "Цена заявки от 25000 ₽"
+
+    custom_threshold_builder = await crm.automation_builder_page(
+        make_asgi_request("owner2", "/automation/builder")
+    )
+    custom_threshold_html = custom_threshold_builder.body.decode("utf-8")
+    assert "Цена заявки от 25000 ₽" in custom_threshold_html
+    assert 'name="condition_value"' in custom_threshold_html
+    assert 'value="25000"' in custom_threshold_html
 
     invalid_conditions_response = await crm.update_automation_rule_conditions(
         make_form_request(
@@ -1798,6 +1834,26 @@ async def assert_automation_runner(task):
         task["id"],
     ))
 
+    price_condition_rule = {
+        "conditions_json": json.dumps({
+            "mode": "price_high",
+            "value": "20000",
+            "label": "Цена заявки от 20000 ₽",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, price_condition_rule, "task", task["id"]
+    )[0] is False
+
+    price_condition_rule["conditions_json"] = json.dumps({
+        "mode": "price_high",
+        "value": "12000",
+        "label": "Цена заявки от 12000 ₽",
+    }, ensure_ascii=False)
+    assert crm.automation_condition_matches(
+        c, 2, price_condition_rule, "task", task["id"]
+    )[0] is True
+
     condition_smokes = [
         (
             "Price high condition smoke",
@@ -1806,8 +1862,8 @@ async def assert_automation_runner(task):
                 "mode": "price_high",
                 "field": "price",
                 "operator": "gte",
-                "value": "10000",
-                "label": "Только дорогие заявки",
+                "value": "12000",
+                "label": "Цена заявки от 12000 ₽",
             },
         ),
         (

@@ -1342,6 +1342,15 @@ def automation_combined_conditions_match(c, company_id, rule, entity_type, entit
     return False, message or "Не все условия выполнены"
 
 
+def automation_condition_number(conditions, default, minimum=0):
+    try:
+        value = float(str(conditions.get("value", default)).replace(",", "."))
+    except (TypeError, ValueError):
+        value = float(default)
+
+    return max(value, minimum)
+
+
 
 def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     try:
@@ -1411,6 +1420,8 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     today_dt = datetime.now()
     today = today_dt.strftime("%Y-%m-%d")
     next_24h = today_dt + timedelta(hours=24)
+    price_threshold = automation_condition_number(conditions, 10000)
+    client_task_threshold = int(automation_condition_number(conditions, 5, 1))
 
     client_id = task["client_id"]
     client = None
@@ -1496,7 +1507,7 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
             return True, ""
 
     elif mode == "price_high":
-        if task_price >= 10000:
+        if task_price >= price_threshold:
             return True, ""
 
     elif mode == "price_missing":
@@ -1538,7 +1549,7 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
             return True, ""
 
     elif mode == "client_many_tasks":
-        if client_task_count >= 5:
+        if client_task_count >= client_task_threshold:
             return True, ""
 
     else:
@@ -3358,6 +3369,19 @@ async def automation_builder_page(request: Request):
             else "none"
         )
         condition_operator = str(conditions.get("operator") or "and").lower()
+        condition_value = str(
+            (condition_items[0] if condition_items else conditions).get("value") or ""
+        )
+        condition_secondary_value = str(
+            condition_items[1].get("value") or ""
+            if len(condition_items) > 1
+            else ""
+        )
+        condition_tertiary_value = str(
+            condition_items[2].get("value") or ""
+            if len(condition_items) > 2
+            else ""
+        )
 
         if condition_mode not in condition_labels:
             condition_mode = "none"
@@ -3375,25 +3399,35 @@ async def automation_builder_page(request: Request):
         rule_data["condition_secondary_mode"] = condition_secondary_mode
         rule_data["condition_tertiary_mode"] = condition_tertiary_mode
         rule_data["condition_operator"] = condition_operator
+        rule_data["condition_value"] = condition_value
+        rule_data["condition_secondary_value"] = condition_secondary_value
+        rule_data["condition_tertiary_value"] = condition_tertiary_value
 
-        selected_condition_modes = [
-            mode
-            for mode in (
-                condition_mode,
-                condition_secondary_mode,
-                condition_tertiary_mode,
+        condition_payloads = (
+            condition_items
+            if condition_items
+            else [conditions]
+        )
+        selected_condition_labels = []
+
+        for index, mode in enumerate((
+            condition_mode,
+            condition_secondary_mode,
+            condition_tertiary_mode,
+        )):
+            if mode == "none":
+                continue
+
+            payload = condition_payloads[index] if index < len(condition_payloads) else {}
+            selected_condition_labels.append(
+                payload.get("label") or condition_labels[mode]
             )
-            if mode != "none"
-        ]
 
-        if len(selected_condition_modes) > 1:
+        if len(selected_condition_labels) > 1:
             separator = " и " if condition_operator == "and" else " или "
-            rule_data["condition_label"] = separator.join(
-                condition_labels[mode]
-                for mode in selected_condition_modes
-            )
-        elif selected_condition_modes:
-            rule_data["condition_label"] = condition_labels[selected_condition_modes[0]]
+            rule_data["condition_label"] = separator.join(selected_condition_labels)
+        elif selected_condition_labels:
+            rule_data["condition_label"] = selected_condition_labels[0]
         else:
             rule_data["condition_label"] = condition_labels["none"]
 
@@ -4201,6 +4235,11 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
     condition_tertiary_mode = str(
         form.get("condition_tertiary_mode") or "none"
     ).strip()
+    condition_values = [
+        str(form.get("condition_value") or "").strip(),
+        str(form.get("condition_secondary_value") or "").strip(),
+        str(form.get("condition_tertiary_value") or "").strip(),
+    ]
     condition_operator = str(form.get("condition_operator") or "and").strip().lower()
     allowed_modes = {
         "none": {},
@@ -4360,25 +4399,47 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
     selected_modes = [
-        mode
-        for mode in (
+        (mode, condition_values[index])
+        for index, mode in enumerate((
             condition_mode,
             condition_secondary_mode,
             condition_tertiary_mode,
-        )
+        ))
         if mode != "none"
     ]
+
+    selected_conditions = []
+
+    for mode, raw_value in selected_modes:
+        condition = dict(allowed_modes[mode])
+
+        if mode == "price_high":
+            try:
+                threshold = max(float(raw_value.replace(",", ".")), 0) if raw_value else 10000
+            except ValueError:
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+            condition["value"] = f"{threshold:g}"
+            condition["label"] = f"Цена заявки от {threshold:g} ₽"
+
+        elif mode == "client_many_tasks":
+            try:
+                threshold = max(int(raw_value), 1) if raw_value else 5
+            except ValueError:
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+            condition["value"] = str(threshold)
+            condition["label"] = f"У клиента от {threshold} заявок"
+
+        selected_conditions.append(condition)
 
     if len(selected_modes) > 1:
         conditions_payload = {
             "operator": condition_operator,
-            "conditions": [
-                allowed_modes[mode]
-                for mode in selected_modes
-            ],
+            "conditions": selected_conditions,
         }
     elif selected_modes:
-        conditions_payload = allowed_modes[selected_modes[0]]
+        conditions_payload = selected_conditions[0]
     else:
         conditions_payload = {}
 

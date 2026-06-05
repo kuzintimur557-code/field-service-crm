@@ -26,7 +26,7 @@
         .pill.off{background:#fee2e2;color:#991b1b}
         .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
         .filters{display:flex;gap:8px;flex-wrap:wrap}
-        select{width:100%;padding:10px;border-radius:12px;border:1px solid #d1d5db;background:#fff}
+        select,input[type="number"]{width:100%;box-sizing:border-box;padding:10px;border-radius:12px;border:1px solid #d1d5db;background:#fff}
         .small-button{width:100%;margin-top:8px;padding:9px 10px;border-radius:12px;border:0;background:#111827;color:#fff;font-weight:900;cursor:pointer}
         @media(max-width:820px){
             .builder{grid-template-columns:1fr}
@@ -174,6 +174,9 @@
                             </optgroup>
                             {% endfor %}
                         </select>
+                        <input type="number" name="condition_value" min="0" step="0.01"
+                               value="{{ rule['condition_value'] }}"
+                               placeholder="Порог цены или количества" aria-label="Значение первого условия">
                         <select name="condition_operator" aria-label="Логика условий">
                             <option value="and" {% if rule["condition_operator"] == "and" %}selected{% endif %}>И — выполнить все</option>
                             <option value="or" {% if rule["condition_operator"] == "or" %}selected{% endif %}>ИЛИ — выполнить любое</option>
@@ -187,6 +190,9 @@
                             </optgroup>
                             {% endfor %}
                         </select>
+                        <input type="number" name="condition_secondary_value" min="0" step="0.01"
+                               value="{{ rule['condition_secondary_value'] }}"
+                               placeholder="Порог цены или количества" aria-label="Значение второго условия">
                         <select name="condition_tertiary_mode" aria-label="Третье условие">
                             {% for group_label, group_items in condition_groups %}
                             <optgroup label="{{ group_label }}">
@@ -196,6 +202,9 @@
                             </optgroup>
                             {% endfor %}
                         </select>
+                        <input type="number" name="condition_tertiary_value" min="0" step="0.01"
+                               value="{{ rule['condition_tertiary_value'] }}"
+                               placeholder="Порог цены или количества" aria-label="Значение третьего условия">
                         <button class="small-button" type="submit">Сохранить условия</button>
                     </form>
                     <div class="meta" style="margin-top:8px">{{ rule["conditions_json"] or "{}" }}</div>

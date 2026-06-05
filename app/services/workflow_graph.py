@@ -53,7 +53,7 @@ def _condition_summary(conditions_json):
 
         for item in items:
             item_mode = item.get("mode") or "none"
-            item_labels.append(labels.get(item_mode, item.get("label") or item_mode))
+            item_labels.append(item.get("label") or labels.get(item_mode, item_mode))
 
         if operator == "or":
             label = "Любое условие: " + " или ".join(item_labels)
@@ -77,7 +77,7 @@ def _condition_summary(conditions_json):
 
     return {
         "mode": mode,
-        "label": labels[mode],
+        "label": conditions.get("label") or labels[mode],
         "raw": conditions,
     }
 
