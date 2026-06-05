@@ -34,6 +34,7 @@ def _condition_summary(conditions_json):
         "sla_today": "Только дедлайн сегодня",
         "sla_overdue": "Только просроченный SLA",
         "sla_due_24h": "Только дедлайн в ближайшие 24 часа",
+        "client_specific": "Только выбранный клиент",
         "client_new": "Только новые клиенты",
         "client_repeat": "Только постоянные клиенты",
         "client_vip": "Только VIP клиенты",

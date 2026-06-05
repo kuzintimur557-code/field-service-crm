@@ -634,8 +634,13 @@ async def assert_automation_page():
     assert 'name="condition_worker"' in builder_html
     assert 'name="condition_secondary_worker"' in builder_html
     assert 'name="condition_tertiary_worker"' in builder_html
+    assert 'name="condition_client"' in builder_html
+    assert 'name="condition_secondary_client"' in builder_html
+    assert 'name="condition_tertiary_client"' in builder_html
     assert "Только выбранный исполнитель" in builder_html
+    assert "Только выбранный клиент" in builder_html
     assert 'value="helper2"' in builder_html
+    assert "Client 2" in builder_html
     assert "И — выполнить все" in builder_html
     assert "ИЛИ — выполнить любое" in builder_html
     assert "Только высокий приоритет" in builder_html
@@ -800,6 +805,56 @@ async def assert_automation_page():
     )
     assert outsider_worker_response.status_code == 302
     assert outsider_worker_response.headers["location"] == "/automation/builder?conditions_error=1"
+
+    conn = connect()
+    c = conn.cursor()
+    builder_client = c.execute("""
+    SELECT id
+    FROM clients
+    WHERE company_id=2
+      AND name='Client 2'
+    """).fetchone()
+    conn.close()
+
+    client_condition_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "client_specific",
+                "condition_client": str(builder_client["id"]),
+            },
+        ),
+        rule["id"],
+    )
+    assert client_condition_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    client_condition = json.loads(c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()["conditions_json"])
+    conn.close()
+
+    assert client_condition["mode"] == "client_specific"
+    assert client_condition["value"] == str(builder_client["id"])
+    assert client_condition["label"] == "Клиент: Client 2"
+
+    outsider_client_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "client_specific",
+                "condition_client": "999999",
+            },
+        ),
+        rule["id"],
+    )
+    assert outsider_client_response.status_code == 302
+    assert outsider_client_response.headers["location"] == "/automation/builder?conditions_error=1"
 
     invalid_conditions_response = await crm.update_automation_rule_conditions(
         make_form_request(
@@ -1672,6 +1727,26 @@ async def assert_automation_runner(task):
     }, ensure_ascii=False)
     assert crm.automation_condition_matches(
         c, 2, specific_worker_rule, "task", task["id"]
+    )[0] is False
+
+    specific_client_rule = {
+        "conditions_json": json.dumps({
+            "mode": "client_specific",
+            "value": str(task["client_id"]),
+            "label": "Клиент: Client 2",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, specific_client_rule, "task", task["id"]
+    )[0] is True
+
+    specific_client_rule["conditions_json"] = json.dumps({
+        "mode": "client_specific",
+        "value": "999999",
+        "label": "Клиент: другой",
+    }, ensure_ascii=False)
+    assert crm.automation_condition_matches(
+        c, 2, specific_client_rule, "task", task["id"]
     )[0] is False
 
     today = datetime.now().strftime("%Y-%m-%d")

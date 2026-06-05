@@ -1431,7 +1431,8 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         SELECT id, name, phone, notes, created_at
         FROM clients
         WHERE id=?
-        """, (client_id,)).fetchone()
+          AND company_id=?
+        """, (client_id, company_id)).fetchone()
 
     client_task_count = 0
     client_unpaid_count = 0
@@ -1535,6 +1536,15 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
                     return True, ""
             except Exception:
                 pass
+
+    elif mode == "client_specific":
+        try:
+            selected_client_id = int(conditions.get("value"))
+        except (TypeError, ValueError):
+            selected_client_id = 0
+
+        if client and selected_client_id and client_id == selected_client_id:
+            return True, ""
 
     elif mode == "client_new":
         if client_task_count <= 1:
@@ -3314,6 +3324,13 @@ async def automation_builder_page(request: Request):
     ORDER BY COALESCE(NULLIF(full_name, ''), username), username
     """, (company_id,)).fetchall()
 
+    clients = c.execute("""
+    SELECT id, name, phone
+    FROM clients
+    WHERE company_id=?
+    ORDER BY name, id
+    """, (company_id,)).fetchall()
+
     conn.close()
 
     actions_by_rule = {}
@@ -3341,6 +3358,7 @@ async def automation_builder_page(request: Request):
         ("sla_today", "Только дедлайн сегодня"),
         ("sla_overdue", "Только просроченный SLA"),
         ("sla_due_24h", "Только дедлайн в ближайшие 24 часа"),
+        ("client_specific", "Только выбранный клиент"),
         ("client_new", "Только новые клиенты"),
         ("client_repeat", "Только постоянные клиенты"),
         ("client_vip", "Только VIP клиенты"),
@@ -3441,6 +3459,19 @@ async def automation_builder_page(request: Request):
             if condition_tertiary_mode == "worker_specific"
             else ""
         )
+        rule_data["condition_client"] = (
+            condition_value if condition_mode == "client_specific" else ""
+        )
+        rule_data["condition_secondary_client"] = (
+            condition_secondary_value
+            if condition_secondary_mode == "client_specific"
+            else ""
+        )
+        rule_data["condition_tertiary_client"] = (
+            condition_tertiary_value
+            if condition_tertiary_mode == "client_specific"
+            else ""
+        )
 
         condition_payloads = (
             condition_items
@@ -3486,6 +3517,7 @@ async def automation_builder_page(request: Request):
             "condition_presets": condition_presets,
             "condition_groups": condition_groups,
             "workers": workers,
+            "clients": clients,
         }
     )
 
@@ -4285,6 +4317,11 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         str(form.get("condition_secondary_worker") or "").strip(),
         str(form.get("condition_tertiary_worker") or "").strip(),
     ]
+    condition_clients = [
+        str(form.get("condition_client") or "").strip(),
+        str(form.get("condition_secondary_client") or "").strip(),
+        str(form.get("condition_tertiary_client") or "").strip(),
+    ]
     condition_operator = str(form.get("condition_operator") or "and").strip().lower()
     allowed_modes = {
         "none": {},
@@ -4406,6 +4443,13 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "operator": "within_24h",
             "label": "Только дедлайн в ближайшие 24 часа",
         },
+        "client_specific": {
+            "mode": "client_specific",
+            "field": "client_id",
+            "operator": "equals",
+            "value": "",
+            "label": "Только выбранный клиент",
+        },
         "client_new": {
             "mode": "client_new",
             "field": "client_id",
@@ -4451,7 +4495,12 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
     selected_modes = [
-        (mode, condition_values[index], condition_workers[index])
+        (
+            mode,
+            condition_values[index],
+            condition_workers[index],
+            condition_clients[index],
+        )
         for index, mode in enumerate((
             condition_mode,
             condition_secondary_mode,
@@ -4462,7 +4511,7 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
 
     selected_conditions = []
 
-    for mode, raw_value, selected_worker in selected_modes:
+    for mode, raw_value, selected_worker, selected_client in selected_modes:
         condition = dict(allowed_modes[mode])
 
         if mode == "worker_specific":
@@ -4471,6 +4520,15 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
 
             condition["value"] = selected_worker
             condition["label"] = f"Исполнитель: {selected_worker}"
+
+        elif mode == "client_specific":
+            try:
+                client_id = int(selected_client)
+            except (TypeError, ValueError):
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+            condition["value"] = str(client_id)
+            condition["label"] = f"Клиент #{client_id}"
 
         elif mode == "price_high":
             try:
@@ -4517,20 +4575,32 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
         return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
     for condition in selected_conditions:
-        if condition.get("mode") != "worker_specific":
-            continue
+        if condition.get("mode") == "worker_specific":
+            worker_exists = c.execute("""
+            SELECT 1
+            FROM users
+            WHERE company_id=?
+              AND role='worker'
+              AND username=?
+            """, (company_id, condition["value"])).fetchone()
 
-        worker_exists = c.execute("""
-        SELECT 1
-        FROM users
-        WHERE company_id=?
-          AND role='worker'
-          AND username=?
-        """, (company_id, condition["value"])).fetchone()
+            if not worker_exists:
+                conn.close()
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
-        if not worker_exists:
-            conn.close()
-            return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+        elif condition.get("mode") == "client_specific":
+            client_row = c.execute("""
+            SELECT id, name
+            FROM clients
+            WHERE company_id=?
+              AND id=?
+            """, (company_id, condition["value"])).fetchone()
+
+            if not client_row:
+                conn.close()
+                return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
+
+            condition["label"] = f"Клиент: {client_row['name']}"
 
     c.execute("""
     UPDATE automation_rules

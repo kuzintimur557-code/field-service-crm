@@ -186,6 +186,14 @@
                             </option>
                             {% endfor %}
                         </select>
+                        <select name="condition_client" data-condition-client="primary" aria-label="Клиент первого условия">
+                            <option value="">Выберите клиента</option>
+                            {% for client in clients %}
+                            <option value="{{ client['id'] }}" {% if rule["condition_client"] == client["id"]|string %}selected{% endif %}>
+                                {{ client["name"] }}{% if client["phone"] %} · {{ client["phone"] }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
                         <select name="condition_operator" aria-label="Логика условий">
                             <option value="and" {% if rule["condition_operator"] == "and" %}selected{% endif %}>И — выполнить все</option>
                             <option value="or" {% if rule["condition_operator"] == "or" %}selected{% endif %}>ИЛИ — выполнить любое</option>
@@ -210,6 +218,14 @@
                             </option>
                             {% endfor %}
                         </select>
+                        <select name="condition_secondary_client" data-condition-client="secondary" aria-label="Клиент второго условия">
+                            <option value="">Выберите клиента</option>
+                            {% for client in clients %}
+                            <option value="{{ client['id'] }}" {% if rule["condition_secondary_client"] == client["id"]|string %}selected{% endif %}>
+                                {{ client["name"] }}{% if client["phone"] %} · {{ client["phone"] }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
                         <select name="condition_tertiary_mode" data-condition-mode="tertiary" aria-label="Третье условие">
                             {% for group_label, group_items in condition_groups %}
                             <optgroup label="{{ group_label }}">
@@ -227,6 +243,14 @@
                             {% for worker in workers %}
                             <option value="{{ worker['username'] }}" {% if rule["condition_tertiary_worker"] == worker["username"] %}selected{% endif %}>
                                 {{ worker["full_name"] or worker["username"] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <select name="condition_tertiary_client" data-condition-client="tertiary" aria-label="Клиент третьего условия">
+                            <option value="">Выберите клиента</option>
+                            {% for client in clients %}
+                            <option value="{{ client['id'] }}" {% if rule["condition_tertiary_client"] == client["id"]|string %}selected{% endif %}>
+                                {{ client["name"] }}{% if client["phone"] %} · {{ client["phone"] }}{% endif %}
                             </option>
                             {% endfor %}
                         </select>
@@ -292,14 +316,19 @@ function filterBuilderChains(filter) {
     });
 }
 
-function syncConditionWorkers(form) {
+function syncConditionInputs(form) {
     form.querySelectorAll("[data-condition-mode]").forEach(modeSelect => {
         const slot = modeSelect.dataset.conditionMode;
         const workerSelect = form.querySelector(`[data-condition-worker="${slot}"]`);
+        const clientSelect = form.querySelector(`[data-condition-client="${slot}"]`);
         const valueInput = form.querySelector(`[data-condition-value="${slot}"]`);
 
         if (workerSelect) {
             workerSelect.style.display = modeSelect.value === "worker_specific" ? "" : "none";
+        }
+
+        if (clientSelect) {
+            clientSelect.style.display = modeSelect.value === "client_specific" ? "" : "none";
         }
 
         if (valueInput) {
@@ -311,9 +340,9 @@ function syncConditionWorkers(form) {
 }
 
 document.querySelectorAll("[data-condition-form]").forEach(form => {
-    syncConditionWorkers(form);
+    syncConditionInputs(form);
     form.querySelectorAll("[data-condition-mode]").forEach(select => {
-        select.addEventListener("change", () => syncConditionWorkers(form));
+        select.addEventListener("change", () => syncConditionInputs(form));
     });
 });
 </script>
