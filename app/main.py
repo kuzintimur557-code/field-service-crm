@@ -3352,6 +3352,11 @@ async def automation_builder_page(request: Request):
             if len(condition_items) > 1
             else "none"
         )
+        condition_tertiary_mode = (
+            condition_items[2].get("mode")
+            if len(condition_items) > 2
+            else "none"
+        )
         condition_operator = str(conditions.get("operator") or "and").lower()
 
         if condition_mode not in condition_labels:
@@ -3360,22 +3365,37 @@ async def automation_builder_page(request: Request):
         if condition_secondary_mode not in condition_labels:
             condition_secondary_mode = "none"
 
+        if condition_tertiary_mode not in condition_labels:
+            condition_tertiary_mode = "none"
+
         if condition_operator not in ("and", "or"):
             condition_operator = "and"
 
         rule_data["condition_mode"] = condition_mode
         rule_data["condition_secondary_mode"] = condition_secondary_mode
+        rule_data["condition_tertiary_mode"] = condition_tertiary_mode
         rule_data["condition_operator"] = condition_operator
 
-        if condition_secondary_mode != "none":
-            separator = " и " if condition_operator == "and" else " или "
-            rule_data["condition_label"] = (
-                condition_labels[condition_mode]
-                + separator
-                + condition_labels[condition_secondary_mode]
+        selected_condition_modes = [
+            mode
+            for mode in (
+                condition_mode,
+                condition_secondary_mode,
+                condition_tertiary_mode,
             )
+            if mode != "none"
+        ]
+
+        if len(selected_condition_modes) > 1:
+            separator = " и " if condition_operator == "and" else " или "
+            rule_data["condition_label"] = separator.join(
+                condition_labels[mode]
+                for mode in selected_condition_modes
+            )
+        elif selected_condition_modes:
+            rule_data["condition_label"] = condition_labels[selected_condition_modes[0]]
         else:
-            rule_data["condition_label"] = condition_labels[condition_mode]
+            rule_data["condition_label"] = condition_labels["none"]
 
         rules_view.append(rule_data)
 
@@ -4178,6 +4198,9 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
     condition_secondary_mode = str(
         form.get("condition_secondary_mode") or "none"
     ).strip()
+    condition_tertiary_mode = str(
+        form.get("condition_tertiary_mode") or "none"
+    ).strip()
     condition_operator = str(form.get("condition_operator") or "and").strip().lower()
     allowed_modes = {
         "none": {},
@@ -4331,24 +4354,33 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
     if (
         condition_mode not in allowed_modes
         or condition_secondary_mode not in allowed_modes
+        or condition_tertiary_mode not in allowed_modes
         or condition_operator not in ("and", "or")
     ):
         return RedirectResponse("/automation/builder?conditions_error=1", status_code=302)
 
-    if condition_mode == "none" and condition_secondary_mode != "none":
-        condition_mode = condition_secondary_mode
-        condition_secondary_mode = "none"
+    selected_modes = [
+        mode
+        for mode in (
+            condition_mode,
+            condition_secondary_mode,
+            condition_tertiary_mode,
+        )
+        if mode != "none"
+    ]
 
-    if condition_mode != "none" and condition_secondary_mode != "none":
+    if len(selected_modes) > 1:
         conditions_payload = {
             "operator": condition_operator,
             "conditions": [
-                allowed_modes[condition_mode],
-                allowed_modes[condition_secondary_mode],
+                allowed_modes[mode]
+                for mode in selected_modes
             ],
         }
+    elif selected_modes:
+        conditions_payload = allowed_modes[selected_modes[0]]
     else:
-        conditions_payload = allowed_modes[condition_mode]
+        conditions_payload = {}
 
     conn = connect()
     c = conn.cursor()

@@ -627,6 +627,7 @@ async def assert_automation_page():
     assert "Сохранить условия" in builder_html
     assert 'name="condition_operator"' in builder_html
     assert 'name="condition_secondary_mode"' in builder_html
+    assert 'name="condition_tertiary_mode"' in builder_html
     assert "И — выполнить все" in builder_html
     assert "ИЛИ — выполнить любое" in builder_html
     assert "Только высокий приоритет" in builder_html
@@ -684,6 +685,7 @@ async def assert_automation_page():
                 "condition_mode": "priority_high",
                 "condition_operator": "and",
                 "condition_secondary_mode": "payment_unpaid",
+                "condition_tertiary_mode": "date_today",
             },
         ),
         rule["id"],
@@ -705,13 +707,17 @@ async def assert_automation_page():
     assert [item["mode"] for item in combined_payload["conditions"]] == [
         "priority_high",
         "payment_unpaid",
+        "date_today",
     ]
 
     combined_builder_response = await crm.automation_builder_page(
         make_asgi_request("owner2", "/automation/builder")
     )
     combined_builder_html = combined_builder_response.body.decode("utf-8")
-    assert "Только высокий приоритет и Только неоплаченные заявки" in combined_builder_html
+    assert (
+        "Только высокий приоритет и Только неоплаченные заявки"
+        " и Только задачи на сегодня"
+    ) in combined_builder_html
     assert '<option value="and" selected' in combined_builder_html
 
     invalid_conditions_response = await crm.update_automation_rule_conditions(

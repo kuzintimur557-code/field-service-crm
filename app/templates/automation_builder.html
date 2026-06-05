@@ -187,6 +187,15 @@
                             </optgroup>
                             {% endfor %}
                         </select>
+                        <select name="condition_tertiary_mode" aria-label="Третье условие">
+                            {% for group_label, group_items in condition_groups %}
+                            <optgroup label="{{ group_label }}">
+                                {% for key, label in group_items %}
+                                <option value="{{ key }}" {% if rule["condition_tertiary_mode"] == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
                         <button class="small-button" type="submit">Сохранить условия</button>
                     </form>
                     <div class="meta" style="margin-top:8px">{{ rule["conditions_json"] or "{}" }}</div>
