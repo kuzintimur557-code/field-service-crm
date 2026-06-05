@@ -348,6 +348,7 @@ def assert_automation_foundation():
           AND name IN (
               'automation_rules',
               'automation_actions',
+              'automation_action_runs',
               'automation_events',
               'ai_assistant_notes',
               'ai_assistant_events'
@@ -364,6 +365,7 @@ def assert_automation_foundation():
           AND name IN (
               'idx_automation_rules_company_active',
               'idx_automation_actions_rule',
+              'idx_automation_action_runs_source',
               'idx_automation_events_company_status',
               'idx_ai_assistant_notes_company_created',
               'idx_ai_assistant_events_company_created'
@@ -381,6 +383,7 @@ def assert_automation_foundation():
     assert table_names == {
         "automation_rules",
         "automation_actions",
+        "automation_action_runs",
         "automation_events",
         "ai_assistant_notes",
         "ai_assistant_events",
@@ -388,6 +391,7 @@ def assert_automation_foundation():
     assert index_names == {
         "idx_automation_rules_company_active",
         "idx_automation_actions_rule",
+        "idx_automation_action_runs_source",
         "idx_automation_events_company_status",
         "idx_ai_assistant_notes_company_created",
         "idx_ai_assistant_events_company_created",
@@ -1220,6 +1224,115 @@ async def assert_automation_page():
     assert unsupported_dry_run["status"] == "unsupported_actions"
     assert len(unsupported_dry_run["unsupported_actions"]) == 1
     assert unsupported_dry_run["unsupported_actions"][0]["dry_run_supported"] is False
+
+    create_task_preview = crm.automation_dry_run_readiness(
+        True,
+        True,
+        [{
+            "active": 1,
+            "action_key": "create_task",
+            "payload_json": json.dumps({
+                "target_username": "helper2",
+                "message": "Автоматическая проверка клиента",
+            }),
+        }],
+    )
+    assert create_task_preview["status"] == "ready"
+    assert create_task_preview["executable_actions"][0]["dry_run_supported"] is True
+    assert "Новая задача для: helper2" in create_task_preview["executable_actions"][0]["dry_run_detail"]
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, 'create_task', ?, 99, 1, ?)
+    """, (
+        2,
+        rule["id"],
+        json.dumps({
+            "target_username": "helper2",
+            "message": "Автоматическая проверка клиента",
+        }, ensure_ascii=False),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    create_task_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE id=?
+    """, (c.lastrowid,)).fetchone()
+    source_task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=2
+    ORDER BY id
+    LIMIT 1
+    """).fetchone()
+
+    created_task_id = crm.execute_automation_create_task_action(
+        c,
+        2,
+        rule,
+        create_task_action,
+        json.loads(create_task_action["payload_json"]),
+        "task",
+        source_task["id"],
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
+    duplicate_task_id = crm.execute_automation_create_task_action(
+        c,
+        2,
+        rule,
+        create_task_action,
+        json.loads(create_task_action["payload_json"]),
+        "task",
+        source_task["id"],
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
+    created_task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+      AND company_id=2
+    """, (created_task_id,)).fetchone()
+    create_task_run_count = c.execute("""
+    SELECT COUNT(*)
+    FROM automation_action_runs
+    WHERE company_id=2
+      AND action_id=?
+      AND entity_type='task'
+      AND entity_id=?
+    """, (create_task_action["id"], source_task["id"])).fetchone()[0]
+
+    assert created_task_id == duplicate_task_id
+    assert created_task is not None
+    assert created_task["client_id"] == source_task["client_id"]
+    assert created_task["phone"] == source_task["phone"]
+    assert created_task["address"] == source_task["address"]
+    assert created_task["worker"] == "helper2"
+    assert created_task["status"] == "Новая"
+    assert created_task["description"] == "Автоматическая проверка клиента"
+    assert create_task_run_count == 1
+
+    c.execute("""
+    DELETE FROM automation_action_runs
+    WHERE company_id=2
+      AND action_id=?
+    """, (create_task_action["id"],))
+    c.execute("""
+    DELETE FROM tasks
+    WHERE company_id=2
+      AND id=?
+    """, (created_task_id,))
+    c.execute("""
+    DELETE FROM automation_actions
+    WHERE company_id=2
+      AND id=?
+    """, (create_task_action["id"],))
+    conn.commit()
+    conn.close()
 
     empty_text_condition_response = await crm.update_automation_rule_conditions(
         make_form_request(

@@ -1555,6 +1555,7 @@ def automation_action_dry_run_preview(action):
         "notification",
         "telegram_alert",
         "ai_digest",
+        "create_task",
     }
 
     if action_key == "notification":
@@ -1566,7 +1567,10 @@ def automation_action_dry_run_preview(action):
     elif action_key == "email":
         detail = f"Почта: {target or 'получатель не указан'}"
     elif action_key == "create_task":
-        detail = "Создание задачи"
+        detail = (
+            f"Новая задача для: {target or 'без исполнителя'}"
+            " · данные клиента из исходной заявки"
+        )
     else:
         detail = "Неизвестное действие"
 
@@ -1579,6 +1583,116 @@ def automation_action_dry_run_preview(action):
     action_data["dry_run_supported"] = supported
     action_data["dry_run_detail"] = detail
     return action_data
+
+
+def execute_automation_create_task_action(
+    c,
+    company_id,
+    rule,
+    action,
+    payload,
+    entity_type,
+    entity_id,
+    now,
+):
+    if entity_type != "task" or not entity_id:
+        return None
+
+    previous_run = c.execute("""
+    SELECT created_entity_id
+    FROM automation_action_runs
+    WHERE company_id=?
+      AND action_id=?
+      AND entity_type=?
+      AND entity_id=?
+    """, (
+        company_id,
+        action["id"],
+        entity_type,
+        entity_id,
+    )).fetchone()
+
+    if previous_run:
+        return previous_run["created_entity_id"]
+
+    source_task = c.execute("""
+    SELECT
+        client_id, client, phone, address,
+        worker, workers, priority
+    FROM tasks
+    WHERE company_id=?
+      AND id=?
+      AND archived=0
+    """, (company_id, entity_id)).fetchone()
+
+    if not source_task:
+        return None
+
+    target_username = str(payload.get("target_username") or "").strip()
+    target_worker = ""
+
+    if target_username:
+        worker_row = c.execute("""
+        SELECT username
+        FROM users
+        WHERE company_id=?
+          AND username=?
+          AND role='worker'
+        """, (company_id, target_username)).fetchone()
+
+        if worker_row:
+            target_worker = worker_row["username"]
+
+    description = str(payload.get("message") or "").strip()
+
+    if not description:
+        description = f"Автоматическая задача: {rule['name']}"
+
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client_id, client, phone, address,
+        description, task_date, worker, workers,
+        priority, price, photo, status, report,
+        after_photo, created_at, deadline_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        source_task["client_id"],
+        source_task["client"],
+        source_task["phone"],
+        source_task["address"],
+        description,
+        datetime.now().strftime("%Y-%m-%d"),
+        target_worker,
+        target_worker,
+        source_task["priority"] or "Обычный",
+        "0",
+        "",
+        "Новая",
+        "",
+        "",
+        now,
+        "",
+    ))
+    created_task_id = c.lastrowid
+
+    c.execute("""
+    INSERT INTO automation_action_runs (
+        company_id, action_id, entity_type, entity_id,
+        created_entity_type, created_entity_id, created_at
+    )
+    VALUES (?, ?, ?, ?, 'task', ?, ?)
+    """, (
+        company_id,
+        action["id"],
+        entity_type,
+        entity_id,
+        created_task_id,
+        now,
+    ))
+
+    return created_task_id
 
 
 def automation_dry_run_readiness(rule_active, condition_matched, actions):
@@ -2087,6 +2201,21 @@ def run_automation_event(
                             )
                         except Exception:
                             pass
+
+            if action["action_key"] == "create_task":
+                created_task_id = execute_automation_create_task_action(
+                    c,
+                    company_id,
+                    rule,
+                    action,
+                    payload,
+                    entity_type,
+                    entity_id,
+                    now,
+                )
+
+                if created_task_id:
+                    handled_actions += 1
 
         status = "done" if handled_actions else "skipped"
 

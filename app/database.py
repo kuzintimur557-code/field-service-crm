@@ -355,6 +355,19 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS automation_action_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        action_id INTEGER NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id INTEGER NOT NULL,
+        created_entity_type TEXT,
+        created_entity_id INTEGER,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS autonomous_action_approvals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -679,6 +692,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_automation_events_company_status
     ON automation_events(company_id, status, created_at)
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_action_runs_source
+    ON automation_action_runs(company_id, action_id, entity_type, entity_id)
     """)
 
     c.execute("""
