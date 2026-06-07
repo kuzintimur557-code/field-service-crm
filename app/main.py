@@ -1656,10 +1656,11 @@ def execute_automation_create_task_action(
 
     target_username = str(payload.get("target_username") or "").strip()
     target_worker = ""
+    target_chat_id = ""
 
     if target_username:
         worker_row = c.execute("""
-        SELECT username
+        SELECT username, telegram_chat_id
         FROM users
         WHERE company_id=?
           AND username=?
@@ -1668,6 +1669,7 @@ def execute_automation_create_task_action(
 
         if worker_row:
             target_worker = worker_row["username"]
+            target_chat_id = str(worker_row["telegram_chat_id"] or "").strip()
 
     description = str(payload.get("message") or "").strip()
 
@@ -1704,6 +1706,38 @@ def execute_automation_create_task_action(
     created_task_id = c.lastrowid
 
     c.execute("""
+    INSERT INTO task_activity (
+        task_id, username, role, action, details, created_at
+    )
+    VALUES (?, ?, 'system', 'Создана автоматизацией', ?, ?)
+    """, (
+        created_task_id,
+        rule["created_by"] or "automation",
+        (
+            f"Правило: {rule['name']}. "
+            f"Исходная заявка: #{entity_id}. "
+            f"Исполнитель: {target_worker or 'не назначен'}"
+        ),
+        now,
+    ))
+
+    if target_worker:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message,
+            link, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            target_worker,
+            f"Новая автоматическая заявка #{created_task_id}",
+            description,
+            f"/task/{created_task_id}",
+            now,
+        ))
+
+    c.execute("""
     INSERT INTO automation_action_runs (
         company_id, action_id, entity_type, entity_id,
         created_entity_type, created_entity_id, created_at
@@ -1717,6 +1751,19 @@ def execute_automation_create_task_action(
         created_task_id,
         now,
     ))
+
+    if target_chat_id:
+        try:
+            send_message_to_chat(
+                target_chat_id,
+                (
+                    f"Вам назначена автоматическая заявка #{created_task_id}\n"
+                    f"Клиент: {source_task['client'] or 'Без клиента'}\n"
+                    f"Описание: {description}"
+                ),
+            )
+        except Exception:
+            pass
 
     return created_task_id
 

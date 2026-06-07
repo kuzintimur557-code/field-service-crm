@@ -1271,26 +1271,37 @@ async def assert_automation_page():
     LIMIT 1
     """).fetchone()
 
-    created_task_id = crm.execute_automation_create_task_action(
-        c,
-        2,
-        rule,
-        create_task_action,
-        json.loads(create_task_action["payload_json"]),
-        "task",
-        source_task["id"],
-        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    sent_create_task_telegram = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = (
+        lambda chat_id, text:
+        sent_create_task_telegram.append((chat_id, text)) or True
     )
-    duplicate_task_id = crm.execute_automation_create_task_action(
-        c,
-        2,
-        rule,
-        create_task_action,
-        json.loads(create_task_action["payload_json"]),
-        "task",
-        source_task["id"],
-        datetime.now().strftime("%Y-%m-%d %H:%M"),
-    )
+
+    try:
+        created_task_id = crm.execute_automation_create_task_action(
+            c,
+            2,
+            rule,
+            create_task_action,
+            json.loads(create_task_action["payload_json"]),
+            "task",
+            source_task["id"],
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        )
+        duplicate_task_id = crm.execute_automation_create_task_action(
+            c,
+            2,
+            rule,
+            create_task_action,
+            json.loads(create_task_action["payload_json"]),
+            "task",
+            source_task["id"],
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
     created_task = c.execute("""
     SELECT *
     FROM tasks
@@ -1305,6 +1316,19 @@ async def assert_automation_page():
       AND entity_type='task'
       AND entity_id=?
     """, (create_task_action["id"], source_task["id"])).fetchone()[0]
+    create_task_activity = c.execute("""
+    SELECT *
+    FROM task_activity
+    WHERE task_id=?
+      AND action='Создана автоматизацией'
+    """, (created_task_id,)).fetchall()
+    create_task_notifications = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='helper2'
+      AND link=?
+    """, (f"/task/{created_task_id}",)).fetchall()
 
     assert created_task_id == duplicate_task_id
     assert created_task is not None
@@ -1315,6 +1339,20 @@ async def assert_automation_page():
     assert created_task["status"] == "Новая"
     assert created_task["description"] == "Автоматическая проверка клиента"
     assert create_task_run_count == 1
+    assert len(create_task_activity) == 1
+    assert f"Исходная заявка: #{source_task['id']}" in create_task_activity[0]["details"]
+    assert len(create_task_notifications) == 1
+    assert create_task_notifications[0]["title"] == (
+        f"Новая автоматическая заявка #{created_task_id}"
+    )
+    assert sent_create_task_telegram == [(
+        "chat-helper2",
+        (
+            f"Вам назначена автоматическая заявка #{created_task_id}\n"
+            f"Клиент: {source_task['client']}\n"
+            "Описание: Автоматическая проверка клиента"
+        ),
+    )]
 
     conn.commit()
 
@@ -1331,6 +1369,15 @@ async def assert_automation_page():
     assert f'href="/task/{created_task_id}"' in action_history_html
     assert f"Создана заявка #{created_task_id}" in action_history_html
 
+    c.execute("""
+    DELETE FROM notifications
+    WHERE company_id=2
+      AND link=?
+    """, (f"/task/{created_task_id}",))
+    c.execute("""
+    DELETE FROM task_activity
+    WHERE task_id=?
+    """, (created_task_id,))
     c.execute("""
     DELETE FROM automation_action_runs
     WHERE company_id=2
