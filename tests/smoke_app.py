@@ -1255,10 +1255,14 @@ async def assert_automation_page():
             "action_key": "create_task",
             "payload_json": json.dumps({
                 "target_username": "__least_loaded__",
+                "task_max_daily_load": 3,
             }),
         }],
     )
     assert "авто: наименее загруженный" in (
+        auto_worker_preview["executable_actions"][0]["dry_run_detail"]
+    )
+    assert "лимит: 3 в день" in (
         auto_worker_preview["executable_actions"][0]["dry_run_detail"]
     )
 
@@ -1443,6 +1447,7 @@ async def assert_automation_page():
             "task_delay_days": 3,
             "task_priority": "Обычный",
             "task_deadline_hours": 8,
+            "task_max_daily_load": 1,
         }, ensure_ascii=False),
         datetime.now().strftime("%Y-%m-%d %H:%M"),
     ))
@@ -1477,6 +1482,33 @@ async def assert_automation_page():
         "create_task",
         "__least_loaded__",
     ) is True
+
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client_id, client, description,
+        task_date, worker, workers, priority,
+        price, status, archived
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+    """, (
+        2,
+        source_task["client_id"],
+        source_task["client"],
+        "Проверка лимита автоназначения",
+        auto_worker_task["task_date"],
+        "worker2",
+        "worker2",
+        "Обычный",
+        "0",
+        "Новая",
+    ))
+    max_load_task_id = c.lastrowid
+    assert crm.automation_least_loaded_worker(
+        c,
+        2,
+        auto_worker_task["task_date"],
+        1,
+    ) is None
 
     conn.commit()
 
@@ -1518,11 +1550,12 @@ async def assert_automation_page():
     c.execute("""
     DELETE FROM tasks
     WHERE company_id=2
-      AND id IN (?, ?, ?)
+      AND id IN (?, ?, ?, ?)
     """, (
         created_task_id,
         client_created_task_id,
         auto_worker_task_id,
+        max_load_task_id,
     ))
     c.execute("""
     DELETE FROM automation_actions
@@ -1673,6 +1706,7 @@ async def assert_automation_page():
     assert "Через 7 дней" in rule_detail_html
     assert "Приоритет" in rule_detail_html
     assert "Срок SLA" in rule_detail_html
+    assert "Лимит автоназначения" in rule_detail_html
 
     builder_response = await crm.create_rule_action(
         make_form_request(
@@ -1766,6 +1800,7 @@ async def assert_automation_page():
                 "task_delay_days": "1",
                 "task_priority": "Срочно",
                 "task_deadline_hours": "8",
+                "task_max_daily_load": "3",
             },
         ),
         rule["id"],
@@ -1793,6 +1828,7 @@ async def assert_automation_page():
     assert '"task_delay_days": 1' in valid_create_task_action["payload_json"]
     assert '"task_priority": "Срочно"' in valid_create_task_action["payload_json"]
     assert '"task_deadline_hours": 8' in valid_create_task_action["payload_json"]
+    assert '"task_max_daily_load": 3' in valid_create_task_action["payload_json"]
 
     conn = connect()
     c = conn.cursor()

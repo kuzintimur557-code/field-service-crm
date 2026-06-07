@@ -1554,6 +1554,7 @@ def automation_action_dry_run_preview(action):
     task_delay_days, task_priority, task_deadline_hours = (
         automation_create_task_settings(payload)
     )
+    task_max_daily_load = automation_task_max_daily_load(payload)
     supported = action_key in {
         "notification",
         "telegram_alert",
@@ -1585,11 +1586,22 @@ def automation_action_dry_run_preview(action):
             if task_deadline_hours == 0
             else f"SLA: {task_deadline_hours} ч."
         )
+        load_limit_detail = ""
+
+        if target == "__least_loaded__":
+            load_limit_label = (
+                "без лимита загрузки"
+                if task_max_daily_load == 0
+                else f"лимит: {task_max_daily_load} в день"
+            )
+            load_limit_detail = f" · {load_limit_label}"
+
         detail = (
             f"Новая задача для: {target_label}"
             f" · {schedule_label}"
             f" · приоритет: {task_priority}"
             f" · {deadline_label}"
+            f"{load_limit_detail}"
             " · данные клиента из исходной заявки"
         )
     else:
@@ -1631,7 +1643,24 @@ def automation_create_task_settings(payload):
     return task_delay_days, task_priority, task_deadline_hours
 
 
-def automation_least_loaded_worker(c, company_id, task_date):
+def automation_task_max_daily_load(payload):
+    try:
+        max_daily_load = int(payload.get("task_max_daily_load") or 0)
+    except (TypeError, ValueError):
+        max_daily_load = 0
+
+    if max_daily_load not in (0, 1, 2, 3, 5):
+        max_daily_load = 0
+
+    return max_daily_load
+
+
+def automation_least_loaded_worker(
+    c,
+    company_id,
+    task_date,
+    max_daily_load=0,
+):
     workers = c.execute("""
     SELECT username, telegram_chat_id
     FROM users
@@ -1661,8 +1690,20 @@ def automation_least_loaded_worker(c, company_id, task_date):
             if worker_name in worker_load:
                 worker_load[worker_name] += 1
 
+    available_workers = [
+        worker
+        for worker in workers
+        if (
+            not max_daily_load
+            or worker_load[worker["username"]] < max_daily_load
+        )
+    ]
+
+    if not available_workers:
+        return None
+
     selected_worker = min(
-        workers,
+        available_workers,
         key=lambda worker: (
             worker_load[worker["username"]],
             worker["username"],
@@ -1774,6 +1815,7 @@ def execute_automation_create_task_action(
     task_delay_days, task_priority, task_deadline_hours = (
         automation_create_task_settings(payload)
     )
+    task_max_daily_load = automation_task_max_daily_load(payload)
     scheduled_at = datetime.now() + timedelta(days=task_delay_days)
     task_date = scheduled_at.strftime("%Y-%m-%d")
     deadline_at = ""
@@ -1792,6 +1834,7 @@ def execute_automation_create_task_action(
             c,
             company_id,
             task_date,
+            task_max_daily_load,
         )
 
         if selected_worker:
@@ -4953,6 +4996,9 @@ async def create_automation_rule(request: Request):
             "task_deadline_hours": form.get("task_deadline_hours"),
         })
     )
+    task_max_daily_load = automation_task_max_daily_load({
+        "task_max_daily_load": form.get("task_max_daily_load"),
+    })
 
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
@@ -4984,6 +5030,7 @@ async def create_automation_rule(request: Request):
         payload["task_delay_days"] = task_delay_days
         payload["task_priority"] = task_priority
         payload["task_deadline_hours"] = task_deadline_hours
+        payload["task_max_daily_load"] = task_max_daily_load
 
     conn = connect()
     c = conn.cursor()
@@ -6515,6 +6562,9 @@ async def create_rule_action(request: Request, rule_id: int):
             "task_deadline_hours": form.get("task_deadline_hours"),
         })
     )
+    task_max_daily_load = automation_task_max_daily_load({
+        "task_max_daily_load": form.get("task_max_daily_load"),
+    })
 
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
 
@@ -6573,6 +6623,7 @@ async def create_rule_action(request: Request, rule_id: int):
         payload["task_delay_days"] = task_delay_days
         payload["task_priority"] = task_priority
         payload["task_deadline_hours"] = task_deadline_hours
+        payload["task_max_daily_load"] = task_max_daily_load
 
     c.execute("""
     INSERT INTO automation_actions (
