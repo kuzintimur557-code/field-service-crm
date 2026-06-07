@@ -1247,6 +1247,21 @@ async def assert_automation_page():
     assert "приоритет: Срочно" in create_task_preview["executable_actions"][0]["dry_run_detail"]
     assert "SLA: 24 ч." in create_task_preview["executable_actions"][0]["dry_run_detail"]
 
+    auto_worker_preview = crm.automation_dry_run_readiness(
+        True,
+        True,
+        [{
+            "active": 1,
+            "action_key": "create_task",
+            "payload_json": json.dumps({
+                "target_username": "__least_loaded__",
+            }),
+        }],
+    )
+    assert "авто: наименее загруженный" in (
+        auto_worker_preview["executable_actions"][0]["dry_run_detail"]
+    )
+
     conn = connect()
     c = conn.cursor()
     c.execute("""
@@ -1413,6 +1428,56 @@ async def assert_automation_page():
         ("chat-helper2", expected_client_telegram_message),
     ]
 
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, 'create_task', ?, 100, 1, ?)
+    """, (
+        2,
+        rule["id"],
+        json.dumps({
+            "target_username": "__least_loaded__",
+            "message": "Автоматическое распределение",
+            "task_delay_days": 3,
+            "task_priority": "Обычный",
+            "task_deadline_hours": 8,
+        }, ensure_ascii=False),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    auto_worker_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE id=?
+    """, (c.lastrowid,)).fetchone()
+    auto_worker_task_id = crm.execute_automation_create_task_action(
+        c,
+        2,
+        rule,
+        auto_worker_action,
+        json.loads(auto_worker_action["payload_json"]),
+        "task",
+        source_task["id"],
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
+    auto_worker_task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+      AND company_id=2
+    """, (auto_worker_task_id,)).fetchone()
+
+    assert auto_worker_task is not None
+    assert auto_worker_task["worker"] == "free2"
+    assert auto_worker_task["workers"] == "free2"
+    assert crm.automation_action_target_is_valid(
+        c,
+        2,
+        "create_task",
+        "__least_loaded__",
+    ) is True
+
     conn.commit()
 
     action_history_response = await crm.automation_rule_detail(
@@ -1431,30 +1496,44 @@ async def assert_automation_page():
     c.execute("""
     DELETE FROM notifications
     WHERE company_id=2
-      AND link IN (?, ?)
+      AND link IN (?, ?, ?)
     """, (
         f"/task/{created_task_id}",
         f"/task/{client_created_task_id}",
+        f"/task/{auto_worker_task_id}",
     ))
     c.execute("""
     DELETE FROM task_activity
-    WHERE task_id IN (?, ?)
-    """, (created_task_id, client_created_task_id))
+    WHERE task_id IN (?, ?, ?)
+    """, (
+        created_task_id,
+        client_created_task_id,
+        auto_worker_task_id,
+    ))
     c.execute("""
     DELETE FROM automation_action_runs
     WHERE company_id=2
-      AND action_id=?
-    """, (create_task_action["id"],))
+      AND action_id IN (?, ?)
+    """, (create_task_action["id"], auto_worker_action["id"]))
     c.execute("""
     DELETE FROM tasks
     WHERE company_id=2
-      AND id IN (?, ?)
-    """, (created_task_id, client_created_task_id))
+      AND id IN (?, ?, ?)
+    """, (
+        created_task_id,
+        client_created_task_id,
+        auto_worker_task_id,
+    ))
     c.execute("""
     DELETE FROM automation_actions
     WHERE company_id=2
       AND id=?
     """, (create_task_action["id"],))
+    c.execute("""
+    DELETE FROM automation_actions
+    WHERE company_id=2
+      AND id=?
+    """, (auto_worker_action["id"],))
     conn.commit()
     conn.close()
 
@@ -1588,6 +1667,7 @@ async def assert_automation_page():
     assert f"/automation/rules/{rule['id']}/actions/create" in rule_detail_html
     assert "Исполнитель новой задачи" in rule_detail_html
     assert 'data-role="worker"' in rule_detail_html
+    assert "Авто: наименее загруженный" in rule_detail_html
     assert "Данные берутся из исходной заявки или нового клиента" in rule_detail_html
     assert "Дата выполнения" in rule_detail_html
     assert "Через 7 дней" in rule_detail_html

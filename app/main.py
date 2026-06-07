@@ -1570,6 +1570,11 @@ def automation_action_dry_run_preview(action):
     elif action_key == "email":
         detail = f"Почта: {target or 'получатель не указан'}"
     elif action_key == "create_task":
+        target_label = (
+            "авто: наименее загруженный"
+            if target == "__least_loaded__"
+            else target or "без исполнителя"
+        )
         schedule_label = (
             "сегодня"
             if task_delay_days == 0
@@ -1581,7 +1586,7 @@ def automation_action_dry_run_preview(action):
             else f"SLA: {task_deadline_hours} ч."
         )
         detail = (
-            f"Новая задача для: {target or 'без исполнителя'}"
+            f"Новая задача для: {target_label}"
             f" · {schedule_label}"
             f" · приоритет: {task_priority}"
             f" · {deadline_label}"
@@ -1626,12 +1631,66 @@ def automation_create_task_settings(payload):
     return task_delay_days, task_priority, task_deadline_hours
 
 
+def automation_least_loaded_worker(c, company_id, task_date):
+    workers = c.execute("""
+    SELECT username, telegram_chat_id
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+    ORDER BY username
+    """, (company_id,)).fetchall()
+
+    if not workers:
+        return None
+
+    worker_load = {
+        worker["username"]: 0
+        for worker in workers
+    }
+    tasks = c.execute("""
+    SELECT worker, workers
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND task_date LIKE ?
+      AND status NOT IN ('Завершено', 'Отменено')
+    """, (company_id, f"{task_date}%")).fetchall()
+
+    for task in tasks:
+        for worker_name in get_task_worker_names(task):
+            if worker_name in worker_load:
+                worker_load[worker_name] += 1
+
+    selected_worker = min(
+        workers,
+        key=lambda worker: (
+            worker_load[worker["username"]],
+            worker["username"],
+        ),
+    )
+
+    return {
+        "username": selected_worker["username"],
+        "telegram_chat_id": selected_worker["telegram_chat_id"],
+        "active_count": worker_load[selected_worker["username"]],
+    }
+
+
 def automation_action_target_is_valid(c, company_id, action_key, target_username):
     target_username = str(target_username or "").strip()
 
     if action_key == "create_task":
         if not target_username:
             return True
+
+        if target_username == "__least_loaded__":
+            return bool(c.execute("""
+            SELECT id
+            FROM users
+            WHERE company_id=?
+              AND role='worker'
+            LIMIT 1
+            """, (company_id,)).fetchone())
 
         return bool(c.execute("""
         SELECT id
@@ -1711,23 +1770,6 @@ def execute_automation_create_task_action(
     if not source_row:
         return None
 
-    target_username = str(payload.get("target_username") or "").strip()
-    target_worker = ""
-    target_chat_id = ""
-
-    if target_username:
-        worker_row = c.execute("""
-        SELECT username, telegram_chat_id
-        FROM users
-        WHERE company_id=?
-          AND username=?
-          AND role='worker'
-        """, (company_id, target_username)).fetchone()
-
-        if worker_row:
-            target_worker = worker_row["username"]
-            target_chat_id = str(worker_row["telegram_chat_id"] or "").strip()
-
     description = str(payload.get("message") or "").strip()
     task_delay_days, task_priority, task_deadline_hours = (
         automation_create_task_settings(payload)
@@ -1740,6 +1782,37 @@ def execute_automation_create_task_action(
         deadline_at = (
             scheduled_at + timedelta(hours=task_deadline_hours)
         ).strftime("%Y-%m-%dT%H:%M")
+
+    target_username = str(payload.get("target_username") or "").strip()
+    target_worker = ""
+    target_chat_id = ""
+
+    if target_username == "__least_loaded__":
+        selected_worker = automation_least_loaded_worker(
+            c,
+            company_id,
+            task_date,
+        )
+
+        if selected_worker:
+            target_worker = selected_worker["username"]
+            target_chat_id = str(
+                selected_worker["telegram_chat_id"] or ""
+            ).strip()
+        else:
+            return None
+    elif target_username:
+        worker_row = c.execute("""
+        SELECT username, telegram_chat_id
+        FROM users
+        WHERE company_id=?
+          AND username=?
+          AND role='worker'
+        """, (company_id, target_username)).fetchone()
+
+        if worker_row:
+            target_worker = worker_row["username"]
+            target_chat_id = str(worker_row["telegram_chat_id"] or "").strip()
 
     if not description:
         description = f"Автоматическая задача: {rule['name']}"

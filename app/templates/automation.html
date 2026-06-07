@@ -1701,9 +1701,10 @@ setInterval(loadA3ApprovalHistory, 30000);
         </div>
         <div>
             <label>Получатель</label>
-            <select name="target_username">
+            <select name="target_username" data-new-rule-target>
+                <option value="__least_loaded__" data-role="auto_worker">Авто: наименее загруженный</option>
                 {% for user in users %}
-                <option value="{{ user['username'] }}" {% if user["username"] == username %}selected{% endif %}>
+                <option value="{{ user['username'] }}" data-role="{{ user['role'] }}" {% if user["username"] == username %}selected{% endif %}>
                     {{ user["username"] }} / {{ role_label(user["role"]) }}
                 </option>
                 {% endfor %}
@@ -1754,6 +1755,7 @@ const newRuleActionKey = document.querySelector("[data-new-rule-action-key]");
 const newRuleCreateTaskSettings = document.querySelector(
     "[data-new-rule-create-task-settings]"
 );
+const newRuleTarget = document.querySelector("[data-new-rule-target]");
 
 function syncNewRuleCreateTaskSettings() {
     if (!newRuleActionKey || !newRuleCreateTaskSettings) {
@@ -1762,6 +1764,34 @@ function syncNewRuleCreateTaskSettings() {
 
     newRuleCreateTaskSettings.style.display =
         newRuleActionKey.value === "create_task" ? "" : "none";
+
+    if (newRuleTarget) {
+        const createsTask = newRuleActionKey.value === "create_task";
+
+        newRuleTarget.querySelectorAll("option[data-role]").forEach(option => {
+            option.hidden = createsTask
+                ? !["worker", "auto_worker"].includes(option.dataset.role)
+                : option.dataset.role === "auto_worker";
+        });
+
+        const selectedOption =
+            newRuleTarget.options[newRuleTarget.selectedIndex];
+
+        if (
+            createsTask
+            && !["worker", "auto_worker"].includes(selectedOption?.dataset.role)
+        ) {
+            newRuleTarget.value = "__least_loaded__";
+        } else if (
+            !createsTask
+            && selectedOption?.dataset.role === "auto_worker"
+        ) {
+            const fallbackOption = Array.from(newRuleTarget.options).find(
+                option => option.dataset.role !== "auto_worker"
+            );
+            newRuleTarget.value = fallbackOption?.value || "";
+        }
+    }
 }
 
 if (newRuleActionKey) {

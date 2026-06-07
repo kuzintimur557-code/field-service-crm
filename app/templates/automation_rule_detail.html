@@ -241,6 +241,7 @@
                     <div class="label" data-target-label>Получатель</div>
                     <select name="target_username" data-action-target style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
                         <option value="">Без получателя</option>
+                        <option value="__least_loaded__" data-role="auto_worker">Авто: наименее загруженный</option>
                         {% for user in users %}
                         <option value="{{ user['username'] }}" data-role="{{ user['role'] }}"
                                 {% if user["username"] == username %}selected{% endif %}>
@@ -444,12 +445,17 @@ function syncActionTargetOptions() {
     const createsTask = actionKeySelect.value === "create_task";
 
     actionTargetSelect.querySelectorAll("option[data-role]").forEach(option => {
-        option.hidden = createsTask && option.dataset.role !== "worker";
+        option.hidden = createsTask
+            ? !["worker", "auto_worker"].includes(option.dataset.role)
+            : option.dataset.role === "auto_worker";
     });
 
     const selectedOption = actionTargetSelect.options[actionTargetSelect.selectedIndex];
 
-    if (createsTask && selectedOption?.dataset.role !== "worker") {
+    if (
+        createsTask
+        && !["worker", "auto_worker"].includes(selectedOption?.dataset.role)
+    ) {
         actionTargetSelect.value = "";
     }
 
