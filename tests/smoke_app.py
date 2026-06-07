@@ -1308,6 +1308,26 @@ async def assert_automation_page():
             source_task["id"],
             datetime.now().strftime("%Y-%m-%d %H:%M"),
         )
+        client_created_task_id = crm.execute_automation_create_task_action(
+            c,
+            2,
+            rule,
+            create_task_action,
+            json.loads(create_task_action["payload_json"]),
+            "client",
+            source_task["client_id"],
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        )
+        duplicate_client_task_id = crm.execute_automation_create_task_action(
+            c,
+            2,
+            rule,
+            create_task_action,
+            json.loads(create_task_action["payload_json"]),
+            "client",
+            source_task["client_id"],
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        )
     finally:
         crm.send_message_to_chat = original_send_message_to_chat
 
@@ -1317,6 +1337,12 @@ async def assert_automation_page():
     WHERE id=?
       AND company_id=2
     """, (created_task_id,)).fetchone()
+    client_created_task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+      AND company_id=2
+    """, (client_created_task_id,)).fetchone()
     create_task_run_count = c.execute("""
     SELECT COUNT(*)
     FROM automation_action_runs
@@ -1340,7 +1366,9 @@ async def assert_automation_page():
     """, (f"/task/{created_task_id}",)).fetchall()
 
     assert created_task_id == duplicate_task_id
+    assert client_created_task_id == duplicate_client_task_id
     assert created_task is not None
+    assert client_created_task is not None
     assert created_task["client_id"] == source_task["client_id"]
     assert created_task["phone"] == source_task["phone"]
     assert created_task["address"] == source_task["address"]
@@ -1354,6 +1382,11 @@ async def assert_automation_page():
     assert created_task["deadline_at"] == (
         datetime.now() + timedelta(days=3, hours=24)
     ).strftime("%Y-%m-%dT%H:%M")
+    assert client_created_task["client_id"] == source_task["client_id"]
+    assert client_created_task["client"] == source_task["client"]
+    assert client_created_task["phone"] == source_task["phone"]
+    assert client_created_task["address"] == source_task["address"]
+    assert client_created_task["worker"] == "helper2"
     assert create_task_run_count == 1
     assert len(create_task_activity) == 1
     assert f"Исходная заявка: #{source_task['id']}" in create_task_activity[0]["details"]
@@ -1361,16 +1394,24 @@ async def assert_automation_page():
     assert create_task_notifications[0]["title"] == (
         f"Новая автоматическая заявка #{created_task_id}"
     )
-    assert sent_create_task_telegram == [(
-        "chat-helper2",
-        (
+    expected_telegram_message = (
             f"Вам назначена автоматическая заявка #{created_task_id}\n"
             f"Клиент: {source_task['client']}\n"
             f"Дата: {created_task['task_date']}\n"
             f"SLA: {created_task['deadline_at']}\n"
             "Описание: Автоматическая проверка клиента"
-        ),
-    )]
+    )
+    expected_client_telegram_message = (
+        f"Вам назначена автоматическая заявка #{client_created_task_id}\n"
+        f"Клиент: {source_task['client']}\n"
+        f"Дата: {client_created_task['task_date']}\n"
+        f"SLA: {client_created_task['deadline_at']}\n"
+        "Описание: Автоматическая проверка клиента"
+    )
+    assert sent_create_task_telegram == [
+        ("chat-helper2", expected_telegram_message),
+        ("chat-helper2", expected_client_telegram_message),
+    ]
 
     conn.commit()
 
@@ -1390,12 +1431,15 @@ async def assert_automation_page():
     c.execute("""
     DELETE FROM notifications
     WHERE company_id=2
-      AND link=?
-    """, (f"/task/{created_task_id}",))
+      AND link IN (?, ?)
+    """, (
+        f"/task/{created_task_id}",
+        f"/task/{client_created_task_id}",
+    ))
     c.execute("""
     DELETE FROM task_activity
-    WHERE task_id=?
-    """, (created_task_id,))
+    WHERE task_id IN (?, ?)
+    """, (created_task_id, client_created_task_id))
     c.execute("""
     DELETE FROM automation_action_runs
     WHERE company_id=2
@@ -1404,8 +1448,8 @@ async def assert_automation_page():
     c.execute("""
     DELETE FROM tasks
     WHERE company_id=2
-      AND id=?
-    """, (created_task_id,))
+      AND id IN (?, ?)
+    """, (created_task_id, client_created_task_id))
     c.execute("""
     DELETE FROM automation_actions
     WHERE company_id=2
@@ -1544,7 +1588,7 @@ async def assert_automation_page():
     assert f"/automation/rules/{rule['id']}/actions/create" in rule_detail_html
     assert "Исполнитель новой задачи" in rule_detail_html
     assert 'data-role="worker"' in rule_detail_html
-    assert "Данные клиента берутся из исходной заявки" in rule_detail_html
+    assert "Данные берутся из исходной заявки или нового клиента" in rule_detail_html
     assert "Дата выполнения" in rule_detail_html
     assert "Через 7 дней" in rule_detail_html
     assert "Приоритет" in rule_detail_html
@@ -5319,7 +5363,21 @@ async def assert_client_custom_fields():
     assert 'name="client_filter" value="active"' in filtered_html
 
     original_send_message = crm.send_message
+    original_run_automation_event = crm.run_automation_event
+    new_client_events = []
     crm.send_message = lambda text: True
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        new_client_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
 
     try:
         response = await crm.create_client(make_form_request(
@@ -5336,9 +5394,17 @@ async def assert_client_custom_fields():
         ))
     finally:
         crm.send_message = original_send_message
+        crm.run_automation_event = original_run_automation_event
 
     assert response.status_code == 302
     assert response.headers["location"] == "/clients?created=1"
+    assert len(new_client_events) == 1
+    assert new_client_events[0]["company_id"] == 2
+    assert new_client_events[0]["trigger_key"] == "new_client"
+    assert new_client_events[0]["entity_type"] == "client"
+    assert new_client_events[0]["message"] == (
+        "Создан новый клиент: Custom Field Client Company"
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -5355,6 +5421,8 @@ async def assert_client_custom_fields():
     conn.close()
 
     assert value is not None
+    assert new_client_events[0]["entity_id"] == value["client_id"]
+    assert new_client_events[0]["link"] == f"/clients/{value['client_id']}"
 
     detail_response = await crm.client_detail(
         make_asgi_request("owner2", f"/clients/{value['client_id']}"),

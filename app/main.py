@@ -1662,7 +1662,7 @@ def execute_automation_create_task_action(
     entity_id,
     now,
 ):
-    if entity_type != "task" or not entity_id:
+    if entity_type not in ("task", "client") or not entity_id:
         return None
 
     previous_run = c.execute("""
@@ -1682,17 +1682,33 @@ def execute_automation_create_task_action(
     if previous_run:
         return previous_run["created_entity_id"]
 
-    source_task = c.execute("""
-    SELECT
-        client_id, client, phone, address,
-        worker, workers, priority
-    FROM tasks
-    WHERE company_id=?
-      AND id=?
-      AND archived=0
-    """, (company_id, entity_id)).fetchone()
+    if entity_type == "task":
+        source_row = c.execute("""
+        SELECT
+            client_id,
+            client,
+            phone,
+            address
+        FROM tasks
+        WHERE company_id=?
+          AND id=?
+          AND archived=0
+        """, (company_id, entity_id)).fetchone()
+        source_label = f"Исходная заявка: #{entity_id}"
+    else:
+        source_row = c.execute("""
+        SELECT
+            id AS client_id,
+            name AS client,
+            phone,
+            address
+        FROM clients
+        WHERE company_id=?
+          AND id=?
+        """, (company_id, entity_id)).fetchone()
+        source_label = f"Исходный клиент: #{entity_id}"
 
-    if not source_task:
+    if not source_row:
         return None
 
     target_username = str(payload.get("target_username") or "").strip()
@@ -1738,10 +1754,10 @@ def execute_automation_create_task_action(
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
-        source_task["client_id"],
-        source_task["client"],
-        source_task["phone"],
-        source_task["address"],
+        source_row["client_id"],
+        source_row["client"],
+        source_row["phone"],
+        source_row["address"],
         description,
         task_date,
         target_worker,
@@ -1767,7 +1783,7 @@ def execute_automation_create_task_action(
         rule["created_by"] or "automation",
         (
             f"Правило: {rule['name']}. "
-            f"Исходная заявка: #{entity_id}. "
+            f"{source_label}. "
             f"Исполнитель: {target_worker or 'не назначен'}. "
             f"Дата: {task_date}. Приоритет: {task_priority}. "
             f"SLA: {deadline_at or 'не задан'}"
@@ -1812,7 +1828,7 @@ def execute_automation_create_task_action(
                 target_chat_id,
                 (
                     f"Вам назначена автоматическая заявка #{created_task_id}\n"
-                    f"Клиент: {source_task['client'] or 'Без клиента'}\n"
+                    f"Клиент: {source_row['client'] or 'Без клиента'}\n"
                     f"Дата: {task_date}\n"
                     f"SLA: {deadline_at or 'не задан'}\n"
                     f"Описание: {description}"
@@ -13048,6 +13064,15 @@ async def create_client(request: Request):
         )
     except Exception:
         pass
+
+    run_automation_event(
+        company_id,
+        "new_client",
+        "client",
+        client_id,
+        f"Создан новый клиент: {name}",
+        f"/clients/{client_id}",
+    )
 
     return RedirectResponse("/clients?created=1", status_code=302)
 
