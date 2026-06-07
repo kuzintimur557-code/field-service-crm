@@ -1511,6 +1511,95 @@ async def assert_automation_page():
     ) is None
 
     conn.commit()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, '{}', 1, ?, ?, ?)
+    """, (
+        2,
+        "Capacity alert smoke",
+        "capacity_alert_smoke",
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    capacity_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, 'create_task', ?, 1, 1, ?)
+    """, (
+        2,
+        capacity_rule_id,
+        json.dumps({
+            "target_username": "__least_loaded__",
+            "message": "Заявка при полной загрузке",
+            "task_delay_days": 3,
+            "task_max_daily_load": 1,
+        }, ensure_ascii=False),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+    conn.close()
+
+    assert crm.run_automation_event(
+        2,
+        "capacity_alert_smoke",
+        "task",
+        source_task["id"],
+        "Проверка полной загрузки",
+        f"/task/{source_task['id']}",
+    ) == 1
+    assert crm.run_automation_event(
+        2,
+        "capacity_alert_smoke",
+        "task",
+        source_task["id"],
+        "Повтор проверки полной загрузки",
+        f"/task/{source_task['id']}",
+    ) == 1
+
+    conn = connect()
+    c = conn.cursor()
+    capacity_events = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id
+    """, (capacity_rule_id,)).fetchall()
+    capacity_alerts = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='A3: требуется распределение — Capacity alert smoke'
+      AND is_read=0
+    """).fetchall()
+
+    assert len(capacity_events) == 2
+    assert all(event["status"] == "skipped" for event in capacity_events)
+    assert "Нет исполнителя с доступной загрузкой" in capacity_events[0]["message"]
+    assert "Лимит на исполнителя: 1 в день" in capacity_events[0]["message"]
+    assert len(capacity_alerts) == 1
+    assert "Нет исполнителя с доступной загрузкой" in capacity_alerts[0]["message"]
+
+    capacity_event_response = await crm.automation_event_detail(
+        make_asgi_request(
+            "owner2",
+            f"/automation/events/{capacity_events[0]['id']}",
+        ),
+        capacity_events[0]["id"],
+    )
+    assert capacity_event_response.status_code == 200
+    capacity_event_html = capacity_event_response.body.decode("utf-8")
+    assert "Нет исполнителя с доступной загрузкой" in capacity_event_html
+    assert "Лимит на исполнителя: 1 в день" in capacity_event_html
+    assert "Повторить" in capacity_event_html
 
     action_history_response = await crm.automation_rule_detail(
         make_asgi_request(
@@ -1567,6 +1656,26 @@ async def assert_automation_page():
     WHERE company_id=2
       AND id=?
     """, (auto_worker_action["id"],))
+    c.execute("""
+    DELETE FROM notifications
+    WHERE company_id=2
+      AND title='A3: требуется распределение — Capacity alert smoke'
+    """)
+    c.execute("""
+    DELETE FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    """, (capacity_rule_id,))
+    c.execute("""
+    DELETE FROM automation_actions
+    WHERE company_id=2
+      AND rule_id=?
+    """, (capacity_rule_id,))
+    c.execute("""
+    DELETE FROM automation_rules
+    WHERE company_id=2
+      AND id=?
+    """, (capacity_rule_id,))
     conn.commit()
     conn.close()
 

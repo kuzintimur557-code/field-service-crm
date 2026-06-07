@@ -1761,6 +1761,7 @@ def execute_automation_create_task_action(
     entity_type,
     entity_id,
     now,
+    failure_details=None,
 ):
     if entity_type not in ("task", "client") or not entity_id:
         return None
@@ -1843,6 +1844,14 @@ def execute_automation_create_task_action(
                 selected_worker["telegram_chat_id"] or ""
             ).strip()
         else:
+            if failure_details is not None:
+                failure_details.append(
+                    (
+                        "Нет исполнителя с доступной загрузкой "
+                        f"на {task_date}. "
+                        f"Лимит на исполнителя: {task_max_daily_load} в день."
+                    )
+                )
             return None
     elif target_username:
         worker_row = c.execute("""
@@ -2367,6 +2376,7 @@ def run_automation_event(
 
         event_id = c.lastrowid
         handled_actions = 0
+        action_failures = []
 
         actions = c.execute("""
         SELECT *
@@ -2473,20 +2483,65 @@ def run_automation_event(
                     entity_type,
                     entity_id,
                     now,
+                    action_failures,
                 )
 
                 if created_task_id:
                     handled_actions += 1
 
         status = "done" if handled_actions else "skipped"
+        event_message = message
+
+        if action_failures:
+            failure_message = " ".join(dict.fromkeys(action_failures))
+            event_message = (
+                f"{message}. Причина: {failure_message}"
+                if message
+                else failure_message
+            )
+            alert_username = str(rule["created_by"] or "").strip()
+            alert_title = f"A3: требуется распределение — {rule['name']}"
+            alert_link = f"/automation/events/{event_id}"
+
+            if alert_username:
+                existing_alert = c.execute("""
+                SELECT id
+                FROM notifications
+                WHERE company_id=?
+                  AND username=?
+                  AND title=?
+                  AND is_read=0
+                LIMIT 1
+                """, (
+                    company_id,
+                    alert_username,
+                    alert_title,
+                )).fetchone()
+
+                if not existing_alert:
+                    c.execute("""
+                    INSERT INTO notifications (
+                        company_id, username, title, message,
+                        link, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        company_id,
+                        alert_username,
+                        alert_title,
+                        failure_message,
+                        alert_link,
+                        now,
+                    ))
 
         c.execute("""
         UPDATE automation_events
-        SET status=?, processed_at=?
+        SET status=?, message=?, processed_at=?
         WHERE id=?
           AND company_id=?
         """, (
             status,
+            event_message,
             now,
             event_id,
             company_id
