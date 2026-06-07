@@ -1539,6 +1539,7 @@ async def assert_automation_page():
     FROM automation_actions
     WHERE id=?
     """, (c.lastrowid,)).fetchone()
+    fallback_success_details = []
     fallback_task_id = crm.execute_automation_create_task_action(
         c,
         2,
@@ -1548,6 +1549,7 @@ async def assert_automation_page():
         "task",
         source_task["id"],
         datetime.now().strftime("%Y-%m-%d %H:%M"),
+        success_details=fallback_success_details,
     )
     fallback_task = c.execute("""
     SELECT *
@@ -1565,8 +1567,107 @@ async def assert_automation_page():
     assert fallback_task["deadline_at"] == (
         expected_fallback_at + timedelta(hours=8)
     ).strftime("%Y-%m-%dT%H:%M")
+    fallback_activity = c.execute("""
+    SELECT *
+    FROM task_activity
+    WHERE task_id=?
+      AND action='Создана автоматизацией'
+    """, (fallback_task_id,)).fetchone()
+    fallback_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title=?
+    """, (f"A3 перенёс заявку #{fallback_task_id}",)).fetchone()
+
+    assert len(fallback_success_details) == 1
+    assert f"с {auto_worker_task['task_date']}" in fallback_success_details[0]
+    assert f"на {fallback_task['task_date']}" in fallback_success_details[0]
+    assert fallback_activity is not None
+    assert "Автоперенос:" in fallback_activity["details"]
+    assert fallback_notification is not None
+    assert fallback_notification["link"] == f"/task/{fallback_task_id}"
 
     conn.commit()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, '{}', 1, ?, ?, ?)
+    """, (
+        2,
+        "Fallback event smoke",
+        "fallback_event_smoke",
+        "owner2",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    fallback_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, 'create_task', ?, 1, 1, ?)
+    """, (
+        2,
+        fallback_rule_id,
+        json.dumps({
+            "target_username": "__least_loaded__",
+            "message": "Runtime поиск окна",
+            "task_delay_days": 3,
+            "task_max_daily_load": 1,
+            "task_capacity_fallback_days": 3,
+        }, ensure_ascii=False),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    fallback_runtime_action_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    assert crm.run_automation_event(
+        2,
+        "fallback_event_smoke",
+        "task",
+        source_task["id"],
+        "Проверка автоматического переноса",
+        f"/task/{source_task['id']}",
+    ) == 1
+
+    conn = connect()
+    c = conn.cursor()
+    fallback_runtime_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    ORDER BY id DESC
+    LIMIT 1
+    """, (fallback_rule_id,)).fetchone()
+    fallback_runtime_run = c.execute("""
+    SELECT *
+    FROM automation_action_runs
+    WHERE company_id=2
+      AND action_id=?
+    """, (fallback_runtime_action_id,)).fetchone()
+    fallback_runtime_task_id = fallback_runtime_run["created_entity_id"]
+    fallback_runtime_alert = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title=?
+    """, (
+        f"A3 перенёс заявку #{fallback_runtime_task_id}",
+    )).fetchone()
+
+    assert fallback_runtime_event["status"] == "done"
+    assert "Результат: Заявка #" in fallback_runtime_event["message"]
+    assert "перенесена" in fallback_runtime_event["message"]
+    assert fallback_runtime_alert is not None
+
     c.execute("""
     INSERT INTO automation_rules (
         company_id, name, trigger_key, conditions_json,
@@ -1673,41 +1774,45 @@ async def assert_automation_page():
     c.execute("""
     DELETE FROM notifications
     WHERE company_id=2
-      AND link IN (?, ?, ?, ?)
+      AND link IN (?, ?, ?, ?, ?)
     """, (
         f"/task/{created_task_id}",
         f"/task/{client_created_task_id}",
         f"/task/{auto_worker_task_id}",
         f"/task/{fallback_task_id}",
+        f"/task/{fallback_runtime_task_id}",
     ))
     c.execute("""
     DELETE FROM task_activity
-    WHERE task_id IN (?, ?, ?, ?)
+    WHERE task_id IN (?, ?, ?, ?, ?)
     """, (
         created_task_id,
         client_created_task_id,
         auto_worker_task_id,
         fallback_task_id,
+        fallback_runtime_task_id,
     ))
     c.execute("""
     DELETE FROM automation_action_runs
     WHERE company_id=2
-      AND action_id IN (?, ?, ?)
+      AND action_id IN (?, ?, ?, ?)
     """, (
         create_task_action["id"],
         auto_worker_action["id"],
         fallback_action["id"],
+        fallback_runtime_action_id,
     ))
     c.execute("""
     DELETE FROM tasks
     WHERE company_id=2
-      AND id IN (?, ?, ?, ?, ?)
+      AND id IN (?, ?, ?, ?, ?, ?)
     """, (
         created_task_id,
         client_created_task_id,
         auto_worker_task_id,
         max_load_task_id,
         fallback_task_id,
+        fallback_runtime_task_id,
     ))
     c.execute("""
     DELETE FROM automation_actions
@@ -1724,6 +1829,21 @@ async def assert_automation_page():
     WHERE company_id=2
       AND id=?
     """, (fallback_action["id"],))
+    c.execute("""
+    DELETE FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+    """, (fallback_rule_id,))
+    c.execute("""
+    DELETE FROM automation_actions
+    WHERE company_id=2
+      AND rule_id=?
+    """, (fallback_rule_id,))
+    c.execute("""
+    DELETE FROM automation_rules
+    WHERE company_id=2
+      AND id=?
+    """, (fallback_rule_id,))
     c.execute("""
     DELETE FROM notifications
     WHERE company_id=2

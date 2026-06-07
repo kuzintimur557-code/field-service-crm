@@ -1784,6 +1784,7 @@ def execute_automation_create_task_action(
     entity_id,
     now,
     failure_details=None,
+    success_details=None,
 ):
     if entity_type not in ("task", "client") or not entity_id:
         return None
@@ -1844,6 +1845,7 @@ def execute_automation_create_task_action(
     )
     scheduled_at = datetime.now() + timedelta(days=task_delay_days)
     task_date = scheduled_at.strftime("%Y-%m-%d")
+    requested_task_date = task_date
     deadline_at = ""
 
     if task_deadline_hours:
@@ -1925,6 +1927,14 @@ def execute_automation_create_task_action(
     if not description:
         description = f"Автоматическая задача: {rule['name']}"
 
+    was_rescheduled = task_date != requested_task_date
+    schedule_activity = ""
+
+    if was_rescheduled:
+        schedule_activity = (
+            f". Автоперенос: {requested_task_date} → {task_date}"
+        )
+
     c.execute("""
     INSERT INTO tasks (
         company_id, client_id, client, phone, address,
@@ -1968,6 +1978,7 @@ def execute_automation_create_task_action(
             f"Исполнитель: {target_worker or 'не назначен'}. "
             f"Дата: {task_date}. Приоритет: {task_priority}. "
             f"SLA: {deadline_at or 'не задан'}"
+            f"{schedule_activity}"
         ),
         now,
     ))
@@ -1987,6 +1998,34 @@ def execute_automation_create_task_action(
             f"/task/{created_task_id}",
             now,
         ))
+
+    if was_rescheduled:
+        reschedule_message = (
+            f"Заявка #{created_task_id} перенесена "
+            f"с {requested_task_date} на {task_date}. "
+            f"Исполнитель: {target_worker or 'не назначен'}."
+        )
+
+        if success_details is not None:
+            success_details.append(reschedule_message)
+
+        owner_username = str(rule["created_by"] or "").strip()
+
+        if owner_username:
+            c.execute("""
+            INSERT INTO notifications (
+                company_id, username, title, message,
+                link, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                owner_username,
+                f"A3 перенёс заявку #{created_task_id}",
+                reschedule_message,
+                f"/task/{created_task_id}",
+                now,
+            ))
 
     c.execute("""
     INSERT INTO automation_action_runs (
@@ -2433,6 +2472,7 @@ def run_automation_event(
         event_id = c.lastrowid
         handled_actions = 0
         action_failures = []
+        action_successes = []
 
         actions = c.execute("""
         SELECT *
@@ -2540,6 +2580,7 @@ def run_automation_event(
                     entity_id,
                     now,
                     action_failures,
+                    action_successes,
                 )
 
                 if created_task_id:
@@ -2547,6 +2588,14 @@ def run_automation_event(
 
         status = "done" if handled_actions else "skipped"
         event_message = message
+
+        if action_successes:
+            success_message = " ".join(dict.fromkeys(action_successes))
+            event_message = (
+                f"{message}. Результат: {success_message}"
+                if message
+                else success_message
+            )
 
         if action_failures:
             failure_message = " ".join(dict.fromkeys(action_failures))
