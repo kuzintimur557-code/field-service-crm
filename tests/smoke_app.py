@@ -1316,6 +1316,21 @@ async def assert_automation_page():
     assert created_task["description"] == "Автоматическая проверка клиента"
     assert create_task_run_count == 1
 
+    conn.commit()
+
+    action_history_response = await crm.automation_rule_detail(
+        make_asgi_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}",
+        ),
+        rule["id"],
+    )
+    action_history_html = action_history_response.body.decode("utf-8")
+    assert "История выполненных действий" in action_history_html
+    assert f'href="/task/{source_task["id"]}"' in action_history_html
+    assert f'href="/task/{created_task_id}"' in action_history_html
+    assert f"Создана заявка #{created_task_id}" in action_history_html
+
     c.execute("""
     DELETE FROM automation_action_runs
     WHERE company_id=2

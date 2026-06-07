@@ -4954,6 +4954,32 @@ async def automation_rule_detail(request: Request, rule_id: int):
     ORDER BY sort_order, id
     """, (company_id, rule_id)).fetchall()
 
+    action_runs = c.execute("""
+    SELECT
+        automation_action_runs.*,
+        automation_actions.action_key,
+        source_task.client AS source_client,
+        source_task.status AS source_status,
+        created_task.client AS created_client,
+        created_task.status AS created_status
+    FROM automation_action_runs
+    JOIN automation_actions
+      ON automation_actions.id=automation_action_runs.action_id
+      AND automation_actions.company_id=automation_action_runs.company_id
+    LEFT JOIN tasks source_task
+      ON source_task.id=automation_action_runs.entity_id
+      AND source_task.company_id=automation_action_runs.company_id
+      AND automation_action_runs.entity_type='task'
+    LEFT JOIN tasks created_task
+      ON created_task.id=automation_action_runs.created_entity_id
+      AND created_task.company_id=automation_action_runs.company_id
+      AND automation_action_runs.created_entity_type='task'
+    WHERE automation_action_runs.company_id=?
+      AND automation_actions.rule_id=?
+    ORDER BY automation_action_runs.id DESC
+    LIMIT 30
+    """, (company_id, rule_id)).fetchall()
+
     events = c.execute("""
     SELECT *
     FROM automation_events
@@ -5048,6 +5074,7 @@ async def automation_rule_detail(request: Request, rule_id: int):
             "role": role,
             "rule": rule,
             "actions": actions,
+            "action_runs": action_runs,
             "users": users,
             "events": events,
             "trigger_labels": dict(AUTOMATION_TRIGGERS),

@@ -322,6 +322,53 @@
     </div>
 
     <div class="card">
+        <h2>История выполненных действий</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Действие</th>
+                    <th>Источник</th>
+                    <th>Результат</th>
+                    <th>Выполнено</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in action_runs %}
+                <tr>
+                    <td>{{ action_labels.get(run["action_key"], run["action_key"]) }}</td>
+                    <td>
+                        {% if run["entity_type"] == "task" %}
+                        <a href="/task/{{ run['entity_id'] }}">
+                            #{{ run["entity_id"] }} · {{ run["source_client"] or "Без клиента" }}
+                        </a>
+                        {% else %}
+                        {{ run["entity_type"] }} #{{ run["entity_id"] }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if run["created_entity_type"] == "task" and run["created_entity_id"] %}
+                        <a href="/task/{{ run['created_entity_id'] }}">
+                            Создана заявка #{{ run["created_entity_id"] }}
+                            · {{ run["created_client"] or "Без клиента" }}
+                            · {{ run["created_status"] or "" }}
+                        </a>
+                        {% else %}
+                        Выполнено
+                        {% endif %}
+                    </td>
+                    <td>{{ run["created_at"] }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="label">Выполненных действий пока нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
         <h2>Последние события правила</h2>
 
         <table>
