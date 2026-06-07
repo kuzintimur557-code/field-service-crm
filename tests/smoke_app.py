@@ -1257,6 +1257,7 @@ async def assert_automation_page():
                 "target_username": "__least_loaded__",
                 "task_max_daily_load": 3,
                 "task_capacity_fallback_days": 7,
+                "task_business_days_only": True,
             }),
         }],
     )
@@ -1269,9 +1270,41 @@ async def assert_automation_page():
     assert "поиск окна: 7 дн." in (
         auto_worker_preview["executable_actions"][0]["dry_run_detail"]
     )
+    assert "только рабочие дни" in (
+        auto_worker_preview["executable_actions"][0]["dry_run_detail"]
+    )
 
     conn = connect()
     c = conn.cursor()
+    weekend_at = datetime(2026, 6, 13, 9, 0)
+    any_day_worker, any_day_at = crm.automation_find_available_worker_slot(
+        c,
+        2,
+        weekend_at,
+        fallback_days=2,
+        business_days_only=False,
+    )
+    workday_worker, workday_at = crm.automation_find_available_worker_slot(
+        c,
+        2,
+        weekend_at,
+        fallback_days=2,
+        business_days_only=True,
+    )
+    no_workday_worker, _ = crm.automation_find_available_worker_slot(
+        c,
+        2,
+        weekend_at,
+        fallback_days=1,
+        business_days_only=True,
+    )
+
+    assert any_day_worker is not None
+    assert any_day_at.strftime("%Y-%m-%d") == "2026-06-13"
+    assert workday_worker is not None
+    assert workday_at.strftime("%Y-%m-%d") == "2026-06-15"
+    assert no_workday_worker is None
+
     c.execute("""
     INSERT INTO automation_actions (
         company_id, rule_id, action_key, payload_json,
@@ -2005,6 +2038,8 @@ async def assert_automation_page():
     assert "Срок SLA" in rule_detail_html
     assert "Лимит автоназначения" in rule_detail_html
     assert "Поиск свободного дня" in rule_detail_html
+    assert "Календарь поиска" in rule_detail_html
+    assert "Только рабочие дни" in rule_detail_html
 
     builder_response = await crm.create_rule_action(
         make_form_request(
@@ -2100,6 +2135,7 @@ async def assert_automation_page():
                 "task_deadline_hours": "8",
                 "task_max_daily_load": "3",
                 "task_capacity_fallback_days": "7",
+                "task_business_days_only": "1",
             },
         ),
         rule["id"],
@@ -2129,6 +2165,9 @@ async def assert_automation_page():
     assert '"task_deadline_hours": 8' in valid_create_task_action["payload_json"]
     assert '"task_max_daily_load": 3' in valid_create_task_action["payload_json"]
     assert '"task_capacity_fallback_days": 7' in (
+        valid_create_task_action["payload_json"]
+    )
+    assert '"task_business_days_only": true' in (
         valid_create_task_action["payload_json"]
     )
 

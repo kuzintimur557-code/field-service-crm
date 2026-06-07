@@ -1558,6 +1558,7 @@ def automation_action_dry_run_preview(action):
     task_capacity_fallback_days = (
         automation_task_capacity_fallback_days(payload)
     )
+    task_business_days_only = automation_task_business_days_only(payload)
     supported = action_key in {
         "notification",
         "telegram_alert",
@@ -1603,6 +1604,9 @@ def automation_action_dry_run_preview(action):
                 load_limit_detail += (
                     f" · поиск окна: {task_capacity_fallback_days} дн."
                 )
+
+            if task_business_days_only:
+                load_limit_detail += " · только рабочие дни"
 
         detail = (
             f"Новая задача для: {target_label}"
@@ -1677,6 +1681,12 @@ def automation_task_capacity_fallback_days(payload):
     return fallback_days
 
 
+def automation_task_business_days_only(payload):
+    return str(
+        payload.get("task_business_days_only") or ""
+    ).strip().lower() in ("1", "true", "yes", "on")
+
+
 def automation_least_loaded_worker(
     c,
     company_id,
@@ -1737,6 +1747,33 @@ def automation_least_loaded_worker(
         "telegram_chat_id": selected_worker["telegram_chat_id"],
         "active_count": worker_load[selected_worker["username"]],
     }
+
+
+def automation_find_available_worker_slot(
+    c,
+    company_id,
+    scheduled_at,
+    max_daily_load=0,
+    fallback_days=0,
+    business_days_only=False,
+):
+    for offset_days in range(0, fallback_days + 1):
+        candidate_at = scheduled_at + timedelta(days=offset_days)
+
+        if business_days_only and candidate_at.weekday() >= 5:
+            continue
+
+        selected_worker = automation_least_loaded_worker(
+            c,
+            company_id,
+            candidate_at.strftime("%Y-%m-%d"),
+            max_daily_load,
+        )
+
+        if selected_worker:
+            return selected_worker, candidate_at
+
+    return None, scheduled_at
 
 
 def automation_action_target_is_valid(c, company_id, action_key, target_username):
@@ -1843,6 +1880,7 @@ def execute_automation_create_task_action(
     task_capacity_fallback_days = (
         automation_task_capacity_fallback_days(payload)
     )
+    task_business_days_only = automation_task_business_days_only(payload)
     scheduled_at = datetime.now() + timedelta(days=task_delay_days)
     task_date = scheduled_at.strftime("%Y-%m-%d")
     requested_task_date = task_date
@@ -1858,36 +1896,25 @@ def execute_automation_create_task_action(
     target_chat_id = ""
 
     if target_username == "__least_loaded__":
-        selected_worker = automation_least_loaded_worker(
+        selected_worker, selected_at = automation_find_available_worker_slot(
             c,
             company_id,
-            task_date,
+            scheduled_at,
             task_max_daily_load,
+            task_capacity_fallback_days,
+            task_business_days_only,
         )
 
-        if not selected_worker and task_capacity_fallback_days:
-            for offset_days in range(1, task_capacity_fallback_days + 1):
-                fallback_at = scheduled_at + timedelta(days=offset_days)
-                fallback_date = fallback_at.strftime("%Y-%m-%d")
-                selected_worker = automation_least_loaded_worker(
-                    c,
-                    company_id,
-                    fallback_date,
-                    task_max_daily_load,
-                )
-
-                if selected_worker:
-                    scheduled_at = fallback_at
-                    task_date = fallback_date
-
-                    if task_deadline_hours:
-                        deadline_at = (
-                            scheduled_at
-                            + timedelta(hours=task_deadline_hours)
-                        ).strftime("%Y-%m-%dT%H:%M")
-                    break
-
         if selected_worker:
+            scheduled_at = selected_at
+            task_date = scheduled_at.strftime("%Y-%m-%d")
+
+            if task_deadline_hours:
+                deadline_at = (
+                    scheduled_at
+                    + timedelta(hours=task_deadline_hours)
+                ).strftime("%Y-%m-%dT%H:%M")
+
             target_worker = selected_worker["username"]
             target_chat_id = str(
                 selected_worker["telegram_chat_id"] or ""
@@ -1908,6 +1935,11 @@ def execute_automation_create_task_action(
                         )
                         + ". "
                         f"Лимит на исполнителя: {task_max_daily_load} в день."
+                        + (
+                            " Учитываются только рабочие дни."
+                            if task_business_days_only
+                            else ""
+                        )
                     )
                 )
             return None
@@ -5164,6 +5196,9 @@ async def create_automation_rule(request: Request):
             "task_capacity_fallback_days"
         ),
     })
+    task_business_days_only = automation_task_business_days_only({
+        "task_business_days_only": form.get("task_business_days_only"),
+    })
 
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
@@ -5199,6 +5234,7 @@ async def create_automation_rule(request: Request):
         payload["task_capacity_fallback_days"] = (
             task_capacity_fallback_days
         )
+        payload["task_business_days_only"] = task_business_days_only
 
     conn = connect()
     c = conn.cursor()
@@ -6738,6 +6774,9 @@ async def create_rule_action(request: Request, rule_id: int):
             "task_capacity_fallback_days"
         ),
     })
+    task_business_days_only = automation_task_business_days_only({
+        "task_business_days_only": form.get("task_business_days_only"),
+    })
 
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
 
@@ -6800,6 +6839,7 @@ async def create_rule_action(request: Request, rule_id: int):
         payload["task_capacity_fallback_days"] = (
             task_capacity_fallback_days
         )
+        payload["task_business_days_only"] = task_business_days_only
 
     c.execute("""
     INSERT INTO automation_actions (
