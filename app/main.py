@@ -1551,6 +1551,7 @@ def automation_action_dry_run_preview(action):
     target = str(payload.get("target_username") or "").strip()
     message = str(payload.get("message") or "").strip()
     subject = str(payload.get("subject") or "").strip()
+    task_delay_days, task_priority = automation_create_task_settings(payload)
     supported = action_key in {
         "notification",
         "telegram_alert",
@@ -1567,8 +1568,15 @@ def automation_action_dry_run_preview(action):
     elif action_key == "email":
         detail = f"Почта: {target or 'получатель не указан'}"
     elif action_key == "create_task":
+        schedule_label = (
+            "сегодня"
+            if task_delay_days == 0
+            else f"через {task_delay_days} дн."
+        )
         detail = (
             f"Новая задача для: {target or 'без исполнителя'}"
+            f" · {schedule_label}"
+            f" · приоритет: {task_priority}"
             " · данные клиента из исходной заявки"
         )
     else:
@@ -1583,6 +1591,23 @@ def automation_action_dry_run_preview(action):
     action_data["dry_run_supported"] = supported
     action_data["dry_run_detail"] = detail
     return action_data
+
+
+def automation_create_task_settings(payload):
+    try:
+        task_delay_days = int(payload.get("task_delay_days") or 0)
+    except (TypeError, ValueError):
+        task_delay_days = 0
+
+    if task_delay_days not in (0, 1, 3, 7):
+        task_delay_days = 0
+
+    task_priority = str(payload.get("task_priority") or "Обычный").strip()
+
+    if task_priority not in ("Обычный", "Срочно"):
+        task_priority = "Обычный"
+
+    return task_delay_days, task_priority
 
 
 def automation_action_target_is_valid(c, company_id, action_key, target_username):
@@ -1672,6 +1697,10 @@ def execute_automation_create_task_action(
             target_chat_id = str(worker_row["telegram_chat_id"] or "").strip()
 
     description = str(payload.get("message") or "").strip()
+    task_delay_days, task_priority = automation_create_task_settings(payload)
+    task_date = (
+        datetime.now() + timedelta(days=task_delay_days)
+    ).strftime("%Y-%m-%d")
 
     if not description:
         description = f"Автоматическая задача: {rule['name']}"
@@ -1691,10 +1720,10 @@ def execute_automation_create_task_action(
         source_task["phone"],
         source_task["address"],
         description,
-        datetime.now().strftime("%Y-%m-%d"),
+        task_date,
         target_worker,
         target_worker,
-        source_task["priority"] or "Обычный",
+        task_priority,
         "0",
         "",
         "Новая",
@@ -1716,7 +1745,8 @@ def execute_automation_create_task_action(
         (
             f"Правило: {rule['name']}. "
             f"Исходная заявка: #{entity_id}. "
-            f"Исполнитель: {target_worker or 'не назначен'}"
+            f"Исполнитель: {target_worker or 'не назначен'}. "
+            f"Дата: {task_date}. Приоритет: {task_priority}"
         ),
         now,
     ))
@@ -4801,6 +4831,10 @@ async def create_automation_rule(request: Request):
     action_key = str(form.get("action_key") or "").strip()
     target_username = str(form.get("target_username") or username).strip()
     message = str(form.get("message") or "").strip()
+    task_delay_days, task_priority = automation_create_task_settings({
+        "task_delay_days": form.get("task_delay_days"),
+        "task_priority": form.get("task_priority"),
+    })
 
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
@@ -4828,6 +4862,9 @@ async def create_automation_rule(request: Request):
 
     if action_key == "email":
         payload["subject"] = f"Автоматизация: {name}"
+    elif action_key == "create_task":
+        payload["task_delay_days"] = task_delay_days
+        payload["task_priority"] = task_priority
 
     conn = connect()
     c = conn.cursor()
@@ -6352,6 +6389,10 @@ async def create_rule_action(request: Request, rule_id: int):
     action_key = str(form.get("action_key") or "").strip()
     target_username = str(form.get("target_username") or "").strip()
     message = str(form.get("message") or "").strip()
+    task_delay_days, task_priority = automation_create_task_settings({
+        "task_delay_days": form.get("task_delay_days"),
+        "task_priority": form.get("task_priority"),
+    })
 
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
 
@@ -6406,6 +6447,9 @@ async def create_rule_action(request: Request, rule_id: int):
 
     if action_key == "email":
         payload["subject"] = f"Автоматизация: {rule['name']}"
+    elif action_key == "create_task":
+        payload["task_delay_days"] = task_delay_days
+        payload["task_priority"] = task_priority
 
     c.execute("""
     INSERT INTO automation_actions (

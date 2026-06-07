@@ -256,6 +256,25 @@
                 <textarea name="message" style="width:100%;min-height:90px;padding:12px;border:1px solid #d1d5db;border-radius:12px;">Автоматизация: {{ rule["name"] }}</textarea>
             </div>
 
+            <div class="grid" data-create-task-settings style="margin-top:12px;display:none;">
+                <div>
+                    <div class="label">Дата выполнения</div>
+                    <select name="task_delay_days" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
+                        <option value="0">Сегодня</option>
+                        <option value="1">Завтра</option>
+                        <option value="3">Через 3 дня</option>
+                        <option value="7">Через 7 дней</option>
+                    </select>
+                </div>
+                <div>
+                    <div class="label">Приоритет</div>
+                    <select name="task_priority" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
+                        <option value="Обычный">Обычный</option>
+                        <option value="Срочно">Срочно</option>
+                    </select>
+                </div>
+            </div>
+
             <button type="submit" class="btn" style="margin-top:12px;background:#2563eb;">
                 Добавить действие
             </button>
@@ -405,6 +424,7 @@ const actionKeySelect = document.querySelector("[data-action-key]");
 const actionTargetSelect = document.querySelector("[data-action-target]");
 const actionTargetLabel = document.querySelector("[data-target-label]");
 const actionMessageLabel = document.querySelector("[data-message-label]");
+const createTaskSettings = document.querySelector("[data-create-task-settings]");
 
 function syncActionTargetOptions() {
     if (!actionKeySelect || !actionTargetSelect) {
@@ -429,6 +449,10 @@ function syncActionTargetOptions() {
 
     if (actionMessageLabel) {
         actionMessageLabel.textContent = createsTask ? "Описание новой задачи" : "Сообщение";
+    }
+
+    if (createTaskSettings) {
+        createTaskSettings.style.display = createsTask ? "" : "none";
     }
 }
 
