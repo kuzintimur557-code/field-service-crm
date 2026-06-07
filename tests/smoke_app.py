@@ -1256,6 +1256,7 @@ async def assert_automation_page():
             "payload_json": json.dumps({
                 "target_username": "__least_loaded__",
                 "task_max_daily_load": 3,
+                "task_capacity_fallback_days": 7,
             }),
         }],
     )
@@ -1263,6 +1264,9 @@ async def assert_automation_page():
         auto_worker_preview["executable_actions"][0]["dry_run_detail"]
     )
     assert "лимит: 3 в день" in (
+        auto_worker_preview["executable_actions"][0]["dry_run_detail"]
+    )
+    assert "поиск окна: 7 дн." in (
         auto_worker_preview["executable_actions"][0]["dry_run_detail"]
     )
 
@@ -1510,6 +1514,58 @@ async def assert_automation_page():
         1,
     ) is None
 
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, 'create_task', ?, 101, 1, ?)
+    """, (
+        2,
+        rule["id"],
+        json.dumps({
+            "target_username": "__least_loaded__",
+            "message": "Поиск ближайшего окна",
+            "task_delay_days": 3,
+            "task_priority": "Срочно",
+            "task_deadline_hours": 8,
+            "task_max_daily_load": 1,
+            "task_capacity_fallback_days": 3,
+        }, ensure_ascii=False),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    fallback_action = c.execute("""
+    SELECT *
+    FROM automation_actions
+    WHERE id=?
+    """, (c.lastrowid,)).fetchone()
+    fallback_task_id = crm.execute_automation_create_task_action(
+        c,
+        2,
+        rule,
+        fallback_action,
+        json.loads(fallback_action["payload_json"]),
+        "task",
+        source_task["id"],
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
+    fallback_task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=?
+      AND company_id=2
+    """, (fallback_task_id,)).fetchone()
+    expected_fallback_at = datetime.now() + timedelta(days=4)
+
+    assert fallback_task is not None
+    assert fallback_task["worker"] == "free2"
+    assert fallback_task["task_date"] == expected_fallback_at.strftime(
+        "%Y-%m-%d"
+    )
+    assert fallback_task["deadline_at"] == (
+        expected_fallback_at + timedelta(hours=8)
+    ).strftime("%Y-%m-%dT%H:%M")
+
     conn.commit()
     c.execute("""
     INSERT INTO automation_rules (
@@ -1617,34 +1673,41 @@ async def assert_automation_page():
     c.execute("""
     DELETE FROM notifications
     WHERE company_id=2
-      AND link IN (?, ?, ?)
+      AND link IN (?, ?, ?, ?)
     """, (
         f"/task/{created_task_id}",
         f"/task/{client_created_task_id}",
         f"/task/{auto_worker_task_id}",
+        f"/task/{fallback_task_id}",
     ))
     c.execute("""
     DELETE FROM task_activity
-    WHERE task_id IN (?, ?, ?)
+    WHERE task_id IN (?, ?, ?, ?)
     """, (
         created_task_id,
         client_created_task_id,
         auto_worker_task_id,
+        fallback_task_id,
     ))
     c.execute("""
     DELETE FROM automation_action_runs
     WHERE company_id=2
-      AND action_id IN (?, ?)
-    """, (create_task_action["id"], auto_worker_action["id"]))
+      AND action_id IN (?, ?, ?)
+    """, (
+        create_task_action["id"],
+        auto_worker_action["id"],
+        fallback_action["id"],
+    ))
     c.execute("""
     DELETE FROM tasks
     WHERE company_id=2
-      AND id IN (?, ?, ?, ?)
+      AND id IN (?, ?, ?, ?, ?)
     """, (
         created_task_id,
         client_created_task_id,
         auto_worker_task_id,
         max_load_task_id,
+        fallback_task_id,
     ))
     c.execute("""
     DELETE FROM automation_actions
@@ -1656,6 +1719,11 @@ async def assert_automation_page():
     WHERE company_id=2
       AND id=?
     """, (auto_worker_action["id"],))
+    c.execute("""
+    DELETE FROM automation_actions
+    WHERE company_id=2
+      AND id=?
+    """, (fallback_action["id"],))
     c.execute("""
     DELETE FROM notifications
     WHERE company_id=2
@@ -1816,6 +1884,7 @@ async def assert_automation_page():
     assert "Приоритет" in rule_detail_html
     assert "Срок SLA" in rule_detail_html
     assert "Лимит автоназначения" in rule_detail_html
+    assert "Поиск свободного дня" in rule_detail_html
 
     builder_response = await crm.create_rule_action(
         make_form_request(
@@ -1910,6 +1979,7 @@ async def assert_automation_page():
                 "task_priority": "Срочно",
                 "task_deadline_hours": "8",
                 "task_max_daily_load": "3",
+                "task_capacity_fallback_days": "7",
             },
         ),
         rule["id"],
@@ -1938,6 +2008,9 @@ async def assert_automation_page():
     assert '"task_priority": "Срочно"' in valid_create_task_action["payload_json"]
     assert '"task_deadline_hours": 8' in valid_create_task_action["payload_json"]
     assert '"task_max_daily_load": 3' in valid_create_task_action["payload_json"]
+    assert '"task_capacity_fallback_days": 7' in (
+        valid_create_task_action["payload_json"]
+    )
 
     conn = connect()
     c = conn.cursor()

@@ -1555,6 +1555,9 @@ def automation_action_dry_run_preview(action):
         automation_create_task_settings(payload)
     )
     task_max_daily_load = automation_task_max_daily_load(payload)
+    task_capacity_fallback_days = (
+        automation_task_capacity_fallback_days(payload)
+    )
     supported = action_key in {
         "notification",
         "telegram_alert",
@@ -1595,6 +1598,11 @@ def automation_action_dry_run_preview(action):
                 else f"лимит: {task_max_daily_load} в день"
             )
             load_limit_detail = f" · {load_limit_label}"
+
+            if task_capacity_fallback_days:
+                load_limit_detail += (
+                    f" · поиск окна: {task_capacity_fallback_days} дн."
+                )
 
         detail = (
             f"Новая задача для: {target_label}"
@@ -1653,6 +1661,20 @@ def automation_task_max_daily_load(payload):
         max_daily_load = 0
 
     return max_daily_load
+
+
+def automation_task_capacity_fallback_days(payload):
+    try:
+        fallback_days = int(
+            payload.get("task_capacity_fallback_days") or 0
+        )
+    except (TypeError, ValueError):
+        fallback_days = 0
+
+    if fallback_days not in (0, 1, 3, 7):
+        fallback_days = 0
+
+    return fallback_days
 
 
 def automation_least_loaded_worker(
@@ -1817,6 +1839,9 @@ def execute_automation_create_task_action(
         automation_create_task_settings(payload)
     )
     task_max_daily_load = automation_task_max_daily_load(payload)
+    task_capacity_fallback_days = (
+        automation_task_capacity_fallback_days(payload)
+    )
     scheduled_at = datetime.now() + timedelta(days=task_delay_days)
     task_date = scheduled_at.strftime("%Y-%m-%d")
     deadline_at = ""
@@ -1838,6 +1863,28 @@ def execute_automation_create_task_action(
             task_max_daily_load,
         )
 
+        if not selected_worker and task_capacity_fallback_days:
+            for offset_days in range(1, task_capacity_fallback_days + 1):
+                fallback_at = scheduled_at + timedelta(days=offset_days)
+                fallback_date = fallback_at.strftime("%Y-%m-%d")
+                selected_worker = automation_least_loaded_worker(
+                    c,
+                    company_id,
+                    fallback_date,
+                    task_max_daily_load,
+                )
+
+                if selected_worker:
+                    scheduled_at = fallback_at
+                    task_date = fallback_date
+
+                    if task_deadline_hours:
+                        deadline_at = (
+                            scheduled_at
+                            + timedelta(hours=task_deadline_hours)
+                        ).strftime("%Y-%m-%dT%H:%M")
+                    break
+
         if selected_worker:
             target_worker = selected_worker["username"]
             target_chat_id = str(
@@ -1848,7 +1895,16 @@ def execute_automation_create_task_action(
                 failure_details.append(
                     (
                         "Нет исполнителя с доступной загрузкой "
-                        f"на {task_date}. "
+                        f"на {task_date}"
+                        + (
+                            (
+                                " и в течение "
+                                f"{task_capacity_fallback_days} дн. после неё"
+                            )
+                            if task_capacity_fallback_days
+                            else ""
+                        )
+                        + ". "
                         f"Лимит на исполнителя: {task_max_daily_load} в день."
                     )
                 )
@@ -5054,6 +5110,11 @@ async def create_automation_rule(request: Request):
     task_max_daily_load = automation_task_max_daily_load({
         "task_max_daily_load": form.get("task_max_daily_load"),
     })
+    task_capacity_fallback_days = automation_task_capacity_fallback_days({
+        "task_capacity_fallback_days": form.get(
+            "task_capacity_fallback_days"
+        ),
+    })
 
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
@@ -5086,6 +5147,9 @@ async def create_automation_rule(request: Request):
         payload["task_priority"] = task_priority
         payload["task_deadline_hours"] = task_deadline_hours
         payload["task_max_daily_load"] = task_max_daily_load
+        payload["task_capacity_fallback_days"] = (
+            task_capacity_fallback_days
+        )
 
     conn = connect()
     c = conn.cursor()
@@ -6620,6 +6684,11 @@ async def create_rule_action(request: Request, rule_id: int):
     task_max_daily_load = automation_task_max_daily_load({
         "task_max_daily_load": form.get("task_max_daily_load"),
     })
+    task_capacity_fallback_days = automation_task_capacity_fallback_days({
+        "task_capacity_fallback_days": form.get(
+            "task_capacity_fallback_days"
+        ),
+    })
 
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
 
@@ -6679,6 +6748,9 @@ async def create_rule_action(request: Request, rule_id: int):
         payload["task_priority"] = task_priority
         payload["task_deadline_hours"] = task_deadline_hours
         payload["task_max_daily_load"] = task_max_daily_load
+        payload["task_capacity_fallback_days"] = (
+            task_capacity_fallback_days
+        )
 
     c.execute("""
     INSERT INTO automation_actions (
