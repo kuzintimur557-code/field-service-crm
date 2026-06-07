@@ -1551,7 +1551,9 @@ def automation_action_dry_run_preview(action):
     target = str(payload.get("target_username") or "").strip()
     message = str(payload.get("message") or "").strip()
     subject = str(payload.get("subject") or "").strip()
-    task_delay_days, task_priority = automation_create_task_settings(payload)
+    task_delay_days, task_priority, task_deadline_hours = (
+        automation_create_task_settings(payload)
+    )
     supported = action_key in {
         "notification",
         "telegram_alert",
@@ -1573,10 +1575,16 @@ def automation_action_dry_run_preview(action):
             if task_delay_days == 0
             else f"через {task_delay_days} дн."
         )
+        deadline_label = (
+            "без SLA"
+            if task_deadline_hours == 0
+            else f"SLA: {task_deadline_hours} ч."
+        )
         detail = (
             f"Новая задача для: {target or 'без исполнителя'}"
             f" · {schedule_label}"
             f" · приоритет: {task_priority}"
+            f" · {deadline_label}"
             " · данные клиента из исходной заявки"
         )
     else:
@@ -1607,7 +1615,15 @@ def automation_create_task_settings(payload):
     if task_priority not in ("Обычный", "Срочно"):
         task_priority = "Обычный"
 
-    return task_delay_days, task_priority
+    try:
+        task_deadline_hours = int(payload.get("task_deadline_hours") or 0)
+    except (TypeError, ValueError):
+        task_deadline_hours = 0
+
+    if task_deadline_hours not in (0, 4, 8, 24, 72):
+        task_deadline_hours = 0
+
+    return task_delay_days, task_priority, task_deadline_hours
 
 
 def automation_action_target_is_valid(c, company_id, action_key, target_username):
@@ -1697,10 +1713,17 @@ def execute_automation_create_task_action(
             target_chat_id = str(worker_row["telegram_chat_id"] or "").strip()
 
     description = str(payload.get("message") or "").strip()
-    task_delay_days, task_priority = automation_create_task_settings(payload)
-    task_date = (
-        datetime.now() + timedelta(days=task_delay_days)
-    ).strftime("%Y-%m-%d")
+    task_delay_days, task_priority, task_deadline_hours = (
+        automation_create_task_settings(payload)
+    )
+    scheduled_at = datetime.now() + timedelta(days=task_delay_days)
+    task_date = scheduled_at.strftime("%Y-%m-%d")
+    deadline_at = ""
+
+    if task_deadline_hours:
+        deadline_at = (
+            scheduled_at + timedelta(hours=task_deadline_hours)
+        ).strftime("%Y-%m-%dT%H:%M")
 
     if not description:
         description = f"Автоматическая задача: {rule['name']}"
@@ -1730,7 +1753,7 @@ def execute_automation_create_task_action(
         "",
         "",
         now,
-        "",
+        deadline_at,
     ))
     created_task_id = c.lastrowid
 
@@ -1746,7 +1769,8 @@ def execute_automation_create_task_action(
             f"Правило: {rule['name']}. "
             f"Исходная заявка: #{entity_id}. "
             f"Исполнитель: {target_worker or 'не назначен'}. "
-            f"Дата: {task_date}. Приоритет: {task_priority}"
+            f"Дата: {task_date}. Приоритет: {task_priority}. "
+            f"SLA: {deadline_at or 'не задан'}"
         ),
         now,
     ))
@@ -1789,6 +1813,8 @@ def execute_automation_create_task_action(
                 (
                     f"Вам назначена автоматическая заявка #{created_task_id}\n"
                     f"Клиент: {source_task['client'] or 'Без клиента'}\n"
+                    f"Дата: {task_date}\n"
+                    f"SLA: {deadline_at or 'не задан'}\n"
                     f"Описание: {description}"
                 ),
             )
@@ -4831,10 +4857,13 @@ async def create_automation_rule(request: Request):
     action_key = str(form.get("action_key") or "").strip()
     target_username = str(form.get("target_username") or username).strip()
     message = str(form.get("message") or "").strip()
-    task_delay_days, task_priority = automation_create_task_settings({
-        "task_delay_days": form.get("task_delay_days"),
-        "task_priority": form.get("task_priority"),
-    })
+    task_delay_days, task_priority, task_deadline_hours = (
+        automation_create_task_settings({
+            "task_delay_days": form.get("task_delay_days"),
+            "task_priority": form.get("task_priority"),
+            "task_deadline_hours": form.get("task_deadline_hours"),
+        })
+    )
 
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
@@ -4865,6 +4894,7 @@ async def create_automation_rule(request: Request):
     elif action_key == "create_task":
         payload["task_delay_days"] = task_delay_days
         payload["task_priority"] = task_priority
+        payload["task_deadline_hours"] = task_deadline_hours
 
     conn = connect()
     c = conn.cursor()
@@ -6389,10 +6419,13 @@ async def create_rule_action(request: Request, rule_id: int):
     action_key = str(form.get("action_key") or "").strip()
     target_username = str(form.get("target_username") or "").strip()
     message = str(form.get("message") or "").strip()
-    task_delay_days, task_priority = automation_create_task_settings({
-        "task_delay_days": form.get("task_delay_days"),
-        "task_priority": form.get("task_priority"),
-    })
+    task_delay_days, task_priority, task_deadline_hours = (
+        automation_create_task_settings({
+            "task_delay_days": form.get("task_delay_days"),
+            "task_priority": form.get("task_priority"),
+            "task_deadline_hours": form.get("task_deadline_hours"),
+        })
+    )
 
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
 
@@ -6450,6 +6483,7 @@ async def create_rule_action(request: Request, rule_id: int):
     elif action_key == "create_task":
         payload["task_delay_days"] = task_delay_days
         payload["task_priority"] = task_priority
+        payload["task_deadline_hours"] = task_deadline_hours
 
     c.execute("""
     INSERT INTO automation_actions (

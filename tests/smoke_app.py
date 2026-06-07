@@ -1236,6 +1236,7 @@ async def assert_automation_page():
                 "message": "Автоматическая проверка клиента",
                 "task_delay_days": 3,
                 "task_priority": "Срочно",
+                "task_deadline_hours": 24,
             }),
         }],
     )
@@ -1244,6 +1245,7 @@ async def assert_automation_page():
     assert "Новая задача для: helper2" in create_task_preview["executable_actions"][0]["dry_run_detail"]
     assert "через 3 дн." in create_task_preview["executable_actions"][0]["dry_run_detail"]
     assert "приоритет: Срочно" in create_task_preview["executable_actions"][0]["dry_run_detail"]
+    assert "SLA: 24 ч." in create_task_preview["executable_actions"][0]["dry_run_detail"]
 
     conn = connect()
     c = conn.cursor()
@@ -1261,6 +1263,7 @@ async def assert_automation_page():
             "message": "Автоматическая проверка клиента",
             "task_delay_days": 3,
             "task_priority": "Срочно",
+            "task_deadline_hours": 24,
         }, ensure_ascii=False),
         datetime.now().strftime("%Y-%m-%d %H:%M"),
     ))
@@ -1348,6 +1351,9 @@ async def assert_automation_page():
         datetime.now() + timedelta(days=3)
     ).strftime("%Y-%m-%d")
     assert created_task["priority"] == "Срочно"
+    assert created_task["deadline_at"] == (
+        datetime.now() + timedelta(days=3, hours=24)
+    ).strftime("%Y-%m-%dT%H:%M")
     assert create_task_run_count == 1
     assert len(create_task_activity) == 1
     assert f"Исходная заявка: #{source_task['id']}" in create_task_activity[0]["details"]
@@ -1360,6 +1366,8 @@ async def assert_automation_page():
         (
             f"Вам назначена автоматическая заявка #{created_task_id}\n"
             f"Клиент: {source_task['client']}\n"
+            f"Дата: {created_task['task_date']}\n"
+            f"SLA: {created_task['deadline_at']}\n"
             "Описание: Автоматическая проверка клиента"
         ),
     )]
@@ -1540,6 +1548,7 @@ async def assert_automation_page():
     assert "Дата выполнения" in rule_detail_html
     assert "Через 7 дней" in rule_detail_html
     assert "Приоритет" in rule_detail_html
+    assert "Срок SLA" in rule_detail_html
 
     builder_response = await crm.create_rule_action(
         make_form_request(
@@ -1632,6 +1641,7 @@ async def assert_automation_page():
                 "message": "Новая задача из правила",
                 "task_delay_days": "1",
                 "task_priority": "Срочно",
+                "task_deadline_hours": "8",
             },
         ),
         rule["id"],
@@ -1658,6 +1668,7 @@ async def assert_automation_page():
     assert "Новая задача из правила" in valid_create_task_action["payload_json"]
     assert '"task_delay_days": 1' in valid_create_task_action["payload_json"]
     assert '"task_priority": "Срочно"' in valid_create_task_action["payload_json"]
+    assert '"task_deadline_hours": 8' in valid_create_task_action["payload_json"]
 
     conn = connect()
     c = conn.cursor()
