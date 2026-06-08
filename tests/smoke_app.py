@@ -1273,6 +1273,9 @@ async def assert_automation_page():
     assert "только рабочие дни" in (
         auto_worker_preview["executable_actions"][0]["dry_run_detail"]
     )
+    assert "справедливое распределение" in (
+        auto_worker_preview["executable_actions"][0]["dry_run_detail"]
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -1519,6 +1522,12 @@ async def assert_automation_page():
         "create_task",
         "__least_loaded__",
     ) is True
+    next_fair_worker = crm.automation_least_loaded_worker(
+        c,
+        2,
+        (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d"),
+    )
+    assert next_fair_worker["username"] == "worker2"
 
     c.execute("""
     INSERT INTO tasks (
@@ -1593,7 +1602,7 @@ async def assert_automation_page():
     expected_fallback_at = datetime.now() + timedelta(days=4)
 
     assert fallback_task is not None
-    assert fallback_task["worker"] == "free2"
+    assert fallback_task["worker"] == "worker2"
     assert fallback_task["task_date"] == expected_fallback_at.strftime(
         "%Y-%m-%d"
     )

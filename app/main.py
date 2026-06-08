@@ -1599,6 +1599,7 @@ def automation_action_dry_run_preview(action):
                 else f"лимит: {task_max_daily_load} в день"
             )
             load_limit_detail = f" · {load_limit_label}"
+            load_limit_detail += " · справедливое распределение"
 
             if task_capacity_fallback_days:
                 load_limit_detail += (
@@ -1708,6 +1709,10 @@ def automation_least_loaded_worker(
         worker["username"]: 0
         for worker in workers
     }
+    last_auto_assignment = {
+        worker["username"]: 0
+        for worker in workers
+    }
     tasks = c.execute("""
     SELECT worker, workers
     FROM tasks
@@ -1721,6 +1726,31 @@ def automation_least_loaded_worker(
         for worker_name in get_task_worker_names(task):
             if worker_name in worker_load:
                 worker_load[worker_name] += 1
+
+    assignment_rows = c.execute("""
+    SELECT
+        automation_action_runs.id AS run_id,
+        tasks.worker,
+        tasks.workers
+    FROM automation_action_runs
+    JOIN tasks
+      ON tasks.id=automation_action_runs.created_entity_id
+      AND tasks.company_id=automation_action_runs.company_id
+    WHERE automation_action_runs.company_id=?
+      AND automation_action_runs.created_entity_type='task'
+    ORDER BY automation_action_runs.id DESC
+    """, (company_id,))
+
+    for assignment in assignment_rows:
+        for worker_name in get_task_worker_names(assignment):
+            if (
+                worker_name in last_auto_assignment
+                and not last_auto_assignment[worker_name]
+            ):
+                last_auto_assignment[worker_name] = assignment["run_id"]
+
+        if all(last_auto_assignment.values()):
+            break
 
     available_workers = [
         worker
@@ -1738,6 +1768,7 @@ def automation_least_loaded_worker(
         available_workers,
         key=lambda worker: (
             worker_load[worker["username"]],
+            last_auto_assignment[worker["username"]],
             worker["username"],
         ),
     )
@@ -1746,6 +1777,9 @@ def automation_least_loaded_worker(
         "username": selected_worker["username"],
         "telegram_chat_id": selected_worker["telegram_chat_id"],
         "active_count": worker_load[selected_worker["username"]],
+        "last_auto_assignment": last_auto_assignment[
+            selected_worker["username"]
+        ],
     }
 
 
