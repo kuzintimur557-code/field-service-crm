@@ -3714,7 +3714,9 @@ async def home(
 
     workers = c.execute("""
     SELECT username, last_seen FROM users
-    WHERE role='worker' AND company_id=?
+    WHERE role='worker'
+      AND company_id=?
+      AND COALESCE(is_active, 1)=1
     ORDER BY username
     """, (company_id,)).fetchall()
 
@@ -4108,6 +4110,7 @@ async def automation_page(
     SELECT username, role
     FROM users
     WHERE company_id=?
+      AND COALESCE(is_active, 1)=1
     ORDER BY role, username
     """, (company_id,)).fetchall()
 
@@ -4294,6 +4297,7 @@ async def automation_builder_page(request: Request):
     FROM users
     WHERE company_id=?
       AND role='worker'
+      AND COALESCE(is_active, 1)=1
     ORDER BY COALESCE(NULLIF(full_name, ''), username), username
     """, (company_id,)).fetchall()
 
@@ -5498,6 +5502,7 @@ async def automation_rule_detail(request: Request, rule_id: int):
     SELECT username, role
     FROM users
     WHERE company_id=?
+      AND COALESCE(is_active, 1)=1
     ORDER BY
         CASE role
             WHEN 'worker' THEN 1
@@ -6048,6 +6053,7 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             WHERE company_id=?
               AND role='worker'
               AND username=?
+              AND COALESCE(is_active, 1)=1
             """, (company_id, condition["value"])).fetchone()
 
             if not worker_exists:
@@ -7310,7 +7316,9 @@ async def workload_page(request: Request):
     workers = c.execute("""
     SELECT username, full_name, position, last_seen
     FROM users
-    WHERE role='worker' AND company_id=?
+    WHERE role='worker'
+      AND company_id=?
+      AND COALESCE(is_active, 1)=1
     ORDER BY username
     """, (company_id,)).fetchall()
 
@@ -8006,7 +8014,9 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
         workers = c.execute("""
         SELECT username
         FROM users
-        WHERE role='worker' AND company_id=?
+        WHERE role='worker'
+          AND company_id=?
+          AND COALESCE(is_active, 1)=1
         ORDER BY username
         """, (company_id,)).fetchall()
         worker_names = [w["username"] for w in workers]
@@ -8230,7 +8240,9 @@ async def recurring_jobs_page(request: Request):
     workers = c.execute("""
     SELECT username
     FROM users
-    WHERE role='worker' AND company_id=?
+    WHERE role='worker'
+      AND company_id=?
+      AND COALESCE(is_active, 1)=1
     ORDER BY username
     """, (company_id,)).fetchall()
 
@@ -8312,7 +8324,10 @@ async def create_recurring_job(request: Request):
         worker_user = c.execute("""
         SELECT username
         FROM users
-        WHERE username=? AND role='worker' AND company_id=?
+        WHERE username=?
+          AND role='worker'
+          AND company_id=?
+          AND COALESCE(is_active, 1)=1
         """, (selected_worker, company_id)).fetchone()
 
         if worker_user and worker_user["username"] not in valid_workers:
@@ -14434,7 +14449,9 @@ async def create_task_page(
 
     workers = c.execute("""
     SELECT username FROM users
-    WHERE role='worker' AND company_id=?
+    WHERE role='worker'
+      AND company_id=?
+      AND COALESCE(is_active, 1)=1
     ORDER BY username
     """, (company_id,)).fetchall()
     worker_names = [row["username"] for row in workers]
@@ -14756,7 +14773,10 @@ async def create_task(
         worker_user = c.execute("""
         SELECT username, telegram_chat_id
         FROM users
-        WHERE username=? AND role='worker' AND company_id=?
+        WHERE username=?
+          AND role='worker'
+          AND company_id=?
+          AND COALESCE(is_active, 1)=1
         """, (selected_worker, company_id)).fetchone()
 
         if worker_user and worker_user["username"] not in valid_workers:

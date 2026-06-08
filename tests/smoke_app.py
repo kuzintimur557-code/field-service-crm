@@ -4645,6 +4645,38 @@ async def assert_finance_margin(task):
     assert "Отключён" in workers_html
     assert "Включить пользователя" in workers_html
 
+    create_task_response = await crm.create_task_page(
+        make_asgi_request("owner2", "/create-task")
+    )
+    assert all(
+        worker["username"] != "helper2"
+        for worker in create_task_response.context["workers"]
+    )
+
+    recurring_response = await crm.recurring_jobs_page(
+        make_asgi_request("owner2", "/recurring")
+    )
+    assert all(
+        worker["username"] != "helper2"
+        for worker in recurring_response.context["workers"]
+    )
+
+    calendar_response = await crm.calendar_page(
+        make_asgi_request("owner2", "/calendar")
+    )
+    assert all(
+        worker["username"] != "helper2"
+        for worker in calendar_response.context["workers"]
+    )
+
+    automation_builder_response = await crm.automation_builder_page(
+        make_asgi_request("owner2", "/automation/builder")
+    )
+    assert all(
+        worker["username"] != "helper2"
+        for worker in automation_builder_response.context["workers"]
+    )
+
     toggle_response = await crm.toggle_team_user_active(
         make_form_request(
             "owner2",
