@@ -13831,6 +13831,18 @@ async def create_worker(request: Request):
     worker_password = (form.get("password") or "").strip()
     worker_role = (form.get("role") or "worker").strip()
 
+    if not worker_username or not worker_password:
+        return RedirectResponse(
+            "/workers?error=empty_credentials",
+            status_code=302,
+        )
+
+    if worker_role not in ("manager", "worker"):
+        return RedirectResponse("/workers?error=invalid_role", status_code=302)
+
+    if not is_password_strong(worker_password):
+        return RedirectResponse("/workers?error=weak_password", status_code=302)
+
     full_name = (form.get("full_name") or "").strip()
     position = (form.get("position") or "").strip()
     phone = (form.get("phone") or "").strip()
@@ -13907,6 +13919,7 @@ async def change_team_user_password(request: Request, user_id: int):
     if role != "boss":
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
+    company_id = get_user_company_id(username)
     form = await request.form()
     new_password = (form.get("password") or "").strip()
 
@@ -13922,22 +13935,25 @@ async def change_team_user_password(request: Request, user_id: int):
     user = c.execute("""
     SELECT *
     FROM users
-    WHERE id=?
-    """, (user_id,)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (user_id, company_id)).fetchone()
 
     if not user:
         conn.close()
         return RedirectResponse("/workers", status_code=302)
 
-    if user["username"] == username:
+    if user["username"] == username or user["role"] == "boss":
         conn.close()
-        return RedirectResponse("/workers?error=cannot_change_self_here", status_code=302)
+        return RedirectResponse(
+            "/workers?error=cannot_change_boss",
+            status_code=302,
+        )
 
     c.execute("""
     UPDATE users
     SET password=?
-    WHERE id=?
-    """, (hash_password(new_password), user_id))
+    WHERE id=? AND company_id=?
+    """, (hash_password(new_password), user_id, company_id))
 
     conn.commit()
     conn.close()

@@ -4606,6 +4606,69 @@ async def assert_finance_margin(task):
     conn.commit()
     conn.close()
 
+    invalid_role_response = await crm.create_worker(
+        make_form_request(
+            "owner2",
+            "/workers",
+            {
+                "username": "forged_admin",
+                "password": "strong123",
+                "role": "superadmin",
+            },
+        )
+    )
+    assert invalid_role_response.status_code == 302
+    assert invalid_role_response.headers["location"] == "/workers?error=invalid_role"
+
+    weak_password_response = await crm.create_worker(
+        make_form_request(
+            "owner2",
+            "/workers",
+            {
+                "username": "weak_worker",
+                "password": "123",
+                "role": "worker",
+            },
+        )
+    )
+    assert weak_password_response.status_code == 302
+    assert weak_password_response.headers["location"] == "/workers?error=weak_password"
+
+    conn = connect()
+    c = conn.cursor()
+    assert c.execute("""
+    SELECT id
+    FROM users
+    WHERE username IN ('forged_admin', 'weak_worker')
+    """).fetchone() is None
+    outsider = c.execute("""
+    SELECT id, password
+    FROM users
+    WHERE company_id=1 AND username='outsider_worker'
+    """).fetchone()
+    conn.close()
+
+    cross_company_password_response = await crm.change_team_user_password(
+        make_form_request(
+            "owner2",
+            f"/workers/{outsider['id']}/password",
+            {"password": "changed123"},
+        ),
+        outsider["id"],
+    )
+    assert cross_company_password_response.status_code == 302
+    assert cross_company_password_response.headers["location"] == "/workers"
+
+    conn = connect()
+    c = conn.cursor()
+    unchanged_outsider = c.execute("""
+    SELECT password
+    FROM users
+    WHERE id=?
+    """, (outsider["id"],)).fetchone()
+    conn.close()
+    assert unchanged_outsider["password"] == outsider["password"]
+
     toggle_response = await crm.toggle_team_user_active(
         make_form_request(
             "owner2",

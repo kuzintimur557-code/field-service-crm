@@ -66,6 +66,12 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 
 {% if request.query_params.get("error") == "weak_password" %}
 <div class="notice err">❌ Пароль должен быть минимум 6 символов</div>
+{% elif request.query_params.get("error") == "empty_credentials" %}
+<div class="notice err">Укажите логин и пароль</div>
+{% elif request.query_params.get("error") == "invalid_role" %}
+<div class="notice err">Недопустимая роль пользователя</div>
+{% elif request.query_params.get("error") == "cannot_change_boss" %}
+<div class="notice err">Пароль владельца меняется только в его профиле</div>
 {% elif request.query_params.get("error") %}
 <div class="notice err">❌ Ошибка: {{ request.query_params.get("error") }}</div>
 {% endif %}
