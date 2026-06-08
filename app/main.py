@@ -8418,6 +8418,31 @@ async def generate_recurring_task(request: Request, job_id: int):
     phone = client["phone"] if client else ""
     address = client["address"] if client else ""
     next_date = get_next_recurring_date(job["next_date"], job["interval_type"])
+    assigned_workers = get_task_worker_names(job)
+    active_workers = []
+
+    for worker_name in assigned_workers:
+        active_worker = c.execute("""
+        SELECT username
+        FROM users
+        WHERE company_id=?
+          AND username=?
+          AND role='worker'
+          AND COALESCE(is_active, 1)=1
+        """, (company_id, worker_name)).fetchone()
+
+        if active_worker:
+            active_workers.append(active_worker["username"])
+
+    if assigned_workers and not active_workers:
+        conn.close()
+        return RedirectResponse(
+            "/recurring?error=no_active_workers",
+            status_code=302,
+        )
+
+    task_worker = active_workers[0] if active_workers else ""
+    task_workers = ",".join(active_workers)
 
     c.execute("""
     INSERT INTO tasks (
@@ -8448,8 +8473,8 @@ async def generate_recurring_task(request: Request, job_id: int):
         address,
         job["description"],
         job["next_date"],
-        job["worker"],
-        job["workers"],
+        task_worker,
+        task_workers,
         job["priority"],
         job["price"],
         "",
@@ -8464,9 +8489,17 @@ async def generate_recurring_task(request: Request, job_id: int):
 
     c.execute("""
     UPDATE recurring_jobs
-    SET next_date=?
+    SET next_date=?,
+        worker=?,
+        workers=?
     WHERE id=? AND company_id=?
-    """, (next_date, job_id, company_id))
+    """, (
+        next_date,
+        task_worker,
+        task_workers,
+        job_id,
+        company_id,
+    ))
 
     conn.commit()
     conn.close()

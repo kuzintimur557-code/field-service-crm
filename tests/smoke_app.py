@@ -5753,6 +5753,16 @@ async def assert_recurring_generate(task):
     assert f"/recurring/{job_id}/generate" in page_html
     assert f"/recurring/{job_id}/toggle" in page_html
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE users
+    SET is_active=0
+    WHERE company_id=2 AND username='helper2'
+    """)
+    conn.commit()
+    conn.close()
+
     response = await crm.generate_recurring_task(make_request("owner2"), job_id)
     assert response.status_code == 302
     task_location = response.headers["location"]
@@ -5767,7 +5777,7 @@ async def assert_recurring_generate(task):
     WHERE id=? AND company_id=2
     """, (generated_task_id,)).fetchone()
     job = c.execute("""
-    SELECT next_date
+    SELECT next_date, worker, workers
     FROM recurring_jobs
     WHERE id=?
     """, (job_id,)).fetchone()
@@ -5780,9 +5790,52 @@ async def assert_recurring_generate(task):
 
     assert generated_task is not None
     assert generated_task["client_id"] == task["client_id"]
-    assert generated_task["workers"] == "worker2,helper2"
+    assert generated_task["worker"] == "worker2"
+    assert generated_task["workers"] == "worker2"
     assert job["next_date"] == "2026-06-17"
+    assert job["worker"] == "worker2"
+    assert job["workers"] == "worker2"
     assert activity is not None
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE users
+    SET is_active=0
+    WHERE company_id=2 AND username='worker2'
+    """)
+    conn.commit()
+    tasks_before_blocked_generation = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    blocked_response = await crm.generate_recurring_task(
+        make_request("owner2"),
+        job_id,
+    )
+    assert blocked_response.status_code == 302
+    assert blocked_response.headers["location"] == (
+        "/recurring?error=no_active_workers"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=2
+    """).fetchone()[0] == tasks_before_blocked_generation
+    c.execute("""
+    UPDATE users
+    SET is_active=1
+    WHERE company_id=2
+      AND username IN ('worker2', 'helper2')
+    """)
+    conn.commit()
+    conn.close()
 
     date_response = await crm.update_recurring_job_date(make_form_request(
         "owner2",
