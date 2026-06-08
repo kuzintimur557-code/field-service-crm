@@ -14129,6 +14129,30 @@ async def toggle_team_user_active(request: Request, user_id: int):
         )
 
     current_active = 1 if user["is_active"] is None else int(user["is_active"])
+
+    if current_active and user["role"] == "worker":
+        active_task_count = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND archived=0
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND {worker_task_condition()}
+        """, [
+            company_id,
+            *worker_task_params(user["username"]),
+        ]).fetchone()[0]
+
+        if active_task_count:
+            conn.close()
+            return RedirectResponse(
+                (
+                    "/workers?error=active_tasks"
+                    f"&count={active_task_count}"
+                ),
+                status_code=302,
+            )
+
     c.execute("""
     UPDATE users
     SET is_active=?

@@ -4599,6 +4599,21 @@ async def assert_finance_margin(task):
     WHERE company_id=2 AND username='helper2'
     """).fetchone()
     c.execute("""
+    INSERT INTO users (
+        username, password, role, company_id, telegram_chat_id
+    )
+    VALUES (?, ?, 'worker', 2, ?)
+    """, (
+        "inactive_candidate2",
+        "x",
+        "chat-inactive-candidate2",
+    ))
+    inactive_candidate = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=2 AND username='inactive_candidate2'
+    """).fetchone()
+    c.execute("""
     UPDATE users
     SET commission_percent=10
     WHERE company_id=2 AND username='helper2'
@@ -4669,7 +4684,7 @@ async def assert_finance_margin(task):
     conn.close()
     assert unchanged_outsider["password"] == outsider["password"]
 
-    toggle_response = await crm.toggle_team_user_active(
+    active_task_block_response = await crm.toggle_team_user_active(
         make_form_request(
             "owner2",
             f"/workers/{helper['id']}/toggle-active",
@@ -4677,15 +4692,29 @@ async def assert_finance_margin(task):
         ),
         helper["id"],
     )
+    assert active_task_block_response.status_code == 302
+    assert active_task_block_response.headers["location"].startswith(
+        "/workers?error=active_tasks&count="
+    )
+    assert crm.get_user(make_request("helper2")) == "helper2"
+
+    toggle_response = await crm.toggle_team_user_active(
+        make_form_request(
+            "owner2",
+            f"/workers/{inactive_candidate['id']}/toggle-active",
+            {},
+        ),
+        inactive_candidate["id"],
+    )
     assert toggle_response.status_code == 302
     assert toggle_response.headers["location"] == "/workers?status_updated=1"
-    assert crm.get_user(make_request("helper2")) is None
+    assert crm.get_user(make_request("inactive_candidate2")) is None
 
     disabled_login_response = await crm.login(
         make_form_request(
             "anonymous",
             "/login",
-            {"username": "helper2", "password": "x"},
+            {"username": "inactive_candidate2", "password": "x"},
         )
     )
     assert disabled_login_response.status_code == 302
@@ -4697,7 +4726,7 @@ async def assert_finance_margin(task):
         c,
         2,
         "create_task",
-        "helper2",
+        "inactive_candidate2",
     ) is False
     conn.close()
 
@@ -4715,7 +4744,7 @@ async def assert_finance_margin(task):
     task_detail_html = task_detail_response.body.decode("utf-8")
     assert f"/task/{task['id']}/workers" in task_detail_html
     assert all(
-        worker["username"] != "helper2"
+        worker["username"] != "inactive_candidate2"
         for worker in task_detail_response.context["available_workers"]
     )
 
@@ -4727,7 +4756,7 @@ async def assert_finance_margin(task):
                 "workers": [
                     "worker2",
                     "free2",
-                    "helper2",
+                    "inactive_candidate2",
                     "outsider_worker",
                 ],
             },
@@ -4770,7 +4799,7 @@ async def assert_finance_margin(task):
         make_asgi_request("owner2", "/create-task")
     )
     assert all(
-        worker["username"] != "helper2"
+        worker["username"] != "inactive_candidate2"
         for worker in create_task_response.context["workers"]
     )
 
@@ -4778,7 +4807,7 @@ async def assert_finance_margin(task):
         make_asgi_request("owner2", "/recurring")
     )
     assert all(
-        worker["username"] != "helper2"
+        worker["username"] != "inactive_candidate2"
         for worker in recurring_response.context["workers"]
     )
 
@@ -4786,7 +4815,7 @@ async def assert_finance_margin(task):
         make_asgi_request("owner2", "/calendar")
     )
     assert all(
-        worker["username"] != "helper2"
+        worker["username"] != "inactive_candidate2"
         for worker in calendar_response.context["workers"]
     )
 
@@ -4794,20 +4823,22 @@ async def assert_finance_margin(task):
         make_asgi_request("owner2", "/automation/builder")
     )
     assert all(
-        worker["username"] != "helper2"
+        worker["username"] != "inactive_candidate2"
         for worker in automation_builder_response.context["workers"]
     )
 
     toggle_response = await crm.toggle_team_user_active(
         make_form_request(
             "owner2",
-            f"/workers/{helper['id']}/toggle-active",
+            f"/workers/{inactive_candidate['id']}/toggle-active",
             {},
         ),
-        helper["id"],
+        inactive_candidate["id"],
     )
     assert toggle_response.status_code == 302
-    assert crm.get_user(make_request("helper2")) == "helper2"
+    assert crm.get_user(make_request("inactive_candidate2")) == (
+        "inactive_candidate2"
+    )
 
     sent_reassignment_telegram = []
     original_send_message_to_chat = crm.send_message_to_chat
@@ -4953,7 +4984,7 @@ async def assert_finance_margin(task):
         c,
         2,
         "create_task",
-        "helper2",
+        "inactive_candidate2",
     ) is True
     conn.close()
 
