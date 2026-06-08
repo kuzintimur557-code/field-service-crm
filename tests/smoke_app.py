@@ -4848,6 +4848,11 @@ async def assert_finance_margin(task):
         f"Назначена заявка #{task['id']}",
         f"/task/{task['id']}",
     )).fetchone()[0]
+    activity_count_before_duplicate = c.execute("""
+    SELECT COUNT(*)
+    FROM task_activity
+    WHERE task_id=? AND action='Изменены исполнители'
+    """, (task["id"],)).fetchone()[0]
     conn.close()
 
     duplicate_telegram = []
@@ -4885,7 +4890,65 @@ async def assert_finance_margin(task):
         f"Назначена заявка #{task['id']}",
         f"/task/{task['id']}",
     )).fetchone()[0] == helper_notification_count
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM task_activity
+    WHERE task_id=? AND action='Изменены исполнители'
+    """, (task["id"],)).fetchone()[0] == activity_count_before_duplicate
+    conn.close()
 
+    removed_worker_telegram = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = (
+        lambda chat_id, text:
+        removed_worker_telegram.append((chat_id, text)) or True
+    )
+
+    try:
+        remove_helper_response = await crm.update_task_workers(
+            make_multipart_request(
+                "owner2",
+                f"/task/{task['id']}/workers",
+                {"workers": ["worker2"]},
+            ),
+            task["id"],
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert remove_helper_response.status_code == 302
+    assert removed_worker_telegram
+    assert removed_worker_telegram[-1][0] == "chat-helper2"
+    assert f"С вас снята заявка #{task['id']}" in (
+        removed_worker_telegram[-1][1]
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    removal_notification = c.execute("""
+    SELECT title, link
+    FROM notifications
+    WHERE company_id=2
+      AND username='helper2'
+      AND title=?
+    ORDER BY id DESC
+    """, (f"Снято назначение с заявки #{task['id']}",)).fetchone()
+    conn.close()
+
+    assert removal_notification["link"] == "/my-tasks"
+
+    restore_after_removal = await crm.update_task_workers(
+        make_multipart_request(
+            "owner2",
+            f"/task/{task['id']}/workers",
+            {"workers": ["worker2", "helper2"]},
+        ),
+        task["id"],
+    )
+    assert restore_after_removal.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
     assert crm.automation_action_target_is_valid(
         c,
         2,

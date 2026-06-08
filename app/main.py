@@ -16189,6 +16189,32 @@ async def update_task_workers(request: Request, task_id: int):
         for worker_name in valid_workers
         if worker_name not in previous_workers
     ]
+    removed_workers = [
+        worker_name
+        for worker_name in previous_workers
+        if worker_name not in valid_workers
+    ]
+
+    if valid_workers == previous_workers:
+        conn.close()
+        return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+    removed_worker_chat_ids = {}
+
+    for worker_name in removed_workers:
+        worker = c.execute("""
+        SELECT username, telegram_chat_id
+        FROM users
+        WHERE company_id=?
+          AND username=?
+          AND role='worker'
+          AND COALESCE(is_active, 1)=1
+        """, (company_id, worker_name)).fetchone()
+
+        if worker:
+            removed_worker_chat_ids[worker_name] = str(
+                worker["telegram_chat_id"] or ""
+            ).strip()
 
     c.execute("""
     UPDATE tasks
@@ -16242,6 +16268,26 @@ async def update_task_workers(request: Request, task_id: int):
             notification_created_at,
         ))
 
+    for worker_name in removed_worker_chat_ids:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id,
+            username,
+            title,
+            message,
+            link,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            f"Снято назначение с заявки #{task_id}",
+            notification_message,
+            "/my-tasks",
+            notification_created_at,
+        ))
+
     conn.commit()
     conn.close()
 
@@ -16262,6 +16308,21 @@ async def update_task_workers(request: Request, task_id: int):
             send_message_to_chat(chat_id, telegram_text)
         except Exception as error:
             print("Telegram reassignment notification error:", error)
+
+    removal_telegram_text = (
+        f"С вас снята заявка #{task_id}\n"
+        f"Клиент: {task['client']}\n"
+        f"Дата: {task['task_date'] or 'не указана'}"
+    )
+
+    for worker_name, chat_id in removed_worker_chat_ids.items():
+        if not chat_id:
+            continue
+
+        try:
+            send_message_to_chat(chat_id, removal_telegram_text)
+        except Exception as error:
+            print("Telegram unassignment notification error:", error)
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
