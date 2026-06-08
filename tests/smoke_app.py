@@ -4724,7 +4724,12 @@ async def assert_finance_margin(task):
             "owner2",
             f"/task/{task['id']}/workers",
             {
-                "workers": ["worker2", "helper2", "outsider_worker"],
+                "workers": [
+                    "worker2",
+                    "free2",
+                    "helper2",
+                    "outsider_worker",
+                ],
             },
         ),
         task["id"],
@@ -4745,11 +4750,21 @@ async def assert_finance_margin(task):
     WHERE task_id=? AND action='Изменены исполнители'
     ORDER BY id DESC
     """, (task["id"],)).fetchone()
+    assignment_notification = c.execute("""
+    SELECT title, message, link
+    FROM notifications
+    WHERE company_id=2
+      AND username='free2'
+      AND link=?
+    ORDER BY id DESC
+    """, (f"/task/{task['id']}",)).fetchone()
     conn.close()
 
     assert reassigned_task["worker"] == "worker2"
-    assert reassigned_task["workers"] == "worker2"
-    assert reassignment_activity["details"] == "worker2"
+    assert reassigned_task["workers"] == "worker2,free2"
+    assert reassignment_activity["details"] == "worker2, free2"
+    assert assignment_notification["title"] == f"Назначена заявка #{task['id']}"
+    assert assignment_notification["link"] == f"/task/{task['id']}"
 
     create_task_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task")
@@ -4794,18 +4809,83 @@ async def assert_finance_margin(task):
     assert toggle_response.status_code == 302
     assert crm.get_user(make_request("helper2")) == "helper2"
 
-    restore_workers_response = await crm.update_task_workers(
-        make_multipart_request(
-            "owner2",
-            f"/task/{task['id']}/workers",
-            {"workers": ["worker2", "helper2"]},
-        ),
-        task["id"],
+    sent_reassignment_telegram = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = (
+        lambda chat_id, text:
+        sent_reassignment_telegram.append((chat_id, text)) or True
     )
+
+    try:
+        restore_workers_response = await crm.update_task_workers(
+            make_multipart_request(
+                "owner2",
+                f"/task/{task['id']}/workers",
+                {"workers": ["worker2", "helper2"]},
+            ),
+            task["id"],
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
     assert restore_workers_response.status_code == 302
+    assert sent_reassignment_telegram
+    assert sent_reassignment_telegram[-1][0] == "chat-helper2"
+    assert f"Вам назначена заявка #{task['id']}" in (
+        sent_reassignment_telegram[-1][1]
+    )
 
     conn = connect()
     c = conn.cursor()
+    helper_notification_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=2
+      AND username='helper2'
+      AND title=?
+      AND link=?
+    """, (
+        f"Назначена заявка #{task['id']}",
+        f"/task/{task['id']}",
+    )).fetchone()[0]
+    conn.close()
+
+    duplicate_telegram = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = (
+        lambda chat_id, text:
+        duplicate_telegram.append((chat_id, text)) or True
+    )
+
+    try:
+        duplicate_response = await crm.update_task_workers(
+            make_multipart_request(
+                "owner2",
+                f"/task/{task['id']}/workers",
+                {"workers": ["worker2", "helper2"]},
+            ),
+            task["id"],
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert duplicate_response.status_code == 302
+    assert duplicate_telegram == []
+
+    conn = connect()
+    c = conn.cursor()
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=2
+      AND username='helper2'
+      AND title=?
+      AND link=?
+    """, (
+        f"Назначена заявка #{task['id']}",
+        f"/task/{task['id']}",
+    )).fetchone()[0] == helper_notification_count
+
     assert crm.automation_action_target_is_valid(
         c,
         2,

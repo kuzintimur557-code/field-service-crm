@@ -16157,7 +16157,9 @@ async def update_task_workers(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    previous_workers = get_task_worker_names(task)
     valid_workers = []
+    worker_chat_ids = {}
 
     for worker_name in selected_workers:
         worker_name = str(worker_name or "").strip()
@@ -16166,7 +16168,7 @@ async def update_task_workers(request: Request, task_id: int):
             continue
 
         worker = c.execute("""
-        SELECT username
+        SELECT username, telegram_chat_id
         FROM users
         WHERE company_id=?
           AND username=?
@@ -16176,9 +16178,17 @@ async def update_task_workers(request: Request, task_id: int):
 
         if worker:
             valid_workers.append(worker["username"])
+            worker_chat_ids[worker["username"]] = str(
+                worker["telegram_chat_id"] or ""
+            ).strip()
 
     worker_value = valid_workers[0] if valid_workers else ""
     workers_value = ",".join(valid_workers)
+    added_workers = [
+        worker_name
+        for worker_name in valid_workers
+        if worker_name not in previous_workers
+    ]
 
     c.execute("""
     UPDATE tasks
@@ -16205,8 +16215,53 @@ async def update_task_workers(request: Request, task_id: int):
         datetime.now().strftime("%Y-%m-%d %H:%M"),
     ))
 
+    notification_title = f"Назначена заявка #{task_id}"
+    notification_message = (
+        f"Клиент: {task['client']}. "
+        f"Дата: {task['task_date'] or 'не указана'}"
+    )
+    notification_created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    for worker_name in added_workers:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id,
+            username,
+            title,
+            message,
+            link,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            notification_title,
+            notification_message,
+            f"/task/{task_id}",
+            notification_created_at,
+        ))
+
     conn.commit()
     conn.close()
+
+    telegram_text = (
+        f"Вам назначена заявка #{task_id}\n"
+        f"Клиент: {task['client']}\n"
+        f"Дата: {task['task_date'] or 'не указана'}\n"
+        f"Описание: {task['description'] or 'не указано'}"
+    )
+
+    for worker_name in added_workers:
+        chat_id = worker_chat_ids.get(worker_name)
+
+        if not chat_id:
+            continue
+
+        try:
+            send_message_to_chat(chat_id, telegram_text)
+        except Exception as error:
+            print("Telegram reassignment notification error:", error)
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
