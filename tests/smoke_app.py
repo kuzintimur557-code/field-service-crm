@@ -4708,6 +4708,49 @@ async def assert_finance_margin(task):
     assert "Отключён" in workers_html
     assert "Включить пользователя" in workers_html
 
+    task_detail_response = await crm.task_detail(
+        make_asgi_request("owner2", f"/task/{task['id']}"),
+        task["id"],
+    )
+    task_detail_html = task_detail_response.body.decode("utf-8")
+    assert f"/task/{task['id']}/workers" in task_detail_html
+    assert all(
+        worker["username"] != "helper2"
+        for worker in task_detail_response.context["available_workers"]
+    )
+
+    update_workers_response = await crm.update_task_workers(
+        make_multipart_request(
+            "owner2",
+            f"/task/{task['id']}/workers",
+            {
+                "workers": ["worker2", "helper2", "outsider_worker"],
+            },
+        ),
+        task["id"],
+    )
+    assert update_workers_response.status_code == 302
+    assert update_workers_response.headers["location"] == f"/task/{task['id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    reassigned_task = c.execute("""
+    SELECT worker, workers
+    FROM tasks
+    WHERE id=?
+    """, (task["id"],)).fetchone()
+    reassignment_activity = c.execute("""
+    SELECT details
+    FROM task_activity
+    WHERE task_id=? AND action='Изменены исполнители'
+    ORDER BY id DESC
+    """, (task["id"],)).fetchone()
+    conn.close()
+
+    assert reassigned_task["worker"] == "worker2"
+    assert reassigned_task["workers"] == "worker2"
+    assert reassignment_activity["details"] == "worker2"
+
     create_task_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task")
     )
@@ -4750,6 +4793,16 @@ async def assert_finance_margin(task):
     )
     assert toggle_response.status_code == 302
     assert crm.get_user(make_request("helper2")) == "helper2"
+
+    restore_workers_response = await crm.update_task_workers(
+        make_multipart_request(
+            "owner2",
+            f"/task/{task['id']}/workers",
+            {"workers": ["worker2", "helper2"]},
+        ),
+        task["id"],
+    )
+    assert restore_workers_response.status_code == 302
 
     conn = connect()
     c = conn.cursor()

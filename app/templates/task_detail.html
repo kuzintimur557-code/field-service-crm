@@ -460,7 +460,7 @@ button{
 	{% endif %}
 	</div>
 	</div>
-	<button class="edit-btn" onclick="openEdit('worker','{{ task['worker'] }}')">✎</button>
+	<button class="edit-btn" onclick="openWorkers()">✎</button>
 	</div>
 
 <div class="info-row">
@@ -870,6 +870,30 @@ button{
 	</div>
 	</div>
 
+	<div class="modal" id="workersModal">
+	<div class="modal-content">
+
+	<h3>Назначить исполнителей</h3>
+
+	<form method="post" action="/task/{{ task['id'] }}/workers">
+	<div style="display:grid;gap:10px;margin:14px 0">
+	{% for worker in available_workers %}
+	<label style="display:flex;align-items:center;gap:10px;font-weight:800">
+	<input type="checkbox" name="workers" value="{{ worker['username'] }}" style="width:auto" {% if worker['username'] in task_workers %}checked{% endif %}>
+	<span>{{ worker["full_name"] or worker["username"] }}</span>
+	</label>
+	{% else %}
+	<div class="muted">Нет активных исполнителей</div>
+	{% endfor %}
+	</div>
+
+	<button class="btn blue">Сохранить исполнителей</button>
+
+	</form>
+
+	</div>
+	</div>
+
 	<div class="modal" id="customFieldModal">
 	<div class="modal-content">
 
@@ -931,6 +955,10 @@ document.getElementById('customFieldId').value=id
 const input=document.getElementById('customFieldValue')
 input.type=(type==='number'||type==='date') ? type : 'text'
 input.value=value || ''
+}
+
+function openWorkers(){
+document.getElementById('workersModal').style.display='flex'
 }
 
 function openDate(){

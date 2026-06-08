@@ -15097,6 +15097,14 @@ async def task_detail(request: Request, task_id: int):
         else:
             sla_status = "done"
     task_workers = get_task_worker_names(task)
+    available_workers = c.execute("""
+    SELECT username, full_name
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY COALESCE(NULLIF(full_name, ''), username), username
+    """, (company_id,)).fetchall()
     task_custom_fields = c.execute("""
     SELECT custom_fields.id, custom_fields.label, custom_fields.group_name, custom_fields.field_type, custom_field_values.value
     FROM custom_fields
@@ -15138,6 +15146,7 @@ async def task_detail(request: Request, task_id: int):
             "estimate_final_profit": estimate_final_profit,
             "estimate_margin": estimate_margin,
             "task_workers": task_workers,
+            "available_workers": available_workers,
             "task_custom_fields": task_custom_fields,
             "sla_status": sla_status,
             "settings": settings
@@ -16062,8 +16071,7 @@ async def edit_task_field(request: Request, task_id: int):
         "description": "description",
         "priority": "priority",
         "price": "price",
-        "status": "status",
-        "worker": "worker"
+        "status": "status"
     }
 
     if field not in allowed_fields:
@@ -16111,6 +16119,90 @@ async def edit_task_field(request: Request, task_id: int):
         "Изменено поле",
         f"{field}: {value}",
         datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
+@app.post("/task/{task_id}/workers")
+async def update_task_workers(request: Request, task_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    form = await request.form()
+    selected_workers = form.getlist("workers")
+
+    conn = connect()
+    c = conn.cursor()
+
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=? AND company_id=?
+    """, (task_id, company_id)).fetchone()
+
+    if not task or not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    valid_workers = []
+
+    for worker_name in selected_workers:
+        worker_name = str(worker_name or "").strip()
+
+        if not worker_name or worker_name in valid_workers:
+            continue
+
+        worker = c.execute("""
+        SELECT username
+        FROM users
+        WHERE company_id=?
+          AND username=?
+          AND role='worker'
+          AND COALESCE(is_active, 1)=1
+        """, (company_id, worker_name)).fetchone()
+
+        if worker:
+            valid_workers.append(worker["username"])
+
+    worker_value = valid_workers[0] if valid_workers else ""
+    workers_value = ",".join(valid_workers)
+
+    c.execute("""
+    UPDATE tasks
+    SET worker=?, workers=?
+    WHERE id=? AND company_id=?
+    """, (worker_value, workers_value, task_id, company_id))
+
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id,
+        username,
+        role,
+        action,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Изменены исполнители",
+        ", ".join(valid_workers) if valid_workers else "Исполнители сняты",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
     ))
 
     conn.commit()
