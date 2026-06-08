@@ -14178,33 +14178,82 @@ async def delete_team_user(request: Request, user_id: int):
     if role != "boss":
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
+    current_company_id = get_user_company_id(username)
     conn = connect()
     c = conn.cursor()
 
     user = c.execute("""
     SELECT *
     FROM users
-    WHERE id=?
-    """, (user_id,)).fetchone()
+    WHERE id=? AND company_id=?
+    """, (user_id, current_company_id)).fetchone()
 
     if not user:
         conn.close()
         return RedirectResponse("/workers", status_code=302)
 
-    current_company_id = get_user_company_id(username)
-
     if user["username"] == username or user["role"] == "boss":
         conn.close()
         return RedirectResponse("/workers?error=cannot_delete_boss", status_code=302)
 
-    if user["company_id"] != current_company_id:
-        conn.close()
-        return RedirectResponse("/workers?error=wrong_company", status_code=302)
+    if user["role"] == "worker":
+        worker_params = worker_task_params(user["username"])
+        active_task_count = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND archived=0
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND {worker_task_condition()}
+        """, [current_company_id, *worker_params]).fetchone()[0]
+
+        if active_task_count:
+            conn.close()
+            return RedirectResponse(
+                (
+                    "/workers?error=active_tasks"
+                    f"&count={active_task_count}"
+                ),
+                status_code=302,
+            )
+
+        task_history_count = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND {worker_task_condition()}
+        """, [current_company_id, *worker_params]).fetchone()[0]
+        recurring_count = c.execute(f"""
+        SELECT COUNT(*)
+        FROM recurring_jobs
+        WHERE company_id=?
+          AND {worker_task_condition()}
+        """, [current_company_id, *worker_params]).fetchone()[0]
+        payout_count = c.execute("""
+        SELECT COUNT(*)
+        FROM payroll_payouts
+        WHERE company_id=? AND worker_id=?
+        """, (current_company_id, user_id)).fetchone()[0]
+        history_count = (
+            task_history_count
+            + recurring_count
+            + payout_count
+        )
+
+        if history_count:
+            conn.close()
+            return RedirectResponse(
+                (
+                    "/workers?error=user_has_history"
+                    f"&count={history_count}"
+                ),
+                status_code=302,
+            )
 
     c.execute("""
     DELETE FROM users
-    WHERE id=?
-    """, (user_id,))
+    WHERE id=? AND company_id=?
+    """, (user_id, current_company_id))
 
     conn.commit()
     conn.close()

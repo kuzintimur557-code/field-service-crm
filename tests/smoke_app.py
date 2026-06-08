@@ -4613,6 +4613,33 @@ async def assert_finance_margin(task):
     FROM users
     WHERE company_id=2 AND username='inactive_candidate2'
     """).fetchone()
+    c.executemany("""
+    INSERT INTO users (
+        username, password, role, company_id, telegram_chat_id
+    )
+    VALUES (?, ?, 'worker', 2, '')
+    """, [
+        ("delete_candidate2", "x"),
+        ("history_candidate2", "x"),
+    ])
+    delete_candidate = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=2 AND username='delete_candidate2'
+    """).fetchone()
+    history_candidate = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=2 AND username='history_candidate2'
+    """).fetchone()
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, description, task_date,
+        worker, workers, status, archived
+    )
+    VALUES (2, 'History client', 'Archived history', '2026-01-01',
+            'history_candidate2', 'history_candidate2', 'Завершено', 1)
+    """)
     c.execute("""
     UPDATE users
     SET commission_percent=10
@@ -4683,6 +4710,73 @@ async def assert_finance_margin(task):
     """, (outsider["id"],)).fetchone()
     conn.close()
     assert unchanged_outsider["password"] == outsider["password"]
+
+    cross_company_delete_response = await crm.delete_team_user(
+        make_form_request(
+            "owner2",
+            f"/workers/{outsider['id']}/delete",
+            {},
+        ),
+        outsider["id"],
+    )
+    assert cross_company_delete_response.status_code == 302
+    assert cross_company_delete_response.headers["location"] == "/workers"
+
+    active_delete_response = await crm.delete_team_user(
+        make_form_request(
+            "owner2",
+            f"/workers/{helper['id']}/delete",
+            {},
+        ),
+        helper["id"],
+    )
+    assert active_delete_response.status_code == 302
+    assert active_delete_response.headers["location"].startswith(
+        "/workers?error=active_tasks&count="
+    )
+
+    history_delete_response = await crm.delete_team_user(
+        make_form_request(
+            "owner2",
+            f"/workers/{history_candidate['id']}/delete",
+            {},
+        ),
+        history_candidate["id"],
+    )
+    assert history_delete_response.status_code == 302
+    assert history_delete_response.headers["location"].startswith(
+        "/workers?error=user_has_history&count="
+    )
+
+    clean_delete_response = await crm.delete_team_user(
+        make_form_request(
+            "owner2",
+            f"/workers/{delete_candidate['id']}/delete",
+            {},
+        ),
+        delete_candidate["id"],
+    )
+    assert clean_delete_response.status_code == 302
+    assert clean_delete_response.headers["location"] == "/workers?deleted=1"
+
+    conn = connect()
+    c = conn.cursor()
+    assert c.execute("""
+    SELECT id
+    FROM users
+    WHERE id=?
+    """, (delete_candidate["id"],)).fetchone() is None
+    preserved_users = c.execute("""
+    SELECT id
+    FROM users
+    WHERE id IN (?, ?, ?)
+    """, (
+        outsider["id"],
+        helper["id"],
+        history_candidate["id"],
+    )).fetchall()
+    conn.close()
+    assert len(preserved_users) == 3
 
     active_task_block_response = await crm.toggle_team_user_active(
         make_form_request(

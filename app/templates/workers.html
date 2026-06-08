@@ -74,6 +74,8 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="notice err">Пароль владельца меняется только в его профиле</div>
 {% elif request.query_params.get("error") == "active_tasks" %}
 <div class="notice err">Нельзя отключить исполнителя: у него активных заявок — {{ request.query_params.get("count") or "1" }}. Сначала переназначьте их.</div>
+{% elif request.query_params.get("error") == "user_has_history" %}
+<div class="notice err">Удаление запрещено: с пользователем связано записей — {{ request.query_params.get("count") or "1" }}. Отключите пользователя, чтобы сохранить историю и расчёты.</div>
 {% elif request.query_params.get("error") %}
 <div class="notice err">❌ Ошибка: {{ request.query_params.get("error") }}</div>
 {% endif %}
