@@ -74,6 +74,8 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="notice err">Пароль владельца меняется только в его профиле</div>
 {% elif request.query_params.get("error") == "active_tasks" %}
 <div class="notice err">Нельзя отключить исполнителя: у него активных заявок — {{ request.query_params.get("count") or "1" }}. Сначала переназначьте их.</div>
+{% elif request.query_params.get("error") == "disable_before_delete" %}
+<div class="notice err">Сначала отключите пользователя, затем подтвердите удаление.</div>
 {% elif request.query_params.get("error") == "user_has_history" %}
 <div class="notice err">Удаление запрещено: с пользователем связано записей — {{ request.query_params.get("count") or "1" }}. Отключите пользователя, чтобы сохранить историю и расчёты.</div>
 {% elif request.query_params.get("error") %}
@@ -157,9 +159,13 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
         {% endif %}
     </form>
 
+    {% if worker["is_active"] is not none and not worker["is_active"] %}
     <form method="post" action="/workers/{{ worker['id'] }}/delete" onsubmit="return confirm('Удалить пользователя?')">
         <button class="btn-red" type="submit">Удалить пользователя</button>
     </form>
+    {% else %}
+    <div class="meta" style="margin-top:10px">Для удаления сначала отключите пользователя.</div>
+    {% endif %}
     {% endif %}
 </div>
 {% endfor %}

@@ -4735,6 +4735,31 @@ async def assert_finance_margin(task):
         "/workers?error=active_tasks&count="
     )
 
+    active_clean_delete_response = await crm.delete_team_user(
+        make_form_request(
+            "owner2",
+            f"/workers/{delete_candidate['id']}/delete",
+            {},
+        ),
+        delete_candidate["id"],
+    )
+    assert active_clean_delete_response.status_code == 302
+    assert (
+        active_clean_delete_response.headers["location"]
+        == "/workers?error=disable_before_delete"
+    )
+
+    history_toggle_response = await crm.toggle_team_user_active(
+        make_form_request(
+            "owner2",
+            f"/workers/{history_candidate['id']}/toggle-active",
+            {},
+        ),
+        history_candidate["id"],
+    )
+    assert history_toggle_response.status_code == 302
+    assert history_toggle_response.headers["location"] == "/workers?status_updated=1"
+
     history_delete_response = await crm.delete_team_user(
         make_form_request(
             "owner2",
@@ -4747,6 +4772,17 @@ async def assert_finance_margin(task):
     assert history_delete_response.headers["location"].startswith(
         "/workers?error=user_has_history&count="
     )
+
+    clean_toggle_response = await crm.toggle_team_user_active(
+        make_form_request(
+            "owner2",
+            f"/workers/{delete_candidate['id']}/toggle-active",
+            {},
+        ),
+        delete_candidate["id"],
+    )
+    assert clean_toggle_response.status_code == 302
+    assert clean_toggle_response.headers["location"] == "/workers?status_updated=1"
 
     clean_delete_response = await crm.delete_team_user(
         make_form_request(

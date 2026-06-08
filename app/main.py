@@ -14196,6 +14196,8 @@ async def delete_team_user(request: Request, user_id: int):
         conn.close()
         return RedirectResponse("/workers?error=cannot_delete_boss", status_code=302)
 
+    current_active = 1 if user["is_active"] is None else int(user["is_active"])
+
     if user["role"] == "worker":
         worker_params = worker_task_params(user["username"])
         active_task_count = c.execute(f"""
@@ -14217,6 +14219,14 @@ async def delete_team_user(request: Request, user_id: int):
                 status_code=302,
             )
 
+    if current_active:
+        conn.close()
+        return RedirectResponse(
+            "/workers?error=disable_before_delete",
+            status_code=302,
+        )
+
+    if user["role"] == "worker":
         task_history_count = c.execute(f"""
         SELECT COUNT(*)
         FROM tasks
