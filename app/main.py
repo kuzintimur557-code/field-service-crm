@@ -14876,8 +14876,35 @@ async def create_task(
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
-    conn.commit()
     task_id = c.lastrowid
+    notification_created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    notification_message = (
+        f"Клиент: {client}. "
+        f"Дата: {task_date or 'не указана'}. "
+        f"Приоритет: {priority or 'не указан'}"
+    )
+
+    for worker_name in valid_workers:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id,
+            username,
+            title,
+            message,
+            link,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            f"Назначена новая заявка #{task_id}",
+            notification_message,
+            f"/task/{task_id}",
+            notification_created_at,
+        ))
+
+    conn.commit()
 
     filename = save_upload_file(photo, task_id, "before")
 

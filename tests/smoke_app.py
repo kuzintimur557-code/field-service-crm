@@ -6449,9 +6449,30 @@ async def assert_task_custom_fields():
       AND custom_field_values.value=?
       AND tasks.client=?
     """, (field_id, "Moscow - Tula", "Custom Field Client")).fetchone()
+    assignment_notification = c.execute("""
+    SELECT title, message, link
+    FROM notifications
+    WHERE company_id=2
+      AND username='worker2'
+      AND link=?
+    ORDER BY id DESC
+    """, (f"/task/{value['task_id']}",)).fetchone()
+    unexpected_notification_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=2
+      AND username IN ('helper2', 'free2', 'outsider_worker')
+      AND link=?
+    """, (f"/task/{value['task_id']}",)).fetchone()[0]
     conn.close()
 
     assert value is not None
+    assert assignment_notification["title"] == (
+        f"Назначена новая заявка #{value['task_id']}"
+    )
+    assert assignment_notification["link"] == f"/task/{value['task_id']}"
+    assert "Клиент: Custom Field Client" in assignment_notification["message"]
+    assert unexpected_notification_count == 0
 
     detail_response = await crm.task_detail(
         make_asgi_request("owner2", f"/task/{value['task_id']}"),
