@@ -8420,10 +8420,11 @@ async def generate_recurring_task(request: Request, job_id: int):
     next_date = get_next_recurring_date(job["next_date"], job["interval_type"])
     assigned_workers = get_task_worker_names(job)
     active_workers = []
+    worker_chat_ids = {}
 
     for worker_name in assigned_workers:
         active_worker = c.execute("""
-        SELECT username
+        SELECT username, telegram_chat_id
         FROM users
         WHERE company_id=?
           AND username=?
@@ -8433,6 +8434,9 @@ async def generate_recurring_task(request: Request, job_id: int):
 
         if active_worker:
             active_workers.append(active_worker["username"])
+            worker_chat_ids[active_worker["username"]] = str(
+                active_worker["telegram_chat_id"] or ""
+            ).strip()
 
     if assigned_workers and not active_workers:
         conn.close()
@@ -8486,6 +8490,32 @@ async def generate_recurring_task(request: Request, job_id: int):
     ))
 
     task_id = c.lastrowid
+    notification_created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    notification_message = (
+        f"Клиент: {client_name}. "
+        f"Дата: {job['next_date'] or 'не указана'}. "
+        f"Регулярная работа: {job['title']}"
+    )
+
+    for worker_name in active_workers:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id,
+            username,
+            title,
+            message,
+            link,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            f"Назначена регулярная заявка #{task_id}",
+            notification_message,
+            f"/task/{task_id}",
+            notification_created_at,
+        ))
 
     c.execute("""
     UPDATE recurring_jobs
@@ -8511,6 +8541,24 @@ async def generate_recurring_task(request: Request, job_id: int):
         "Создана из регулярной работы",
         f"Шаблон: {job['title']}"
     )
+
+    telegram_text = (
+        f"Вам назначена регулярная заявка #{task_id}\n"
+        f"Клиент: {client_name}\n"
+        f"Дата: {job['next_date'] or 'не указана'}\n"
+        f"Описание: {job['description'] or 'не указано'}"
+    )
+
+    for worker_name in active_workers:
+        chat_id = worker_chat_ids.get(worker_name)
+
+        if not chat_id:
+            continue
+
+        try:
+            send_message_to_chat(chat_id, telegram_text)
+        except Exception as error:
+            print("Telegram recurring notification error:", error)
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 

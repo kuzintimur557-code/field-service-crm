@@ -5959,7 +5959,21 @@ async def assert_recurring_generate(task):
     conn.commit()
     conn.close()
 
-    response = await crm.generate_recurring_task(make_request("owner2"), job_id)
+    recurring_telegram = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = (
+        lambda chat_id, text:
+        recurring_telegram.append((chat_id, text)) or True
+    )
+
+    try:
+        response = await crm.generate_recurring_task(
+            make_request("owner2"),
+            job_id,
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
     assert response.status_code == 302
     task_location = response.headers["location"]
     assert task_location.startswith("/task/")
@@ -5982,6 +5996,21 @@ async def assert_recurring_generate(task):
     FROM task_activity
     WHERE task_id=? AND action='Создана из регулярной работы'
     """, (generated_task_id,)).fetchone()
+    recurring_notification = c.execute("""
+    SELECT title, message, link
+    FROM notifications
+    WHERE company_id=2
+      AND username='worker2'
+      AND link=?
+    ORDER BY id DESC
+    """, (f"/task/{generated_task_id}",)).fetchone()
+    inactive_notification_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=2
+      AND username='helper2'
+      AND link=?
+    """, (f"/task/{generated_task_id}",)).fetchone()[0]
     conn.close()
 
     assert generated_task is not None
@@ -5992,6 +6021,22 @@ async def assert_recurring_generate(task):
     assert job["worker"] == "worker2"
     assert job["workers"] == "worker2"
     assert activity is not None
+    assert recurring_notification["title"] == (
+        f"Назначена регулярная заявка #{generated_task_id}"
+    )
+    assert recurring_notification["link"] == f"/task/{generated_task_id}"
+    assert inactive_notification_count == 0
+    assert recurring_telegram == [
+        (
+            "chat-worker2",
+            (
+                f"Вам назначена регулярная заявка #{generated_task_id}\n"
+                "Клиент: Client 2\n"
+                "Дата: 2026-05-17\n"
+                "Описание: Generated from recurring"
+            ),
+        )
+    ]
 
     conn = connect()
     c = conn.cursor()
