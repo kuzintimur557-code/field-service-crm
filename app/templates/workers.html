@@ -22,10 +22,15 @@ h2{margin:0 0 16px;font-size:22px}
 .badge{padding:8px 14px;border-radius:999px;font-weight:900}
 .manager{background:#dbeafe;color:#1d4ed8}
 .worker{background:#dcfce7;color:#166534}
+.status-active{background:#dcfce7;color:#166534}
+.status-disabled{background:#fee2e2;color:#991b1b}
+.badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input,button{width:100%;padding:13px;border-radius:14px;font-size:15px;margin-top:10px}
 input{border:1px solid #d1d5db;background:white}
 button{border:0;color:white;font-weight:900;cursor:pointer}
 .btn-dark{background:#111827}
+.btn-toggle{background:#92400e}
+.btn-enable{background:#166534}
 .btn-red{background:#991b1b}
 .notice{margin-top:16px;padding:14px;border-radius:16px;font-weight:900}
 .ok{background:#dcfce7;color:#166534}
@@ -49,6 +54,10 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 
 {% if request.query_params.get("commission_updated") == "1" %}
 <div class="notice ok">✅ Процент исполнителя обновлён</div>
+{% endif %}
+
+{% if request.query_params.get("status_updated") == "1" %}
+<div class="notice ok">Статус пользователя обновлён</div>
 {% endif %}
 
 {% if request.query_params.get("deleted") == "1" %}
@@ -104,11 +113,19 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
             <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
         </div>
 
-        {% if worker["role"] == "manager" %}
-        <div class="badge manager">Менеджер</div>
-        {% else %}
-        <div class="badge worker">Исполнитель</div>
-        {% endif %}
+        <div class="badges">
+            {% if worker["role"] == "manager" %}
+            <div class="badge manager">Менеджер</div>
+            {% else %}
+            <div class="badge worker">Исполнитель</div>
+            {% endif %}
+
+            {% if worker["is_active"] is none or worker["is_active"] %}
+            <div class="badge status-active">Активен</div>
+            {% else %}
+            <div class="badge status-disabled">Отключён</div>
+            {% endif %}
+        </div>
     </div>
 
     {% if role == "boss" and worker["role"] != "boss" %}
@@ -120,6 +137,14 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     <form method="post" action="/workers/{{ worker['id'] }}/commission">
         <input type="number" name="commission_percent" min="0" step="0.1" value="{{ worker['commission_percent'] or 0 }}" placeholder="Процент с прибыли">
         <button class="btn-dark" type="submit">Сохранить процент</button>
+    </form>
+
+    <form method="post" action="/workers/{{ worker['id'] }}/toggle-active">
+        {% if worker["is_active"] is none or worker["is_active"] %}
+        <button class="btn-toggle" type="submit">Отключить пользователя</button>
+        {% else %}
+        <button class="btn-enable" type="submit">Включить пользователя</button>
+        {% endif %}
     </form>
 
     <form method="post" action="/workers/{{ worker['id'] }}/delete" onsubmit="return confirm('Удалить пользователя?')">

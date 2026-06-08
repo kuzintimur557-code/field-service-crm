@@ -34,7 +34,8 @@ def init_db():
         username TEXT UNIQUE,
         password TEXT,
         role TEXT,
-        last_seen TEXT
+        last_seen TEXT,
+        is_active INTEGER DEFAULT 1
     )
     """)
 
@@ -497,6 +498,7 @@ def init_db():
     add_column_if_missing(c, "users", "email", "TEXT")
     add_column_if_missing(c, "users", "telegram_chat_id", "TEXT")
     add_column_if_missing(c, "users", "commission_percent", "REAL DEFAULT 0")
+    add_column_if_missing(c, "users", "is_active", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "task_items", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "client_notes", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "catalog_items", "company_id", "INTEGER DEFAULT 1")

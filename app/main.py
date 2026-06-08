@@ -1699,6 +1699,7 @@ def automation_least_loaded_worker(
     FROM users
     WHERE company_id=?
       AND role='worker'
+      AND COALESCE(is_active, 1)=1
     ORDER BY username
     """, (company_id,)).fetchall()
 
@@ -1823,6 +1824,7 @@ def automation_action_target_is_valid(c, company_id, action_key, target_username
             FROM users
             WHERE company_id=?
               AND role='worker'
+              AND COALESCE(is_active, 1)=1
             LIMIT 1
             """, (company_id,)).fetchone())
 
@@ -1832,6 +1834,7 @@ def automation_action_target_is_valid(c, company_id, action_key, target_username
         WHERE company_id=?
           AND username=?
           AND role='worker'
+          AND COALESCE(is_active, 1)=1
         """, (company_id, target_username)).fetchone())
 
     if not target_username:
@@ -1842,6 +1845,7 @@ def automation_action_target_is_valid(c, company_id, action_key, target_username
     FROM users
     WHERE company_id=?
       AND username=?
+      AND COALESCE(is_active, 1)=1
     """, (company_id, target_username)).fetchone())
 
 
@@ -1984,6 +1988,7 @@ def execute_automation_create_task_action(
         WHERE company_id=?
           AND username=?
           AND role='worker'
+          AND COALESCE(is_active, 1)=1
         """, (company_id, target_username)).fetchone()
 
         if worker_row:
@@ -3084,10 +3089,22 @@ def get_user(request: Request):
     signed_value = request.cookies.get(SESSION_COOKIE_NAME)
     username = verify_session_value(signed_value)
 
-    if username:
-        return username
+    if not username:
+        return None
 
-    return None
+    conn = connect()
+    c = conn.cursor()
+    user = c.execute("""
+    SELECT is_active
+    FROM users
+    WHERE username=?
+    """, (username,)).fetchone()
+    conn.close()
+
+    if not user or user["is_active"] == 0:
+        return None
+
+    return username
 
 
 def is_superadmin(role):
@@ -13967,6 +13984,51 @@ async def update_worker_commission(request: Request, user_id: int):
     return RedirectResponse("/workers?commission_updated=1", status_code=302)
 
 
+@app.post("/workers/{user_id}/toggle-active")
+async def toggle_team_user_active(request: Request, user_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "boss":
+        return RedirectResponse("/workers?error=only_boss", status_code=302)
+
+    company_id = get_user_company_id(username)
+    conn = connect()
+    c = conn.cursor()
+
+    user = c.execute("""
+    SELECT id, username, role, is_active
+    FROM users
+    WHERE id=? AND company_id=?
+    """, (user_id, company_id)).fetchone()
+
+    if not user:
+        conn.close()
+        return RedirectResponse("/workers", status_code=302)
+
+    if user["username"] == username or user["role"] == "boss":
+        conn.close()
+        return RedirectResponse(
+            "/workers?error=cannot_disable_boss",
+            status_code=302,
+        )
+
+    current_active = 1 if user["is_active"] is None else int(user["is_active"])
+    c.execute("""
+    UPDATE users
+    SET is_active=?
+    WHERE id=? AND company_id=?
+    """, (0 if current_active else 1, user_id, company_id))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/workers?status_updated=1", status_code=302)
+
+
 @app.post("/workers/{user_id}/delete")
 async def delete_team_user(request: Request, user_id: int):
 
@@ -14289,6 +14351,10 @@ async def login(request: Request):
         conn.close()
         register_failed_login(username, ip)
         return RedirectResponse("/login?error=invalid", status_code=302)
+
+    if user["is_active"] == 0:
+        conn.close()
+        return RedirectResponse("/login?error=disabled", status_code=302)
 
     if password_needs_upgrade(user["password"]):
         c.execute("""

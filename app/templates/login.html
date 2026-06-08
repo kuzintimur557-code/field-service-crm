@@ -60,6 +60,12 @@ CRM система для исполнителей,<br>
 </div>
 {% endif %}
 
+{% if request.query_params.get("error") == "disabled" %}
+<div style="margin-bottom:16px;padding:14px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+Учётная запись отключена владельцем компании.
+</div>
+{% endif %}
+
 <form method="post" action="/login">
 
 <label>Логин</label>

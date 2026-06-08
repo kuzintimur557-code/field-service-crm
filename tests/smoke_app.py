@@ -4606,6 +4606,66 @@ async def assert_finance_margin(task):
     conn.commit()
     conn.close()
 
+    toggle_response = await crm.toggle_team_user_active(
+        make_form_request(
+            "owner2",
+            f"/workers/{helper['id']}/toggle-active",
+            {},
+        ),
+        helper["id"],
+    )
+    assert toggle_response.status_code == 302
+    assert toggle_response.headers["location"] == "/workers?status_updated=1"
+    assert crm.get_user(make_request("helper2")) is None
+
+    disabled_login_response = await crm.login(
+        make_form_request(
+            "anonymous",
+            "/login",
+            {"username": "helper2", "password": "x"},
+        )
+    )
+    assert disabled_login_response.status_code == 302
+    assert disabled_login_response.headers["location"] == "/login?error=disabled"
+
+    conn = connect()
+    c = conn.cursor()
+    assert crm.automation_action_target_is_valid(
+        c,
+        2,
+        "create_task",
+        "helper2",
+    ) is False
+    conn.close()
+
+    workers_response = await crm.workers_page(
+        make_asgi_request("owner2", "/workers")
+    )
+    workers_html = workers_response.body.decode("utf-8")
+    assert "Отключён" in workers_html
+    assert "Включить пользователя" in workers_html
+
+    toggle_response = await crm.toggle_team_user_active(
+        make_form_request(
+            "owner2",
+            f"/workers/{helper['id']}/toggle-active",
+            {},
+        ),
+        helper["id"],
+    )
+    assert toggle_response.status_code == 302
+    assert crm.get_user(make_request("helper2")) == "helper2"
+
+    conn = connect()
+    c = conn.cursor()
+    assert crm.automation_action_target_is_valid(
+        c,
+        2,
+        "create_task",
+        "helper2",
+    ) is True
+    conn.close()
+
     commission_response = await crm.update_worker_commission(
         make_form_request(
             "owner2",
