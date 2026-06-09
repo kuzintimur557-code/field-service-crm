@@ -5844,6 +5844,15 @@ async def assert_finance_margin(task):
     )
     assert "worker=helper2" in worker_detail_html
     assert "return_to=calendar" in worker_detail_html
+    assert "Загрузка на 7 дней" in worker_detail_html
+    assert len(worker_detail_response.context["weekly_schedule"]) == 7
+    assert worker_detail_response.context["nearest_free_date"]
+    assert all(
+        day["calendar_url"].startswith("/calendar?date=")
+        and "worker=helper2" in day["calendar_url"]
+        and day["create_url"].startswith("/create-task?task_date=")
+        for day in worker_detail_response.context["weekly_schedule"]
+    )
 
     apply_response = await crm.apply_task_estimate_total(
         make_request("owner2"),

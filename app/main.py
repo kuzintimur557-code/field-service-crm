@@ -14175,11 +14175,72 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
     LIMIT 20
     """, (company_id, worker_id)).fetchall()
 
+    weekly_schedule = []
+    nearest_free_date = ""
+    worker_is_active = (
+        worker["is_active"] is None or int(worker["is_active"]) == 1
+    )
+
+    if worker["role"] == "worker" and worker_is_active:
+        schedule_end = (
+            datetime.now() + timedelta(days=6)
+        ).strftime("%Y-%m-%d")
+        schedule_rows = c.execute(f"""
+        SELECT substr(task_date, 1, 10) AS work_date, COUNT(*) AS task_count
+        FROM tasks
+        WHERE company_id=?
+          AND archived=0
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND task_date IS NOT NULL
+          AND task_date != ''
+          AND substr(task_date, 1, 10) BETWEEN ? AND ?
+          AND {worker_condition}
+        GROUP BY substr(task_date, 1, 10)
+        """, [company_id, today, schedule_end] + worker_params).fetchall()
+        schedule_counts = {
+            row["work_date"]: row["task_count"]
+            for row in schedule_rows
+        }
+        weekday_labels = [
+            "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"
+        ]
+
+        for day_offset in range(7):
+            schedule_date = datetime.now() + timedelta(days=day_offset)
+            date_value = schedule_date.strftime("%Y-%m-%d")
+            task_count = int(schedule_counts.get(date_value, 0))
+            load_status = "Свободен"
+
+            if task_count >= 3:
+                load_status = "Перегружен"
+            elif task_count:
+                load_status = "В норме"
+
+            if not nearest_free_date and task_count == 0:
+                nearest_free_date = date_value
+
+            weekly_schedule.append({
+                "date": date_value,
+                "day_label": weekday_labels[schedule_date.weekday()],
+                "date_label": schedule_date.strftime("%d.%m"),
+                "task_count": task_count,
+                "load_status": load_status,
+                "calendar_url": "/calendar?" + urlencode({
+                    "date": date_value,
+                    "worker": worker["username"],
+                }),
+                "create_url": "/create-task?" + urlencode({
+                    "task_date": date_value,
+                    "worker": worker["username"],
+                    "return_to": "calendar",
+                }),
+            })
+
     conn.close()
     create_task_url = ""
     worker_calendar_url = ""
 
-    if worker["role"] == "worker":
+    if worker["role"] == "worker" and worker_is_active:
         create_task_url = "/create-task?" + urlencode({
             "task_date": today,
             "worker": worker["username"],
@@ -14211,6 +14272,8 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             "client_label": client_label,
             "create_task_url": create_task_url,
             "worker_calendar_url": worker_calendar_url,
+            "weekly_schedule": weekly_schedule,
+            "nearest_free_date": nearest_free_date,
             "income": income,
             "finance_total": finance_total,
             "finance_profit": finance_profit,

@@ -41,7 +41,17 @@ h1{margin:0 0 10px;font-size:34px}
 .quick-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
 .quick-actions a{padding:11px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
 .quick-actions a.secondary{background:#111827}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:14px}
+.day{padding:12px 8px;border-radius:12px;background:#f9fafb;text-align:center}
+.day-name{font-size:12px;color:#6b7280;font-weight:900}
+.day-date{font-weight:900;margin:4px 0}
+.day-count{font-size:20px;font-weight:900}
+.day.free{background:#dcfce7;color:#166534}
+.day.normal{background:#dbeafe;color:#1d4ed8}
+.day.busy{background:#fee2e2;color:#991b1b}
+.day a{display:block;margin-top:7px;color:inherit;font-size:12px;font-weight:900;text-decoration:none}
 @media(max-width:700px){.container{padding:16px}.grid,.edit-form{grid-template-columns:1fr}h1{font-size:28px}}
+@media(max-width:700px){.week{grid-template-columns:repeat(2,1fr)}.quick-actions a{width:100%;text-align:center}}
 </style>
 </head>
 
@@ -144,7 +154,7 @@ h1{margin:0 0 10px;font-size:34px}
 
 <div class="card">
 <h2>Текущая загрузка</h2>
-{% if worker["role"] == "worker" %}
+{% if create_task_url %}
 <div class="quick-actions">
     <a href="{{ create_task_url }}">Создать заявку на сегодня</a>
     <a class="secondary" href="{{ worker_calendar_url }}">Открыть календарь сотрудника</a>
@@ -175,6 +185,29 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="meta">Активных заявок нет</div>
 {% endif %}
 </div>
+
+{% if weekly_schedule %}
+<div class="card">
+<h2>Загрузка на 7 дней</h2>
+{% if nearest_free_date %}
+<div class="meta">Ближайший свободный день: {{ nearest_free_date }}</div>
+{% else %}
+<div class="meta">На ближайшие 7 дней свободных дней нет</div>
+{% endif %}
+<div class="week">
+{% for day in weekly_schedule %}
+<div class="day {% if day['load_status'] == 'Свободен' %}free{% elif day['load_status'] == 'Перегружен' %}busy{% else %}normal{% endif %}">
+    <div class="day-name">{{ day["day_label"] }}</div>
+    <div class="day-date">{{ day["date_label"] }}</div>
+    <div class="day-count">{{ day["task_count"] }}</div>
+    <div class="day-name">{{ day["load_status"] }}</div>
+    <a href="{{ day['calendar_url'] }}">Открыть</a>
+    <a href="{{ day['create_url'] }}">Создать</a>
+</div>
+{% endfor %}
+</div>
+</div>
+{% endif %}
 
 <div class="card">
 <h2>Финансы за месяц</h2>
