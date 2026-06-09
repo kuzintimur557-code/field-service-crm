@@ -5831,11 +5831,19 @@ async def assert_finance_margin(task):
     assert "70.0 ₽" in worker_detail_html
     assert "Текущая загрузка" in worker_detail_html
     assert worker_detail_response.context["active_tasks_count"] >= 1
+    assert worker_detail_response.context["today_tasks_count"] >= 0
+    assert worker_detail_response.context["future_tasks_count"] >= 0
     assert any(
         active_task["id"] == task["id"]
         for active_task in worker_detail_response.context["active_tasks"]
     )
     assert f"/task/{task['id']}" in worker_detail_html
+    assert (
+        "Создать заявку на сегодня" in worker_detail_html
+        and "Открыть календарь сотрудника" in worker_detail_html
+    )
+    assert "worker=helper2" in worker_detail_html
+    assert "return_to=calendar" in worker_detail_html
 
     apply_response = await crm.apply_task_estimate_total(
         make_request("owner2"),

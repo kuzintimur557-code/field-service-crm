@@ -38,6 +38,9 @@ h1{margin:0 0 10px;font-size:34px}
 .task-status{padding:7px 9px;border-radius:10px;background:#e5e7eb;font-size:12px;font-weight:900}
 .task-date{color:#2563eb;font-weight:900}
 .task-date.overdue{color:#b91c1c}
+.quick-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.quick-actions a{padding:11px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
+.quick-actions a.secondary{background:#111827}
 @media(max-width:700px){.container{padding:16px}.grid,.edit-form{grid-template-columns:1fr}h1{font-size:28px}}
 </style>
 </head>
@@ -123,6 +126,16 @@ h1{margin:0 0 10px;font-size:34px}
     </div>
 
     <div class="stat">
+        <div class="label">Сегодня</div>
+        <div class="value">{{ today_tasks_count }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Будущие</div>
+        <div class="value">{{ future_tasks_count }}</div>
+    </div>
+
+    <div class="stat">
         <div class="label">Доход</div>
         <div class="value">{{ income }} ₽</div>
     </div>
@@ -131,6 +144,12 @@ h1{margin:0 0 10px;font-size:34px}
 
 <div class="card">
 <h2>Текущая загрузка</h2>
+{% if worker["role"] == "worker" %}
+<div class="quick-actions">
+    <a href="{{ create_task_url }}">Создать заявку на сегодня</a>
+    <a class="secondary" href="{{ worker_calendar_url }}">Открыть календарь сотрудника</a>
+</div>
+{% endif %}
 {% if active_tasks %}
 {% for task in active_tasks %}
 <a class="task" href="/task/{{ task['id'] }}">

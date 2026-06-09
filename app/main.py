@@ -14058,6 +14058,28 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
       AND {worker_condition}
     """, [company_id, today] + worker_params).fetchone()[0]
 
+    today_tasks_count = c.execute(f"""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date LIKE ?
+      AND {worker_condition}
+    """, [company_id, f"{today}%"] + worker_params).fetchone()[0]
+
+    future_tasks_count = c.execute(f"""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date != ''
+      AND substr(task_date, 1, 10) > ?
+      AND {worker_condition}
+    """, [company_id, today] + worker_params).fetchone()[0]
+
     active_tasks = c.execute(f"""
     SELECT *
     FROM tasks
@@ -14154,6 +14176,19 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
     """, (company_id, worker_id)).fetchall()
 
     conn.close()
+    create_task_url = ""
+    worker_calendar_url = ""
+
+    if worker["role"] == "worker":
+        create_task_url = "/create-task?" + urlencode({
+            "task_date": today,
+            "worker": worker["username"],
+            "return_to": "calendar",
+        })
+        worker_calendar_url = "/calendar?" + urlencode({
+            "worker": worker["username"],
+            "month": today[:7],
+        })
 
     return templates.TemplateResponse(
         request=request,
@@ -14168,10 +14203,14 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             "done_tasks": done_tasks,
             "active_tasks_count": active_tasks_count,
             "overdue_tasks_count": overdue_tasks_count,
+            "today_tasks_count": today_tasks_count,
+            "future_tasks_count": future_tasks_count,
             "active_tasks": active_tasks,
             "today": today,
             "task_label": task_label,
             "client_label": client_label,
+            "create_task_url": create_task_url,
+            "worker_calendar_url": worker_calendar_url,
             "income": income,
             "finance_total": finance_total,
             "finance_profit": finance_profit,
