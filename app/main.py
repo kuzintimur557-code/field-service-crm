@@ -426,6 +426,88 @@ def format_task_workers(task):
     return ", ".join(names) if names else "Не назначены"
 
 
+def get_worker_unavailability(
+    cursor,
+    company_id,
+    worker_names,
+    date_from,
+    date_to,
+):
+    worker_names = list(dict.fromkeys(
+        str(name or "").strip()
+        for name in worker_names
+        if str(name or "").strip()
+    ))
+
+    if not worker_names:
+        return {}, []
+
+    placeholders = ",".join("?" for _ in worker_names)
+    rows = cursor.execute(f"""
+    SELECT
+        worker_unavailability.*,
+        users.username
+    FROM worker_unavailability
+    JOIN users ON users.id=worker_unavailability.worker_id
+    WHERE worker_unavailability.company_id=?
+      AND users.company_id=worker_unavailability.company_id
+      AND users.username IN ({placeholders})
+      AND worker_unavailability.date_from <= ?
+      AND worker_unavailability.date_to >= ?
+    ORDER BY
+        worker_unavailability.date_from,
+        worker_unavailability.id
+    """, [
+        company_id,
+        *worker_names,
+        str(date_to)[:10],
+        str(date_from)[:10],
+    ]).fetchall()
+    dates_by_worker = {
+        worker_name: set()
+        for worker_name in worker_names
+    }
+    reasons_by_worker_date = {}
+
+    try:
+        requested_start = datetime.strptime(
+            str(date_from)[:10],
+            "%Y-%m-%d",
+        ).date()
+        requested_end = datetime.strptime(
+            str(date_to)[:10],
+            "%Y-%m-%d",
+        ).date()
+    except Exception:
+        return dates_by_worker, reasons_by_worker_date
+
+    for row in rows:
+        try:
+            period_start = datetime.strptime(
+                row["date_from"],
+                "%Y-%m-%d",
+            ).date()
+            period_end = datetime.strptime(
+                row["date_to"],
+                "%Y-%m-%d",
+            ).date()
+        except Exception:
+            continue
+
+        current_date = max(period_start, requested_start)
+        period_end = min(period_end, requested_end)
+
+        while current_date <= period_end:
+            date_value = current_date.strftime("%Y-%m-%d")
+            dates_by_worker.setdefault(row["username"], set()).add(date_value)
+            reasons_by_worker_date[
+                (row["username"], date_value)
+            ] = row["reason"] or "Сотрудник недоступен"
+            current_date += timedelta(days=1)
+
+    return dates_by_worker, reasons_by_worker_date
+
+
 def worker_task_condition():
     return """
     (
@@ -8005,6 +8087,8 @@ async def calendar_page(
         "capacity": 0,
         "available_slots": 0,
         "full_cells": 0,
+        "unavailable_cells": 0,
+        "conflict_assignments": 0,
         "utilization_percent": 0,
     }
     smart_schedule_items = []
@@ -8018,9 +8102,14 @@ async def calendar_page(
     availability_summary = {
         "total": 0,
         "free": 0,
-        "busy": 0
+        "busy": 0,
+        "unavailable": 0,
     }
-    selected_availability = availability if availability in ("free", "busy") else ""
+    selected_availability = (
+        availability
+        if availability in ("free", "busy", "unavailable")
+        else ""
+    )
     selected_date = str(date or "").strip()
 
     try:
@@ -8105,6 +8194,29 @@ async def calendar_page(
             )
             for worker_row in workers
         }
+        availability_day = datetime.strptime(
+            availability_date,
+            "%Y-%m-%d",
+        ).date()
+        schedule_end_date = (
+            schedule_start_date
+            + timedelta(days=selected_schedule_days - 1)
+        )
+        unavailable_dates, unavailable_reasons = get_worker_unavailability(
+            c,
+            company_id,
+            worker_names,
+            min(
+                availability_day,
+                calendar_week_start,
+                schedule_start_date,
+            ).strftime("%Y-%m-%d"),
+            max(
+                availability_day,
+                calendar_week_end,
+                schedule_end_date,
+            ).strftime("%Y-%m-%d"),
+        )
 
         if worker and worker in worker_names:
             query += f" AND {worker_task_condition()}"
@@ -8178,6 +8290,14 @@ async def calendar_page(
             active_count = busy_counts.get(worker_name, 0)
             daily_capacity = worker_capacity_map[worker_name]
             available_slots = max(daily_capacity - active_count, 0)
+            is_unavailable = (
+                availability_date
+                in unavailable_dates.get(worker_name, set())
+            )
+
+            if is_unavailable:
+                available_slots = 0
+
             worker_availability.append({
                 "username": worker_name,
                 "active_count": active_count,
@@ -8187,8 +8307,15 @@ async def calendar_page(
                     round(active_count / daily_capacity * 100),
                     100,
                 ),
-                "is_free": available_slots > 0,
-                "is_at_capacity": available_slots == 0,
+                "is_free": available_slots > 0 and not is_unavailable,
+                "is_at_capacity": (
+                    available_slots == 0 and not is_unavailable
+                ),
+                "is_unavailable": is_unavailable,
+                "unavailable_reason": unavailable_reasons.get(
+                    (worker_name, availability_date),
+                    "",
+                ),
                 "is_recommended": False
             })
 
@@ -8197,6 +8324,7 @@ async def calendar_page(
                 item["active_count"] / item["daily_capacity"]
                 for item in worker_availability
                 if item["available_slots"] > 0
+                and not item["is_unavailable"]
             ],
             default=None
         )
@@ -8205,6 +8333,7 @@ async def calendar_page(
             item["is_recommended"] = (
                 recommended_load is not None
                 and item["available_slots"] > 0
+                and not item["is_unavailable"]
                 and item["active_count"] / item["daily_capacity"]
                 == recommended_load
             )
@@ -8212,13 +8341,32 @@ async def calendar_page(
         availability_summary = {
             "total": len(worker_availability),
             "free": sum(1 for item in worker_availability if item["is_free"]),
-            "busy": sum(1 for item in worker_availability if not item["is_free"])
+            "busy": sum(
+                1
+                for item in worker_availability
+                if item["is_at_capacity"]
+            ),
+            "unavailable": sum(
+                1
+                for item in worker_availability
+                if item["is_unavailable"]
+            ),
         }
 
         if selected_availability == "free":
             worker_availability = [item for item in worker_availability if item["is_free"]]
         elif selected_availability == "busy":
-            worker_availability = [item for item in worker_availability if not item["is_free"]]
+            worker_availability = [
+                item
+                for item in worker_availability
+                if item["is_at_capacity"]
+            ]
+        elif selected_availability == "unavailable":
+            worker_availability = [
+                item
+                for item in worker_availability
+                if item["is_unavailable"]
+            ]
 
         weekly_counts = {
             worker_name: {
@@ -8256,6 +8404,7 @@ async def calendar_page(
             available_workers = [
                 worker_name
                 for worker_name in planner_worker_names
+                if day_date not in unavailable_dates.get(worker_name, set())
                 if weekly_counts[worker_name][day_date]
                 < worker_capacity_map[worker_name]
             ]
@@ -8278,12 +8427,22 @@ async def calendar_page(
             for day in weekly_capacity_days:
                 day_date = day["date"]
                 task_count = weekly_counts[worker_name][day_date]
-                available_slots = max(daily_capacity - task_count, 0)
+                is_unavailable = (
+                    day_date
+                    in unavailable_dates.get(worker_name, set())
+                )
+                available_slots = (
+                    0
+                    if is_unavailable
+                    else max(daily_capacity - task_count, 0)
+                )
                 is_at_capacity = available_slots == 0
                 is_overloaded = task_count > daily_capacity
                 cell_status = "free"
 
-                if is_overloaded:
+                if is_unavailable:
+                    cell_status = "unavailable"
+                elif is_overloaded:
                     cell_status = "overloaded"
                 elif is_at_capacity:
                     cell_status = "full"
@@ -8299,6 +8458,12 @@ async def calendar_page(
                         100,
                     ),
                     "status": cell_status,
+                    "is_unavailable": is_unavailable,
+                    "has_conflict": is_unavailable and task_count > 0,
+                    "unavailable_reason": unavailable_reasons.get(
+                        (worker_name, day_date),
+                        "",
+                    ),
                     "is_recommended": (
                         recommended_workers_by_day.get(day_date)
                         == worker_name
@@ -8318,7 +8483,12 @@ async def calendar_page(
             total_assignments = sum(
                 cell["task_count"] for cell in cells
             )
-            total_capacity = daily_capacity * 7
+            available_day_count = sum(
+                1
+                for cell in cells
+                if not cell["is_unavailable"]
+            )
+            total_capacity = daily_capacity * available_day_count
             total_available_slots = sum(
                 cell["available_slots"] for cell in cells
             )
@@ -8329,9 +8499,10 @@ async def calendar_page(
                 "total_assignments": total_assignments,
                 "total_capacity": total_capacity,
                 "available_slots": total_available_slots,
+                "unavailable_days": 7 - available_day_count,
                 "utilization_percent": round(
                     total_assignments / total_capacity * 100
-                ),
+                ) if total_capacity else 0,
             })
 
         weekly_capacity_summary = {
@@ -8353,6 +8524,18 @@ async def calendar_page(
                 for cell in row["cells"]
                 if cell["status"] in ("full", "overloaded")
             ),
+            "unavailable_cells": sum(
+                1
+                for row in weekly_capacity_rows
+                for cell in row["cells"]
+                if cell["status"] == "unavailable"
+            ),
+            "conflict_assignments": sum(
+                cell["task_count"]
+                for row in weekly_capacity_rows
+                for cell in row["cells"]
+                if cell["is_unavailable"]
+            ),
             "utilization_percent": 0,
         }
 
@@ -8363,10 +8546,6 @@ async def calendar_page(
                 * 100
             )
 
-        schedule_end_date = (
-            schedule_start_date
-            + timedelta(days=selected_schedule_days - 1)
-        )
         schedule_rows = c.execute("""
         SELECT worker, workers, substr(task_date, 1, 10) AS work_date
         FROM tasks
@@ -8394,6 +8573,7 @@ async def calendar_page(
             search_days=selected_schedule_days,
             required_workers=selected_schedule_workers,
             preferred_worker=worker if worker in worker_names else "",
+            unavailable_dates=unavailable_dates,
         )
         smart_schedule_items = scheduling_result["items"]
         smart_schedule_summary = scheduling_result["summary"]
@@ -8621,6 +8801,13 @@ def api_calendar_smart_schedule(
         start_date.strftime("%Y-%m-%d"),
         end_date.strftime("%Y-%m-%d"),
     )).fetchall()
+    unavailable_dates, _ = get_worker_unavailability(
+        c,
+        company_id,
+        worker_capacities.keys(),
+        start_date.strftime("%Y-%m-%d"),
+        end_date.strftime("%Y-%m-%d"),
+    )
     conn.close()
     result = build_scheduling_recommendations(
         worker_capacities=worker_capacities,
@@ -8635,6 +8822,7 @@ def api_calendar_smart_schedule(
         search_days=search_days,
         required_workers=required_workers,
         preferred_worker=preferred_worker,
+        unavailable_dates=unavailable_dates,
     )
 
     for item in result["items"]:
@@ -14624,6 +14812,20 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
     LIMIT 20
     """, (company_id, worker_id)).fetchall()
 
+    unavailability_periods = []
+
+    if worker["role"] == "worker":
+        unavailability_periods = c.execute("""
+        SELECT *
+        FROM worker_unavailability
+        WHERE company_id=? AND worker_id=?
+        ORDER BY
+            CASE WHEN date_to >= ? THEN 0 ELSE 1 END,
+            date_from,
+            id DESC
+        LIMIT 30
+        """, (company_id, worker_id, today)).fetchall()
+
     weekly_schedule = []
     nearest_free_date = ""
     daily_capacity = max(1, int(worker["daily_capacity"] or 3))
@@ -14651,6 +14853,13 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             row["work_date"]: row["task_count"]
             for row in schedule_rows
         }
+        unavailable_dates, unavailable_reasons = get_worker_unavailability(
+            c,
+            company_id,
+            [worker["username"]],
+            today,
+            schedule_end,
+        )
         weekday_labels = [
             "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"
         ]
@@ -14661,13 +14870,28 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             task_count = int(schedule_counts.get(date_value, 0))
             load_status = "Свободен"
             available_slots = max(daily_capacity - task_count, 0)
+            is_unavailable = (
+                date_value
+                in unavailable_dates.get(worker["username"], set())
+            )
+            unavailable_reason = unavailable_reasons.get(
+                (worker["username"], date_value),
+                "",
+            )
 
-            if task_count >= daily_capacity:
+            if is_unavailable:
+                load_status = "Недоступен"
+                available_slots = 0
+            elif task_count >= daily_capacity:
                 load_status = "Нет мест"
             elif task_count:
                 load_status = "Есть места"
 
-            if not nearest_free_date and available_slots > 0:
+            if (
+                not nearest_free_date
+                and not is_unavailable
+                and available_slots > 0
+            ):
                 nearest_free_date = date_value
 
             weekly_schedule.append({
@@ -14677,6 +14901,8 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
                 "task_count": task_count,
                 "available_slots": available_slots,
                 "load_status": load_status,
+                "is_unavailable": is_unavailable,
+                "unavailable_reason": unavailable_reason,
                 "calendar_url": "/calendar?" + urlencode({
                     "date": date_value,
                     "worker": worker["username"],
@@ -14725,6 +14951,7 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             "create_task_url": create_task_url,
             "worker_calendar_url": worker_calendar_url,
             "weekly_schedule": weekly_schedule,
+            "unavailability_periods": unavailability_periods,
             "nearest_free_date": nearest_free_date,
             "daily_capacity": daily_capacity,
             "income": income,
@@ -14741,6 +14968,190 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
         }
     )
 
+
+
+@app.post("/workers/{user_id}/unavailability")
+async def create_worker_unavailability(request: Request, user_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    form = await request.form()
+    date_from = str(form.get("date_from") or "").strip()
+    date_to = str(form.get("date_to") or "").strip()
+    reason = str(form.get("reason") or "").strip()[:300]
+
+    try:
+        period_start = datetime.strptime(date_from, "%Y-%m-%d").date()
+        period_end = datetime.strptime(date_to, "%Y-%m-%d").date()
+    except Exception:
+        return RedirectResponse(
+            f"/workers/{user_id}?unavailability_error=invalid_date",
+            status_code=302,
+        )
+
+    if period_end < period_start:
+        return RedirectResponse(
+            f"/workers/{user_id}?unavailability_error=invalid_period",
+            status_code=302,
+        )
+
+    if (period_end - period_start).days > 365:
+        return RedirectResponse(
+            f"/workers/{user_id}?unavailability_error=period_too_long",
+            status_code=302,
+        )
+
+    conn = connect()
+    c = conn.cursor()
+    worker = c.execute("""
+    SELECT id, username, role
+    FROM users
+    WHERE id=? AND company_id=?
+    """, (user_id, company_id)).fetchone()
+
+    if not worker or worker["role"] != "worker":
+        conn.close()
+        return RedirectResponse("/workers", status_code=302)
+
+    overlapping_period = c.execute("""
+    SELECT id
+    FROM worker_unavailability
+    WHERE company_id=?
+      AND worker_id=?
+      AND date_from <= ?
+      AND date_to >= ?
+    LIMIT 1
+    """, (
+        company_id,
+        user_id,
+        date_to,
+        date_from,
+    )).fetchone()
+
+    if overlapping_period:
+        conn.close()
+        return RedirectResponse(
+            f"/workers/{user_id}?unavailability_error=overlap",
+            status_code=302,
+        )
+
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO worker_unavailability (
+        company_id, worker_id, date_from, date_to,
+        reason, created_by, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        user_id,
+        date_from,
+        date_to,
+        reason,
+        username,
+        created_at,
+    ))
+    activity_details = f"{date_from} — {date_to}"
+
+    if reason:
+        activity_details += f" · {reason}"
+
+    c.execute("""
+    INSERT INTO team_activity (
+        company_id, user_id, target_username, actor_username,
+        action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        user_id,
+        worker["username"],
+        username,
+        "Добавлен период недоступности",
+        activity_details,
+        created_at,
+    ))
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        f"/workers/{user_id}?unavailability_created=1",
+        status_code=302,
+    )
+
+
+@app.post("/workers/{user_id}/unavailability/{period_id}/delete")
+async def delete_worker_unavailability(
+    request: Request,
+    user_id: int,
+    period_id: int,
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    conn = connect()
+    c = conn.cursor()
+    period = c.execute("""
+    SELECT
+        worker_unavailability.*,
+        users.username AS worker_username
+    FROM worker_unavailability
+    JOIN users ON users.id=worker_unavailability.worker_id
+    WHERE worker_unavailability.id=?
+      AND worker_unavailability.worker_id=?
+      AND worker_unavailability.company_id=?
+      AND users.company_id=worker_unavailability.company_id
+    """, (period_id, user_id, company_id)).fetchone()
+
+    if not period:
+        conn.close()
+        return RedirectResponse(f"/workers/{user_id}", status_code=302)
+
+    c.execute("""
+    DELETE FROM worker_unavailability
+    WHERE id=? AND worker_id=? AND company_id=?
+    """, (period_id, user_id, company_id))
+    activity_details = f"{period['date_from']} — {period['date_to']}"
+
+    if period["reason"]:
+        activity_details += f" · {period['reason']}"
+
+    c.execute("""
+    INSERT INTO team_activity (
+        company_id, user_id, target_username, actor_username,
+        action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        user_id,
+        period["worker_username"],
+        username,
+        "Удалён период недоступности",
+        activity_details,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        f"/workers/{user_id}?unavailability_deleted=1",
+        status_code=302,
+    )
 
 
 @app.post("/workers")
@@ -15340,6 +15751,11 @@ async def delete_team_user(request: Request, user_id: int):
     ))
 
     c.execute("""
+    DELETE FROM worker_unavailability
+    WHERE worker_id=? AND company_id=?
+    """, (user_id, current_company_id))
+
+    c.execute("""
     DELETE FROM users
     WHERE id=? AND company_id=?
     """, (user_id, current_company_id))
@@ -15720,6 +16136,8 @@ async def create_task_page(
         for row in workers
     }
     daily_counts = {worker_name: 0 for worker_name in worker_names}
+    unavailable_dates = {}
+    unavailable_reasons = {}
 
     if selected_task_date:
         daily_rows = c.execute("""
@@ -15736,18 +16154,40 @@ async def create_task_page(
                 if worker_name in daily_counts:
                     daily_counts[worker_name] += 1
 
+        unavailable_dates, unavailable_reasons = get_worker_unavailability(
+            c,
+            company_id,
+            worker_names,
+            selected_task_date,
+            selected_task_date,
+        )
+
     worker_options = []
 
     for worker_name in worker_names:
         daily_capacity = worker_capacity_map[worker_name]
         active_count = daily_counts[worker_name]
         available_slots = max(daily_capacity - active_count, 0)
+        is_unavailable = (
+            selected_task_date
+            and selected_task_date
+            in unavailable_dates.get(worker_name, set())
+        )
+
+        if is_unavailable:
+            available_slots = 0
+
         worker_options.append({
             "username": worker_name,
             "active_count": active_count,
             "daily_capacity": daily_capacity,
             "available_slots": available_slots,
-            "is_at_capacity": available_slots == 0,
+            "is_at_capacity": available_slots == 0 and not is_unavailable,
+            "is_unavailable": is_unavailable,
+            "unavailable_reason": unavailable_reasons.get(
+                (worker_name, selected_task_date),
+                "",
+            ),
         })
 
     selected_workers = [
@@ -15766,6 +16206,8 @@ async def create_task_page(
     selected_worker_daily_capacity = 0
     selected_worker_available_slots = 0
     selected_worker_at_capacity = False
+    selected_worker_unavailable = False
+    selected_worker_unavailable_reason = ""
     recommended_worker = None
     selected_client = None
     selected_address = ""
@@ -15800,12 +16242,29 @@ async def create_task_page(
                 selected_worker_active_count
                 >= selected_worker_daily_capacity
             )
+            selected_worker_unavailable = (
+                selected_task_date
+                in unavailable_dates.get(selected_worker, set())
+            )
+            selected_worker_unavailable_reason = unavailable_reasons.get(
+                (selected_worker, selected_task_date),
+                "",
+            )
 
-            if selected_worker_active_count > 0:
+            if selected_worker_unavailable:
+                selected_worker_available_slots = 0
+
+            if selected_worker_active_count > 0 or selected_worker_unavailable:
                 alternatives = []
 
                 for worker_name, active_count in daily_counts.items():
                     if worker_name == selected_worker:
+                        continue
+
+                    if (
+                        selected_task_date
+                        in unavailable_dates.get(worker_name, set())
+                    ):
                         continue
 
                     worker_capacity = worker_capacity_map[worker_name]
@@ -15952,6 +16411,10 @@ async def create_task_page(
             "selected_worker_daily_capacity": selected_worker_daily_capacity,
             "selected_worker_available_slots": selected_worker_available_slots,
             "selected_worker_at_capacity": selected_worker_at_capacity,
+            "selected_worker_unavailable": selected_worker_unavailable,
+            "selected_worker_unavailable_reason": (
+                selected_worker_unavailable_reason
+            ),
             "recommended_worker": recommended_worker,
             "settings": settings
         }
@@ -16121,6 +16584,7 @@ async def create_task(
     worker = valid_workers[0] if valid_workers else ""
     workers_text = ",".join(valid_workers)
     over_capacity_workers = []
+    unavailable_workers = []
     selected_task_date = str(task_date or "")[:10]
 
     try:
@@ -16130,7 +16594,28 @@ async def create_task(
         selected_task_date = ""
 
     if selected_task_date:
+        unavailable_dates, unavailable_reasons = get_worker_unavailability(
+            c,
+            company_id,
+            valid_workers,
+            selected_task_date,
+            selected_task_date,
+        )
+
         for worker_name in valid_workers:
+            if (
+                selected_task_date
+                in unavailable_dates.get(worker_name, set())
+            ):
+                unavailable_workers.append({
+                    "username": worker_name,
+                    "reason": unavailable_reasons.get(
+                        (worker_name, selected_task_date),
+                        "",
+                    ),
+                })
+                continue
+
             active_count = c.execute(f"""
             SELECT COUNT(*)
             FROM tasks
@@ -16152,6 +16637,26 @@ async def create_task(
                     "active_count": active_count,
                     "daily_capacity": daily_capacity,
                 })
+
+    if unavailable_workers:
+        error_params = {
+            "error": "worker_unavailable",
+            "task_date": selected_task_date,
+            "worker": unavailable_workers[0]["username"],
+            "workers_csv": ",".join(valid_workers),
+        }
+
+        if return_to == "calendar":
+            error_params["return_to"] = "calendar"
+        elif return_to == "client" and client_id:
+            error_params["return_to"] = "client"
+            error_params["client_id"] = client_id
+
+        conn.close()
+        return RedirectResponse(
+            f"/create-task?{urlencode(error_params)}",
+            status_code=302,
+        )
 
     if over_capacity_workers and not allow_capacity_override:
         error_params = {"error": "capacity_confirmation"}
@@ -16545,6 +17050,13 @@ async def task_detail(request: Request, task_id: int):
                 reschedule_start.strftime("%Y-%m-%d"),
                 reschedule_end.strftime("%Y-%m-%d"),
             )).fetchall()
+            reschedule_unavailable_dates, _ = get_worker_unavailability(
+                c,
+                company_id,
+                task_workers,
+                reschedule_start.strftime("%Y-%m-%d"),
+                reschedule_end.strftime("%Y-%m-%d"),
+            )
             reschedule_result = build_scheduling_recommendations(
                 worker_capacities=reschedule_capacities,
                 assignments=[
@@ -16557,6 +17069,7 @@ async def task_detail(request: Request, task_id: int):
                 start_date=reschedule_start,
                 search_days=14,
                 fixed_workers=task_workers,
+                unavailable_dates=reschedule_unavailable_dates,
                 limit=5,
             )
             smart_reschedule_items = reschedule_result["items"]
@@ -18039,6 +18552,48 @@ async def update_task_date(request: Request, task_id: int):
     if not can_access_task(username, role, task):
         conn.close()
         return RedirectResponse("/", status_code=302)
+
+    selected_date = str(new_date or "")[:10]
+
+    try:
+        if selected_date:
+            datetime.strptime(selected_date, "%Y-%m-%d")
+    except Exception:
+        conn.close()
+        return RedirectResponse(
+            f"/task/{task_id}?date_error=invalid",
+            status_code=302,
+        )
+
+    task_workers = get_task_worker_names(task)
+
+    if selected_date and task_workers:
+        unavailable_dates, _ = get_worker_unavailability(
+            c,
+            task["company_id"],
+            task_workers,
+            selected_date,
+            selected_date,
+        )
+        unavailable_worker = next(
+            (
+                worker_name
+                for worker_name in task_workers
+                if selected_date
+                in unavailable_dates.get(worker_name, set())
+            ),
+            "",
+        )
+
+        if unavailable_worker:
+            conn.close()
+            return RedirectResponse(
+                (
+                    f"/task/{task_id}?date_error=worker_unavailable"
+                    f"&worker={unavailable_worker}"
+                ),
+                status_code=302,
+            )
 
     old_date = task["task_date"]
     worker_chat_ids = get_task_worker_chat_ids(c, task)

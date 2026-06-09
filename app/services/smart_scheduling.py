@@ -9,6 +9,7 @@ def build_scheduling_recommendations(
     required_workers=1,
     preferred_worker="",
     fixed_workers=None,
+    unavailable_dates=None,
     limit=12,
 ):
     worker_names = sorted(worker_capacities)
@@ -20,6 +21,10 @@ def build_scheduling_recommendations(
         for worker_name in dict.fromkeys(fixed_workers or [])
         if worker_name in worker_capacities
     ]
+    unavailable_dates = {
+        worker_name: set(date_values or [])
+        for worker_name, date_values in (unavailable_dates or {}).items()
+    }
 
     if fixed_workers:
         required_workers = len(fixed_workers)
@@ -52,6 +57,9 @@ def build_scheduling_recommendations(
         candidates = []
 
         for worker_name in worker_names:
+            if date_value in unavailable_dates.get(worker_name, set()):
+                continue
+
             capacity = max(1, int(worker_capacities[worker_name] or 1))
             task_count = daily_counts[worker_name].get(date_value, 0)
             available_slots = max(capacity - task_count, 0)

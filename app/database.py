@@ -206,6 +206,19 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS worker_unavailability (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        worker_id INTEGER NOT NULL,
+        date_from TEXT NOT NULL,
+        date_to TEXT NOT NULL,
+        reason TEXT,
+        created_by TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER,
@@ -759,6 +772,16 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_team_activity_company_user_created
     ON team_activity(company_id, user_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_worker_unavailability_company_worker_dates
+    ON worker_unavailability(company_id, worker_id, date_from, date_to)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_worker_unavailability_company_dates
+    ON worker_unavailability(company_id, date_from, date_to)
     """)
 
     if os.getenv("ENV") != "production":

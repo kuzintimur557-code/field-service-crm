@@ -43,6 +43,7 @@ h1{font-size:32px;margin:0}
 	.availability-pill{padding:7px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:900}
 	.availability-pill.free{background:#dcfce7;color:#166534}
 	.availability-pill.busy{background:#ffedd5;color:#9a3412}
+	.availability-pill.unavailable{background:#e5e7eb;color:#374151}
 	.availability-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 	.availability-filter a{padding:8px 10px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
 	.availability-filter a.active{background:#111827;color:white}
@@ -50,9 +51,11 @@ h1{font-size:32px;margin:0}
 	.availability-card{padding:12px;border-radius:16px;background:#f9fafb;border:1px solid #e5e7eb}
 	.availability-card.free{background:#ecfdf5;border-color:#bbf7d0}
 	.availability-card.busy{background:#fff7ed;border-color:#fed7aa}
+	.availability-card.unavailable{background:#f3f4f6;border-color:#9ca3af}
 	.availability-progress{height:7px;margin-top:9px;border-radius:999px;background:#e5e7eb;overflow:hidden}
 	.availability-progress span{display:block;height:100%;border-radius:inherit;background:#22c55e}
 	.availability-card.busy .availability-progress span{background:#f97316}
+	.availability-card.unavailable .availability-progress span{background:#9ca3af}
 	.availability-name{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:900;margin-bottom:6px}
 	.recommended{padding:4px 7px;border-radius:999px;background:#2563eb;color:white;font-size:11px;font-weight:900;white-space:nowrap}
 	.availability-status{font-size:13px;font-weight:900;color:#374151}
@@ -72,7 +75,7 @@ h1{font-size:32px;margin:0}
 	.week-jump{display:flex;gap:6px}
 	.week-jump input{width:145px;padding:8px;border:1px solid #d1d5db;border-radius:11px;background:white;font-weight:800}
 	.week-jump button{padding:8px 10px;border:0;border-radius:11px;background:#111827;color:white;font-weight:900;cursor:pointer}
-	.week-summary{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+	.week-summary{display:grid;grid-template-columns:repeat(7,minmax(100px,1fr));gap:10px;margin-bottom:14px}
 	.week-summary-item{padding:11px;border-radius:14px;background:#f9fafb;border:1px solid #e5e7eb}
 	.week-summary-label{font-size:12px;color:#6b7280;font-weight:900}
 	.week-summary-value{margin-top:4px;font-size:20px;font-weight:900}
@@ -90,6 +93,8 @@ h1{font-size:32px;margin:0}
 	.week-cell.partial{background:#eff6ff;border-color:#bfdbfe}
 	.week-cell.full{background:#fff7ed;border-color:#fed7aa}
 	.week-cell.overloaded{background:#fef2f2;border-color:#fecaca}
+	.week-cell.unavailable{background:#f3f4f6;border:1px dashed #9ca3af}
+	.week-cell.unavailable.conflict{background:#fef2f2;border-color:#ef4444}
 	.week-cell.recommended{box-shadow:inset 0 0 0 2px #22c55e}
 	.week-cell-count{font-size:18px;font-weight:900}
 	.week-cell-status{min-height:28px;margin-top:3px;color:#4b5563;font-size:11px;font-weight:800}
@@ -315,6 +320,14 @@ h1{font-size:32px;margin:0}
 		            <div class="week-summary-label">Дней без мест</div>
 		            <div class="week-summary-value">{{ weekly_capacity_summary["full_cells"] }}</div>
 		        </div>
+		        <div class="week-summary-item">
+		            <div class="week-summary-label">Дней недоступности</div>
+		            <div class="week-summary-value">{{ weekly_capacity_summary["unavailable_cells"] }}</div>
+		        </div>
+		        <div class="week-summary-item">
+		            <div class="week-summary-label">Конфликтов</div>
+		            <div class="week-summary-value">{{ weekly_capacity_summary["conflict_assignments"] }}</div>
+		        </div>
 		    </div>
 
 		    {% if weekly_capacity_rows %}
@@ -337,13 +350,16 @@ h1{font-size:32px;margin:0}
 		                    <small>Лимит: {{ worker["daily_capacity"] }} в день</small>
 		                </div>
 		                {% for cell in worker["cells"] %}
-		                <div class="week-cell {{ cell['status'] }} {% if cell['is_recommended'] %}recommended{% endif %}">
+		                <div class="week-cell {{ cell['status'] }} {% if cell['has_conflict'] %}conflict{% endif %} {% if cell['is_recommended'] %}recommended{% endif %}">
 		                    {% if cell["is_recommended"] %}
 		                    <span class="week-best" title="Рекомендованное свободное окно"></span>
 		                    {% endif %}
 		                    <div class="week-cell-count">{{ cell["task_count"] }}/{{ worker["daily_capacity"] }}</div>
 		                    <div class="week-cell-status">
-		                        {% if cell["status"] == "overloaded" %}
+		                        {% if cell["status"] == "unavailable" %}
+		                        Недоступен{% if cell["unavailable_reason"] %}<br>{{ cell["unavailable_reason"] }}{% endif %}
+		                        {% if cell["has_conflict"] %}<br>Есть назначение{% endif %}
+		                        {% elif cell["status"] == "overloaded" %}
 		                        Перегруз
 		                        {% elif cell["status"] == "full" %}
 		                        Нет мест
@@ -355,13 +371,18 @@ h1{font-size:32px;margin:0}
 		                    </div>
 		                    <div class="week-cell-actions">
 		                        <a href="{{ cell['calendar_url'] }}" title="Открыть день">День</a>
+		                        {% if not cell["is_unavailable"] %}
 		                        <a href="{{ cell['create_url'] }}" title="Создать заявку">+</a>
+		                        {% endif %}
 		                    </div>
 		                </div>
 		                {% endfor %}
 		                <div class="week-total">
 		                    <b>{{ worker["total_assignments"] }}/{{ worker["total_capacity"] }}</b>
 		                    <small>Свободно: {{ worker["available_slots"] }}</small>
+		                    {% if worker["unavailable_days"] %}
+		                    <small>Недоступен: {{ worker["unavailable_days"] }} дн.</small>
+		                    {% endif %}
 		                    <small>Загрузка: {{ worker["utilization_percent"] }}%</small>
 		                </div>
 		            </div>
@@ -389,15 +410,17 @@ h1{font-size:32px;margin:0}
 		        <span class="availability-pill">Всего: {{ availability_summary["total"] }}</span>
 		        <span class="availability-pill free">Свободно: {{ availability_summary["free"] }}</span>
 		        <span class="availability-pill busy">Лимит исчерпан: {{ availability_summary["busy"] }}</span>
+		        <span class="availability-pill unavailable">Недоступны: {{ availability_summary["unavailable"] }}</span>
 		    </div>
 		    <div class="availability-filter">
 		        <a href="/calendar?date={{ availability_date }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if not selected_availability %}active{% endif %}">Все</a>
 		        <a href="/calendar?date={{ availability_date }}&availability=free{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if selected_availability == 'free' %}active{% endif %}">Свободные</a>
 		        <a href="/calendar?date={{ availability_date }}&availability=busy{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if selected_availability == 'busy' %}active{% endif %}">Лимит исчерпан</a>
+		        <a href="/calendar?date={{ availability_date }}&availability=unavailable{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if selected_availability == 'unavailable' %}active{% endif %}">Недоступны</a>
 		    </div>
 		    <div class="availability-grid">
 		    {% for worker in worker_availability %}
-		        <div class="availability-card {% if worker['is_free'] %}free{% else %}busy{% endif %}">
+		        <div class="availability-card {% if worker['is_unavailable'] %}unavailable{% elif worker['is_free'] %}free{% else %}busy{% endif %}">
 		            <div class="availability-name">
 		                <span>{{ worker["username"] }}</span>
 		                {% if worker["is_recommended"] %}
@@ -405,7 +428,9 @@ h1{font-size:32px;margin:0}
 		                {% endif %}
 		            </div>
 		            <div class="availability-status">
-		                {% if worker["is_at_capacity"] %}
+		                {% if worker["is_unavailable"] %}
+		                    Недоступен{% if worker["unavailable_reason"] %}: {{ worker["unavailable_reason"] }}{% endif %}
+		                {% elif worker["is_at_capacity"] %}
 		                    Лимит исчерпан: {{ worker["active_count"] }} из {{ worker["daily_capacity"] }}
 		                {% elif worker["active_count"] == 0 %}
 		                    Свободен: {{ worker["available_slots"] }} мест
@@ -416,7 +441,9 @@ h1{font-size:32px;margin:0}
 		            <div class="availability-progress" title="Загрузка: {{ worker['load_percent'] }}%">
 		                <span style="width:{{ worker['load_percent'] }}%"></span>
 		            </div>
+		            {% if not worker["is_unavailable"] %}
 		            <a class="worker-task-link" href="/create-task?task_date={{ availability_date }}&worker={{ worker['username'] }}&return_to=calendar">Создать</a>
+		            {% endif %}
 		        </div>
 		    {% endfor %}
 		    </div>

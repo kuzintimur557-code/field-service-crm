@@ -31,6 +31,7 @@ h1{margin:0 0 10px;font-size:34px}
 .edit-form input{width:100%;margin-top:6px;padding:12px;border:1px solid #d1d5db;border-radius:12px;font-size:15px}
 .edit-form button{grid-column:1/-1;padding:13px;border:0;border-radius:12px;background:#111827;color:white;font-weight:900;cursor:pointer}
 .notice{margin-bottom:16px;padding:14px;border-radius:14px;background:#dcfce7;color:#166534;font-weight:900}
+.notice.error{background:#fee2e2;color:#991b1b}
 .task{display:block;padding:15px 0;border-bottom:1px solid #e5e7eb;color:#111827;text-decoration:none}
 .task:last-child{border-bottom:0}
 .task-top{display:flex;justify-content:space-between;gap:12px;align-items:center}
@@ -49,9 +50,22 @@ h1{margin:0 0 10px;font-size:34px}
 .day.free{background:#dcfce7;color:#166534}
 .day.normal{background:#dbeafe;color:#1d4ed8}
 .day.busy{background:#fee2e2;color:#991b1b}
+.day.unavailable{background:#f3f4f6;color:#4b5563;border:1px dashed #9ca3af}
 .day a{display:block;margin-top:7px;color:inherit;font-size:12px;font-weight:900;text-decoration:none}
+.absence-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.absence-form label{font-size:13px;color:#6b7280;font-weight:900}
+.absence-form input{width:100%;margin-top:6px;padding:12px;border:1px solid #d1d5db;border-radius:12px;font-size:15px}
+.absence-form .wide{grid-column:1/-1}
+.absence-form button{grid-column:1/-1;padding:13px;border:0;border-radius:12px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.absence-list{display:grid;gap:10px;margin-top:16px}
+.absence-item{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:13px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.absence-item.current{background:#fff7ed;border-color:#fed7aa}
+.absence-item.past{opacity:.65}
+.absence-dates{font-weight:900}
+.absence-reason{margin-top:4px;color:#6b7280;font-size:13px;font-weight:800}
+.absence-item button{padding:8px 10px;border:0;border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:900;cursor:pointer}
 @media(max-width:700px){.container{padding:16px}.grid,.edit-form{grid-template-columns:1fr}h1{font-size:28px}}
-@media(max-width:700px){.week{grid-template-columns:repeat(2,1fr)}.quick-actions a{width:100%;text-align:center}}
+@media(max-width:700px){.week{grid-template-columns:repeat(2,1fr)}.absence-form{grid-template-columns:1fr}.quick-actions a{width:100%;text-align:center}.absence-item{align-items:flex-start}.absence-form .wide{grid-column:auto}}
 </style>
 </head>
 
@@ -62,6 +76,25 @@ h1{margin:0 0 10px;font-size:34px}
 
 {% if request.query_params.get("profile_updated") == "1" %}
 <div class="notice">Карточка сотрудника обновлена</div>
+{% endif %}
+{% if request.query_params.get("unavailability_created") == "1" %}
+<div class="notice">Период недоступности добавлен</div>
+{% endif %}
+{% if request.query_params.get("unavailability_deleted") == "1" %}
+<div class="notice">Период недоступности удалён</div>
+{% endif %}
+{% if request.query_params.get("unavailability_error") %}
+<div class="notice error">
+{% if request.query_params.get("unavailability_error") == "overlap" %}
+Этот период пересекается с уже добавленной недоступностью.
+{% elif request.query_params.get("unavailability_error") == "invalid_period" %}
+Дата окончания не может быть раньше даты начала.
+{% elif request.query_params.get("unavailability_error") == "period_too_long" %}
+Один период не может быть длиннее 366 дней.
+{% else %}
+Проверьте даты периода.
+{% endif %}
+</div>
 {% endif %}
 
 <div class="card">
@@ -118,6 +151,45 @@ h1{margin:0 0 10px;font-size:34px}
     {% endif %}
     <button type="submit">Сохранить карточку</button>
 </form>
+</div>
+{% endif %}
+
+{% if worker["role"] == "worker" and role in ("boss", "manager") %}
+<div class="card">
+<h2>Недоступность сотрудника</h2>
+<div class="meta">Добавляйте выходные, отпуск, больничный и другие периоды отсутствия. В эти дни сотрудник не попадёт в умный подбор.</div>
+<form class="absence-form" method="post" action="/workers/{{ worker['id'] }}/unavailability">
+    <label>
+        С даты
+        <input type="date" name="date_from" min="{{ today }}" required>
+    </label>
+    <label>
+        По дату
+        <input type="date" name="date_to" min="{{ today }}" required>
+    </label>
+    <label class="wide">
+        Причина
+        <input type="text" name="reason" maxlength="300" placeholder="Отпуск, выходной, больничный">
+    </label>
+    <button type="submit">Добавить период</button>
+</form>
+{% if unavailability_periods %}
+<div class="absence-list">
+{% for period in unavailability_periods %}
+<div class="absence-item {% if period['date_from'] <= today and period['date_to'] >= today %}current{% elif period['date_to'] < today %}past{% endif %}">
+    <div>
+        <div class="absence-dates">{{ period["date_from"] }} — {{ period["date_to"] }}</div>
+        <div class="absence-reason">{{ period["reason"] or "Причина не указана" }} · Добавил: {{ period["created_by"] or "—" }}</div>
+    </div>
+    <form method="post" action="/workers/{{ worker['id'] }}/unavailability/{{ period['id'] }}/delete">
+        <button type="submit">Удалить</button>
+    </form>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="meta" style="margin-top:14px">Периодов недоступности пока нет</div>
+{% endif %}
 </div>
 {% endif %}
 
@@ -206,14 +278,19 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="meta">Дневной лимит: {{ daily_capacity }}</div>
 <div class="week">
 {% for day in weekly_schedule %}
-<div class="day {% if day['load_status'] == 'Свободен' %}free{% elif day['load_status'] == 'Нет мест' %}busy{% else %}normal{% endif %}">
+<div class="day {% if day['is_unavailable'] %}unavailable{% elif day['load_status'] == 'Свободен' %}free{% elif day['load_status'] == 'Нет мест' %}busy{% else %}normal{% endif %}">
     <div class="day-name">{{ day["day_label"] }}</div>
     <div class="day-date">{{ day["date_label"] }}</div>
     <div class="day-count">{{ day["task_count"] }}</div>
     <div class="day-name">{{ day["load_status"] }}</div>
+    {% if day["unavailable_reason"] %}
+    <div class="day-name">{{ day["unavailable_reason"] }}</div>
+    {% endif %}
     <div class="day-name">Свободно: {{ day["available_slots"] }}</div>
     <a href="{{ day['calendar_url'] }}">Открыть</a>
+    {% if not day["is_unavailable"] %}
     <a href="{{ day['create_url'] }}">Создать</a>
+    {% endif %}
 </div>
 {% endfor %}
 </div>

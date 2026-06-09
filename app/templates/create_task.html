@@ -27,10 +27,12 @@ button:hover{background:#1d4ed8}
 .capacity-confirm label{margin:0;line-height:1.4}
 .worker-option{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb}
 .worker-option.at-capacity{background:#fef2f2;border-color:#fecaca}
+.worker-option.unavailable{background:#f3f4f6;border-color:#9ca3af}
 .worker-option-main{display:flex;align-items:center;gap:10px;min-width:0}
 .worker-option-main input{width:auto;flex:0 0 auto}
 .worker-load{font-size:12px;font-weight:900;color:#166534;text-align:right}
 .worker-option.at-capacity .worker-load{color:#991b1b}
+.worker-option.unavailable .worker-load{color:#4b5563}
 @media(max-width:700px){
     .container{padding:16px}
     .grid{grid-template-columns:1fr}
@@ -66,13 +68,23 @@ button:hover{background:#1d4ed8}
 	</div>
 	{% endif %}
 
-	{% if selected_worker_active_count %}
-	<div class="note" style="{% if selected_worker_at_capacity %}background:#fee2e2;color:#991b1b{% else %}background:#fff7ed;color:#9a3412{% endif %}">
+	{% if request.query_params.get("error") == "worker_unavailable" %}
+	<div class="note" style="background:#fee2e2;color:#991b1b">
+	Выбранный исполнитель недоступен на эту дату. Выберите другого сотрудника или измените дату.
+	</div>
+	{% endif %}
+
+	{% if selected_worker_active_count or selected_worker_unavailable %}
+	<div class="note" style="{% if selected_worker_at_capacity or selected_worker_unavailable %}background:#fee2e2;color:#991b1b{% else %}background:#fff7ed;color:#9a3412{% endif %}">
+	{% if selected_worker_unavailable %}
+	Исполнитель недоступен на эту дату{% if selected_worker_unavailable_reason %}: {{ selected_worker_unavailable_reason }}{% endif %}.
+	{% else %}
 	У выбранного исполнителя на эту дату: {{ selected_worker_active_count }} из {{ selected_worker_daily_capacity }}.
 	{% if selected_worker_at_capacity %}
 	Свободных мест нет. Назначение превысит дневной лимит.
 	{% else %}
 	Свободных мест: {{ selected_worker_available_slots }}.
+	{% endif %}
 	{% endif %}
 	{% if selected_worker_active_tasks %}
 	<div style="display:grid;gap:6px;margin-top:10px">
@@ -134,14 +146,16 @@ button:hover{background:#1d4ed8}
 
     <div style="display:grid;gap:10px;margin-top:12px">
         {% for worker in worker_options %}
-        <label class="worker-option {% if worker['is_at_capacity'] %}at-capacity{% endif %}">
+        <label class="worker-option {% if worker['is_unavailable'] %}unavailable{% elif worker['is_at_capacity'] %}at-capacity{% endif %}">
             <span class="worker-option-main">
-                <input type="checkbox" name="workers" value="{{ worker['username'] }}" data-at-capacity="{{ 1 if worker['is_at_capacity'] else 0 }}" {% if worker['username'] in selected_workers %}checked{% endif %}>
+                <input type="checkbox" name="workers" value="{{ worker['username'] }}" data-at-capacity="{{ 1 if worker['is_at_capacity'] else 0 }}" {% if worker['username'] in selected_workers %}checked{% endif %} {% if worker['is_unavailable'] %}disabled{% endif %}>
                 <span>{{ worker["username"] }}</span>
             </span>
             <span class="worker-load">
                 {% if selected_task_date %}
-                    {% if worker["is_at_capacity"] %}
+                    {% if worker["is_unavailable"] %}
+                    Недоступен{% if worker["unavailable_reason"] %}: {{ worker["unavailable_reason"] }}{% endif %}
+                    {% elif worker["is_at_capacity"] %}
                     Лимит {{ worker["active_count"] }}/{{ worker["daily_capacity"] }}
                     {% else %}
                     Свободно {{ worker["available_slots"] }} · {{ worker["active_count"] }}/{{ worker["daily_capacity"] }}

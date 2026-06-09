@@ -4365,6 +4365,19 @@ async def assert_calendar_access():
         "worker_a",
         "worker_b",
     ]
+    unavailable_team_result = crm.build_scheduling_recommendations(
+        worker_capacities={"worker_a": 1, "worker_b": 1},
+        assignments=[],
+        start_date=fixed_team_start,
+        search_days=3,
+        fixed_workers=["worker_a", "worker_b"],
+        unavailable_dates={
+            "worker_b": {fixed_team_start.strftime("%Y-%m-%d")},
+        },
+    )
+    assert unavailable_team_result["items"][0]["date"] == (
+        fixed_team_start + timedelta(days=1)
+    ).strftime("%Y-%m-%d")
 
     conn = connect()
     c = conn.cursor()
@@ -4453,6 +4466,8 @@ async def assert_calendar_access():
         "capacity": 7,
         "available_slots": 6,
         "full_cells": 1,
+        "unavailable_cells": 0,
+        "conflict_assignments": 0,
         "utilization_percent": 14,
     }
     helper_week = next(
@@ -4599,11 +4614,146 @@ async def assert_calendar_access():
 
     conn = connect()
     c = conn.cursor()
+    helper = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=2 AND username='helper2'
+    """).fetchone()
     task = c.execute("""
     SELECT *
     FROM tasks
     WHERE company_id=? AND client=?
     """, (2, "Client 2")).fetchone()
+    unavailable_end = today_value + timedelta(days=1)
+    c.execute("""
+    INSERT INTO worker_unavailability (
+        company_id, worker_id, date_from, date_to,
+        reason, created_by, created_at
+    )
+    VALUES (2, ?, ?, ?, 'Отпуск smoke', 'owner2', ?)
+    """, (
+        helper["id"],
+        today_value.strftime("%Y-%m-%d"),
+        unavailable_end.strftime("%Y-%m-%d"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    unavailable_period_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    unavailable_calendar = await crm.calendar_page(
+        make_asgi_request("owner2"),
+        worker="helper2",
+        date=today_value.strftime("%Y-%m-%d"),
+        week_start=today_value.strftime("%Y-%m-%d"),
+        schedule_start=today_value.strftime("%Y-%m-%d"),
+        schedule_days=7,
+    )
+    unavailable_html = unavailable_calendar.body.decode("utf-8")
+    helper_availability = next(
+        item
+        for item in unavailable_calendar.context["worker_availability"]
+        if item["username"] == "helper2"
+    )
+    assert helper_availability["is_unavailable"] is True
+    assert helper_availability["available_slots"] == 0
+    assert helper_availability["unavailable_reason"] == "Отпуск smoke"
+    assert "Недоступны: 1" in unavailable_html
+    assert "Отпуск smoke" in unavailable_html
+    helper_week = unavailable_calendar.context["weekly_capacity_rows"][0]
+    unavailable_cells = [
+        cell
+        for cell in helper_week["cells"]
+        if cell["status"] == "unavailable"
+    ]
+    assert len(unavailable_cells) == 2
+    assert helper_week["total_capacity"] == 5
+    assert helper_week["unavailable_days"] == 2
+    assert (
+        unavailable_calendar.context["smart_schedule_items"][0]["date"]
+        == (today_value + timedelta(days=2)).strftime("%Y-%m-%d")
+    )
+
+    unavailable_filter = await crm.calendar_page(
+        make_asgi_request("owner2"),
+        date=today_value.strftime("%Y-%m-%d"),
+        availability="unavailable",
+    )
+    assert unavailable_filter.context["selected_availability"] == "unavailable"
+    assert [
+        item["username"]
+        for item in unavailable_filter.context["worker_availability"]
+    ] == ["helper2"]
+
+    unavailable_api = crm.api_calendar_smart_schedule(
+        make_request("owner2"),
+        start=today_value.strftime("%Y-%m-%d"),
+        days=7,
+        worker="helper2",
+    )
+    assert unavailable_api["items"][0]["date"] == (
+        today_value + timedelta(days=2)
+    ).strftime("%Y-%m-%d")
+
+    unavailable_create_page = await crm.create_task_page(
+        make_asgi_request("owner2", "/create-task"),
+        task_date=today_value.strftime("%Y-%m-%d"),
+        worker="helper2",
+    )
+    assert unavailable_create_page.context["selected_worker_unavailable"] is True
+    assert "Исполнитель недоступен на эту дату" in (
+        unavailable_create_page.body.decode("utf-8")
+    )
+    helper_option = next(
+        item
+        for item in unavailable_create_page.context["worker_options"]
+        if item["username"] == "helper2"
+    )
+    assert helper_option["is_unavailable"] is True
+
+    blocked_create = await crm.create_task(
+        make_form_request(
+            "owner2",
+            "/create-task",
+            {
+                "client": "Blocked absence client",
+                "task_date": today_value.strftime("%Y-%m-%d"),
+                "workers": "helper2",
+                "priority": "Обычный",
+            },
+        ),
+    )
+    assert blocked_create.status_code == 302
+    assert "error=worker_unavailable" in blocked_create.headers["location"]
+    conn = connect()
+    c = conn.cursor()
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=2 AND client='Blocked absence client'
+    """).fetchone()[0] == 0
+    conn.close()
+
+    unavailable_reschedule = await crm.update_task_date(
+        make_form_request(
+            "owner2",
+            f"/task/{task['id']}/date",
+            {"task_date": today_value.strftime("%Y-%m-%d")},
+        ),
+        task["id"],
+    )
+    assert unavailable_reschedule.status_code == 302
+    assert unavailable_reschedule.headers["location"] == (
+        f"/task/{task['id']}?date_error=worker_unavailable&worker=helper2"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute(
+        "DELETE FROM worker_unavailability WHERE id=?",
+        (unavailable_period_id,),
+    )
+    conn.commit()
     conn.close()
 
     original_send_message = crm.send_message
@@ -5180,6 +5330,82 @@ async def assert_finance_margin(task):
     assert "+7 900 000-00-00" not in profile_activity["details"]
     assert "history@example.test" not in profile_activity["details"]
 
+    absence_start = datetime.now().date() + timedelta(days=10)
+    absence_end = absence_start + timedelta(days=2)
+    absence_response = await crm.create_worker_unavailability(
+        make_form_request(
+            "manager2",
+            f"/workers/{history_candidate['id']}/unavailability",
+            {
+                "date_from": absence_start.strftime("%Y-%m-%d"),
+                "date_to": absence_end.strftime("%Y-%m-%d"),
+                "reason": "Учебный отпуск",
+            },
+        ),
+        history_candidate["id"],
+    )
+    assert absence_response.status_code == 302
+    assert absence_response.headers["location"] == (
+        f"/workers/{history_candidate['id']}?unavailability_created=1"
+    )
+
+    overlap_response = await crm.create_worker_unavailability(
+        make_form_request(
+            "owner2",
+            f"/workers/{history_candidate['id']}/unavailability",
+            {
+                "date_from": absence_start.strftime("%Y-%m-%d"),
+                "date_to": absence_end.strftime("%Y-%m-%d"),
+                "reason": "Повтор",
+            },
+        ),
+        history_candidate["id"],
+    )
+    assert overlap_response.headers["location"] == (
+        f"/workers/{history_candidate['id']}?unavailability_error=overlap"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    absence_period = c.execute("""
+    SELECT *
+    FROM worker_unavailability
+    WHERE company_id=2 AND worker_id=?
+    """, (history_candidate["id"],)).fetchone()
+    outsider_worker = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=1 AND username='outsider_worker'
+    """).fetchone()
+    absence_activity = c.execute("""
+    SELECT action, details, actor_username
+    FROM team_activity
+    WHERE company_id=2
+      AND user_id=?
+      AND action='Добавлен период недоступности'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (history_candidate["id"],)).fetchone()
+    conn.close()
+    assert absence_period["reason"] == "Учебный отпуск"
+    assert absence_period["created_by"] == "manager2"
+    assert absence_activity["actor_username"] == "manager2"
+    assert "Учебный отпуск" in absence_activity["details"]
+
+    cross_company_absence = await crm.create_worker_unavailability(
+        make_form_request(
+            "owner2",
+            f"/workers/{outsider_worker['id']}/unavailability",
+            {
+                "date_from": absence_start.strftime("%Y-%m-%d"),
+                "date_to": absence_end.strftime("%Y-%m-%d"),
+                "reason": "Чужая компания",
+            },
+        ),
+        outsider_worker["id"],
+    )
+    assert cross_company_absence.headers["location"] == "/workers"
+
     team_activity_response = await crm.team_activity_page(
         make_asgi_request(
             "owner2",
@@ -5220,7 +5446,44 @@ async def assert_finance_margin(task):
     assert "Карточка обновлена" in history_worker_html
     assert "Редактировать карточку" in history_worker_html
     assert "Сохранить карточку" in history_worker_html
+    assert "Недоступность сотрудника" in history_worker_html
+    assert "Учебный отпуск" in history_worker_html
+    assert "Добавлен период недоступности" in history_worker_html
     assert "0% → 7.5%" in history_worker_html
+
+    delete_absence_response = await crm.delete_worker_unavailability(
+        make_form_request(
+            "manager2",
+            (
+                f"/workers/{history_candidate['id']}/unavailability/"
+                f"{absence_period['id']}/delete"
+            ),
+            {},
+        ),
+        history_candidate["id"],
+        absence_period["id"],
+    )
+    assert delete_absence_response.headers["location"] == (
+        f"/workers/{history_candidate['id']}?unavailability_deleted=1"
+    )
+    conn = connect()
+    c = conn.cursor()
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM worker_unavailability
+    WHERE id=?
+    """, (absence_period["id"],)).fetchone()[0] == 0
+    deleted_absence_activity = c.execute("""
+    SELECT action
+    FROM team_activity
+    WHERE company_id=2
+      AND user_id=?
+      AND action='Удалён период недоступности'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (history_candidate["id"],)).fetchone()
+    conn.close()
+    assert deleted_absence_activity is not None
 
     clean_toggle_response = await crm.toggle_team_user_active(
         make_form_request(

@@ -425,6 +425,15 @@ button{
 </head>
 
 <body>
+{% if request.query_params.get("date_error") == "worker_unavailable" %}
+<div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+Перенос невозможен: исполнитель {{ request.query_params.get("worker") }} недоступен на выбранную дату.
+</div>
+{% elif request.query_params.get("date_error") == "invalid" %}
+<div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+Укажите корректную дату переноса.
+</div>
+{% endif %}
 
 <div class="page">
 
