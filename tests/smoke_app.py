@@ -4733,15 +4733,33 @@ async def assert_finance_margin(task):
     assert cross_company_password_response.status_code == 302
     assert cross_company_password_response.headers["location"] == "/workers"
 
+    cross_company_profile_response = await crm.update_team_user_profile(
+        make_form_request(
+            "owner2",
+            f"/workers/{outsider['id']}/profile",
+            {
+                "full_name": "Подменённое имя",
+                "position": "",
+                "phone": "",
+                "email": "",
+                "telegram_chat_id": "",
+            },
+        ),
+        outsider["id"],
+    )
+    assert cross_company_profile_response.status_code == 302
+    assert cross_company_profile_response.headers["location"] == "/workers"
+
     conn = connect()
     c = conn.cursor()
     unchanged_outsider = c.execute("""
-    SELECT password
+    SELECT password, full_name
     FROM users
     WHERE id=?
     """, (outsider["id"],)).fetchone()
     conn.close()
     assert unchanged_outsider["password"] == outsider["password"]
+    assert unchanged_outsider["full_name"] != "Подменённое имя"
 
     cross_company_delete_response = await crm.delete_team_user(
         make_form_request(
@@ -4897,6 +4915,50 @@ async def assert_finance_margin(task):
     assert management_activity[1]["details"] == "Пароль изменён владельцем компании"
     assert "secure456" not in management_activity[1]["details"]
 
+    profile_update_response = await crm.update_team_user_profile(
+        make_form_request(
+            "owner2",
+            f"/workers/{history_candidate['id']}/profile",
+            {
+                "full_name": "Исторический Сотрудник",
+                "position": "Старший специалист",
+                "phone": "+7 900 000-00-00",
+                "email": "history@example.test",
+                "telegram_chat_id": "history-chat",
+            },
+        ),
+        history_candidate["id"],
+    )
+    assert profile_update_response.status_code == 302
+    assert profile_update_response.headers["location"] == (
+        f"/workers/{history_candidate['id']}?profile_updated=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    updated_profile = c.execute("""
+    SELECT full_name, position, phone, email, telegram_chat_id
+    FROM users
+    WHERE id=? AND company_id=2
+    """, (history_candidate["id"],)).fetchone()
+    profile_activity = c.execute("""
+    SELECT action, details
+    FROM team_activity
+    WHERE company_id=2 AND user_id=? AND action='Карточка обновлена'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (history_candidate["id"],)).fetchone()
+    conn.close()
+    assert updated_profile["full_name"] == "Исторический Сотрудник"
+    assert updated_profile["position"] == "Старший специалист"
+    assert updated_profile["telegram_chat_id"] == "history-chat"
+    assert profile_activity["details"] == (
+        "Изменены поля: ФИО, Должность, Телефон, "
+        "Электронная почта, ID чата Telegram"
+    )
+    assert "+7 900 000-00-00" not in profile_activity["details"]
+    assert "history@example.test" not in profile_activity["details"]
+
     team_activity_response = await crm.team_activity_page(
         make_asgi_request(
             "owner2",
@@ -4934,6 +4996,9 @@ async def assert_finance_margin(task):
     assert "Сотрудник уволен" in history_worker_html
     assert "Пароль обновлён" in history_worker_html
     assert "Процент обновлён" in history_worker_html
+    assert "Карточка обновлена" in history_worker_html
+    assert "Редактировать карточку" in history_worker_html
+    assert "Сохранить карточку" in history_worker_html
     assert "0% → 7.5%" in history_worker_html
 
     clean_toggle_response = await crm.toggle_team_user_active(

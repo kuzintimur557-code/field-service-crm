@@ -14257,6 +14257,101 @@ async def create_worker(request: Request):
     return RedirectResponse("/workers?created=1", status_code=302)
 
 
+@app.post("/workers/{user_id}/profile")
+async def update_team_user_profile(request: Request, user_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "boss":
+        return RedirectResponse("/workers?error=only_boss", status_code=302)
+
+    company_id = get_user_company_id(username)
+    form = await request.form()
+    profile_fields = {
+        "full_name": str(form.get("full_name") or "").strip()[:150],
+        "position": str(form.get("position") or "").strip()[:150],
+        "phone": str(form.get("phone") or "").strip()[:100],
+        "email": str(form.get("email") or "").strip()[:200],
+        "telegram_chat_id": str(
+            form.get("telegram_chat_id") or ""
+        ).strip()[:200],
+    }
+    field_labels = {
+        "full_name": "ФИО",
+        "position": "Должность",
+        "phone": "Телефон",
+        "email": "Электронная почта",
+        "telegram_chat_id": "ID чата Telegram",
+    }
+
+    conn = connect()
+    c = conn.cursor()
+    user = c.execute("""
+    SELECT *
+    FROM users
+    WHERE id=? AND company_id=?
+    """, (user_id, company_id)).fetchone()
+
+    if not user:
+        conn.close()
+        return RedirectResponse("/workers", status_code=302)
+
+    if user["role"] == "boss":
+        conn.close()
+        return RedirectResponse(
+            "/workers?error=cannot_change_boss",
+            status_code=302,
+        )
+
+    changed_fields = [
+        field_labels[field]
+        for field, value in profile_fields.items()
+        if str(user[field] or "") != value
+    ]
+
+    c.execute("""
+    UPDATE users
+    SET full_name=?, position=?, phone=?, email=?, telegram_chat_id=?
+    WHERE id=? AND company_id=?
+    """, (
+        profile_fields["full_name"],
+        profile_fields["position"],
+        profile_fields["phone"],
+        profile_fields["email"],
+        profile_fields["telegram_chat_id"],
+        user_id,
+        company_id,
+    ))
+
+    if changed_fields:
+        c.execute("""
+        INSERT INTO team_activity (
+            company_id, user_id, target_username, actor_username,
+            action, details, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            user_id,
+            user["username"],
+            username,
+            "Карточка обновлена",
+            "Изменены поля: " + ", ".join(changed_fields),
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        f"/workers/{user_id}?profile_updated=1",
+        status_code=302,
+    )
+
+
 @app.post("/workers/{user_id}/password")
 async def change_team_user_password(request: Request, user_id: int):
 

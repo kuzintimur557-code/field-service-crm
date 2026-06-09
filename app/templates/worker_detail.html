@@ -26,7 +26,12 @@ h1{margin:0 0 10px;font-size:34px}
 .activity{padding:14px 0;border-bottom:1px solid #e5e7eb}
 .activity:last-child{border-bottom:0}
 .activity-title{font-weight:900}
-@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}}
+.edit-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.edit-form label{font-size:13px;color:#6b7280;font-weight:900}
+.edit-form input{width:100%;margin-top:6px;padding:12px;border:1px solid #d1d5db;border-radius:12px;font-size:15px}
+.edit-form button{grid-column:1/-1;padding:13px;border:0;border-radius:12px;background:#111827;color:white;font-weight:900;cursor:pointer}
+.notice{margin-bottom:16px;padding:14px;border-radius:14px;background:#dcfce7;color:#166534;font-weight:900}
+@media(max-width:700px){.container{padding:16px}.grid,.edit-form{grid-template-columns:1fr}h1{font-size:28px}}
 </style>
 </head>
 
@@ -34,6 +39,10 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="container">
 
 <a href="/workers" class="back">← Назад к команде</a>
+
+{% if request.query_params.get("profile_updated") == "1" %}
+<div class="notice">Карточка сотрудника обновлена</div>
+{% endif %}
 
 <div class="card">
 <h1>{{ worker["full_name"] or worker["username"] }}</h1>
@@ -53,6 +62,35 @@ h1{margin:0 0 10px;font-size:34px}
 {% endif %}
 {% endif %}
 </div>
+
+{% if role == "boss" and worker["role"] != "boss" %}
+<div class="card">
+<h2>Редактировать карточку</h2>
+<form class="edit-form" method="post" action="/workers/{{ worker['id'] }}/profile">
+    <label>
+        ФИО
+        <input type="text" name="full_name" maxlength="150" value="{{ worker['full_name'] or '' }}">
+    </label>
+    <label>
+        Должность
+        <input type="text" name="position" maxlength="150" value="{{ worker['position'] or '' }}">
+    </label>
+    <label>
+        Телефон
+        <input type="text" name="phone" maxlength="100" value="{{ worker['phone'] or '' }}">
+    </label>
+    <label>
+        Электронная почта
+        <input type="email" name="email" maxlength="200" value="{{ worker['email'] or '' }}">
+    </label>
+    <label>
+        ID чата Telegram
+        <input type="text" name="telegram_chat_id" maxlength="200" value="{{ worker['telegram_chat_id'] or '' }}">
+    </label>
+    <button type="submit">Сохранить карточку</button>
+</form>
+</div>
+{% endif %}
 
 <div class="card">
 <h2>Статистика</h2>
