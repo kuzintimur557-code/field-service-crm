@@ -15548,6 +15548,12 @@ async def create_task(
     note_id = (form.get("note_id") or "").strip()
     source_task_id = (form.get("source_task_id") or "").strip()
     ai_note_id = (form.get("ai_note_id") or "").strip()
+    capacity_warning_shown = (
+        form.get("capacity_warning_shown") or ""
+    ).strip() == "1"
+    allow_capacity_override = (
+        form.get("allow_capacity_override") or ""
+    ).strip() == "1"
     priority = form.get("priority")
     price = form.get("price")
     company_id = get_user_company_id(username)
@@ -15671,6 +15677,32 @@ async def create_task(
 
     worker = valid_workers[0] if valid_workers else ""
     workers_text = ",".join(valid_workers)
+
+    if capacity_warning_shown and not allow_capacity_override:
+        error_params = {"error": "capacity_confirmation"}
+        selected_task_date = str(task_date or "")[:10]
+
+        try:
+            if selected_task_date:
+                datetime.strptime(selected_task_date, "%Y-%m-%d")
+                error_params["task_date"] = selected_task_date
+        except Exception:
+            pass
+
+        if worker:
+            error_params["worker"] = worker
+
+        if return_to == "calendar":
+            error_params["return_to"] = "calendar"
+        elif return_to == "client" and client_id:
+            error_params["return_to"] = "client"
+            error_params["client_id"] = client_id
+
+        conn.close()
+        return RedirectResponse(
+            f"/create-task?{urlencode(error_params)}",
+            status_code=302,
+        )
 
     c.execute("""
     INSERT INTO tasks (

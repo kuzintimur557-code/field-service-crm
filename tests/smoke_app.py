@@ -7007,6 +7007,9 @@ async def assert_task_custom_fields():
     assert page_response.context["selected_worker_at_capacity"] is True
     assert "Свободных мест нет" in page_html
     assert "Назначение превысит дневной лимит" in page_html
+    assert 'name="capacity_warning_shown" value="1"' in page_html
+    assert 'name="allow_capacity_override" value="1"' in page_html
+    assert "Назначить сверх дневного лимита" in page_html
     assert page_response.context["selected_worker_available_slots"] == max(
         page_response.context["selected_worker_daily_capacity"]
         - page_response.context["selected_worker_active_count"],
@@ -7018,6 +7021,37 @@ async def assert_task_custom_fields():
     assert "свободно" in page_html
     assert "Выбрать альтернативу" in page_html
     assert "/create-task?task_date=2026-05-17&amp;worker=free2&amp;return_to=calendar" in page_html
+
+    blocked_response = await crm.create_task(
+        make_multipart_request(
+            "owner2",
+            "/create-task",
+            {
+                "client": "Blocked Capacity Client",
+                "task_date": "2026-05-17",
+                "workers": ["worker2"],
+                "return_to": "calendar",
+                "priority": "Обычный",
+                "capacity_warning_shown": "1",
+            },
+        ),
+        photo=None,
+    )
+    assert blocked_response.status_code == 302
+    assert blocked_response.headers["location"] == (
+        "/create-task?error=capacity_confirmation"
+        "&task_date=2026-05-17&worker=worker2&return_to=calendar"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    blocked_task_count = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=2 AND client='Blocked Capacity Client'
+    """).fetchone()[0]
+    conn.close()
+    assert blocked_task_count == 0
 
     original_send_message = crm.send_message
     original_send_message_to_chat = crm.send_message_to_chat
