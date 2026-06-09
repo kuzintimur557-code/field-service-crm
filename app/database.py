@@ -514,6 +514,7 @@ def init_db():
     add_column_if_missing(c, "users", "is_active", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "disabled_at", "TEXT")
     add_column_if_missing(c, "users", "disabled_reason", "TEXT")
+    add_column_if_missing(c, "users", "daily_capacity", "INTEGER DEFAULT 3")
     add_column_if_missing(c, "task_items", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "client_notes", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "catalog_items", "company_id", "INTEGER DEFAULT 1")

@@ -72,6 +72,9 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="meta">Телефон: {{ worker["phone"] or "—" }}</div>
 <div class="meta">Электронная почта: {{ worker["email"] or "—" }}</div>
 <div class="meta">ID чата Telegram: {{ worker["telegram_chat_id"] or "—" }}</div>
+{% if worker["role"] == "worker" %}
+<div class="meta">Лимит заявок в день: {{ daily_capacity }}</div>
+{% endif %}
 <div class="meta">Процент с прибыли: {{ worker["commission_percent"] or 0 }}%</div>
 <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
 <div class="meta">Статус: {% if worker["is_active"] is none or worker["is_active"] %}активен{% else %}отключён{% endif %}</div>
@@ -107,6 +110,12 @@ h1{margin:0 0 10px;font-size:34px}
         ID чата Telegram
         <input type="text" name="telegram_chat_id" maxlength="200" value="{{ worker['telegram_chat_id'] or '' }}">
     </label>
+    {% if worker["role"] == "worker" %}
+    <label>
+        Дневной лимит заявок
+        <input type="number" name="daily_capacity" min="1" max="20" value="{{ daily_capacity }}">
+    </label>
+    {% endif %}
     <button type="submit">Сохранить карточку</button>
 </form>
 </div>
@@ -190,17 +199,19 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="card">
 <h2>Загрузка на 7 дней</h2>
 {% if nearest_free_date %}
-<div class="meta">Ближайший свободный день: {{ nearest_free_date }}</div>
+<div class="meta">Ближайший день со свободным местом: {{ nearest_free_date }}</div>
 {% else %}
-<div class="meta">На ближайшие 7 дней свободных дней нет</div>
+<div class="meta">На ближайшие 7 дней свободных мест нет</div>
 {% endif %}
+<div class="meta">Дневной лимит: {{ daily_capacity }}</div>
 <div class="week">
 {% for day in weekly_schedule %}
-<div class="day {% if day['load_status'] == 'Свободен' %}free{% elif day['load_status'] == 'Перегружен' %}busy{% else %}normal{% endif %}">
+<div class="day {% if day['load_status'] == 'Свободен' %}free{% elif day['load_status'] == 'Нет мест' %}busy{% else %}normal{% endif %}">
     <div class="day-name">{{ day["day_label"] }}</div>
     <div class="day-date">{{ day["date_label"] }}</div>
     <div class="day-count">{{ day["task_count"] }}</div>
     <div class="day-name">{{ day["load_status"] }}</div>
+    <div class="day-name">Свободно: {{ day["available_slots"] }}</div>
     <a href="{{ day['calendar_url'] }}">Открыть</a>
     <a href="{{ day['create_url'] }}">Создать</a>
 </div>

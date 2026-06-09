@@ -4925,6 +4925,7 @@ async def assert_finance_margin(task):
                 "phone": "+7 900 000-00-00",
                 "email": "history@example.test",
                 "telegram_chat_id": "history-chat",
+                "daily_capacity": "4",
             },
         ),
         history_candidate["id"],
@@ -4937,7 +4938,7 @@ async def assert_finance_margin(task):
     conn = connect()
     c = conn.cursor()
     updated_profile = c.execute("""
-    SELECT full_name, position, phone, email, telegram_chat_id
+    SELECT full_name, position, phone, email, telegram_chat_id, daily_capacity
     FROM users
     WHERE id=? AND company_id=2
     """, (history_candidate["id"],)).fetchone()
@@ -4952,9 +4953,10 @@ async def assert_finance_margin(task):
     assert updated_profile["full_name"] == "Исторический Сотрудник"
     assert updated_profile["position"] == "Старший специалист"
     assert updated_profile["telegram_chat_id"] == "history-chat"
+    assert updated_profile["daily_capacity"] == 4
     assert profile_activity["details"] == (
         "Изменены поля: ФИО, Должность, Телефон, "
-        "Электронная почта, ID чата Telegram"
+        "Электронная почта, ID чата Telegram, Дневной лимит заявок"
     )
     assert "+7 900 000-00-00" not in profile_activity["details"]
     assert "history@example.test" not in profile_activity["details"]
@@ -5847,10 +5849,16 @@ async def assert_finance_margin(task):
     assert "Загрузка на 7 дней" in worker_detail_html
     assert len(worker_detail_response.context["weekly_schedule"]) == 7
     assert worker_detail_response.context["nearest_free_date"]
+    assert worker_detail_response.context["daily_capacity"] == 3
     assert all(
         day["calendar_url"].startswith("/calendar?date=")
         and "worker=helper2" in day["calendar_url"]
         and day["create_url"].startswith("/create-task?task_date=")
+        and day["available_slots"] == max(
+            worker_detail_response.context["daily_capacity"]
+            - day["task_count"],
+            0,
+        )
         for day in worker_detail_response.context["weekly_schedule"]
     )
 

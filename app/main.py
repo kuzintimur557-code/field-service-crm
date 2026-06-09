@@ -14177,6 +14177,7 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
 
     weekly_schedule = []
     nearest_free_date = ""
+    daily_capacity = max(1, int(worker["daily_capacity"] or 3))
     worker_is_active = (
         worker["is_active"] is None or int(worker["is_active"]) == 1
     )
@@ -14210,13 +14211,14 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             date_value = schedule_date.strftime("%Y-%m-%d")
             task_count = int(schedule_counts.get(date_value, 0))
             load_status = "Свободен"
+            available_slots = max(daily_capacity - task_count, 0)
 
-            if task_count >= 3:
-                load_status = "Перегружен"
+            if task_count >= daily_capacity:
+                load_status = "Нет мест"
             elif task_count:
-                load_status = "В норме"
+                load_status = "Есть места"
 
-            if not nearest_free_date and task_count == 0:
+            if not nearest_free_date and available_slots > 0:
                 nearest_free_date = date_value
 
             weekly_schedule.append({
@@ -14224,6 +14226,7 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
                 "day_label": weekday_labels[schedule_date.weekday()],
                 "date_label": schedule_date.strftime("%d.%m"),
                 "task_count": task_count,
+                "available_slots": available_slots,
                 "load_status": load_status,
                 "calendar_url": "/calendar?" + urlencode({
                     "date": date_value,
@@ -14274,6 +14277,7 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             "worker_calendar_url": worker_calendar_url,
             "weekly_schedule": weekly_schedule,
             "nearest_free_date": nearest_free_date,
+            "daily_capacity": daily_capacity,
             "income": income,
             "finance_total": finance_total,
             "finance_profit": finance_profit,
@@ -14426,12 +14430,14 @@ async def update_team_user_profile(request: Request, user_id: int):
             form.get("telegram_chat_id") or ""
         ).strip()[:200],
     }
+    raw_daily_capacity = form.get("daily_capacity")
     field_labels = {
         "full_name": "ФИО",
         "position": "Должность",
         "phone": "Телефон",
         "email": "Электронная почта",
         "telegram_chat_id": "ID чата Telegram",
+        "daily_capacity": "Дневной лимит заявок",
     }
 
     conn = connect()
@@ -14453,15 +14459,31 @@ async def update_team_user_profile(request: Request, user_id: int):
             status_code=302,
         )
 
+    try:
+        daily_capacity = int(
+            raw_daily_capacity
+            if raw_daily_capacity not in (None, "")
+            else (user["daily_capacity"] or 3)
+        )
+    except Exception:
+        daily_capacity = int(user["daily_capacity"] or 3)
+
+    daily_capacity = min(max(daily_capacity, 1), 20)
+    profile_fields["daily_capacity"] = daily_capacity
     changed_fields = [
         field_labels[field]
         for field, value in profile_fields.items()
-        if str(user[field] or "") != value
+        if (
+            int(user[field] or 3) != value
+            if field == "daily_capacity"
+            else str(user[field] or "") != value
+        )
     ]
 
     c.execute("""
     UPDATE users
-    SET full_name=?, position=?, phone=?, email=?, telegram_chat_id=?
+    SET full_name=?, position=?, phone=?, email=?, telegram_chat_id=?,
+        daily_capacity=?
     WHERE id=? AND company_id=?
     """, (
         profile_fields["full_name"],
@@ -14469,6 +14491,7 @@ async def update_team_user_profile(request: Request, user_id: int):
         profile_fields["phone"],
         profile_fields["email"],
         profile_fields["telegram_chat_id"],
+        profile_fields["daily_capacity"],
         user_id,
         company_id,
     ))
