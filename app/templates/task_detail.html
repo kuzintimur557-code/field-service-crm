@@ -255,6 +255,79 @@ button{
     gap:14px;
 }
 
+.reschedule-list{
+    display:grid;
+    gap:10px;
+}
+
+.reschedule-option{
+    padding:14px;
+    border:1px solid #dbeafe;
+    border-radius:16px;
+    background:#f8fbff;
+}
+
+.reschedule-option:first-child{
+    border-color:#86efac;
+    background:#f0fdf4;
+}
+
+.reschedule-option-head{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:center;
+}
+
+.reschedule-date{
+    font-size:18px;
+    font-weight:900;
+}
+
+.reschedule-score{
+    padding:5px 8px;
+    border-radius:999px;
+    background:#dbeafe;
+    color:#1d4ed8;
+    font-size:11px;
+    font-weight:900;
+}
+
+.reschedule-reason{
+    margin-top:5px;
+    color:#6b7280;
+    font-size:12px;
+    font-weight:800;
+}
+
+.reschedule-team{
+    margin-top:8px;
+    color:#374151;
+    font-size:12px;
+    font-weight:900;
+}
+
+.reschedule-option form{
+    margin-top:10px;
+}
+
+.reschedule-option button{
+    width:100%;
+    padding:11px;
+    border-radius:12px;
+    background:#2563eb;
+    color:white;
+    font-weight:900;
+}
+
+.reschedule-empty{
+    padding:14px;
+    border-radius:14px;
+    background:#fff7ed;
+    color:#9a3412;
+    font-weight:800;
+}
+
 .timeline{
     position:relative;
 }
@@ -752,6 +825,44 @@ button{
 </div>
 
 </div>
+
+{% if role in ["boss", "manager"] and task_workers and task["status"] not in ["Завершено", "Отменено"] %}
+<div class="card">
+<div class="section-title">Умный перенос</div>
+
+<div class="meta" style="margin-bottom:14px">
+Подбор даты для текущей команды: {{ task_workers|join(", ") }}.
+Найдено вариантов: {{ smart_reschedule_summary["found"] }}.
+</div>
+
+{% if smart_reschedule_items %}
+<div class="reschedule-list">
+{% for item in smart_reschedule_items %}
+<div class="reschedule-option">
+    <div class="reschedule-option-head">
+        <span class="reschedule-date">{{ item["date_label"] }}</span>
+        <span class="reschedule-score">Оценка {{ item["score"] }}</span>
+    </div>
+    <div class="reschedule-reason">{{ item["reason"] }}</div>
+    <div class="reschedule-team">
+        Загрузка команды после переноса: {{ item["average_load_percent"] }}%.
+        Резерв мест: {{ item["available_after"] }}.
+    </div>
+    <form method="post" action="/task/{{ task['id'] }}/date">
+        <input type="hidden" name="task_date" value="{{ item['date'] }}">
+        <button type="submit">Перенести на {{ item["date_label"] }}</button>
+    </form>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="reschedule-empty">
+На ближайшие 14 дней нет общего свободного окна для текущей команды.
+</div>
+{% endif %}
+
+</div>
+{% endif %}
 
 {% if role in ["boss", "manager"] %}
 <div class="card">

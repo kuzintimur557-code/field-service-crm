@@ -97,6 +97,32 @@ h1{font-size:32px;margin:0}
 	.week-cell-actions a{display:inline-flex;align-items:center;justify-content:center;min-width:31px;height:28px;padding:0 7px;border-radius:9px;background:white;color:#111827;text-decoration:none;font-size:11px;font-weight:900;border:1px solid rgba(17,24,39,.1)}
 	.week-best{position:absolute;right:6px;top:6px;width:7px;height:7px;border-radius:50%;background:#22c55e}
 	.week-empty{padding:14px;border-radius:14px;background:#f9fafb;color:#6b7280;font-weight:800}
+	.smart-scheduler{margin-bottom:18px;padding:18px;background:white;border-radius:20px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
+	.smart-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
+	.smart-title{font-size:20px;font-weight:900}
+	.smart-subtitle{margin-top:4px;color:#6b7280;font-size:13px;font-weight:800}
+	.smart-form{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+	.smart-form label{display:block;margin-bottom:5px;color:#6b7280;font-size:12px;font-weight:900}
+	.smart-form input,.smart-form select{min-width:145px;padding:10px;border:1px solid #d1d5db;border-radius:12px;background:white;font-weight:800}
+	.smart-form button{padding:10px 13px;border:0;border-radius:12px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+	.smart-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+	.smart-summary span{padding:7px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:12px;font-weight:900}
+	.smart-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:10px}
+	.smart-result{padding:14px;border:1px solid #dbeafe;border-radius:16px;background:#f8fbff}
+	.smart-result.best{border-color:#86efac;background:#f0fdf4}
+	.smart-result-top{display:flex;justify-content:space-between;gap:10px;align-items:center}
+	.smart-result-date{font-size:17px;font-weight:900}
+	.smart-score{padding:5px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:900}
+	.smart-result.best .smart-score{background:#dcfce7;color:#166534}
+	.smart-reason{margin-top:5px;color:#4b5563;font-size:12px;font-weight:800}
+	.smart-workers{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+	.smart-worker{padding:6px 8px;border-radius:10px;background:white;border:1px solid #e5e7eb;font-size:12px;font-weight:900}
+	.smart-worker small{display:block;margin-top:2px;color:#6b7280;font-size:10px}
+	.smart-result-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;color:#4b5563;font-size:11px;font-weight:800}
+	.smart-actions{display:flex;gap:7px;margin-top:11px}
+	.smart-actions a{display:inline-flex;justify-content:center;align-items:center;padding:9px 11px;border-radius:11px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
+	.smart-actions a.primary{background:#2563eb}
+	.smart-no-results{padding:14px;border-radius:14px;background:#fff7ed;color:#9a3412;font-weight:800}
 	@media(max-width:700px){
 	    .container{padding:16px}
 	    h1{font-size:26px}
@@ -109,6 +135,9 @@ h1{font-size:32px;margin:0}
 	    .week-jump input{min-width:0;flex:1}
 	    .week-grid{min-width:890px}
 	    .week-row{grid-template-columns:130px repeat(7,98px) 92px}
+	    .smart-scheduler{padding:14px}
+	    .smart-form,.smart-form>div,.smart-form input,.smart-form select,.smart-form button{width:100%}
+	    .smart-results{grid-template-columns:1fr}
 	}
 	</style>
 </head>
@@ -161,6 +190,87 @@ h1{font-size:32px;margin:0}
 		{% endif %}
 
 		{% if role in ("boss", "manager") %}
+		<section class="smart-scheduler">
+		    <div class="smart-head">
+		        <div>
+		            <div class="smart-title">Умный подбор окна</div>
+		            <div class="smart-subtitle">
+		                Подбирает ближайшую дату и наименее загруженную команду.
+		                {% if selected_worker %}Обязательный исполнитель: {{ selected_worker }}.{% endif %}
+		            </div>
+		        </div>
+		        <form class="smart-form" method="get" action="/calendar">
+		            <div>
+		                <label>Начать поиск</label>
+		                <input type="date" name="schedule_start" value="{{ selected_schedule_start }}">
+		            </div>
+		            <div>
+		                <label>Период</label>
+		                <select name="schedule_days">
+		                    <option value="7" {% if selected_schedule_days == 7 %}selected{% endif %}>7 дней</option>
+		                    <option value="14" {% if selected_schedule_days == 14 %}selected{% endif %}>14 дней</option>
+		                    <option value="30" {% if selected_schedule_days == 30 %}selected{% endif %}>30 дней</option>
+		                </select>
+		            </div>
+		            <div>
+		                <label>Исполнителей</label>
+		                <select name="schedule_workers">
+		                    {% for count in range(1, 6) %}
+		                    <option value="{{ count }}" {% if selected_schedule_workers == count %}selected{% endif %}>{{ count }}</option>
+		                    {% endfor %}
+		                </select>
+		            </div>
+		            {% if selected_worker %}
+		            <input type="hidden" name="worker" value="{{ selected_worker }}">
+		            {% endif %}
+		            <input type="hidden" name="week_start" value="{{ selected_week_start }}">
+		            <button type="submit">Найти окно</button>
+		        </form>
+		    </div>
+
+		    <div class="smart-summary">
+		        <span>Проверено дней: {{ smart_schedule_summary["search_days"] }}</span>
+		        <span>Дней с нужной командой: {{ smart_schedule_summary["days_with_capacity"] }}</span>
+		        <span>Свободных мест: {{ smart_schedule_summary["total_open_slots"] }}</span>
+		        <span>Подходящих вариантов: {{ smart_schedule_summary["found"] }}</span>
+		    </div>
+
+		    {% if smart_schedule_items %}
+		    <div class="smart-results">
+		        {% for item in smart_schedule_items %}
+		        <article class="smart-result {% if loop.first %}best{% endif %}">
+		            <div class="smart-result-top">
+		                <div class="smart-result-date">{{ item["date_label"] }}</div>
+		                <span class="smart-score">Оценка {{ item["score"] }}</span>
+		            </div>
+		            <div class="smart-reason">{{ item["reason"] }}</div>
+		            <div class="smart-workers">
+		                {% for worker in item["workers"] %}
+		                <span class="smart-worker">
+		                    {{ worker["username"] }}
+		                    <small>{{ worker["task_count"] }}/{{ worker["daily_capacity"] }} занято</small>
+		                </span>
+		                {% endfor %}
+		            </div>
+		            <div class="smart-result-meta">
+		                <span>Средняя загрузка после назначения: {{ item["average_load_percent"] }}%</span>
+		                <span>Резерв мест: {{ item["available_after"] }}</span>
+		            </div>
+		            <div class="smart-actions">
+		                <a class="primary" href="{{ item['create_url'] }}">Создать заявку</a>
+		                <a href="{{ item['calendar_url'] }}">Открыть день</a>
+		            </div>
+		        </article>
+		        {% endfor %}
+		    </div>
+		    {% else %}
+		    <div class="smart-no-results">
+		        На выбранный период нет окна для команды из {{ selected_schedule_workers }} исполнителей.
+		        Увеличьте период или уменьшите размер команды.
+		    </div>
+		    {% endif %}
+		</section>
+
 		<section class="week-planner">
 		    <div class="week-planner-head">
 		        <div>

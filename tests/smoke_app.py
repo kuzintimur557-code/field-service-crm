@@ -4345,6 +4345,27 @@ async def assert_upload_access():
 
 
 async def assert_calendar_access():
+    fixed_team_start = datetime.now().date()
+    fixed_team_result = crm.build_scheduling_recommendations(
+        worker_capacities={"worker_a": 1, "worker_b": 1},
+        assignments=[{
+            "date": fixed_team_start.strftime("%Y-%m-%d"),
+            "workers": ["worker_a"],
+        }],
+        start_date=fixed_team_start,
+        search_days=3,
+        fixed_workers=["worker_a", "worker_b"],
+    )
+    assert fixed_team_result["summary"]["required_workers"] == 2
+    assert fixed_team_result["summary"]["days_with_capacity"] == 2
+    assert fixed_team_result["items"][0]["date"] == (
+        fixed_team_start + timedelta(days=1)
+    ).strftime("%Y-%m-%d")
+    assert fixed_team_result["items"][0]["worker_names"] == [
+        "worker_a",
+        "worker_b",
+    ]
+
     conn = connect()
     c = conn.cursor()
     c.execute("""
@@ -4388,6 +4409,13 @@ async def assert_calendar_access():
     assert "Дней без мест" in manager_html
     assert "Дата нужной недели" in manager_html
     assert "Перейти" in manager_html
+    assert "Умный подбор окна" in manager_html
+    assert "Найти окно" in manager_html
+    assert "Начать поиск" in manager_html
+    assert "Проверено дней:" in manager_html
+    assert "Дней с нужной командой:" in manager_html
+    assert "Средняя загрузка после назначения:" in manager_html
+    assert "Обязательный исполнитель: helper2" in manager_html
     assert "week-cell" in manager_html
     assert "Рекомендованное свободное окно" in manager_html
     assert "/calendar?date=2026-05-16&amp;worker=helper2&amp;status=" in manager_html
@@ -4446,6 +4474,25 @@ async def assert_calendar_access():
     assert helper_sunday["create_url"].startswith(
         "/create-task?task_date=2026-05-17&worker=helper2"
     )
+    today_value = datetime.now().date()
+    assert manager_response.context["selected_schedule_start"] == (
+        today_value.strftime("%Y-%m-%d")
+    )
+    assert manager_response.context["selected_schedule_days"] == 14
+    assert manager_response.context["selected_schedule_workers"] == 1
+    assert manager_response.context["smart_schedule_items"]
+    assert (
+        manager_response.context["smart_schedule_items"][0]["date"]
+        == today_value.strftime("%Y-%m-%d")
+    )
+    assert (
+        manager_response.context["smart_schedule_items"][0]["worker_names"]
+        == ["helper2"]
+    )
+    assert all(
+        "outsider_worker" not in item["worker_names"]
+        for item in manager_response.context["smart_schedule_items"]
+    )
 
     free_response = await crm.calendar_page(
         make_asgi_request("owner2"),
@@ -4462,6 +4509,93 @@ async def assert_calendar_access():
         row["username"] != "outsider_worker"
         for row in free_response.context["weekly_capacity_rows"]
     )
+
+    team_schedule_response = await crm.calendar_page(
+        make_asgi_request("owner2"),
+        schedule_start="2026-05-17",
+        schedule_days=7,
+        schedule_workers=2,
+    )
+    assert team_schedule_response.status_code == 200
+    team_schedule_html = team_schedule_response.body.decode("utf-8")
+    assert '<option value="7" selected>7 дней</option>' in team_schedule_html
+    assert '<option value="2" selected>2</option>' in team_schedule_html
+    assert "Создать заявку" in team_schedule_html
+    assert team_schedule_response.context["smart_schedule_summary"] == {
+        "search_days": 7,
+        "required_workers": 2,
+        "days_with_capacity": 7,
+        "total_open_slots": 35,
+        "found": 7,
+    }
+    best_team_slot = team_schedule_response.context["smart_schedule_items"][0]
+    assert best_team_slot["date"] == today_value.strftime("%Y-%m-%d")
+    assert best_team_slot["worker_names"] == ["free2", "helper2"]
+    assert "workers_csv=free2%2Chelper2" in best_team_slot["create_url"]
+    assert "outsider_worker" not in best_team_slot["worker_names"]
+
+    team_create_response = await crm.create_task_page(
+        make_asgi_request("owner2", "/create-task"),
+        task_date=best_team_slot["date"],
+        worker=best_team_slot["worker_names"][0],
+        workers_csv=",".join(best_team_slot["worker_names"]),
+        return_to="calendar",
+    )
+    assert team_create_response.status_code == 200
+    assert team_create_response.context["selected_workers"] == [
+        "free2",
+        "helper2",
+    ]
+    team_create_html = team_create_response.body.decode("utf-8")
+    assert 'value="free2" data-at-capacity="0" checked' in team_create_html
+    assert 'value="helper2" data-at-capacity="0" checked' in team_create_html
+
+    schedule_api = crm.api_calendar_smart_schedule(
+        make_request("owner2"),
+        start="2026-05-17",
+        days=7,
+        workers=2,
+    )
+    assert schedule_api["ok"] is True
+    assert schedule_api["company_id"] == 2
+    assert schedule_api["start"] == today_value.strftime("%Y-%m-%d")
+    assert schedule_api["end"] == (
+        today_value + timedelta(days=6)
+    ).strftime("%Y-%m-%d")
+    assert schedule_api["summary"]["required_workers"] == 2
+    assert schedule_api["items"][0]["worker_names"] == [
+        "free2",
+        "helper2",
+    ]
+    assert all(
+        "outsider_worker" not in item["worker_names"]
+        for item in schedule_api["items"]
+    )
+    assert "workers_csv=free2%2Chelper2" in (
+        schedule_api["items"][0]["create_url"]
+    )
+
+    invalid_worker_api = crm.api_calendar_smart_schedule(
+        make_request("owner2"),
+        start="2026-05-17",
+        worker="outsider_worker",
+    )
+    assert invalid_worker_api.status_code == 400
+    assert json.loads(invalid_worker_api.body)["error"] == "invalid_worker"
+
+    worker_api = crm.api_calendar_smart_schedule(
+        make_request("helper2"),
+        start="2026-05-17",
+    )
+    assert worker_api.status_code == 403
+    assert json.loads(worker_api.body)["error"] == "forbidden"
+
+    anonymous_api = crm.api_calendar_smart_schedule(
+        make_request(),
+        start="2026-05-17",
+    )
+    assert anonymous_api.status_code == 401
+    assert json.loads(anonymous_api.body)["error"] == "unauthorized"
 
     conn = connect()
     c = conn.cursor()
@@ -5289,6 +5423,24 @@ async def assert_finance_margin(task):
     )
     task_detail_html = task_detail_response.body.decode("utf-8")
     assert f"/task/{task['id']}/workers" in task_detail_html
+    assert "Умный перенос" in task_detail_html
+    assert "Подбор даты для текущей команды:" in task_detail_html
+    assert "Загрузка команды после переноса:" in task_detail_html
+    assert task_detail_response.context["smart_reschedule_items"]
+    assert len(task_detail_response.context["smart_reschedule_items"]) <= 5
+    assert all(
+        item["worker_names"]
+        == task_detail_response.context["task_workers"]
+        for item in task_detail_response.context["smart_reschedule_items"]
+    )
+    assert all(
+        "outsider_worker" not in item["worker_names"]
+        for item in task_detail_response.context["smart_reschedule_items"]
+    )
+    assert (
+        f'action="/task/{task["id"]}/date"'
+        in task_detail_html
+    )
     assert all(
         worker["username"] != "inactive_candidate2"
         for worker in task_detail_response.context["available_workers"]

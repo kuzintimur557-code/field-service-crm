@@ -33,6 +33,7 @@ from app.services.system_health import (
     calculate_system_health,
     get_system_health_history,
 )
+from app.services.smart_scheduling import build_scheduling_recommendations
 from app.services.workflow_graph import (
     get_company_workflow_graphs,
     get_rule_workflow_debug,
@@ -7969,6 +7970,9 @@ async def calendar_page(
     date: str = "",
     availability: str = "",
     week_start: str = "",
+    schedule_start: str = "",
+    schedule_days: int = 14,
+    schedule_workers: int = 1,
 ):
 
     username = get_user(request)
@@ -8003,6 +8007,14 @@ async def calendar_page(
         "full_cells": 0,
         "utilization_percent": 0,
     }
+    smart_schedule_items = []
+    smart_schedule_summary = {
+        "search_days": 14,
+        "required_workers": 1,
+        "days_with_capacity": 0,
+        "total_open_slots": 0,
+        "found": 0,
+    }
     availability_summary = {
         "total": 0,
         "free": 0,
@@ -8018,6 +8030,24 @@ async def calendar_page(
         selected_date = ""
 
     availability_date = selected_date or datetime.now().strftime("%Y-%m-%d")
+    selected_schedule_start = str(schedule_start or "").strip()
+
+    try:
+        schedule_start_date = datetime.strptime(
+            selected_schedule_start or availability_date,
+            "%Y-%m-%d",
+        ).date()
+    except Exception:
+        schedule_start_date = datetime.now().date()
+
+    if schedule_start_date < datetime.now().date():
+        schedule_start_date = datetime.now().date()
+
+    selected_schedule_start = schedule_start_date.strftime("%Y-%m-%d")
+    selected_schedule_days = (
+        schedule_days if schedule_days in (7, 14, 30) else 14
+    )
+    selected_schedule_workers = min(max(int(schedule_workers or 1), 1), 5)
     selected_week_start = str(week_start or "").strip()
 
     try:
@@ -8332,6 +8362,56 @@ async def calendar_page(
                 / weekly_capacity_summary["capacity"]
                 * 100
             )
+
+        schedule_end_date = (
+            schedule_start_date
+            + timedelta(days=selected_schedule_days - 1)
+        )
+        schedule_rows = c.execute("""
+        SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+        FROM tasks
+        WHERE archived=0
+          AND company_id=?
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND task_date IS NOT NULL
+          AND task_date != ''
+          AND substr(task_date, 1, 10) BETWEEN ? AND ?
+        """, (
+            company_id,
+            selected_schedule_start,
+            schedule_end_date.strftime("%Y-%m-%d"),
+        )).fetchall()
+        scheduling_result = build_scheduling_recommendations(
+            worker_capacities=worker_capacity_map,
+            assignments=[
+                {
+                    "date": row["work_date"],
+                    "workers": get_task_worker_names(row),
+                }
+                for row in schedule_rows
+            ],
+            start_date=schedule_start_date,
+            search_days=selected_schedule_days,
+            required_workers=selected_schedule_workers,
+            preferred_worker=worker if worker in worker_names else "",
+        )
+        smart_schedule_items = scheduling_result["items"]
+        smart_schedule_summary = scheduling_result["summary"]
+
+        for item in smart_schedule_items:
+            item["create_url"] = "/create-task?" + urlencode({
+                "task_date": item["date"],
+                "worker": item["worker_names"][0],
+                "workers_csv": ",".join(item["worker_names"]),
+                "return_to": "calendar",
+            })
+            item["calendar_url"] = "/calendar?" + urlencode({
+                "date": item["date"],
+                "week_start": (
+                    schedule_start_date
+                    - timedelta(days=schedule_start_date.weekday())
+                ).strftime("%Y-%m-%d"),
+            })
     else:
         worker = ""
         query += f" AND {worker_task_condition()}"
@@ -8429,6 +8509,8 @@ async def calendar_page(
             "weekly_capacity_rows": weekly_capacity_rows,
             "weekly_capacity_days": weekly_capacity_days,
             "weekly_capacity_summary": weekly_capacity_summary,
+            "smart_schedule_items": smart_schedule_items,
+            "smart_schedule_summary": smart_schedule_summary,
             "availability_summary": availability_summary,
             "selected_worker": worker,
             "selected_month": month,
@@ -8438,6 +8520,9 @@ async def calendar_page(
             "availability_date": availability_date,
             "selected_week_start": selected_week_start,
             "selected_week_end": selected_week_end,
+            "selected_schedule_start": selected_schedule_start,
+            "selected_schedule_days": selected_schedule_days,
+            "selected_schedule_workers": selected_schedule_workers,
             "previous_day_url": previous_day_url,
             "today_day_url": today_day_url,
             "next_day_url": next_day_url,
@@ -8448,6 +8533,127 @@ async def calendar_page(
             "role": role
         }
     )
+
+
+@app.get("/api/calendar/smart-schedule")
+def api_calendar_smart_schedule(
+    request: Request,
+    start: str = "",
+    days: int = 14,
+    workers: int = 1,
+    worker: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {"ok": False, "error": "unauthorized"},
+            status_code=401,
+        )
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {"ok": False, "error": "feature_disabled"},
+            status_code=403,
+        )
+
+    try:
+        start_date = datetime.strptime(
+            str(start or datetime.now().strftime("%Y-%m-%d")),
+            "%Y-%m-%d",
+        ).date()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "invalid_start_date"},
+            status_code=400,
+        )
+
+    if start_date < datetime.now().date():
+        start_date = datetime.now().date()
+
+    search_days = days if days in (7, 14, 30) else 14
+    required_workers = min(max(int(workers or 1), 1), 5)
+    preferred_worker = str(worker or "").strip()
+    conn = connect()
+    c = conn.cursor()
+    worker_rows = c.execute("""
+    SELECT username, daily_capacity
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY username
+    """, (company_id,)).fetchall()
+    worker_capacities = {
+        row["username"]: max(1, int(row["daily_capacity"] or 3))
+        for row in worker_rows
+    }
+
+    if preferred_worker and preferred_worker not in worker_capacities:
+        conn.close()
+        return JSONResponse(
+            {"ok": False, "error": "invalid_worker"},
+            status_code=400,
+        )
+
+    end_date = start_date + timedelta(days=search_days - 1)
+    assignment_rows = c.execute("""
+    SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+    FROM tasks
+    WHERE archived=0
+      AND company_id=?
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date != ''
+      AND substr(task_date, 1, 10) BETWEEN ? AND ?
+    """, (
+        company_id,
+        start_date.strftime("%Y-%m-%d"),
+        end_date.strftime("%Y-%m-%d"),
+    )).fetchall()
+    conn.close()
+    result = build_scheduling_recommendations(
+        worker_capacities=worker_capacities,
+        assignments=[
+            {
+                "date": row["work_date"],
+                "workers": get_task_worker_names(row),
+            }
+            for row in assignment_rows
+        ],
+        start_date=start_date,
+        search_days=search_days,
+        required_workers=required_workers,
+        preferred_worker=preferred_worker,
+    )
+
+    for item in result["items"]:
+        item["create_url"] = "/create-task?" + urlencode({
+            "task_date": item["date"],
+            "worker": item["worker_names"][0],
+            "workers_csv": ",".join(item["worker_names"]),
+            "return_to": "calendar",
+        })
+
+    return {
+        "ok": True,
+        "company_id": company_id,
+        "start": start_date.strftime("%Y-%m-%d"),
+        "end": end_date.strftime("%Y-%m-%d"),
+        "preferred_worker": preferred_worker,
+        "summary": result["summary"],
+        "items": result["items"],
+    }
 
 
 @app.get("/recurring", response_class=HTMLResponse)
@@ -15467,6 +15673,7 @@ async def create_task_page(
     request: Request,
     task_date: str = "",
     worker: str = "",
+    workers_csv: str = "",
     return_to: str = "",
     client_id: int = 0,
     note_id: int = 0,
@@ -15543,7 +15750,15 @@ async def create_task_page(
             "is_at_capacity": available_slots == 0,
         })
 
-    selected_workers = []
+    selected_workers = [
+        worker_name
+        for worker_name in dict.fromkeys(
+            part.strip()
+            for part in str(workers_csv or "").split(",")
+            if part.strip()
+        )
+        if worker_name in worker_names
+    ]
     selected_worker = str(worker or "").strip()
     selected_return_to = return_to if return_to in ("calendar", "client") else ""
     selected_worker_active_count = 0
@@ -15560,7 +15775,8 @@ async def create_task_page(
     selected_ai_note_id = 0
 
     if selected_worker in worker_names:
-        selected_workers.append(selected_worker)
+        if selected_worker not in selected_workers:
+            selected_workers.insert(0, selected_worker)
         selected_worker_daily_capacity = worker_capacity_map[selected_worker]
 
         if selected_task_date:
@@ -16266,6 +16482,86 @@ async def task_detail(request: Request, task_id: int):
       AND COALESCE(is_active, 1)=1
     ORDER BY COALESCE(NULLIF(full_name, ''), username), username
     """, (company_id,)).fetchall()
+    smart_reschedule_items = []
+    smart_reschedule_summary = {
+        "search_days": 14,
+        "required_workers": len(task_workers),
+        "days_with_capacity": 0,
+        "total_open_slots": 0,
+        "found": 0,
+    }
+
+    if (
+        role in ("boss", "manager")
+        and task_workers
+        and task["status"] not in ("Завершено", "Отменено")
+    ):
+        worker_placeholders = ",".join("?" for _ in task_workers)
+        reschedule_workers = c.execute(f"""
+        SELECT username, daily_capacity
+        FROM users
+        WHERE company_id=?
+          AND role='worker'
+          AND COALESCE(is_active, 1)=1
+          AND username IN ({worker_placeholders})
+        ORDER BY username
+        """, [company_id, *task_workers]).fetchall()
+        reschedule_capacities = {
+            row["username"]: max(
+                1,
+                int(row["daily_capacity"] or 3),
+            )
+            for row in reschedule_workers
+        }
+
+        if len(reschedule_capacities) == len(task_workers):
+            reschedule_start = datetime.now().date()
+
+            try:
+                current_task_date = datetime.strptime(
+                    str(task["task_date"] or "")[:10],
+                    "%Y-%m-%d",
+                ).date()
+
+                if current_task_date > reschedule_start:
+                    reschedule_start = current_task_date
+            except Exception:
+                pass
+
+            reschedule_end = reschedule_start + timedelta(days=13)
+            reschedule_rows = c.execute("""
+            SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+            FROM tasks
+            WHERE archived=0
+              AND company_id=?
+              AND id!=?
+              AND status NOT IN ('Завершено', 'Отменено')
+              AND task_date IS NOT NULL
+              AND task_date != ''
+              AND substr(task_date, 1, 10) BETWEEN ? AND ?
+            """, (
+                company_id,
+                task_id,
+                reschedule_start.strftime("%Y-%m-%d"),
+                reschedule_end.strftime("%Y-%m-%d"),
+            )).fetchall()
+            reschedule_result = build_scheduling_recommendations(
+                worker_capacities=reschedule_capacities,
+                assignments=[
+                    {
+                        "date": row["work_date"],
+                        "workers": get_task_worker_names(row),
+                    }
+                    for row in reschedule_rows
+                ],
+                start_date=reschedule_start,
+                search_days=14,
+                fixed_workers=task_workers,
+                limit=5,
+            )
+            smart_reschedule_items = reschedule_result["items"]
+            smart_reschedule_summary = reschedule_result["summary"]
+
     task_custom_fields = c.execute("""
     SELECT custom_fields.id, custom_fields.label, custom_fields.group_name, custom_fields.field_type, custom_field_values.value
     FROM custom_fields
@@ -16308,6 +16604,8 @@ async def task_detail(request: Request, task_id: int):
             "estimate_margin": estimate_margin,
             "task_workers": task_workers,
             "available_workers": available_workers,
+            "smart_reschedule_items": smart_reschedule_items,
+            "smart_reschedule_summary": smart_reschedule_summary,
             "task_custom_fields": task_custom_fields,
             "sla_status": sla_status,
             "settings": settings
