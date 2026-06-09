@@ -14108,6 +14108,8 @@ async def toggle_team_user_active(request: Request, user_id: int):
         return RedirectResponse("/workers?error=only_boss", status_code=302)
 
     company_id = get_user_company_id(username)
+    form = await request.form()
+    disabled_reason = str(form.get("disabled_reason") or "").strip()[:500]
     conn = connect()
     c = conn.cursor()
 
@@ -14153,11 +14155,23 @@ async def toggle_team_user_active(request: Request, user_id: int):
                 status_code=302,
             )
 
-    c.execute("""
-    UPDATE users
-    SET is_active=?
-    WHERE id=? AND company_id=?
-    """, (0 if current_active else 1, user_id, company_id))
+    if current_active:
+        c.execute("""
+        UPDATE users
+        SET is_active=0, disabled_at=?, disabled_reason=?
+        WHERE id=? AND company_id=?
+        """, (
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            disabled_reason,
+            user_id,
+            company_id,
+        ))
+    else:
+        c.execute("""
+        UPDATE users
+        SET is_active=1, disabled_at=NULL, disabled_reason=NULL
+        WHERE id=? AND company_id=?
+        """, (user_id, company_id))
 
     conn.commit()
     conn.close()

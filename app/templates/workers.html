@@ -153,6 +153,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 
     <form method="post" action="/workers/{{ worker['id'] }}/toggle-active">
         {% if worker["is_active"] is none or worker["is_active"] %}
+        <input type="text" name="disabled_reason" maxlength="500" placeholder="Причина отключения (необязательно)">
         <button class="btn-toggle" type="submit">Отключить пользователя</button>
         {% else %}
         <button class="btn-enable" type="submit">Включить пользователя</button>
@@ -160,6 +161,10 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     </form>
 
     {% if worker["is_active"] is not none and not worker["is_active"] %}
+    <div class="meta">Отключён: {{ worker["disabled_at"] or "дата не указана" }}</div>
+    {% if worker["disabled_reason"] %}
+    <div class="meta">Причина: {{ worker["disabled_reason"] }}</div>
+    {% endif %}
     <form method="post" action="/workers/{{ worker['id'] }}/delete" onsubmit="return confirm('Удалить пользователя?')">
         <button class="btn-red" type="submit">Удалить пользователя</button>
     </form>

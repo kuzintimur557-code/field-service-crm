@@ -4753,12 +4753,24 @@ async def assert_finance_margin(task):
         make_form_request(
             "owner2",
             f"/workers/{history_candidate['id']}/toggle-active",
-            {},
+            {"disabled_reason": "Сотрудник уволен"},
         ),
         history_candidate["id"],
     )
     assert history_toggle_response.status_code == 302
     assert history_toggle_response.headers["location"] == "/workers?status_updated=1"
+
+    conn = connect()
+    c = conn.cursor()
+    disabled_history_candidate = c.execute("""
+    SELECT is_active, disabled_at, disabled_reason
+    FROM users
+    WHERE id=?
+    """, (history_candidate["id"],)).fetchone()
+    conn.close()
+    assert disabled_history_candidate["is_active"] == 0
+    assert disabled_history_candidate["disabled_at"]
+    assert disabled_history_candidate["disabled_reason"] == "Сотрудник уволен"
 
     history_delete_response = await crm.delete_team_user(
         make_form_request(
@@ -4772,6 +4784,29 @@ async def assert_finance_margin(task):
     assert history_delete_response.headers["location"].startswith(
         "/workers?error=user_has_history&count="
     )
+
+    history_reenable_response = await crm.toggle_team_user_active(
+        make_form_request(
+            "owner2",
+            f"/workers/{history_candidate['id']}/toggle-active",
+            {},
+        ),
+        history_candidate["id"],
+    )
+    assert history_reenable_response.status_code == 302
+    assert history_reenable_response.headers["location"] == "/workers?status_updated=1"
+
+    conn = connect()
+    c = conn.cursor()
+    reenabled_history_candidate = c.execute("""
+    SELECT is_active, disabled_at, disabled_reason
+    FROM users
+    WHERE id=?
+    """, (history_candidate["id"],)).fetchone()
+    conn.close()
+    assert reenabled_history_candidate["is_active"] == 1
+    assert reenabled_history_candidate["disabled_at"] is None
+    assert reenabled_history_candidate["disabled_reason"] is None
 
     clean_toggle_response = await crm.toggle_team_user_active(
         make_form_request(

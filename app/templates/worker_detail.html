@@ -42,6 +42,13 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="meta">ID чата Telegram: {{ worker["telegram_chat_id"] or "—" }}</div>
 <div class="meta">Процент с прибыли: {{ worker["commission_percent"] or 0 }}%</div>
 <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
+<div class="meta">Статус: {% if worker["is_active"] is none or worker["is_active"] %}активен{% else %}отключён{% endif %}</div>
+{% if worker["is_active"] is not none and not worker["is_active"] %}
+<div class="meta">Отключён: {{ worker["disabled_at"] or "дата не указана" }}</div>
+{% if worker["disabled_reason"] %}
+<div class="meta">Причина: {{ worker["disabled_reason"] }}</div>
+{% endif %}
+{% endif %}
 </div>
 
 <div class="card">
