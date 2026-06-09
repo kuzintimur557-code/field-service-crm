@@ -15725,8 +15725,7 @@ async def create_task(
         if selected_task_date:
             error_params["task_date"] = selected_task_date
 
-        if worker:
-            error_params["worker"] = worker
+        error_params["worker"] = over_capacity_workers[0]["username"]
 
         if return_to == "calendar":
             error_params["return_to"] = "calendar"
