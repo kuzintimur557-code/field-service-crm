@@ -50,6 +50,9 @@ h1{font-size:32px;margin:0}
 	.availability-card{padding:12px;border-radius:16px;background:#f9fafb;border:1px solid #e5e7eb}
 	.availability-card.free{background:#ecfdf5;border-color:#bbf7d0}
 	.availability-card.busy{background:#fff7ed;border-color:#fed7aa}
+	.availability-progress{height:7px;margin-top:9px;border-radius:999px;background:#e5e7eb;overflow:hidden}
+	.availability-progress span{display:block;height:100%;border-radius:inherit;background:#22c55e}
+	.availability-card.busy .availability-progress span{background:#f97316}
 	.availability-name{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:900;margin-bottom:6px}
 	.recommended{padding:4px 7px;border-radius:999px;background:#2563eb;color:white;font-size:11px;font-weight:900;white-space:nowrap}
 	.availability-status{font-size:13px;font-weight:900;color:#374151}
@@ -124,12 +127,12 @@ h1{font-size:32px;margin:0}
 		    <div class="availability-summary">
 		        <span class="availability-pill">Всего: {{ availability_summary["total"] }}</span>
 		        <span class="availability-pill free">Свободно: {{ availability_summary["free"] }}</span>
-		        <span class="availability-pill busy">Занято: {{ availability_summary["busy"] }}</span>
+		        <span class="availability-pill busy">Лимит исчерпан: {{ availability_summary["busy"] }}</span>
 		    </div>
 		    <div class="availability-filter">
 		        <a href="/calendar?date={{ availability_date }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if not selected_availability %}active{% endif %}">Все</a>
 		        <a href="/calendar?date={{ availability_date }}&availability=free{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if selected_availability == 'free' %}active{% endif %}">Свободные</a>
-		        <a href="/calendar?date={{ availability_date }}&availability=busy{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if selected_availability == 'busy' %}active{% endif %}">Занятые</a>
+		        <a href="/calendar?date={{ availability_date }}&availability=busy{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="{% if selected_availability == 'busy' %}active{% endif %}">Лимит исчерпан</a>
 		    </div>
 		    <div class="availability-grid">
 		    {% for worker in worker_availability %}
@@ -141,11 +144,16 @@ h1{font-size:32px;margin:0}
 		                {% endif %}
 		            </div>
 		            <div class="availability-status">
-		                {% if worker["is_free"] %}
-		                    Свободен
+		                {% if worker["is_at_capacity"] %}
+		                    Лимит исчерпан: {{ worker["active_count"] }} из {{ worker["daily_capacity"] }}
+		                {% elif worker["active_count"] == 0 %}
+		                    Свободен: {{ worker["available_slots"] }} мест
 		                {% else %}
-		                    Занят: {{ worker["active_count"] }} активных заявок
+		                    Занято {{ worker["active_count"] }} из {{ worker["daily_capacity"] }} · свободно {{ worker["available_slots"] }}
 		                {% endif %}
+		            </div>
+		            <div class="availability-progress" title="Загрузка: {{ worker['load_percent'] }}%">
+		                <span style="width:{{ worker['load_percent'] }}%"></span>
 		            </div>
 		            <a class="worker-task-link" href="/create-task?task_date={{ availability_date }}&worker={{ worker['username'] }}&return_to=calendar">Создать</a>
 		        </div>

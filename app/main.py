@@ -8019,7 +8019,7 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
 
     if role in ("boss", "manager"):
         workers = c.execute("""
-        SELECT username
+        SELECT username, daily_capacity
         FROM users
         WHERE role='worker'
           AND company_id=?
@@ -8027,6 +8027,13 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
         ORDER BY username
         """, (company_id,)).fetchall()
         worker_names = [w["username"] for w in workers]
+        worker_capacity_map = {
+            worker_row["username"]: max(
+                1,
+                int(worker_row["daily_capacity"] or 3),
+            )
+            for worker_row in workers
+        }
 
         if worker and worker in worker_names:
             query += f" AND {worker_task_condition()}"
@@ -8094,20 +8101,38 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
 
         for worker_name in worker_names:
             active_count = busy_counts.get(worker_name, 0)
+            daily_capacity = worker_capacity_map[worker_name]
+            available_slots = max(daily_capacity - active_count, 0)
             worker_availability.append({
                 "username": worker_name,
                 "active_count": active_count,
-                "is_free": active_count == 0,
+                "daily_capacity": daily_capacity,
+                "available_slots": available_slots,
+                "load_percent": min(
+                    round(active_count / daily_capacity * 100),
+                    100,
+                ),
+                "is_free": available_slots > 0,
+                "is_at_capacity": available_slots == 0,
                 "is_recommended": False
             })
 
-        recommended_count = min(
-            [item["active_count"] for item in worker_availability],
+        recommended_load = min(
+            [
+                item["active_count"] / item["daily_capacity"]
+                for item in worker_availability
+                if item["available_slots"] > 0
+            ],
             default=None
         )
 
         for item in worker_availability:
-            item["is_recommended"] = recommended_count is not None and item["active_count"] == recommended_count
+            item["is_recommended"] = (
+                recommended_load is not None
+                and item["available_slots"] > 0
+                and item["active_count"] / item["daily_capacity"]
+                == recommended_load
+            )
 
         availability_summary = {
             "total": len(worker_availability),

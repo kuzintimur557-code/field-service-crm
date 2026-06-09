@@ -4345,6 +4345,17 @@ async def assert_upload_access():
 
 
 async def assert_calendar_access():
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=1
+    WHERE company_id=2
+      AND username IN ('worker2', 'helper2')
+    """)
+    conn.commit()
+    conn.close()
+
     manager_response = await crm.calendar_page(
         make_asgi_request("owner2"),
         worker="helper2",
@@ -4365,20 +4376,29 @@ async def assert_calendar_access():
     assert "Свободные окна" in manager_html
     assert "availability-filter" in manager_html
     assert "Свободные" in manager_html
-    assert "Занятые" in manager_html
+    assert "Лимит исчерпан" in manager_html
     assert "Предыдущий день" in manager_html
     assert "Следующий день" in manager_html
     assert "/calendar?date=2026-05-16&amp;worker=helper2&amp;status=" in manager_html
     assert "/calendar?date=2026-05-18&amp;worker=helper2&amp;status=" in manager_html
     assert "Всего: 3" in manager_html
     assert "Свободно: 1" in manager_html
-    assert "Занято: 2" in manager_html
+    assert "Лимит исчерпан: 2" in manager_html
     assert "/create-task?task_date=2026-05-17&return_to=calendar" in manager_html
     assert "/create-task?task_date=2026-05-17&worker=free2" in manager_html
     assert "free2" in manager_html
-    assert "Свободен" in manager_html
-    assert "Занят: 1 активных заявок" in manager_html
+    assert "Свободен: 3 мест" in manager_html
+    assert "Лимит исчерпан: 1 из 1" in manager_html
+    assert "availability-progress" in manager_html
     assert "Рекомендован" in manager_html
+    helper_availability = next(
+        item
+        for item in manager_response.context["worker_availability"]
+        if item["username"] == "helper2"
+    )
+    assert helper_availability["available_slots"] == 0
+    assert helper_availability["is_at_capacity"] is True
+    assert helper_availability["load_percent"] == 100
 
     free_response = await crm.calendar_page(
         make_asgi_request("owner2"),
@@ -4388,7 +4408,7 @@ async def assert_calendar_access():
     assert free_response.status_code == 200
     free_html = free_response.body.decode("utf-8")
     assert "free2" in free_html
-    assert "Занят: 1 активных заявок" not in free_html
+    assert "Лимит исчерпан: 1 из 1" not in free_html
     assert "/calendar?date=2026-05-18&amp;availability=free" in free_html
 
     conn = connect()
@@ -4467,6 +4487,17 @@ async def assert_calendar_access():
     )
     assert outsider_response.status_code == 200
     assert "Client 2" not in outsider_response.body.decode("utf-8")
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=3
+    WHERE company_id=2
+      AND username IN ('worker2', 'helper2')
+    """)
+    conn.commit()
+    conn.close()
 
 
 async def assert_archive_restore(task):
