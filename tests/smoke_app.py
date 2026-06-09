@@ -4676,6 +4676,21 @@ async def assert_finance_margin(task):
     assert weak_password_response.status_code == 302
     assert weak_password_response.headers["location"] == "/workers?error=weak_password"
 
+    created_worker_response = await crm.create_worker(
+        make_form_request(
+            "owner2",
+            "/workers",
+            {
+                "username": "audit_manager2",
+                "password": "strong123",
+                "role": "manager",
+                "full_name": "Аудит Менеджер",
+            },
+        )
+    )
+    assert created_worker_response.status_code == 302
+    assert created_worker_response.headers["location"] == "/workers?created=1"
+
     conn = connect()
     c = conn.cursor()
     assert c.execute("""
@@ -4683,6 +4698,23 @@ async def assert_finance_margin(task):
     FROM users
     WHERE username IN ('forged_admin', 'weak_worker')
     """).fetchone() is None
+    created_worker = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=2 AND username='audit_manager2'
+    """).fetchone()
+    created_worker_activity = c.execute("""
+    SELECT action, details, actor_username
+    FROM team_activity
+    WHERE company_id=2 AND user_id=?
+    ORDER BY id DESC
+    LIMIT 1
+    """, (created_worker["id"],)).fetchone()
+    assert created_worker_activity["action"] == "Пользователь создан"
+    assert created_worker_activity["details"] == "Роль: Менеджер"
+    assert created_worker_activity["actor_username"] == "owner2"
+    c.execute("DELETE FROM users WHERE id=?", (created_worker["id"],))
+    conn.commit()
     outsider = c.execute("""
     SELECT id, password
     FROM users
@@ -4933,6 +4965,15 @@ async def assert_finance_margin(task):
     FROM users
     WHERE id=?
     """, (delete_candidate["id"],)).fetchone() is None
+    deleted_user_activity = c.execute("""
+    SELECT action, details, actor_username
+    FROM team_activity
+    WHERE company_id=2
+      AND user_id=?
+      AND action='Пользователь удалён'
+    """, (delete_candidate["id"],)).fetchone()
+    assert deleted_user_activity["details"] == "Роль: Исполнитель"
+    assert deleted_user_activity["actor_username"] == "owner2"
     preserved_users = c.execute("""
     SELECT id
     FROM users
@@ -4944,6 +4985,29 @@ async def assert_finance_margin(task):
     )).fetchall()
     conn.close()
     assert len(preserved_users) == 3
+
+    membership_activity_response = await crm.team_activity_page(
+        make_asgi_request(
+            "owner2",
+            "/workers/activity?action=membership",
+        ),
+        action="membership",
+    )
+    membership_activity_html = membership_activity_response.body.decode("utf-8")
+    assert membership_activity_response.status_code == 200
+    assert membership_activity_response.context["action"] == "membership"
+    assert all(
+        event["action"] in ("Пользователь создан", "Пользователь удалён")
+        for event in membership_activity_response.context["events"]
+    )
+    assert "audit_manager2" in membership_activity_html
+    assert "delete_candidate2" in membership_activity_html
+    deleted_events = [
+        event for event in membership_activity_response.context["events"]
+        if event["action"] == "Пользователь удалён"
+    ]
+    assert deleted_events
+    assert deleted_events[0]["current_user_id"] is None
 
     active_task_block_response = await crm.toggle_team_user_active(
         make_form_request(

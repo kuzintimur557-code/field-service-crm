@@ -15,7 +15,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
 h1{margin:0 0 8px;font-size:34px}
 .meta{font-size:14px;color:#6b7280;font-weight:800;margin-top:6px}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:18px 0}
 .stat{background:#f9fafb;padding:14px;border-radius:14px}
 .stat strong{display:block;font-size:22px;margin-top:4px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
@@ -40,6 +40,7 @@ h1{margin:0 0 8px;font-size:34px}
 
 <div class="stats">
     <div class="stat"><div class="meta">Всего</div><strong>{{ activity_counts["total_count"] or 0 }}</strong></div>
+    <div class="stat"><div class="meta">Состав</div><strong>{{ activity_counts["membership_count"] or 0 }}</strong></div>
     <div class="stat"><div class="meta">Доступ</div><strong>{{ activity_counts["access_count"] or 0 }}</strong></div>
     <div class="stat"><div class="meta">Пароли</div><strong>{{ activity_counts["password_count"] or 0 }}</strong></div>
     <div class="stat"><div class="meta">Проценты</div><strong>{{ activity_counts["commission_count"] or 0 }}</strong></div>
@@ -47,6 +48,7 @@ h1{margin:0 0 8px;font-size:34px}
 
 <div class="filters">
     <a href="/workers/activity?action=all" class="{% if action == 'all' %}active{% endif %}">Все</a>
+    <a href="/workers/activity?action=membership" class="{% if action == 'membership' %}active{% endif %}">Состав команды</a>
     <a href="/workers/activity?action=access" class="{% if action == 'access' %}active{% endif %}">Доступ</a>
     <a href="/workers/activity?action=password" class="{% if action == 'password' %}active{% endif %}">Пароли</a>
     <a href="/workers/activity?action=commission" class="{% if action == 'commission' %}active{% endif %}">Проценты</a>

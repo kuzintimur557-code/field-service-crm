@@ -13780,6 +13780,7 @@ async def team_activity_page(request: Request, action: str = "all"):
     company_id = get_user_company_id(username)
     action_filters = {
         "all": None,
+        "membership": ("Пользователь создан", "Пользователь удалён"),
         "access": ("Пользователь отключён", "Пользователь включён"),
         "password": ("Пароль обновлён",),
         "commission": ("Процент обновлён",),
@@ -13820,6 +13821,9 @@ async def team_activity_page(request: Request, action: str = "all"):
     activity_counts = c.execute("""
     SELECT
         COUNT(*) AS total_count,
+        SUM(CASE WHEN action IN (
+            'Пользователь создан', 'Пользователь удалён'
+        ) THEN 1 ELSE 0 END) AS membership_count,
         SUM(CASE WHEN action IN (
             'Пользователь отключён', 'Пользователь включён'
         ) THEN 1 ELSE 0 END) AS access_count,
@@ -14090,6 +14094,24 @@ async def create_worker(request: Request):
         telegram_chat_id,
         commission_percent,
         datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+    created_user_id = c.lastrowid
+    c.execute("""
+    INSERT INTO team_activity (
+        company_id, user_id, target_username, actor_username,
+        action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        created_user_id,
+        worker_username,
+        username,
+        "Пользователь создан",
+        "Роль: " + (
+            "Менеджер" if worker_role == "manager" else "Исполнитель"
+        ),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
     ))
 
     conn.commit()
@@ -14447,6 +14469,24 @@ async def delete_team_user(request: Request, user_id: int):
                 ),
                 status_code=302,
             )
+
+    c.execute("""
+    INSERT INTO team_activity (
+        company_id, user_id, target_username, actor_username,
+        action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        current_company_id,
+        user_id,
+        user["username"],
+        username,
+        "Пользователь удалён",
+        "Роль: " + (
+            "Менеджер" if user["role"] == "manager" else "Исполнитель"
+        ),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
 
     c.execute("""
     DELETE FROM users
