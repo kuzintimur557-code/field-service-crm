@@ -72,6 +72,13 @@ import json
 APP_VERSION = "0.2.1"
 
 SESSION_COOKIE_NAME = "crm_session"
+TEAM_ACTIVITY_FILTERS = {
+    "all": None,
+    "membership": ("Пользователь создан", "Пользователь удалён"),
+    "access": ("Пользователь отключён", "Пользователь включён"),
+    "password": ("Пароль обновлён",),
+    "commission": ("Процент обновлён",),
+}
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 COOKIE_SECURE = (
     os.getenv("COOKIE_SECURE", "").lower() in ("1", "true", "yes", "on")
@@ -13778,20 +13785,12 @@ async def team_activity_page(request: Request, action: str = "all"):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
-    action_filters = {
-        "all": None,
-        "membership": ("Пользователь создан", "Пользователь удалён"),
-        "access": ("Пользователь отключён", "Пользователь включён"),
-        "password": ("Пароль обновлён",),
-        "commission": ("Процент обновлён",),
-    }
-
-    if action not in action_filters:
+    if action not in TEAM_ACTIVITY_FILTERS:
         action = "all"
 
     conn = connect()
     c = conn.cursor()
-    selected_actions = action_filters[action]
+    selected_actions = TEAM_ACTIVITY_FILTERS[action]
 
     if selected_actions:
         placeholders = ",".join("?" for _ in selected_actions)
@@ -13845,6 +13844,74 @@ async def team_activity_page(request: Request, action: str = "all"):
             "events": events,
             "action": action,
             "activity_counts": activity_counts,
+        },
+    )
+
+
+@app.get("/workers/activity/export")
+async def team_activity_export(request: Request, action: str = "all"):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    if action not in TEAM_ACTIVITY_FILTERS:
+        action = "all"
+
+    company_id = get_user_company_id(username)
+    selected_actions = TEAM_ACTIVITY_FILTERS[action]
+    conn = connect()
+    c = conn.cursor()
+    query = """
+    SELECT target_username, actor_username, action, details, created_at
+    FROM team_activity
+    WHERE company_id=?
+    """
+    params = [company_id]
+
+    if selected_actions:
+        placeholders = ",".join("?" for _ in selected_actions)
+        query += f" AND action IN ({placeholders})"
+        params.extend(selected_actions)
+
+    query += " ORDER BY id DESC"
+    events = c.execute(query, params).fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Сотрудник",
+        "Действие",
+        "Подробности",
+        "Выполнил",
+        "Дата",
+    ])
+
+    for event in events:
+        writer.writerow([
+            event["target_username"] or "",
+            event["action"] or "",
+            event["details"] or "",
+            event["actor_username"] or "",
+            event["created_at"] or "",
+        ])
+
+    content = "\ufeff" + output.getvalue()
+
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=team_activity_{action}.csv"
+            )
         },
     )
 

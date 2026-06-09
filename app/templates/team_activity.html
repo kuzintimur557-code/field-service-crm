@@ -25,6 +25,7 @@ h1{margin:0 0 8px;font-size:34px}
 .event:last-child{border-bottom:0}
 .event-title{font-weight:900;font-size:16px}
 .event-user{color:#2563eb;text-decoration:none;font-weight:900}
+.export{display:inline-block;margin-bottom:18px;padding:11px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
 @media(max-width:700px){.container{padding:16px}.stats{grid-template-columns:1fr 1fr}h1{font-size:28px}.filters a{flex:1;text-align:center}}
 </style>
 </head>
@@ -53,6 +54,8 @@ h1{margin:0 0 8px;font-size:34px}
     <a href="/workers/activity?action=password" class="{% if action == 'password' %}active{% endif %}">Пароли</a>
     <a href="/workers/activity?action=commission" class="{% if action == 'commission' %}active{% endif %}">Проценты</a>
 </div>
+
+<a class="export" href="/workers/activity/export?action={{ action }}">Скачать CSV</a>
 
 {% if events %}
 {% for event in events %}

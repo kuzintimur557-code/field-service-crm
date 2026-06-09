@@ -5009,6 +5009,24 @@ async def assert_finance_margin(task):
     assert deleted_events
     assert deleted_events[0]["current_user_id"] is None
 
+    membership_export_response = await crm.team_activity_export(
+        make_request("owner2"),
+        action="membership",
+    )
+    assert membership_export_response.status_code == 200
+    assert (
+        membership_export_response.headers["content-disposition"]
+        == "attachment; filename=team_activity_membership.csv"
+    )
+    membership_export_csv = membership_export_response.body.decode("utf-8")
+    assert membership_export_csv.startswith("\ufeff")
+    assert "Сотрудник,Действие,Подробности,Выполнил,Дата" in (
+        membership_export_csv
+    )
+    assert "Пользователь создан" in membership_export_csv
+    assert "Пользователь удалён" in membership_export_csv
+    assert "Пароль обновлён" not in membership_export_csv
+
     active_task_block_response = await crm.toggle_team_user_active(
         make_form_request(
             "owner2",
