@@ -4865,6 +4865,29 @@ async def assert_finance_margin(task):
     assert management_activity[1]["details"] == "Пароль изменён владельцем компании"
     assert "secure456" not in management_activity[1]["details"]
 
+    team_activity_response = await crm.team_activity_page(
+        make_asgi_request(
+            "owner2",
+            "/workers/activity?action=commission",
+        ),
+        action="commission",
+    )
+    team_activity_html = team_activity_response.body.decode("utf-8")
+    assert team_activity_response.status_code == 200
+    assert team_activity_response.context["action"] == "commission"
+    assert team_activity_response.context["events"]
+    assert all(
+        event["company_id"] == 2
+        for event in team_activity_response.context["events"]
+    )
+    assert all(
+        event["action"] == "Процент обновлён"
+        for event in team_activity_response.context["events"]
+    )
+    assert "История команды" in team_activity_html
+    assert "0% → 7.5%" in team_activity_html
+    assert "secure456" not in team_activity_html
+
     history_worker_response = await crm.worker_detail(
         make_asgi_request(
             "owner2",
@@ -4987,6 +5010,9 @@ async def assert_finance_margin(task):
     assert all(
         worker["is_active"] is None or worker["is_active"]
         for worker in active_workers_response.context["workers"]
+    )
+    assert "История управления командой" in (
+        active_workers_response.body.decode("utf-8")
     )
 
     task_detail_response = await crm.task_detail(

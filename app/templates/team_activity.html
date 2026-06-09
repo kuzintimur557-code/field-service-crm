@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>История команды</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:950px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
+h1{margin:0 0 8px;font-size:34px}
+.meta{font-size:14px;color:#6b7280;font-weight:800;margin-top:6px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
+.stat{background:#f9fafb;padding:14px;border-radius:14px}
+.stat strong{display:block;font-size:22px;margin-top:4px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.filters a{padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filters a.active{background:#111827;color:white}
+.event{padding:16px 0;border-bottom:1px solid #e5e7eb}
+.event:last-child{border-bottom:0}
+.event-title{font-weight:900;font-size:16px}
+.event-user{color:#2563eb;text-decoration:none;font-weight:900}
+@media(max-width:700px){.container{padding:16px}.stats{grid-template-columns:1fr 1fr}h1{font-size:28px}.filters a{flex:1;text-align:center}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/workers" class="back">← Назад к команде</a>
+
+<div class="card">
+<h1>История команды</h1>
+<div class="meta">Последние действия владельца и менеджеров с учётными записями сотрудников</div>
+
+<div class="stats">
+    <div class="stat"><div class="meta">Всего</div><strong>{{ activity_counts["total_count"] or 0 }}</strong></div>
+    <div class="stat"><div class="meta">Доступ</div><strong>{{ activity_counts["access_count"] or 0 }}</strong></div>
+    <div class="stat"><div class="meta">Пароли</div><strong>{{ activity_counts["password_count"] or 0 }}</strong></div>
+    <div class="stat"><div class="meta">Проценты</div><strong>{{ activity_counts["commission_count"] or 0 }}</strong></div>
+</div>
+
+<div class="filters">
+    <a href="/workers/activity?action=all" class="{% if action == 'all' %}active{% endif %}">Все</a>
+    <a href="/workers/activity?action=access" class="{% if action == 'access' %}active{% endif %}">Доступ</a>
+    <a href="/workers/activity?action=password" class="{% if action == 'password' %}active{% endif %}">Пароли</a>
+    <a href="/workers/activity?action=commission" class="{% if action == 'commission' %}active{% endif %}">Проценты</a>
+</div>
+
+{% if events %}
+{% for event in events %}
+<div class="event">
+    <div class="event-title">{{ event["action"] }}</div>
+    <div class="meta">
+        {% if event["current_user_id"] %}
+        <a class="event-user" href="/workers/{{ event['current_user_id'] }}">{{ event["target_username"] }}</a>
+        {% else %}
+        {{ event["target_username"] }}
+        {% endif %}
+        · {{ event["created_at"] }}
+    </div>
+    <div class="meta">Выполнил: {{ event["actor_username"] }}</div>
+    {% if event["details"] %}
+    <div class="meta">{{ event["details"] }}</div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="meta">Событий по выбранному фильтру пока нет</div>
+{% endif %}
+</div>
+
+</div>
+{% include 'mobile_nav.html' %}
+</body>
+</html>

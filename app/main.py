@@ -13764,6 +13764,87 @@ async def workers_page(request: Request, status: str = "active"):
     )
 
 
+@app.get("/workers/activity", response_class=HTMLResponse)
+async def team_activity_page(request: Request, action: str = "all"):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    action_filters = {
+        "all": None,
+        "access": ("Пользователь отключён", "Пользователь включён"),
+        "password": ("Пароль обновлён",),
+        "commission": ("Процент обновлён",),
+    }
+
+    if action not in action_filters:
+        action = "all"
+
+    conn = connect()
+    c = conn.cursor()
+    selected_actions = action_filters[action]
+
+    if selected_actions:
+        placeholders = ",".join("?" for _ in selected_actions)
+        events = c.execute(f"""
+        SELECT team_activity.*, users.id AS current_user_id
+        FROM team_activity
+        LEFT JOIN users
+          ON users.id=team_activity.user_id
+         AND users.company_id=team_activity.company_id
+        WHERE team_activity.company_id=?
+          AND team_activity.action IN ({placeholders})
+        ORDER BY team_activity.id DESC
+        LIMIT 200
+        """, [company_id, *selected_actions]).fetchall()
+    else:
+        events = c.execute("""
+        SELECT team_activity.*, users.id AS current_user_id
+        FROM team_activity
+        LEFT JOIN users
+          ON users.id=team_activity.user_id
+         AND users.company_id=team_activity.company_id
+        WHERE team_activity.company_id=?
+        ORDER BY team_activity.id DESC
+        LIMIT 200
+        """, (company_id,)).fetchall()
+
+    activity_counts = c.execute("""
+    SELECT
+        COUNT(*) AS total_count,
+        SUM(CASE WHEN action IN (
+            'Пользователь отключён', 'Пользователь включён'
+        ) THEN 1 ELSE 0 END) AS access_count,
+        SUM(CASE WHEN action='Пароль обновлён' THEN 1 ELSE 0 END) AS password_count,
+        SUM(CASE WHEN action='Процент обновлён' THEN 1 ELSE 0 END) AS commission_count
+    FROM team_activity
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="team_activity.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "events": events,
+            "action": action,
+            "activity_counts": activity_counts,
+        },
+    )
+
+
 
 @app.get("/workers/{worker_id}", response_class=HTMLResponse)
 async def worker_detail(request: Request, worker_id: int, month: str = ""):
