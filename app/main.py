@@ -13772,7 +13772,13 @@ async def workers_page(request: Request, status: str = "active"):
 
 
 @app.get("/workers/activity", response_class=HTMLResponse)
-async def team_activity_page(request: Request, action: str = "all"):
+async def team_activity_page(
+    request: Request,
+    action: str = "all",
+    search: str = "",
+    date_from: str = "",
+    date_to: str = "",
+):
 
     username = get_user(request)
 
@@ -13788,34 +13794,47 @@ async def team_activity_page(request: Request, action: str = "all"):
     if action not in TEAM_ACTIVITY_FILTERS:
         action = "all"
 
+    search = str(search or "").strip()[:100]
+    date_from = str(date_from or "").strip()[:10]
+    date_to = str(date_to or "").strip()[:10]
     conn = connect()
     c = conn.cursor()
     selected_actions = TEAM_ACTIVITY_FILTERS[action]
+    query = """
+    SELECT team_activity.*, users.id AS current_user_id
+    FROM team_activity
+    LEFT JOIN users
+      ON users.id=team_activity.user_id
+     AND users.company_id=team_activity.company_id
+    WHERE team_activity.company_id=?
+    """
+    params = [company_id]
 
     if selected_actions:
         placeholders = ",".join("?" for _ in selected_actions)
-        events = c.execute(f"""
-        SELECT team_activity.*, users.id AS current_user_id
-        FROM team_activity
-        LEFT JOIN users
-          ON users.id=team_activity.user_id
-         AND users.company_id=team_activity.company_id
-        WHERE team_activity.company_id=?
-          AND team_activity.action IN ({placeholders})
-        ORDER BY team_activity.id DESC
-        LIMIT 200
-        """, [company_id, *selected_actions]).fetchall()
-    else:
-        events = c.execute("""
-        SELECT team_activity.*, users.id AS current_user_id
-        FROM team_activity
-        LEFT JOIN users
-          ON users.id=team_activity.user_id
-         AND users.company_id=team_activity.company_id
-        WHERE team_activity.company_id=?
-        ORDER BY team_activity.id DESC
-        LIMIT 200
-        """, (company_id,)).fetchall()
+        query += f" AND team_activity.action IN ({placeholders})"
+        params.extend(selected_actions)
+
+    if search:
+        query += """
+        AND (
+            lower(team_activity.target_username) LIKE ?
+            OR lower(team_activity.actor_username) LIKE ?
+        )
+        """
+        search_value = f"%{search.lower()}%"
+        params.extend([search_value, search_value])
+
+    if date_from:
+        query += " AND team_activity.created_at >= ?"
+        params.append(date_from)
+
+    if date_to:
+        query += " AND team_activity.created_at <= ?"
+        params.append(date_to + " 23:59")
+
+    query += " ORDER BY team_activity.id DESC LIMIT 200"
+    events = c.execute(query, params).fetchall()
 
     activity_counts = c.execute("""
     SELECT
@@ -13833,6 +13852,23 @@ async def team_activity_page(request: Request, action: str = "all"):
     """, (company_id,)).fetchone()
 
     conn.close()
+    common_filter_params = {}
+
+    if search:
+        common_filter_params["search"] = search
+    if date_from:
+        common_filter_params["date_from"] = date_from
+    if date_to:
+        common_filter_params["date_to"] = date_to
+
+    activity_filter_links = {}
+    for action_key in TEAM_ACTIVITY_FILTERS:
+        link_params = {"action": action_key, **common_filter_params}
+        activity_filter_links[action_key] = (
+            "/workers/activity?" + urlencode(link_params)
+        )
+
+    export_params = {"action": action, **common_filter_params}
 
     return templates.TemplateResponse(
         request=request,
@@ -13843,13 +13879,26 @@ async def team_activity_page(request: Request, action: str = "all"):
             "role": role,
             "events": events,
             "action": action,
+            "search": search,
+            "date_from": date_from,
+            "date_to": date_to,
             "activity_counts": activity_counts,
+            "activity_filter_links": activity_filter_links,
+            "export_url": (
+                "/workers/activity/export?" + urlencode(export_params)
+            ),
         },
     )
 
 
 @app.get("/workers/activity/export")
-async def team_activity_export(request: Request, action: str = "all"):
+async def team_activity_export(
+    request: Request,
+    action: str = "all",
+    search: str = "",
+    date_from: str = "",
+    date_to: str = "",
+):
 
     username = get_user(request)
 
@@ -13864,6 +13913,9 @@ async def team_activity_export(request: Request, action: str = "all"):
     if action not in TEAM_ACTIVITY_FILTERS:
         action = "all"
 
+    search = str(search or "").strip()[:100]
+    date_from = str(date_from or "").strip()[:10]
+    date_to = str(date_to or "").strip()[:10]
     company_id = get_user_company_id(username)
     selected_actions = TEAM_ACTIVITY_FILTERS[action]
     conn = connect()
@@ -13879,6 +13931,24 @@ async def team_activity_export(request: Request, action: str = "all"):
         placeholders = ",".join("?" for _ in selected_actions)
         query += f" AND action IN ({placeholders})"
         params.extend(selected_actions)
+
+    if search:
+        query += """
+        AND (
+            lower(target_username) LIKE ?
+            OR lower(actor_username) LIKE ?
+        )
+        """
+        search_value = f"%{search.lower()}%"
+        params.extend([search_value, search_value])
+
+    if date_from:
+        query += " AND created_at >= ?"
+        params.append(date_from)
+
+    if date_to:
+        query += " AND created_at <= ?"
+        params.append(date_to + " 23:59")
 
     query += " ORDER BY id DESC"
     events = c.execute(query, params).fetchall()

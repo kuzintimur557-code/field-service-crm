@@ -5027,6 +5027,40 @@ async def assert_finance_margin(task):
     assert "Пользователь удалён" in membership_export_csv
     assert "Пароль обновлён" not in membership_export_csv
 
+    searched_activity_response = await crm.team_activity_page(
+        make_asgi_request(
+            "owner2",
+            "/workers/activity",
+        ),
+        action="all",
+        search="delete_candidate2",
+        date_from="2020-01-01",
+        date_to="2030-12-31",
+    )
+    searched_activity_html = searched_activity_response.body.decode("utf-8")
+    assert searched_activity_response.context["events"]
+    assert all(
+        "delete_candidate2" in (
+            (event["target_username"] or "")
+            + (event["actor_username"] or "")
+        )
+        for event in searched_activity_response.context["events"]
+    )
+    assert 'value="delete_candidate2"' in searched_activity_html
+    assert "date_from=2020-01-01" in searched_activity_html
+    assert "date_to=2030-12-31" in searched_activity_html
+
+    searched_export_response = await crm.team_activity_export(
+        make_request("owner2"),
+        action="all",
+        search="delete_candidate2",
+        date_from="2020-01-01",
+        date_to="2030-12-31",
+    )
+    searched_export_csv = searched_export_response.body.decode("utf-8")
+    assert "delete_candidate2" in searched_export_csv
+    assert "history_candidate2" not in searched_export_csv
+
     active_task_block_response = await crm.toggle_team_user_active(
         make_form_request(
             "owner2",

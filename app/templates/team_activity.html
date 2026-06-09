@@ -26,7 +26,11 @@ h1{margin:0 0 8px;font-size:34px}
 .event-title{font-weight:900;font-size:16px}
 .event-user{color:#2563eb;text-decoration:none;font-weight:900}
 .export{display:inline-block;margin-bottom:18px;padding:11px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
-@media(max-width:700px){.container{padding:16px}.stats{grid-template-columns:1fr 1fr}h1{font-size:28px}.filters a{flex:1;text-align:center}}
+.search-form{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;margin:18px 0}
+.search-form label{font-size:13px;color:#6b7280;font-weight:900}
+.search-form input{width:100%;margin-top:6px;padding:11px;border:1px solid #d1d5db;border-radius:12px;font-size:14px}
+.search-form button{padding:12px 16px;border:0;border-radius:12px;background:#111827;color:white;font-weight:900;cursor:pointer}
+@media(max-width:700px){.container{padding:16px}.stats{grid-template-columns:1fr 1fr}h1{font-size:28px}.filters a{flex:1;text-align:center}.search-form{grid-template-columns:1fr}.search-form button{width:100%}}
 </style>
 </head>
 
@@ -47,15 +51,32 @@ h1{margin:0 0 8px;font-size:34px}
     <div class="stat"><div class="meta">Проценты</div><strong>{{ activity_counts["commission_count"] or 0 }}</strong></div>
 </div>
 
+<form class="search-form" method="get" action="/workers/activity">
+    <input type="hidden" name="action" value="{{ action }}">
+    <label>
+        Сотрудник или автор действия
+        <input type="search" name="search" value="{{ search }}" placeholder="Логин сотрудника или владельца">
+    </label>
+    <label>
+        Дата от
+        <input type="date" name="date_from" value="{{ date_from }}">
+    </label>
+    <label>
+        Дата до
+        <input type="date" name="date_to" value="{{ date_to }}">
+    </label>
+    <button type="submit">Найти</button>
+</form>
+
 <div class="filters">
-    <a href="/workers/activity?action=all" class="{% if action == 'all' %}active{% endif %}">Все</a>
-    <a href="/workers/activity?action=membership" class="{% if action == 'membership' %}active{% endif %}">Состав команды</a>
-    <a href="/workers/activity?action=access" class="{% if action == 'access' %}active{% endif %}">Доступ</a>
-    <a href="/workers/activity?action=password" class="{% if action == 'password' %}active{% endif %}">Пароли</a>
-    <a href="/workers/activity?action=commission" class="{% if action == 'commission' %}active{% endif %}">Проценты</a>
+    <a href="{{ activity_filter_links['all'] }}" class="{% if action == 'all' %}active{% endif %}">Все</a>
+    <a href="{{ activity_filter_links['membership'] }}" class="{% if action == 'membership' %}active{% endif %}">Состав команды</a>
+    <a href="{{ activity_filter_links['access'] }}" class="{% if action == 'access' %}active{% endif %}">Доступ</a>
+    <a href="{{ activity_filter_links['password'] }}" class="{% if action == 'password' %}active{% endif %}">Пароли</a>
+    <a href="{{ activity_filter_links['commission'] }}" class="{% if action == 'commission' %}active{% endif %}">Проценты</a>
 </div>
 
-<a class="export" href="/workers/activity/export?action={{ action }}">Скачать CSV</a>
+<a class="export" href="{{ export_url }}">Скачать CSV</a>
 
 {% if events %}
 {% for event in events %}
