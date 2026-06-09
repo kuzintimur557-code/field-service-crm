@@ -6950,6 +6950,11 @@ async def assert_task_custom_fields():
         "2026-05-19 10:01",
     ))
     empty_field_id = c.lastrowid
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=1
+    WHERE company_id=2 AND username='worker2'
+    """)
     conn.commit()
     conn.close()
 
@@ -6966,11 +6971,20 @@ async def assert_task_custom_fields():
     assert 'name="task_date" type="date" value="2026-05-17"' in page_html
     assert 'value="worker2" style="width:auto" checked' in page_html
     assert 'name="return_to" value="calendar"' in page_html
-    assert "уже есть активные заявки" in page_html
+    assert "У выбранного исполнителя на эту дату:" in page_html
+    assert page_response.context["selected_worker_daily_capacity"] == 1
+    assert page_response.context["selected_worker_at_capacity"] is True
+    assert "Свободных мест нет" in page_html
+    assert "Назначение превысит дневной лимит" in page_html
+    assert page_response.context["selected_worker_available_slots"] == max(
+        page_response.context["selected_worker_daily_capacity"]
+        - page_response.context["selected_worker_active_count"],
+        0,
+    )
     assert "/task/" in page_html
     assert "Client 2 / Новая" in page_html
     assert "Альтернатива: free2" in page_html
-    assert "free2 свободен" in page_html
+    assert "свободно" in page_html
     assert "Выбрать альтернативу" in page_html
     assert "/create-task?task_date=2026-05-17&amp;worker=free2&amp;return_to=calendar" in page_html
 

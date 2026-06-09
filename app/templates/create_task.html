@@ -45,8 +45,13 @@ button:hover{background:#1d4ed8}
 	{% endif %}
 
 	{% if selected_worker_active_count %}
-	<div class="note" style="background:#fff7ed;color:#9a3412">
-	У выбранного исполнителя уже есть активные заявки на эту дату: {{ selected_worker_active_count }}.
+	<div class="note" style="{% if selected_worker_at_capacity %}background:#fee2e2;color:#991b1b{% else %}background:#fff7ed;color:#9a3412{% endif %}">
+	У выбранного исполнителя на эту дату: {{ selected_worker_active_count }} из {{ selected_worker_daily_capacity }}.
+	{% if selected_worker_at_capacity %}
+	Свободных мест нет. Назначение превысит дневной лимит.
+	{% else %}
+	Свободных мест: {{ selected_worker_available_slots }}.
+	{% endif %}
 	{% if selected_worker_active_tasks %}
 	<div style="display:grid;gap:6px;margin-top:10px">
 	    {% for task in selected_worker_active_tasks %}
@@ -55,7 +60,7 @@ button:hover{background:#1d4ed8}
 	</div>
 	{% endif %}
 	{% if recommended_worker %}
-	<br>Альтернатива: {{ recommended_worker["username"] }}{% if recommended_worker["active_count"] == 0 %} свободен{% else %}, активных заявок: {{ recommended_worker["active_count"] }}{% endif %}.
+	<br>Альтернатива: {{ recommended_worker["username"] }} — занято {{ recommended_worker["active_count"] }} из {{ recommended_worker["daily_capacity"] }}, свободно {{ recommended_worker["available_slots"] }}.
 	<br><a href="{{ recommended_worker['switch_url'] }}" style="display:inline-block;margin-top:10px;color:#9a3412;font-weight:900">Выбрать альтернативу</a>
 	{% endif %}
 	</div>

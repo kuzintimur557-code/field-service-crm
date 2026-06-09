@@ -15258,7 +15258,7 @@ async def create_task_page(
     c = conn.cursor()
 
     workers = c.execute("""
-    SELECT username FROM users
+    SELECT username, daily_capacity FROM users
     WHERE role='worker'
       AND company_id=?
       AND COALESCE(is_active, 1)=1
@@ -15270,6 +15270,9 @@ async def create_task_page(
     selected_return_to = return_to if return_to in ("calendar", "client") else ""
     selected_worker_active_count = 0
     selected_worker_active_tasks = []
+    selected_worker_daily_capacity = 0
+    selected_worker_available_slots = 0
+    selected_worker_at_capacity = False
     recommended_worker = None
     selected_client = None
     selected_address = ""
@@ -15280,6 +15283,14 @@ async def create_task_page(
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
+        selected_worker_row = next(
+            row for row in workers
+            if row["username"] == selected_worker
+        )
+        selected_worker_daily_capacity = max(
+            1,
+            int(selected_worker_row["daily_capacity"] or 3),
+        )
 
         if selected_task_date:
             selected_worker_active_tasks = c.execute(f"""
@@ -15293,6 +15304,15 @@ async def create_task_page(
             ORDER BY task_date ASC, id DESC
             """, [company_id, f"{selected_task_date}%", *worker_task_params(selected_worker)]).fetchall()
             selected_worker_active_count = len(selected_worker_active_tasks)
+            selected_worker_available_slots = max(
+                selected_worker_daily_capacity
+                - selected_worker_active_count,
+                0,
+            )
+            selected_worker_at_capacity = (
+                selected_worker_active_count
+                >= selected_worker_daily_capacity
+            )
 
             if selected_worker_active_count > 0:
                 daily_counts = {worker_name: 0 for worker_name in worker_names}
@@ -15310,17 +15330,43 @@ async def create_task_page(
                         if worker_name in daily_counts:
                             daily_counts[worker_name] += 1
 
-                alternatives = [
-                    {
-                        "username": worker_name,
-                        "active_count": active_count
-                    }
-                    for worker_name, active_count in daily_counts.items()
-                    if worker_name != selected_worker
-                ]
+                worker_capacity_map = {
+                    row["username"]: max(
+                        1,
+                        int(row["daily_capacity"] or 3),
+                    )
+                    for row in workers
+                }
+                alternatives = []
 
-                alternatives.sort(key=lambda item: (item["active_count"], item["username"]))
-                recommended_worker = alternatives[0] if alternatives else None
+                for worker_name, active_count in daily_counts.items():
+                    if worker_name == selected_worker:
+                        continue
+
+                    worker_capacity = worker_capacity_map[worker_name]
+                    available_slots = max(
+                        worker_capacity - active_count,
+                        0,
+                    )
+
+                    if available_slots <= 0:
+                        continue
+
+                    alternatives.append({
+                        "username": worker_name,
+                        "active_count": active_count,
+                        "daily_capacity": worker_capacity,
+                        "available_slots": available_slots,
+                    })
+
+                alternatives.sort(key=lambda item: (
+                    item["active_count"] / item["daily_capacity"],
+                    item["active_count"],
+                    item["username"],
+                ))
+                recommended_worker = (
+                    alternatives[0] if alternatives else None
+                )
 
                 if recommended_worker:
                     switch_params = {
@@ -15437,6 +15483,9 @@ async def create_task_page(
             "selected_return_to": selected_return_to,
             "selected_worker_active_count": selected_worker_active_count,
             "selected_worker_active_tasks": selected_worker_active_tasks,
+            "selected_worker_daily_capacity": selected_worker_daily_capacity,
+            "selected_worker_available_slots": selected_worker_available_slots,
+            "selected_worker_at_capacity": selected_worker_at_capacity,
             "recommended_worker": recommended_worker,
             "settings": settings
         }
