@@ -15290,6 +15290,41 @@ async def create_task_page(
     ORDER BY username
     """, (company_id,)).fetchall()
     worker_names = [row["username"] for row in workers]
+    worker_capacity_map = {
+        row["username"]: max(1, int(row["daily_capacity"] or 3))
+        for row in workers
+    }
+    daily_counts = {worker_name: 0 for worker_name in worker_names}
+
+    if selected_task_date:
+        daily_rows = c.execute("""
+        SELECT worker, workers
+        FROM tasks
+        WHERE archived=0
+          AND company_id=?
+          AND task_date LIKE ?
+          AND status NOT IN ('Завершено', 'Отменено')
+        """, (company_id, f"{selected_task_date}%")).fetchall()
+
+        for daily_task in daily_rows:
+            for worker_name in get_task_worker_names(daily_task):
+                if worker_name in daily_counts:
+                    daily_counts[worker_name] += 1
+
+    worker_options = []
+
+    for worker_name in worker_names:
+        daily_capacity = worker_capacity_map[worker_name]
+        active_count = daily_counts[worker_name]
+        available_slots = max(daily_capacity - active_count, 0)
+        worker_options.append({
+            "username": worker_name,
+            "active_count": active_count,
+            "daily_capacity": daily_capacity,
+            "available_slots": available_slots,
+            "is_at_capacity": available_slots == 0,
+        })
+
     selected_workers = []
     selected_worker = str(worker or "").strip()
     selected_return_to = return_to if return_to in ("calendar", "client") else ""
@@ -15308,14 +15343,7 @@ async def create_task_page(
 
     if selected_worker in worker_names:
         selected_workers.append(selected_worker)
-        selected_worker_row = next(
-            row for row in workers
-            if row["username"] == selected_worker
-        )
-        selected_worker_daily_capacity = max(
-            1,
-            int(selected_worker_row["daily_capacity"] or 3),
-        )
+        selected_worker_daily_capacity = worker_capacity_map[selected_worker]
 
         if selected_task_date:
             selected_worker_active_tasks = c.execute(f"""
@@ -15328,7 +15356,7 @@ async def create_task_page(
               AND {worker_task_condition()}
             ORDER BY task_date ASC, id DESC
             """, [company_id, f"{selected_task_date}%", *worker_task_params(selected_worker)]).fetchall()
-            selected_worker_active_count = len(selected_worker_active_tasks)
+            selected_worker_active_count = daily_counts[selected_worker]
             selected_worker_available_slots = max(
                 selected_worker_daily_capacity
                 - selected_worker_active_count,
@@ -15340,28 +15368,6 @@ async def create_task_page(
             )
 
             if selected_worker_active_count > 0:
-                daily_counts = {worker_name: 0 for worker_name in worker_names}
-                daily_rows = c.execute("""
-                SELECT worker, workers
-                FROM tasks
-                WHERE archived=0
-                  AND company_id=?
-                  AND task_date LIKE ?
-                  AND status NOT IN ('Завершено', 'Отменено')
-                """, (company_id, f"{selected_task_date}%")).fetchall()
-
-                for daily_task in daily_rows:
-                    for worker_name in get_task_worker_names(daily_task):
-                        if worker_name in daily_counts:
-                            daily_counts[worker_name] += 1
-
-                worker_capacity_map = {
-                    row["username"]: max(
-                        1,
-                        int(row["daily_capacity"] or 3),
-                    )
-                    for row in workers
-                }
                 alternatives = []
 
                 for worker_name, active_count in daily_counts.items():
@@ -15495,6 +15501,7 @@ async def create_task_page(
         context={
             "username": username,
             "workers": workers,
+            "worker_options": worker_options,
             "clients": clients,
             "custom_fields": custom_fields,
             "selected_client": selected_client,

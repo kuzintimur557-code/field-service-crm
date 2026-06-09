@@ -6105,7 +6105,7 @@ async def assert_client_card(task):
     repeat_html = repeat_response.body.decode("utf-8")
     assert f'name="source_task_id" value="{task["id"]}"' in repeat_html
     assert "Smoke task</textarea>" in repeat_html
-    assert 'value="worker2" style="width:auto" checked' in repeat_html
+    assert 'value="worker2" checked' in repeat_html
 
     conn = connect()
     c = conn.cursor()
@@ -7000,7 +7000,7 @@ async def assert_task_custom_fields():
     assert "Route" in page_html
     assert f"custom_field_{field_id}" in page_html
     assert 'name="task_date" type="date" value="2026-05-17"' in page_html
-    assert 'value="worker2" style="width:auto" checked' in page_html
+    assert 'value="worker2" checked' in page_html
     assert 'name="return_to" value="calendar"' in page_html
     assert "У выбранного исполнителя на эту дату:" in page_html
     assert page_response.context["selected_worker_daily_capacity"] == 1
@@ -7009,6 +7009,22 @@ async def assert_task_custom_fields():
     assert "Назначение превысит дневной лимит" in page_html
     assert 'name="allow_capacity_override" value="1"' in page_html
     assert "Назначить сверх дневного лимита" in page_html
+    assert "worker-option at-capacity" in page_html
+    assert "Лимит 1/1" in page_html
+    assert "Свободно 3 · 0/3" in page_html
+    worker2_option = next(
+        item
+        for item in page_response.context["worker_options"]
+        if item["username"] == "worker2"
+    )
+    free2_option = next(
+        item
+        for item in page_response.context["worker_options"]
+        if item["username"] == "free2"
+    )
+    assert worker2_option["is_at_capacity"] is True
+    assert worker2_option["available_slots"] == 0
+    assert free2_option["available_slots"] == 3
     assert page_response.context["selected_worker_available_slots"] == max(
         page_response.context["selected_worker_daily_capacity"]
         - page_response.context["selected_worker_active_count"],

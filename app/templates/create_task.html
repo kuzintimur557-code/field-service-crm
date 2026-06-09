@@ -24,7 +24,19 @@ button:hover{background:#1d4ed8}
 .capacity-confirm{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:12px;border-radius:14px;background:white;border:1px solid #fecaca;color:#991b1b}
 .capacity-confirm input{width:auto;margin-top:3px}
 .capacity-confirm label{margin:0;line-height:1.4}
-@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:26px}}
+.worker-option{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb}
+.worker-option.at-capacity{background:#fef2f2;border-color:#fecaca}
+.worker-option-main{display:flex;align-items:center;gap:10px;min-width:0}
+.worker-option-main input{width:auto;flex:0 0 auto}
+.worker-load{font-size:12px;font-weight:900;color:#166534;text-align:right}
+.worker-option.at-capacity .worker-load{color:#991b1b}
+@media(max-width:700px){
+    .container{padding:16px}
+    .grid{grid-template-columns:1fr}
+    h1{font-size:26px}
+    .worker-option{align-items:flex-start;flex-direction:column}
+    .worker-load{padding-left:30px;text-align:left}
+}
 </style>
 </head>
 
@@ -126,10 +138,23 @@ button:hover{background:#1d4ed8}
     <summary style="cursor:pointer;font-weight:900">Выбрать {{ (settings["worker_label"] or "исполнителей")|lower }}</summary>
 
     <div style="display:grid;gap:10px;margin-top:12px">
-        {% for worker in workers %}
-        <label style="display:flex;align-items:center;gap:10px;font-weight:800">
-            <input type="checkbox" name="workers" value="{{ worker[0] }}" style="width:auto" {% if worker[0] in selected_workers %}checked{% endif %}>
-            {{ worker[0] }}
+        {% for worker in worker_options %}
+        <label class="worker-option {% if worker['is_at_capacity'] %}at-capacity{% endif %}">
+            <span class="worker-option-main">
+                <input type="checkbox" name="workers" value="{{ worker['username'] }}" {% if worker['username'] in selected_workers %}checked{% endif %}>
+                <span>{{ worker["username"] }}</span>
+            </span>
+            <span class="worker-load">
+                {% if selected_task_date %}
+                    {% if worker["is_at_capacity"] %}
+                    Лимит {{ worker["active_count"] }}/{{ worker["daily_capacity"] }}
+                    {% else %}
+                    Свободно {{ worker["available_slots"] }} · {{ worker["active_count"] }}/{{ worker["daily_capacity"] }}
+                    {% endif %}
+                {% else %}
+                    Лимит {{ worker["daily_capacity"] }} в день
+                {% endif %}
+            </span>
         </label>
         {% endfor %}
     </div>
