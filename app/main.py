@@ -14020,6 +14020,10 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
 
     worker_condition = worker_task_condition()
     worker_params = worker_task_params(worker["username"])
+    settings = get_company_settings(company_id)
+    task_label = settings["task_label"] or "Заявка"
+    client_label = settings["client_label"] or "Клиент"
+    today = datetime.now().strftime("%Y-%m-%d")
 
     total_tasks = c.execute(f"""
     SELECT COUNT(*)
@@ -14032,6 +14036,41 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
     FROM tasks
     WHERE company_id=? AND {worker_condition} AND status='Завершено'
     """, [company_id] + worker_params).fetchone()[0]
+
+    active_tasks_count = c.execute(f"""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND {worker_condition}
+    """, [company_id] + worker_params).fetchone()[0]
+
+    overdue_tasks_count = c.execute(f"""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date != ''
+      AND substr(task_date, 1, 10) < ?
+      AND {worker_condition}
+    """, [company_id, today] + worker_params).fetchone()[0]
+
+    active_tasks = c.execute(f"""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND {worker_condition}
+    ORDER BY
+      CASE WHEN task_date IS NULL OR task_date='' THEN 1 ELSE 0 END,
+      task_date,
+      id
+    LIMIT 10
+    """, [company_id] + worker_params).fetchall()
 
     income = c.execute(f"""
     SELECT SUM(price)
@@ -14127,6 +14166,12 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             "month": month,
             "total_tasks": total_tasks,
             "done_tasks": done_tasks,
+            "active_tasks_count": active_tasks_count,
+            "overdue_tasks_count": overdue_tasks_count,
+            "active_tasks": active_tasks,
+            "today": today,
+            "task_label": task_label,
+            "client_label": client_label,
             "income": income,
             "finance_total": finance_total,
             "finance_profit": finance_profit,
