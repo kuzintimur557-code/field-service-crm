@@ -14065,6 +14065,21 @@ async def change_team_user_password(request: Request, user_id: int):
     SET password=?
     WHERE id=? AND company_id=?
     """, (hash_password(new_password), user_id, company_id))
+    c.execute("""
+    INSERT INTO team_activity (
+        company_id, user_id, target_username, actor_username,
+        action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        user_id,
+        user["username"],
+        username,
+        "Пароль обновлён",
+        "Пароль изменён владельцем компании",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
 
     conn.commit()
     conn.close()
@@ -14114,11 +14129,27 @@ async def update_worker_commission(request: Request, user_id: int):
         conn.close()
         return RedirectResponse("/workers?error=cannot_change_boss", status_code=302)
 
+    previous_commission = float(user["commission_percent"] or 0)
     c.execute("""
     UPDATE users
     SET commission_percent=?
     WHERE id=? AND company_id=?
     """, (commission_percent, user_id, company_id))
+    c.execute("""
+    INSERT INTO team_activity (
+        company_id, user_id, target_username, actor_username,
+        action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        user_id,
+        user["username"],
+        username,
+        "Процент обновлён",
+        f"{previous_commission:g}% → {commission_percent:g}%",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
 
     conn.commit()
     conn.close()

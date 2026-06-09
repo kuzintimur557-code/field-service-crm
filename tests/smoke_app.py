@@ -4821,6 +4821,50 @@ async def assert_finance_margin(task):
     assert history_activity[1]["details"] == "Доступ восстановлен"
     conn.close()
 
+    history_password_response = await crm.change_team_user_password(
+        make_form_request(
+            "owner2",
+            f"/workers/{history_candidate['id']}/password",
+            {"password": "secure456"},
+        ),
+        history_candidate["id"],
+    )
+    assert history_password_response.status_code == 302
+    assert (
+        history_password_response.headers["location"]
+        == "/workers?password_changed=1"
+    )
+
+    history_commission_response = await crm.update_worker_commission(
+        make_form_request(
+            "owner2",
+            f"/workers/{history_candidate['id']}/commission",
+            {"commission_percent": "7.5"},
+        ),
+        history_candidate["id"],
+    )
+    assert history_commission_response.status_code == 302
+    assert (
+        history_commission_response.headers["location"]
+        == "/workers?commission_updated=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    management_activity = c.execute("""
+    SELECT action, details
+    FROM team_activity
+    WHERE company_id=2 AND user_id=?
+    ORDER BY id DESC
+    LIMIT 2
+    """, (history_candidate["id"],)).fetchall()
+    conn.close()
+    assert management_activity[0]["action"] == "Процент обновлён"
+    assert management_activity[0]["details"] == "0% → 7.5%"
+    assert management_activity[1]["action"] == "Пароль обновлён"
+    assert management_activity[1]["details"] == "Пароль изменён владельцем компании"
+    assert "secure456" not in management_activity[1]["details"]
+
     history_worker_response = await crm.worker_detail(
         make_asgi_request(
             "owner2",
@@ -4833,6 +4877,9 @@ async def assert_finance_margin(task):
     assert "Пользователь отключён" in history_worker_html
     assert "Пользователь включён" in history_worker_html
     assert "Сотрудник уволен" in history_worker_html
+    assert "Пароль обновлён" in history_worker_html
+    assert "Процент обновлён" in history_worker_html
+    assert "0% → 7.5%" in history_worker_html
 
     clean_toggle_response = await crm.toggle_team_user_active(
         make_form_request(
