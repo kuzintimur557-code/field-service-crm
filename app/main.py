@@ -13884,6 +13884,14 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
     if payroll_payout:
         payroll_status = "Выплачено" if payroll_paid_amount >= finance_payout else "Частично"
 
+    team_activity = c.execute("""
+    SELECT *
+    FROM team_activity
+    WHERE company_id=? AND user_id=?
+    ORDER BY id DESC
+    LIMIT 20
+    """, (company_id, worker_id)).fetchall()
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -13906,7 +13914,8 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             "payroll_status": payroll_status,
             "payroll_paid_amount": payroll_paid_amount,
             "payroll_due_amount": payroll_due_amount,
-            "payroll_note": payroll_payout["note"] if payroll_payout else ""
+            "payroll_note": payroll_payout["note"] if payroll_payout else "",
+            "team_activity": team_activity,
         }
     )
 
@@ -14177,22 +14186,54 @@ async def toggle_team_user_active(request: Request, user_id: int):
             )
 
     if current_active:
+        changed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         c.execute("""
         UPDATE users
         SET is_active=0, disabled_at=?, disabled_reason=?
         WHERE id=? AND company_id=?
         """, (
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            changed_at,
             disabled_reason,
             user_id,
             company_id,
         ))
+        c.execute("""
+        INSERT INTO team_activity (
+            company_id, user_id, target_username, actor_username,
+            action, details, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            user_id,
+            user["username"],
+            username,
+            "Пользователь отключён",
+            disabled_reason,
+            changed_at,
+        ))
     else:
+        changed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         c.execute("""
         UPDATE users
         SET is_active=1, disabled_at=NULL, disabled_reason=NULL
         WHERE id=? AND company_id=?
         """, (user_id, company_id))
+        c.execute("""
+        INSERT INTO team_activity (
+            company_id, user_id, target_username, actor_username,
+            action, details, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            user_id,
+            user["username"],
+            username,
+            "Пользователь включён",
+            "Доступ восстановлен",
+            changed_at,
+        ))
 
     conn.commit()
     conn.close()

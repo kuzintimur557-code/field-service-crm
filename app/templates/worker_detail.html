@@ -23,6 +23,9 @@ h1{margin:0 0 10px;font-size:34px}
 .badge.paid{background:#dcfce7;color:#166534}
 .badge.partial{background:#fef3c7;color:#92400e}
 .badge.unpaid{background:#fee2e2;color:#991b1b}
+.activity{padding:14px 0;border-bottom:1px solid #e5e7eb}
+.activity:last-child{border-bottom:0}
+.activity-title{font-weight:900}
 @media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}}
 </style>
 </head>
@@ -135,6 +138,23 @@ h1{margin:0 0 10px;font-size:34px}
 
 {% if payroll_note %}
 <div class="meta" style="margin-top:14px">Комментарий выплаты: {{ payroll_note }}</div>
+{% endif %}
+</div>
+
+<div class="card">
+<h2>История управления</h2>
+{% if team_activity %}
+{% for event in team_activity %}
+<div class="activity">
+    <div class="activity-title">{{ event["action"] }}</div>
+    <div class="meta">{{ event["created_at"] }} · Выполнил: {{ event["actor_username"] }}</div>
+    {% if event["details"] %}
+    <div class="meta">{{ event["details"] }}</div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="meta">Действий по сотруднику пока нет</div>
 {% endif %}
 </div>
 

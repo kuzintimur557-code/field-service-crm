@@ -4803,10 +4803,36 @@ async def assert_finance_margin(task):
     FROM users
     WHERE id=?
     """, (history_candidate["id"],)).fetchone()
-    conn.close()
     assert reenabled_history_candidate["is_active"] == 1
     assert reenabled_history_candidate["disabled_at"] is None
     assert reenabled_history_candidate["disabled_reason"] is None
+    history_activity = c.execute("""
+    SELECT action, details, actor_username
+    FROM team_activity
+    WHERE company_id=2 AND user_id=?
+    ORDER BY id
+    """, (history_candidate["id"],)).fetchall()
+    assert [event["action"] for event in history_activity] == [
+        "Пользователь отключён",
+        "Пользователь включён",
+    ]
+    assert history_activity[0]["details"] == "Сотрудник уволен"
+    assert history_activity[0]["actor_username"] == "owner2"
+    assert history_activity[1]["details"] == "Доступ восстановлен"
+    conn.close()
+
+    history_worker_response = await crm.worker_detail(
+        make_asgi_request(
+            "owner2",
+            f"/workers/{history_candidate['id']}",
+        ),
+        history_candidate["id"],
+    )
+    history_worker_html = history_worker_response.body.decode("utf-8")
+    assert "История управления" in history_worker_html
+    assert "Пользователь отключён" in history_worker_html
+    assert "Пользователь включён" in history_worker_html
+    assert "Сотрудник уволен" in history_worker_html
 
     clean_toggle_response = await crm.toggle_team_user_active(
         make_form_request(
