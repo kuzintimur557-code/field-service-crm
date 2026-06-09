@@ -63,7 +63,53 @@ h1{font-size:32px;margin:0}
 	.load-total{font-size:24px;font-weight:900;margin-bottom:10px}
 	.load-row{display:flex;justify-content:space-between;gap:10px;color:#4b5563;margin-top:5px}
 	.load-row b{color:#111827}
-	@media(max-width:700px){.container{padding:16px}h1{font-size:26px}.filters select,.filters input,.filters button,.reset{width:100%}}
+	.week-planner{margin-bottom:18px;padding:18px;background:white;border-radius:20px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
+	.week-planner-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+	.week-planner-title{font-size:20px;font-weight:900}
+	.week-planner-period{margin-top:4px;color:#6b7280;font-size:13px;font-weight:800}
+	.week-controls{display:flex;gap:8px;flex-wrap:wrap}
+	.week-controls a{padding:9px 11px;border-radius:12px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-size:13px;font-weight:900}
+	.week-jump{display:flex;gap:6px}
+	.week-jump input{width:145px;padding:8px;border:1px solid #d1d5db;border-radius:11px;background:white;font-weight:800}
+	.week-jump button{padding:8px 10px;border:0;border-radius:11px;background:#111827;color:white;font-weight:900;cursor:pointer}
+	.week-summary{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+	.week-summary-item{padding:11px;border-radius:14px;background:#f9fafb;border:1px solid #e5e7eb}
+	.week-summary-label{font-size:12px;color:#6b7280;font-weight:900}
+	.week-summary-value{margin-top:4px;font-size:20px;font-weight:900}
+	.week-scroll{overflow-x:auto;padding-bottom:5px}
+	.week-grid{min-width:1000px}
+	.week-row{display:grid;grid-template-columns:150px repeat(7,minmax(105px,1fr)) 105px;gap:7px;margin-bottom:7px}
+	.week-row.header-row{position:sticky;top:0;z-index:1}
+	.week-worker,.week-day-head,.week-total,.week-cell{border-radius:12px;border:1px solid #e5e7eb}
+	.week-worker,.week-total{padding:11px;background:#f9fafb}
+	.week-worker{font-weight:900;overflow-wrap:anywhere}
+	.week-worker small,.week-total small{display:block;margin-top:4px;color:#6b7280;font-size:11px}
+	.week-day-head{padding:9px;text-align:center;background:#111827;color:white;font-size:12px;font-weight:900}
+	.week-day-head.today{background:#2563eb}
+	.week-cell{position:relative;min-height:104px;padding:9px;background:#ecfdf5;border-color:#bbf7d0}
+	.week-cell.partial{background:#eff6ff;border-color:#bfdbfe}
+	.week-cell.full{background:#fff7ed;border-color:#fed7aa}
+	.week-cell.overloaded{background:#fef2f2;border-color:#fecaca}
+	.week-cell.recommended{box-shadow:inset 0 0 0 2px #22c55e}
+	.week-cell-count{font-size:18px;font-weight:900}
+	.week-cell-status{min-height:28px;margin-top:3px;color:#4b5563;font-size:11px;font-weight:800}
+	.week-cell-actions{display:flex;gap:5px;margin-top:7px}
+	.week-cell-actions a{display:inline-flex;align-items:center;justify-content:center;min-width:31px;height:28px;padding:0 7px;border-radius:9px;background:white;color:#111827;text-decoration:none;font-size:11px;font-weight:900;border:1px solid rgba(17,24,39,.1)}
+	.week-best{position:absolute;right:6px;top:6px;width:7px;height:7px;border-radius:50%;background:#22c55e}
+	.week-empty{padding:14px;border-radius:14px;background:#f9fafb;color:#6b7280;font-weight:800}
+	@media(max-width:700px){
+	    .container{padding:16px}
+	    h1{font-size:26px}
+	    .filters select,.filters input,.filters button,.reset{width:100%}
+	    .week-planner{padding:14px}
+	    .week-summary{grid-template-columns:1fr 1fr}
+	    .week-summary-value{font-size:17px}
+	    .week-controls{width:100%}
+	    .week-jump{width:100%}
+	    .week-jump input{min-width:0;flex:1}
+	    .week-grid{min-width:890px}
+	    .week-row{grid-template-columns:130px repeat(7,98px) 92px}
+	}
 	</style>
 </head>
 
@@ -78,6 +124,7 @@ h1{font-size:32px;margin:0}
 	{% if role in ("boss", "manager") %}
 		<div class="filters">
 		<form method="get" action="/calendar">
+		    <input type="hidden" name="week_start" value="{{ selected_week_start }}">
 		    <div>
 		        <label>Месяц</label>
 		        <input type="month" name="month" value="{{ selected_month }}">
@@ -111,6 +158,110 @@ h1{font-size:32px;margin:0}
 		    <a class="reset" href="/calendar">Сбросить</a>
 		</form>
 		</div>
+		{% endif %}
+
+		{% if role in ("boss", "manager") %}
+		<section class="week-planner">
+		    <div class="week-planner-head">
+		        <div>
+		            <div class="week-planner-title">Недельный планировщик</div>
+		            <div class="week-planner-period">{{ selected_week_start }} — {{ selected_week_end }}</div>
+		        </div>
+		        <div class="week-controls">
+		            <a href="{{ previous_week_url }}">Предыдущая</a>
+		            <a href="{{ current_week_url }}">Текущая неделя</a>
+		            <a href="{{ next_week_url }}">Следующая</a>
+		            <form class="week-jump" method="get" action="/calendar">
+		                <input type="date" name="week_start" value="{{ selected_week_start }}" aria-label="Дата нужной недели">
+		                {% if selected_worker %}
+		                <input type="hidden" name="worker" value="{{ selected_worker }}">
+		                {% endif %}
+		                {% if selected_status %}
+		                <input type="hidden" name="status" value="{{ selected_status }}">
+		                {% endif %}
+		                <button type="submit">Перейти</button>
+		            </form>
+		        </div>
+		    </div>
+
+		    <div class="week-summary">
+		        <div class="week-summary-item">
+		            <div class="week-summary-label">Назначений</div>
+		            <div class="week-summary-value">{{ weekly_capacity_summary["assignments"] }}</div>
+		        </div>
+		        <div class="week-summary-item">
+		            <div class="week-summary-label">Общая вместимость</div>
+		            <div class="week-summary-value">{{ weekly_capacity_summary["capacity"] }}</div>
+		        </div>
+		        <div class="week-summary-item">
+		            <div class="week-summary-label">Свободных мест</div>
+		            <div class="week-summary-value">{{ weekly_capacity_summary["available_slots"] }}</div>
+		        </div>
+		        <div class="week-summary-item">
+		            <div class="week-summary-label">Загрузка недели</div>
+		            <div class="week-summary-value">{{ weekly_capacity_summary["utilization_percent"] }}%</div>
+		        </div>
+		        <div class="week-summary-item">
+		            <div class="week-summary-label">Дней без мест</div>
+		            <div class="week-summary-value">{{ weekly_capacity_summary["full_cells"] }}</div>
+		        </div>
+		    </div>
+
+		    {% if weekly_capacity_rows %}
+		    <div class="week-scroll">
+		        <div class="week-grid">
+		            <div class="week-row header-row">
+		                <div class="week-worker">Исполнитель</div>
+		                {% for day in weekly_capacity_days %}
+		                <div class="week-day-head {% if day['is_today'] %}today{% endif %}">
+		                    {{ day["day_label"] }}<br>{{ day["date_label"] }}
+		                </div>
+		                {% endfor %}
+		                <div class="week-total">Итого</div>
+		            </div>
+
+		            {% for worker in weekly_capacity_rows %}
+		            <div class="week-row">
+		                <div class="week-worker">
+		                    {{ worker["username"] }}
+		                    <small>Лимит: {{ worker["daily_capacity"] }} в день</small>
+		                </div>
+		                {% for cell in worker["cells"] %}
+		                <div class="week-cell {{ cell['status'] }} {% if cell['is_recommended'] %}recommended{% endif %}">
+		                    {% if cell["is_recommended"] %}
+		                    <span class="week-best" title="Рекомендованное свободное окно"></span>
+		                    {% endif %}
+		                    <div class="week-cell-count">{{ cell["task_count"] }}/{{ worker["daily_capacity"] }}</div>
+		                    <div class="week-cell-status">
+		                        {% if cell["status"] == "overloaded" %}
+		                        Перегруз
+		                        {% elif cell["status"] == "full" %}
+		                        Нет мест
+		                        {% elif cell["task_count"] %}
+		                        Свободно: {{ cell["available_slots"] }}
+		                        {% else %}
+		                        Свободен
+		                        {% endif %}
+		                    </div>
+		                    <div class="week-cell-actions">
+		                        <a href="{{ cell['calendar_url'] }}" title="Открыть день">День</a>
+		                        <a href="{{ cell['create_url'] }}" title="Создать заявку">+</a>
+		                    </div>
+		                </div>
+		                {% endfor %}
+		                <div class="week-total">
+		                    <b>{{ worker["total_assignments"] }}/{{ worker["total_capacity"] }}</b>
+		                    <small>Свободно: {{ worker["available_slots"] }}</small>
+		                    <small>Загрузка: {{ worker["utilization_percent"] }}%</small>
+		                </div>
+		            </div>
+		            {% endfor %}
+		        </div>
+		    </div>
+		    {% else %}
+		    <div class="week-empty">Добавьте активных исполнителей, чтобы планировать загрузку.</div>
+		    {% endif %}
+		</section>
 		{% endif %}
 
 		{% if role in ("boss", "manager") and worker_availability %}

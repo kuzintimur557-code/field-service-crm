@@ -4379,8 +4379,21 @@ async def assert_calendar_access():
     assert "Лимит исчерпан" in manager_html
     assert "Предыдущий день" in manager_html
     assert "Следующий день" in manager_html
+    assert "Недельный планировщик" in manager_html
+    assert "Предыдущая" in manager_html
+    assert "Текущая неделя" in manager_html
+    assert "Следующая" in manager_html
+    assert "Общая вместимость" in manager_html
+    assert "Загрузка недели" in manager_html
+    assert "Дней без мест" in manager_html
+    assert "Дата нужной недели" in manager_html
+    assert "Перейти" in manager_html
+    assert "week-cell" in manager_html
+    assert "Рекомендованное свободное окно" in manager_html
     assert "/calendar?date=2026-05-16&amp;worker=helper2&amp;status=" in manager_html
     assert "/calendar?date=2026-05-18&amp;worker=helper2&amp;status=" in manager_html
+    assert "/calendar?week_start=2026-05-04&amp;worker=helper2&amp;status=" in manager_html
+    assert "/calendar?week_start=2026-05-18&amp;worker=helper2&amp;status=" in manager_html
     assert "Всего: 3" in manager_html
     assert "Свободно: 1" in manager_html
     assert "Лимит исчерпан: 2" in manager_html
@@ -4399,6 +4412,40 @@ async def assert_calendar_access():
     assert helper_availability["available_slots"] == 0
     assert helper_availability["is_at_capacity"] is True
     assert helper_availability["load_percent"] == 100
+    assert manager_response.context["selected_week_start"] == "2026-05-11"
+    assert manager_response.context["selected_week_end"] == "2026-05-17"
+    assert len(manager_response.context["weekly_capacity_days"]) == 7
+    assert len(manager_response.context["weekly_capacity_rows"]) == 1
+    assert all(
+        row["username"] != "outsider_worker"
+        for row in manager_response.context["weekly_capacity_rows"]
+    )
+    assert manager_response.context["weekly_capacity_summary"] == {
+        "assignments": 1,
+        "capacity": 7,
+        "available_slots": 6,
+        "full_cells": 1,
+        "utilization_percent": 14,
+    }
+    helper_week = next(
+        row
+        for row in manager_response.context["weekly_capacity_rows"]
+        if row["username"] == "helper2"
+    )
+    helper_sunday = next(
+        cell
+        for cell in helper_week["cells"]
+        if cell["date"] == "2026-05-17"
+    )
+    assert helper_sunday["task_count"] == 1
+    assert helper_sunday["available_slots"] == 0
+    assert helper_sunday["status"] == "full"
+    assert helper_sunday["calendar_url"].startswith(
+        "/calendar?date=2026-05-17&worker=helper2"
+    )
+    assert helper_sunday["create_url"].startswith(
+        "/create-task?task_date=2026-05-17&worker=helper2"
+    )
 
     free_response = await crm.calendar_page(
         make_asgi_request("owner2"),
@@ -4410,6 +4457,11 @@ async def assert_calendar_access():
     assert "free2" in free_html
     assert "Лимит исчерпан: 1 из 1" not in free_html
     assert "/calendar?date=2026-05-18&amp;availability=free" in free_html
+    assert len(free_response.context["weekly_capacity_rows"]) == 3
+    assert all(
+        row["username"] != "outsider_worker"
+        for row in free_response.context["weekly_capacity_rows"]
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -4479,7 +4531,9 @@ async def assert_calendar_access():
         month="2026-05",
     )
     assert worker_response.status_code == 200
-    assert "Client 2" in worker_response.body.decode("utf-8")
+    worker_html = worker_response.body.decode("utf-8")
+    assert "Client 2" in worker_html
+    assert "Недельный планировщик" not in worker_html
 
     outsider_response = await crm.calendar_page(
         make_asgi_request("outsider_worker"),

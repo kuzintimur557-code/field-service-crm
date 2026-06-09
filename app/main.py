@@ -7961,7 +7961,15 @@ async def create_overdue_reminders(request: Request):
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-async def calendar_page(request: Request, worker: str = "", month: str = "", status: str = "", date: str = "", availability: str = ""):
+async def calendar_page(
+    request: Request,
+    worker: str = "",
+    month: str = "",
+    status: str = "",
+    date: str = "",
+    availability: str = "",
+    week_start: str = "",
+):
 
     username = get_user(request)
 
@@ -7986,6 +7994,15 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
     workers = []
     worker_loads = []
     worker_availability = []
+    weekly_capacity_rows = []
+    weekly_capacity_days = []
+    weekly_capacity_summary = {
+        "assignments": 0,
+        "capacity": 0,
+        "available_slots": 0,
+        "full_cells": 0,
+        "utilization_percent": 0,
+    }
     availability_summary = {
         "total": 0,
         "free": 0,
@@ -8001,6 +8018,30 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
         selected_date = ""
 
     availability_date = selected_date or datetime.now().strftime("%Y-%m-%d")
+    selected_week_start = str(week_start or "").strip()
+
+    try:
+        week_anchor = datetime.strptime(
+            selected_week_start or availability_date,
+            "%Y-%m-%d",
+        ).date()
+    except Exception:
+        week_anchor = datetime.now().date()
+
+    calendar_week_start = week_anchor - timedelta(days=week_anchor.weekday())
+    calendar_week_end = calendar_week_start + timedelta(days=6)
+    selected_week_start = calendar_week_start.strftime("%Y-%m-%d")
+    selected_week_end = calendar_week_end.strftime("%Y-%m-%d")
+    weekday_labels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+
+    for day_offset in range(7):
+        week_day = calendar_week_start + timedelta(days=day_offset)
+        weekly_capacity_days.append({
+            "date": week_day.strftime("%Y-%m-%d"),
+            "day_label": weekday_labels[day_offset],
+            "date_label": week_day.strftime("%d.%m"),
+            "is_today": week_day == datetime.now().date(),
+        })
 
     query = """
     SELECT *
@@ -8038,8 +8079,12 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
         if worker and worker in worker_names:
             query += f" AND {worker_task_condition()}"
             params += worker_task_params(worker)
+            planner_worker_names = [worker]
         elif worker:
             query += " AND 1=0"
+            planner_worker_names = []
+        else:
+            planner_worker_names = worker_names
 
         for worker_row in workers:
             worker_name = worker_row["username"]
@@ -8144,6 +8189,149 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             worker_availability = [item for item in worker_availability if item["is_free"]]
         elif selected_availability == "busy":
             worker_availability = [item for item in worker_availability if not item["is_free"]]
+
+        weekly_counts = {
+            worker_name: {
+                day["date"]: 0
+                for day in weekly_capacity_days
+            }
+            for worker_name in planner_worker_names
+        }
+        weekly_rows = c.execute("""
+        SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+        FROM tasks
+        WHERE archived=0
+          AND company_id=?
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND task_date IS NOT NULL
+          AND task_date != ''
+          AND substr(task_date, 1, 10) BETWEEN ? AND ?
+        """, (
+            company_id,
+            selected_week_start,
+            selected_week_end,
+        )).fetchall()
+
+        for weekly_task in weekly_rows:
+            work_date = weekly_task["work_date"]
+
+            for worker_name in get_task_worker_names(weekly_task):
+                if worker_name in weekly_counts:
+                    weekly_counts[worker_name][work_date] += 1
+
+        recommended_workers_by_day = {}
+
+        for day in weekly_capacity_days:
+            day_date = day["date"]
+            available_workers = [
+                worker_name
+                for worker_name in planner_worker_names
+                if weekly_counts[worker_name][day_date]
+                < worker_capacity_map[worker_name]
+            ]
+
+            if available_workers:
+                recommended_workers_by_day[day_date] = min(
+                    available_workers,
+                    key=lambda worker_name: (
+                        weekly_counts[worker_name][day_date]
+                        / worker_capacity_map[worker_name],
+                        weekly_counts[worker_name][day_date],
+                        worker_name,
+                    ),
+                )
+
+        for worker_name in planner_worker_names:
+            daily_capacity = worker_capacity_map[worker_name]
+            cells = []
+
+            for day in weekly_capacity_days:
+                day_date = day["date"]
+                task_count = weekly_counts[worker_name][day_date]
+                available_slots = max(daily_capacity - task_count, 0)
+                is_at_capacity = available_slots == 0
+                is_overloaded = task_count > daily_capacity
+                cell_status = "free"
+
+                if is_overloaded:
+                    cell_status = "overloaded"
+                elif is_at_capacity:
+                    cell_status = "full"
+                elif task_count:
+                    cell_status = "partial"
+
+                cells.append({
+                    "date": day_date,
+                    "task_count": task_count,
+                    "available_slots": available_slots,
+                    "load_percent": min(
+                        round(task_count / daily_capacity * 100),
+                        100,
+                    ),
+                    "status": cell_status,
+                    "is_recommended": (
+                        recommended_workers_by_day.get(day_date)
+                        == worker_name
+                    ),
+                    "calendar_url": "/calendar?" + urlencode({
+                        "date": day_date,
+                        "worker": worker_name,
+                        "week_start": selected_week_start,
+                    }),
+                    "create_url": "/create-task?" + urlencode({
+                        "task_date": day_date,
+                        "worker": worker_name,
+                        "return_to": "calendar",
+                    }),
+                })
+
+            total_assignments = sum(
+                cell["task_count"] for cell in cells
+            )
+            total_capacity = daily_capacity * 7
+            total_available_slots = sum(
+                cell["available_slots"] for cell in cells
+            )
+            weekly_capacity_rows.append({
+                "username": worker_name,
+                "daily_capacity": daily_capacity,
+                "cells": cells,
+                "total_assignments": total_assignments,
+                "total_capacity": total_capacity,
+                "available_slots": total_available_slots,
+                "utilization_percent": round(
+                    total_assignments / total_capacity * 100
+                ),
+            })
+
+        weekly_capacity_summary = {
+            "assignments": sum(
+                row["total_assignments"]
+                for row in weekly_capacity_rows
+            ),
+            "capacity": sum(
+                row["total_capacity"]
+                for row in weekly_capacity_rows
+            ),
+            "available_slots": sum(
+                row["available_slots"]
+                for row in weekly_capacity_rows
+            ),
+            "full_cells": sum(
+                1
+                for row in weekly_capacity_rows
+                for cell in row["cells"]
+                if cell["status"] in ("full", "overloaded")
+            ),
+            "utilization_percent": 0,
+        }
+
+        if weekly_capacity_summary["capacity"]:
+            weekly_capacity_summary["utilization_percent"] = round(
+                weekly_capacity_summary["assignments"]
+                / weekly_capacity_summary["capacity"]
+                * 100
+            )
     else:
         worker = ""
         query += f" AND {worker_task_condition()}"
@@ -8172,6 +8360,28 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
     previous_day_url = calendar_day_url(current_calendar_day - timedelta(days=1))
     today_day_url = calendar_day_url(datetime.now().date())
     next_day_url = calendar_day_url(current_calendar_day + timedelta(days=1))
+
+    def calendar_week_url(start_date):
+        week_params = {"week_start": start_date.strftime("%Y-%m-%d")}
+
+        if worker:
+            week_params["worker"] = worker
+
+        if status in ("Новая", "В работе", "Завершено", "Отменено"):
+            week_params["status"] = status
+
+        return f"/calendar?{urlencode(week_params)}"
+
+    previous_week_url = calendar_week_url(
+        calendar_week_start - timedelta(days=7)
+    )
+    current_week_url = calendar_week_url(
+        datetime.now().date()
+        - timedelta(days=datetime.now().date().weekday())
+    )
+    next_week_url = calendar_week_url(
+        calendar_week_start + timedelta(days=7)
+    )
 
     query += " ORDER BY task_date ASC, id DESC"
 
@@ -8216,6 +8426,9 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             "workers": workers,
             "worker_loads": worker_loads,
             "worker_availability": worker_availability,
+            "weekly_capacity_rows": weekly_capacity_rows,
+            "weekly_capacity_days": weekly_capacity_days,
+            "weekly_capacity_summary": weekly_capacity_summary,
             "availability_summary": availability_summary,
             "selected_worker": worker,
             "selected_month": month,
@@ -8223,9 +8436,14 @@ async def calendar_page(request: Request, worker: str = "", month: str = "", sta
             "selected_availability": selected_availability,
             "selected_date": selected_date,
             "availability_date": availability_date,
+            "selected_week_start": selected_week_start,
+            "selected_week_end": selected_week_end,
             "previous_day_url": previous_day_url,
             "today_day_url": today_day_url,
             "next_day_url": next_day_url,
+            "previous_week_url": previous_week_url,
+            "current_week_url": current_week_url,
+            "next_week_url": next_week_url,
             "username": username,
             "role": role
         }
