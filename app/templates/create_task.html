@@ -82,9 +82,6 @@ button:hover{background:#1d4ed8}
 	{% endif %}
 
 	<form id="create-task-form" method="post" action="/create-task" enctype="multipart/form-data">
-{% if selected_worker_at_capacity %}
-<input type="hidden" name="capacity_warning_shown" value="1">
-{% endif %}
 {% if selected_return_to %}
 <input type="hidden" name="return_to" value="{{ selected_return_to }}">
 {% endif %}

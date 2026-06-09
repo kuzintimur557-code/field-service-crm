@@ -15548,9 +15548,6 @@ async def create_task(
     note_id = (form.get("note_id") or "").strip()
     source_task_id = (form.get("source_task_id") or "").strip()
     ai_note_id = (form.get("ai_note_id") or "").strip()
-    capacity_warning_shown = (
-        form.get("capacity_warning_shown") or ""
-    ).strip() == "1"
     allow_capacity_override = (
         form.get("allow_capacity_override") or ""
     ).strip() == "1"
@@ -15653,6 +15650,7 @@ async def create_task(
 
     valid_workers = []
     worker_chat_ids = []
+    worker_capacity_map = {}
 
     for selected_worker in selected_workers:
         selected_worker = (selected_worker or "").strip()
@@ -15661,7 +15659,7 @@ async def create_task(
             continue
 
         worker_user = c.execute("""
-        SELECT username, telegram_chat_id
+        SELECT username, telegram_chat_id, daily_capacity
         FROM users
         WHERE username=?
           AND role='worker'
@@ -15671,23 +15669,54 @@ async def create_task(
 
         if worker_user and worker_user["username"] not in valid_workers:
             valid_workers.append(worker_user["username"])
+            worker_capacity_map[worker_user["username"]] = max(
+                1,
+                int(worker_user["daily_capacity"] or 3),
+            )
 
             if worker_user["telegram_chat_id"]:
                 worker_chat_ids.append(worker_user["telegram_chat_id"])
 
     worker = valid_workers[0] if valid_workers else ""
     workers_text = ",".join(valid_workers)
+    over_capacity_workers = []
+    selected_task_date = str(task_date or "")[:10]
 
-    if capacity_warning_shown and not allow_capacity_override:
+    try:
+        if selected_task_date:
+            datetime.strptime(selected_task_date, "%Y-%m-%d")
+    except Exception:
+        selected_task_date = ""
+
+    if selected_task_date:
+        for worker_name in valid_workers:
+            active_count = c.execute(f"""
+            SELECT COUNT(*)
+            FROM tasks
+            WHERE archived=0
+              AND company_id=?
+              AND task_date LIKE ?
+              AND status NOT IN ('Завершено', 'Отменено')
+              AND {worker_task_condition()}
+            """, [
+                company_id,
+                f"{selected_task_date}%",
+                *worker_task_params(worker_name),
+            ]).fetchone()[0]
+            daily_capacity = worker_capacity_map[worker_name]
+
+            if active_count >= daily_capacity:
+                over_capacity_workers.append({
+                    "username": worker_name,
+                    "active_count": active_count,
+                    "daily_capacity": daily_capacity,
+                })
+
+    if over_capacity_workers and not allow_capacity_override:
         error_params = {"error": "capacity_confirmation"}
-        selected_task_date = str(task_date or "")[:10]
 
-        try:
-            if selected_task_date:
-                datetime.strptime(selected_task_date, "%Y-%m-%d")
-                error_params["task_date"] = selected_task_date
-        except Exception:
-            pass
+        if selected_task_date:
+            error_params["task_date"] = selected_task_date
 
         if worker:
             error_params["worker"] = worker
@@ -15838,6 +15867,20 @@ async def create_task(
         "Создана заявка",
         f"Клиент: {client}. Исполнители: {format_task_workers({'worker': worker, 'workers': workers_text})}. Дата: {task_date}"
     )
+
+    if over_capacity_workers:
+        capacity_details = "; ".join(
+            f"{item['username']}: "
+            f"{item['active_count']} из {item['daily_capacity']}"
+            for item in over_capacity_workers
+        )
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Превышен дневной лимит",
+            f"Подтверждено при создании. {capacity_details}",
+        )
 
     text = f"""
 🚀 Новая заявка #{task_id}

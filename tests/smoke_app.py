@@ -7007,7 +7007,6 @@ async def assert_task_custom_fields():
     assert page_response.context["selected_worker_at_capacity"] is True
     assert "Свободных мест нет" in page_html
     assert "Назначение превысит дневной лимит" in page_html
-    assert 'name="capacity_warning_shown" value="1"' in page_html
     assert 'name="allow_capacity_override" value="1"' in page_html
     assert "Назначить сверх дневного лимита" in page_html
     assert page_response.context["selected_worker_available_slots"] == max(
@@ -7032,7 +7031,6 @@ async def assert_task_custom_fields():
                 "workers": ["worker2"],
                 "return_to": "calendar",
                 "priority": "Обычный",
-                "capacity_warning_shown": "1",
             },
         ),
         photo=None,
@@ -7059,6 +7057,21 @@ async def assert_task_custom_fields():
     crm.send_message_to_chat = lambda chat_id, text: True
 
     try:
+        override_response = await crm.create_task(
+            make_multipart_request(
+                "owner2",
+                "/create-task",
+                {
+                    "client": "Confirmed Capacity Client",
+                    "task_date": "2026-05-17",
+                    "workers": ["worker2"],
+                    "return_to": "calendar",
+                    "priority": "Срочно",
+                    "allow_capacity_override": "1",
+                },
+            ),
+            photo=None,
+        )
         response = await crm.create_task(
             make_multipart_request(
                 "owner2",
@@ -7081,6 +7094,33 @@ async def assert_task_custom_fields():
     finally:
         crm.send_message = original_send_message
         crm.send_message_to_chat = original_send_message_to_chat
+
+    assert override_response.status_code == 302
+    assert override_response.headers["location"] == (
+        "/calendar?date=2026-05-17&worker=worker2"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    override_task = c.execute("""
+    SELECT id
+    FROM tasks
+    WHERE company_id=2 AND client='Confirmed Capacity Client'
+    ORDER BY id DESC
+    LIMIT 1
+    """).fetchone()
+    override_activity = c.execute("""
+    SELECT details
+    FROM task_activity
+    WHERE task_id=?
+      AND action='Превышен дневной лимит'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (override_task["id"],)).fetchone()
+    conn.close()
+    assert override_activity["details"] == (
+        "Подтверждено при создании. worker2: 1 из 1"
+    )
 
     assert response.status_code == 302
     assert response.headers["location"] == "/calendar?date=2026-05-20&worker=worker2"
