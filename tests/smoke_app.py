@@ -4896,11 +4896,25 @@ async def assert_finance_margin(task):
     conn.close()
 
     workers_response = await crm.workers_page(
-        make_asgi_request("owner2", "/workers")
+        make_asgi_request("owner2", "/workers?status=inactive"),
+        status="inactive",
     )
     workers_html = workers_response.body.decode("utf-8")
     assert "Отключён" in workers_html
     assert "Включить пользователя" in workers_html
+    assert "Активные" in workers_html
+    assert "Отключённые" in workers_html
+    assert workers_response.context["status"] == "inactive"
+    assert workers_response.context["team_counts"]["inactive_count"] >= 1
+
+    active_workers_response = await crm.workers_page(
+        make_asgi_request("owner2", "/workers"),
+    )
+    assert active_workers_response.context["status"] == "active"
+    assert all(
+        worker["is_active"] is None or worker["is_active"]
+        for worker in active_workers_response.context["workers"]
+    )
 
     task_detail_response = await crm.task_detail(
         make_asgi_request("owner2", f"/task/{task['id']}"),

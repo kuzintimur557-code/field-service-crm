@@ -13703,7 +13703,7 @@ async def change_my_password(request: Request):
 
 
 @app.get("/workers", response_class=HTMLResponse)
-async def workers_page(request: Request):
+async def workers_page(request: Request, status: str = "active"):
 
     username = get_user(request)
 
@@ -13724,10 +13724,29 @@ async def workers_page(request: Request):
 
     company_id = get_user_company_id(username)
 
-    workers = c.execute("""
+    if status not in ("active", "inactive", "all"):
+        status = "active"
+
+    team_counts = c.execute("""
+    SELECT
+        COUNT(*) AS total_count,
+        SUM(CASE WHEN COALESCE(is_active, 1)=1 THEN 1 ELSE 0 END) AS active_count,
+        SUM(CASE WHEN is_active=0 THEN 1 ELSE 0 END) AS inactive_count
+    FROM users
+    WHERE role IN ('manager', 'worker') AND company_id=?
+    """, (company_id,)).fetchone()
+
+    status_condition = ""
+    if status == "active":
+        status_condition = "AND COALESCE(is_active, 1)=1"
+    elif status == "inactive":
+        status_condition = "AND is_active=0"
+
+    workers = c.execute(f"""
     SELECT * FROM users
     WHERE role IN ('manager', 'worker') AND company_id=?
-    ORDER BY role, username
+      {status_condition}
+    ORDER BY role, is_active DESC, username
     """, (company_id,)).fetchall()
 
     conn.close()
@@ -13738,7 +13757,9 @@ async def workers_page(request: Request):
         context={
             "workers": workers,
             "username": username,
-            "role": role
+            "role": role,
+            "status": status,
+            "team_counts": team_counts,
         }
     )
 

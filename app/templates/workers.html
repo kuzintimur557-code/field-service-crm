@@ -35,7 +35,13 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 .notice{margin-top:16px;padding:14px;border-radius:16px;font-weight:900}
 .ok{background:#dcfce7;color:#166534}
 .err{background:#fee2e2;color:#991b1b}
-@media(max-width:700px){.container{padding:16px}.user-top{display:block}.badge{display:inline-block;margin-top:12px}h1{font-size:28px}}
+.team-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.team-stat{background:#f9fafb;padding:14px;border-radius:14px}
+.team-stat strong{display:block;font-size:22px;margin-top:4px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.filters a{padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filters a.active{background:#111827;color:white}
+@media(max-width:700px){.container{padding:16px}.user-top{display:block}.badge{display:inline-block;margin-top:12px}h1{font-size:28px}.team-stats{grid-template-columns:1fr}.filters a{flex:1;text-align:center}}
 </style>
 </head>
 
@@ -108,6 +114,27 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="card">
 <h2>Список команды</h2>
 
+<div class="team-stats">
+    <div class="team-stat">
+        <div class="meta">Всего</div>
+        <strong>{{ team_counts["total_count"] or 0 }}</strong>
+    </div>
+    <div class="team-stat">
+        <div class="meta">Активные</div>
+        <strong>{{ team_counts["active_count"] or 0 }}</strong>
+    </div>
+    <div class="team-stat">
+        <div class="meta">Отключённые</div>
+        <strong>{{ team_counts["inactive_count"] or 0 }}</strong>
+    </div>
+</div>
+
+<div class="filters">
+    <a href="/workers?status=active" class="{% if status == 'active' %}active{% endif %}">Активные</a>
+    <a href="/workers?status=inactive" class="{% if status == 'inactive' %}active{% endif %}">Отключённые</a>
+    <a href="/workers?status=all" class="{% if status == 'all' %}active{% endif %}">Все</a>
+</div>
+
 {% if workers %}
 {% for worker in workers %}
 <div class="user">
@@ -175,7 +202,15 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 </div>
 {% endfor %}
 {% else %}
-<div class="meta">Команда пока пустая</div>
+<div class="meta">
+    {% if status == "inactive" %}
+    Отключённых пользователей нет
+    {% elif status == "active" %}
+    Активных пользователей нет
+    {% else %}
+    Команда пока пустая
+    {% endif %}
+</div>
 {% endif %}
 
 </div>
