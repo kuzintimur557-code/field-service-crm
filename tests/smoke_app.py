@@ -93,7 +93,17 @@ def make_form_request(username, path, data):
 
 def make_json_request(username, path, data):
     body = json.dumps(data).encode("utf-8")
-    cookie = f"{crm.SESSION_COOKIE_NAME}={crm.sign_session_value(username)}"
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"content-length", str(len(body)).encode("utf-8")),
+    ]
+
+    if username:
+        cookie = (
+            f"{crm.SESSION_COOKIE_NAME}="
+            f"{crm.sign_session_value(username)}"
+        )
+        headers.insert(0, (b"cookie", cookie.encode("utf-8")))
 
     async def receive():
         return {
@@ -106,11 +116,7 @@ def make_json_request(username, path, data):
         "type": "http",
         "method": "POST",
         "path": path,
-        "headers": [
-            (b"cookie", cookie.encode("utf-8")),
-            (b"content-type", b"application/json"),
-            (b"content-length", str(len(body)).encode("utf-8")),
-        ],
+        "headers": headers,
         "query_string": b"",
         "scheme": "http",
         "client": ("127.0.0.1", 50000),
@@ -5156,6 +5162,320 @@ async def assert_schedule_conflicts():
     conn.close()
 
 
+async def assert_dispatch_board():
+    today = datetime.now().date()
+    board_start = today + timedelta(days=21)
+    board_start -= timedelta(days=board_start.weekday())
+    original_date = board_start.strftime("%Y-%m-%d")
+    capacity_date = (board_start + timedelta(days=1)).strftime("%Y-%m-%d")
+    unavailable_date = (
+        board_start + timedelta(days=2)
+    ).strftime("%Y-%m-%d")
+    success_date = (board_start + timedelta(days=3)).strftime("%Y-%m-%d")
+    conn = connect()
+    c = conn.cursor()
+    helper = c.execute("""
+    SELECT id, daily_capacity, telegram_chat_id
+    FROM users
+    WHERE company_id=2 AND username='helper2'
+    """).fetchone()
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=1, telegram_chat_id='dispatch-smoke-chat'
+    WHERE company_id=2 AND username='helper2'
+    """)
+    c.execute("""
+    INSERT INTO worker_unavailability (
+        company_id, worker_id, date_from, date_to,
+        reason, created_by, created_at
+    )
+    VALUES (2, ?, ?, ?, 'Выходной диспетчера', 'owner2', ?)
+    """, (
+        helper["id"],
+        unavailable_date,
+        unavailable_date,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    absence_id = c.lastrowid
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, description, task_date,
+        worker, workers, status, archived, created_at
+    )
+    VALUES (2, 'Dispatch mover', 'Dispatch smoke', ?,
+            'helper2', 'helper2', 'Новая', 0, ?)
+    """, (
+        original_date,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    mover_id = c.lastrowid
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, description, task_date,
+        worker, workers, status, archived, created_at
+    )
+    VALUES (2, 'Dispatch blocker', 'Dispatch smoke', ?,
+            'helper2', 'helper2', 'Новая', 0, ?)
+    """, (
+        capacity_date,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    blocker_id = c.lastrowid
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, description, task_date,
+        worker, workers, status, archived, created_at
+    )
+    VALUES (2, 'Dispatch backlog', 'Dispatch smoke', '',
+            '', '', 'Новая', 0, ?)
+    """, (datetime.now().strftime("%Y-%m-%d %H:%M"),))
+    backlog_id = c.lastrowid
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, description, task_date,
+        worker, workers, status, archived, created_at
+    )
+    VALUES (1, 'Dispatch outsider', 'Dispatch smoke', ?,
+            'outsider_worker', 'outsider_worker', 'Новая', 0, ?)
+    """, (
+        original_date,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    outsider_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    page = await crm.calendar_dispatch_page(
+        make_asgi_request(
+            "owner2",
+            "/calendar/dispatch",
+        ),
+        week_start=original_date,
+    )
+    assert page.status_code == 200
+    page_html = page.body.decode("utf-8")
+    assert "Диспетчерская доска" in page_html
+    assert "Dispatch mover" in page_html
+    assert "Dispatch blocker" in page_html
+    assert "Dispatch backlog" in page_html
+    assert "Dispatch outsider" not in page_html
+    assert 'draggable="true"' in page_html
+    assert "/api/calendar/dispatch/move" in page_html
+    assert "Новая дата для заявки" in page_html
+    assert len(page.context["board_columns"]) == 8
+    assert page.context["summary"]["tasks"] == 3
+    assert page.context["summary"]["backlog"] == 1
+    backlog_column = page.context["board_columns"][0]
+    assert backlog_column["is_backlog"] is True
+    assert any(
+        item["task"]["id"] == backlog_id
+        for item in backlog_column["tasks"]
+    )
+
+    filtered_page = await crm.calendar_dispatch_page(
+        make_asgi_request(
+            "owner2",
+            "/calendar/dispatch",
+        ),
+        week_start=original_date,
+        worker="helper2",
+    )
+    assert filtered_page.context["selected_worker"] == "helper2"
+    assert filtered_page.context["summary"]["tasks"] == 2
+    assert "Dispatch backlog" not in filtered_page.body.decode("utf-8")
+
+    anonymous = await crm.api_calendar_dispatch_move(
+        make_json_request(
+            None,
+            "/api/calendar/dispatch/move",
+            {
+                "task_id": mover_id,
+                "target_date": success_date,
+                "expected_date": original_date,
+            },
+        )
+    )
+    assert anonymous.status_code == 401
+    worker_response = await crm.api_calendar_dispatch_move(
+        make_json_request(
+            "helper2",
+            "/api/calendar/dispatch/move",
+            {
+                "task_id": mover_id,
+                "target_date": success_date,
+                "expected_date": original_date,
+            },
+        )
+    )
+    assert worker_response.status_code == 403
+
+    unavailable = await crm.api_calendar_dispatch_move(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/move",
+            {
+                "task_id": mover_id,
+                "target_date": unavailable_date,
+                "expected_date": original_date,
+            },
+        )
+    )
+    assert unavailable.status_code == 409
+    unavailable_data = json.loads(unavailable.body)
+    assert unavailable_data["error"] == "worker_unavailable"
+    assert unavailable_data["worker"] == "helper2"
+    assert unavailable_data["reason"] == "Выходной диспетчера"
+    assert unavailable_data["suggestions"]
+
+    capacity = await crm.api_calendar_dispatch_move(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/move",
+            {
+                "task_id": mover_id,
+                "target_date": capacity_date,
+                "expected_date": original_date,
+            },
+        )
+    )
+    assert capacity.status_code == 409
+    capacity_data = json.loads(capacity.body)
+    assert capacity_data["error"] == "capacity_reached"
+    assert capacity_data["active_count"] == 1
+    assert capacity_data["daily_capacity"] == 1
+    assert capacity_data["suggestions"]
+
+    stale = await crm.api_calendar_dispatch_move(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/move",
+            {
+                "task_id": mover_id,
+                "target_date": success_date,
+                "expected_date": capacity_date,
+            },
+        )
+    )
+    assert stale.status_code == 409
+    assert json.loads(stale.body)["error"] == "stale"
+
+    outsider = await crm.api_calendar_dispatch_move(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/move",
+            {
+                "task_id": outsider_id,
+                "target_date": success_date,
+                "expected_date": original_date,
+            },
+        )
+    )
+    assert outsider.status_code == 404
+
+    original_send_message_to_chat = crm.send_message_to_chat
+    telegram_messages = []
+    crm.send_message_to_chat = lambda chat_id, text: telegram_messages.append(
+        (chat_id, text)
+    )
+
+    try:
+        moved = await crm.api_calendar_dispatch_move(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/move",
+                {
+                    "task_id": mover_id,
+                    "target_date": success_date,
+                    "expected_date": original_date,
+                },
+            )
+        )
+        moved_to_backlog = await crm.api_calendar_dispatch_move(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/move",
+                {
+                    "task_id": mover_id,
+                    "target_date": "",
+                    "expected_date": success_date,
+                },
+            )
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert moved["ok"] is True
+    assert moved["changed"] is True
+    assert moved["old_date"] == original_date
+    assert moved["new_date"] == success_date
+
+    assert moved_to_backlog["ok"] is True
+    assert moved_to_backlog["new_date"] == ""
+    assert len(telegram_messages) == 2
+    assert all(
+        chat_id == "dispatch-smoke-chat"
+        for chat_id, _ in telegram_messages
+    )
+    assert success_date in telegram_messages[0][1]
+    assert "не назначена" in telegram_messages[1][1]
+
+    conn = connect()
+    c = conn.cursor()
+    moved_task = c.execute("""
+    SELECT task_date
+    FROM tasks
+    WHERE id=? AND company_id=2
+    """, (mover_id,)).fetchone()
+    activity_rows = c.execute("""
+    SELECT action, details
+    FROM task_activity
+    WHERE task_id=?
+      AND action='Перенесено на диспетчерской доске'
+    ORDER BY id
+    """, (mover_id,)).fetchall()
+    notification_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=2
+      AND username='helper2'
+      AND title=?
+    """, (f"Изменена дата заявки #{mover_id}",)).fetchone()[0]
+    assert moved_task["task_date"] == ""
+    assert len(activity_rows) == 2
+    assert original_date in activity_rows[0]["details"]
+    assert success_date in activity_rows[0]["details"]
+    assert notification_count == 2
+
+    task_ids = [mover_id, blocker_id, backlog_id, outsider_id]
+    placeholders = ",".join("?" for _ in task_ids)
+    c.execute(
+        f"DELETE FROM task_activity WHERE task_id IN ({placeholders})",
+        task_ids,
+    )
+    c.execute(
+        "DELETE FROM notifications WHERE title=?",
+        (f"Изменена дата заявки #{mover_id}",),
+    )
+    c.execute(
+        f"DELETE FROM tasks WHERE id IN ({placeholders})",
+        task_ids,
+    )
+    c.execute(
+        "DELETE FROM worker_unavailability WHERE id=?",
+        (absence_id,),
+    )
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=?, telegram_chat_id=?
+    WHERE company_id=2 AND username='helper2'
+    """, (
+        helper["daily_capacity"],
+        helper["telegram_chat_id"],
+    ))
+    conn.commit()
+    conn.close()
+
+
 async def assert_archive_restore(task):
     conn = connect()
     c = conn.cursor()
@@ -8613,6 +8933,7 @@ def main():
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_schedule_conflicts())
+        asyncio.run(assert_dispatch_board())
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())
         asyncio.run(assert_finance_margin(task))

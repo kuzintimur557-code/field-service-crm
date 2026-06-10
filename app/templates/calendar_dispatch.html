@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Диспетчерская доска</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
+.container{max-width:1500px;margin:auto;padding:24px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+h1{margin:0;font-size:32px}
+.subtitle{margin-top:5px;color:#6b7280;font-weight:800}
+.header-actions,.week-nav{display:flex;gap:8px;flex-wrap:wrap}
+.button{display:inline-flex;align-items:center;justify-content:center;padding:11px 14px;border-radius:8px;background:#111827;color:white;text-decoration:none;font-weight:900}
+.button.primary{background:#2563eb}
+.button.danger{background:#dc2626}
+.summary{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+.summary-item{padding:13px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.summary-label{color:#6b7280;font-size:12px;font-weight:900}
+.summary-value{margin-top:4px;font-size:23px;font-weight:900}
+.toolbar{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.filters label{display:block;margin-bottom:5px;color:#6b7280;font-size:12px;font-weight:900}
+.filters select,.week-jump input{min-width:170px;padding:10px;border:1px solid #d1d5db;border-radius:8px;background:white;font-weight:800}
+.filters button,.week-jump button{padding:11px 13px;border:0;border-radius:8px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.filters a{padding:11px 8px;color:#1d4ed8;text-decoration:none;font-weight:900}
+.week-jump{display:flex;gap:7px}
+.board-scroll{overflow-x:auto;padding-bottom:10px}
+.board{display:grid;grid-template-columns:repeat(8,minmax(230px,1fr));gap:10px;min-width:1900px}
+.column{min-height:520px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#e5e7eb}
+.column.today{border-color:#2563eb;box-shadow:inset 0 0 0 1px #2563eb}
+.column.past{opacity:.62}
+.column.drag-over{background:#dbeafe;border-color:#2563eb}
+.column-head{min-height:72px;padding:10px;border-radius:7px;background:#111827;color:white}
+.column.backlog .column-head{background:#6b7280}
+.column-title{font-weight:900}
+.column-date{margin-top:3px;font-size:13px;font-weight:800;opacity:.85}
+.column-capacity{margin-top:7px;font-size:11px;font-weight:900}
+.column-tasks{display:grid;gap:8px;margin-top:9px}
+.task-card{padding:11px;border:1px solid #e5e7eb;border-left:4px solid #2563eb;border-radius:8px;background:white;box-shadow:0 3px 8px rgba(0,0,0,.05);cursor:grab}
+.task-card:active{cursor:grabbing}
+.task-card.conflict{border-left-color:#dc2626;background:#fffafa}
+.task-card.dragging{opacity:.45}
+.task-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.task-number{font-weight:900}
+.priority{padding:4px 6px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:10px;font-weight:900}
+.priority.urgent{background:#fee2e2;color:#991b1b}
+.task-client{margin-top:7px;font-weight:900;overflow-wrap:anywhere}
+.task-description{display:-webkit-box;margin-top:5px;overflow:hidden;color:#6b7280;font-size:12px;font-weight:700;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.task-workers{margin-top:7px;color:#374151;font-size:11px;font-weight:900;overflow-wrap:anywhere}
+.task-flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.flag{padding:4px 6px;border-radius:6px;background:#fee2e2;color:#991b1b;font-size:10px;font-weight:900}
+.task-link{display:inline-flex;margin-top:8px;color:#1d4ed8;text-decoration:none;font-size:12px;font-weight:900}
+.mobile-move{display:none;margin-top:9px;padding-top:9px;border-top:1px solid #e5e7eb}
+.mobile-move select{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:7px;background:white;font-weight:800}
+.mobile-move button{width:100%;margin-top:6px;padding:8px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900}
+.empty{padding:16px 8px;color:#6b7280;text-align:center;font-size:12px;font-weight:800}
+.toast{position:fixed;right:18px;bottom:82px;z-index:1000;max-width:390px;padding:14px 16px;border-radius:8px;background:#111827;color:white;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.22)}
+.toast.error{background:#991b1b}
+.toast[hidden]{display:none}
+@media(max-width:850px){
+    .container{padding:16px}
+    h1{font-size:27px}
+    .summary{grid-template-columns:1fr 1fr}
+    .header-actions,.header-actions a,.toolbar,.filters,.filters>div,.filters select,.filters button,.filters a,.week-nav,.week-nav a,.week-jump,.week-jump input,.week-jump button{width:100%}
+    .board-scroll{overflow:visible}
+    .board{grid-template-columns:1fr;min-width:0}
+    .column{min-height:0}
+    .column.past{display:none}
+    .task-card{cursor:default}
+    .mobile-move{display:block}
+}
+</style>
+</head>
+<body>
+<main class="container">
+    <header class="header">
+        <div>
+            <h1>Диспетчерская доска</h1>
+            <div class="subtitle">{{ selected_week_start }} — {{ selected_week_end }}</div>
+        </div>
+        <div class="header-actions">
+            <a class="button danger" href="/calendar/conflicts">Конфликты</a>
+            <a class="button primary" href="/calendar">Календарь</a>
+            <a class="button" href="/">Главное меню</a>
+        </div>
+    </header>
+
+    <section class="summary">
+        <div class="summary-item"><div class="summary-label">Заявок</div><div class="summary-value">{{ summary["tasks"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">Без даты</div><div class="summary-value">{{ summary["backlog"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">Новые</div><div class="summary-value">{{ summary["new"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">В работе</div><div class="summary-value">{{ summary["in_progress"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">Конфликты</div><div class="summary-value">{{ summary["conflicts"] }}</div></div>
+    </section>
+
+    <section class="toolbar">
+        <form class="filters" method="get" action="/calendar/dispatch">
+            <input type="hidden" name="week_start" value="{{ selected_week_start }}">
+            <div>
+                <label>Исполнитель</label>
+                <select name="worker">
+                    <option value="">Все исполнители</option>
+                    {% for worker in workers %}
+                    <option value="{{ worker['username'] }}" {% if selected_worker == worker['username'] %}selected{% endif %}>{{ worker["username"] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Статус</label>
+                <select name="status">
+                    <option value="">Все активные</option>
+                    <option value="Новая" {% if selected_status == "Новая" %}selected{% endif %}>Новые</option>
+                    <option value="В работе" {% if selected_status == "В работе" %}selected{% endif %}>В работе</option>
+                </select>
+            </div>
+            <button type="submit">Показать</button>
+            <a href="/calendar/dispatch?week_start={{ selected_week_start }}">Сбросить</a>
+        </form>
+        <div class="week-nav">
+            <a class="button" href="{{ previous_week_url }}">Предыдущая</a>
+            <a class="button primary" href="{{ current_week_url }}">Текущая</a>
+            <a class="button" href="{{ next_week_url }}">Следующая</a>
+            <form class="week-jump" method="get" action="/calendar/dispatch">
+                <input type="date" name="week_start" value="{{ selected_week_start }}" aria-label="Дата недели">
+                {% if selected_worker %}<input type="hidden" name="worker" value="{{ selected_worker }}">{% endif %}
+                {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
+                <button type="submit">Перейти</button>
+            </form>
+        </div>
+    </section>
+
+    <div class="board-scroll">
+        <section class="board">
+            {% for column in board_columns %}
+            <article
+                class="column {% if column['is_backlog'] %}backlog{% endif %} {% if column['is_today'] %}today{% endif %} {% if column['is_past'] %}past{% endif %}"
+                data-drop-date="{{ column['date'] }}"
+                data-past="{{ 1 if column['is_past'] else 0 }}"
+            >
+                <header class="column-head">
+                    <div class="column-title">{{ column["day_label"] }}</div>
+                    <div class="column-date">{{ column["date_label"] }}</div>
+                    {% if not column["is_backlog"] %}
+                    <div class="column-capacity">
+                        Назначений: {{ column["assignment_count"] }} / {{ column["capacity"] }}
+                        · свободно {{ column["available_slots"] }}
+                    </div>
+                    {% endif %}
+                </header>
+                <div class="column-tasks">
+                    {% for item in column["tasks"] %}
+                    {% set task = item["task"] %}
+                    <div
+                        class="task-card {% if item['has_conflict'] %}conflict{% endif %}"
+                        draggable="true"
+                        data-task-id="{{ task['id'] }}"
+                        data-expected-date="{{ (task['task_date'] or '')[:10] }}"
+                    >
+                        <div class="task-top">
+                            <span class="task-number">#{{ task["id"] }}</span>
+                            <span class="priority {% if task['priority'] == 'Срочно' %}urgent{% endif %}">{{ task["priority"] or "Обычный" }}</span>
+                        </div>
+                        <div class="task-client">{{ task["client"] or "Клиент не указан" }}</div>
+                        {% if task["description"] %}<div class="task-description">{{ task["description"] }}</div>{% endif %}
+                        <div class="task-workers">{{ item["workers_label"] }}</div>
+                        {% if item["has_conflict"] %}
+                        <div class="task-flags"><span class="flag">Конфликт расписания</span></div>
+                        {% endif %}
+                        <a class="task-link" href="/task/{{ task['id'] }}">Открыть заявку</a>
+                        <div class="mobile-move">
+                            <select aria-label="Новая дата для заявки #{{ task['id'] }}">
+                                {% for target in board_columns %}
+                                {% if not target["is_past"] %}
+                                <option value="{{ target['date'] }}" {% if target['date'] == (task['task_date'] or '')[:10] %}selected{% endif %}>{{ target["day_label"] }} · {{ target["date_label"] }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                            <button type="button">Перенести</button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="empty">Нет заявок</div>
+                    {% endfor %}
+                </div>
+            </article>
+            {% endfor %}
+        </section>
+    </div>
+</main>
+<div id="dispatch-toast" class="toast" hidden></div>
+{% include 'mobile_nav.html' %}
+<script>
+(() => {
+    const toast = document.getElementById("dispatch-toast");
+    let draggedCard = null;
+
+    function showToast(message, isError = false) {
+        toast.textContent = message;
+        toast.classList.toggle("error", isError);
+        toast.hidden = false;
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => {
+            toast.hidden = true;
+        }, 5000);
+    }
+
+    function errorMessage(data) {
+        const messages = {
+            past_date: "Нельзя переносить заявку на прошедший день.",
+            stale: "Заявка уже изменилась. Доска будет обновлена.",
+            worker_unavailable: `Исполнитель ${data.worker || ""} недоступен${data.reason ? ": " + data.reason : "."}`,
+            capacity_reached: `У исполнителя ${data.worker || ""} больше нет свободных мест.`,
+            inactive_worker: "Один из исполнителей отключён.",
+            task_closed: "Заявка уже завершена или отменена.",
+            not_found: "Заявка не найдена."
+        };
+        let message = messages[data.error] || "Не удалось перенести заявку.";
+
+        if (data.suggestions && data.suggestions.length) {
+            message += " Свободные даты: " + data.suggestions.map(item => item.date_label).join(", ") + ".";
+        }
+
+        return message;
+    }
+
+    async function moveTask(card, targetDate) {
+        if (!card || card.dataset.expectedDate === targetDate) {
+            return;
+        }
+
+        const response = await fetch("/api/calendar/dispatch/move", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                task_id: Number(card.dataset.taskId),
+                target_date: targetDate,
+                expected_date: card.dataset.expectedDate
+            })
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            showToast(errorMessage(data), true);
+
+            if (data.error === "stale") {
+                window.setTimeout(() => window.location.reload(), 1200);
+            }
+            return;
+        }
+
+        showToast("Дата заявки обновлена.");
+        window.setTimeout(() => window.location.reload(), 350);
+    }
+
+    document.querySelectorAll(".task-card").forEach(card => {
+        card.addEventListener("dragstart", event => {
+            draggedCard = card;
+            card.classList.add("dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", card.dataset.taskId);
+        });
+        card.addEventListener("dragend", () => {
+            card.classList.remove("dragging");
+            draggedCard = null;
+            document.querySelectorAll(".column").forEach(column => {
+                column.classList.remove("drag-over");
+            });
+        });
+
+        const mobileMove = card.querySelector(".mobile-move");
+        const mobileButton = mobileMove.querySelector("button");
+        const mobileSelect = mobileMove.querySelector("select");
+        mobileButton.addEventListener("click", () => {
+            moveTask(card, mobileSelect.value);
+        });
+    });
+
+    document.querySelectorAll(".column").forEach(column => {
+        if (column.dataset.past === "1") {
+            return;
+        }
+
+        column.addEventListener("dragover", event => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            column.classList.add("drag-over");
+        });
+        column.addEventListener("dragleave", () => {
+            column.classList.remove("drag-over");
+        });
+        column.addEventListener("drop", event => {
+            event.preventDefault();
+            column.classList.remove("drag-over");
+            moveTask(draggedCard, column.dataset.dropDate);
+        });
+    });
+})();
+</script>
+</body>
+</html>

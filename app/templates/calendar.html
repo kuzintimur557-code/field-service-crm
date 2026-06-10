@@ -155,6 +155,7 @@ h1{font-size:32px;margin:0}
 	    <h1>📅 Календарь заявок</h1>
 	    <div class="header-actions">
 	        {% if role in ("boss", "manager") %}
+	        <a href="/calendar/dispatch" class="btn" style="background:#111827">Диспетчерская</a>
 	        <a href="/calendar/conflicts" class="btn" style="background:#dc2626">Конфликты</a>
 	        {% endif %}
 	        <a href="/" class="btn">← Главное меню</a>
