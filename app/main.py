@@ -34,6 +34,10 @@ from app.services.system_health import (
     get_system_health_history,
 )
 from app.services.smart_scheduling import build_scheduling_recommendations
+from app.services.schedule_conflicts import (
+    build_conflict_recommendations,
+    detect_schedule_conflicts,
+)
 from app.services.workflow_graph import (
     get_company_workflow_graphs,
     get_rule_workflow_debug,
@@ -506,6 +510,122 @@ def get_worker_unavailability(
             current_date += timedelta(days=1)
 
     return dates_by_worker, reasons_by_worker_date
+
+
+def get_company_schedule_conflicts(
+    company_id,
+    date_from,
+    date_to,
+    recommendation_days=14,
+):
+    conn = connect()
+    c = conn.cursor()
+    worker_rows = c.execute("""
+    SELECT username, daily_capacity
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY username
+    """, (company_id,)).fetchall()
+    worker_capacities = {
+        row["username"]: max(1, int(row["daily_capacity"] or 3))
+        for row in worker_rows
+    }
+    recommendation_end = (
+        datetime.strptime(date_to, "%Y-%m-%d").date()
+        + timedelta(days=recommendation_days)
+    ).strftime("%Y-%m-%d")
+    task_rows = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date != ''
+      AND substr(task_date, 1, 10) BETWEEN ? AND ?
+    ORDER BY task_date, id
+    """, (company_id, date_from, date_to)).fetchall()
+    assignment_rows = c.execute("""
+    SELECT id, worker, workers, substr(task_date, 1, 10) AS work_date
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date != ''
+      AND substr(task_date, 1, 10) BETWEEN ? AND ?
+    ORDER BY task_date, id
+    """, (company_id, date_from, recommendation_end)).fetchall()
+    unavailable_dates, unavailable_reasons = get_worker_unavailability(
+        c,
+        company_id,
+        worker_capacities.keys(),
+        date_from,
+        recommendation_end,
+    )
+    conflicts = detect_schedule_conflicts(
+        tasks=task_rows,
+        worker_capacities=worker_capacities,
+        unavailable_dates=unavailable_dates,
+        unavailable_reasons=unavailable_reasons,
+    )
+
+    for conflict in conflicts:
+        assignments = [
+            {
+                "date": row["work_date"],
+                "workers": get_task_worker_names(row),
+            }
+            for row in assignment_rows
+            if row["id"] != conflict["task_id"]
+        ]
+        conflict["recommendations"] = build_conflict_recommendations(
+            conflict=conflict,
+            worker_capacities=worker_capacities,
+            assignments=assignments,
+            unavailable_dates=unavailable_dates,
+            search_days=recommendation_days,
+        )
+
+    conn.close()
+    summary = {
+        "total": len(conflicts),
+        "critical": sum(
+            1 for conflict in conflicts
+            if conflict["severity"] == "critical"
+        ),
+        "warning": sum(
+            1 for conflict in conflicts
+            if conflict["severity"] == "warning"
+        ),
+        "unavailable": sum(
+            1
+            for conflict in conflicts
+            if any(
+                issue["type"] == "unavailable"
+                for issue in conflict["issues"]
+            )
+        ),
+        "overload": sum(
+            1
+            for conflict in conflicts
+            if any(
+                issue["type"] == "overload"
+                for issue in conflict["issues"]
+            )
+        ),
+        "unassigned": sum(
+            1
+            for conflict in conflicts
+            if any(
+                issue["type"] == "unassigned"
+                for issue in conflict["issues"]
+            )
+        ),
+    }
+    return conflicts, summary
 
 
 def worker_task_condition():
@@ -8041,6 +8161,413 @@ async def create_overdue_reminders(request: Request):
         )
 
     return RedirectResponse(f"/overdue?reminders=1&created={created_count}", status_code=302)
+
+
+@app.get("/calendar/conflicts", response_class=HTMLResponse)
+async def calendar_conflicts_page(
+    request: Request,
+    days: int = 30,
+    severity: str = "",
+    conflict_type: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calendar")
+
+    if disabled_response:
+        return disabled_response
+
+    selected_days = days if days in (7, 14, 30, 60) else 30
+    date_from = datetime.now().strftime("%Y-%m-%d")
+    date_to = (
+        datetime.now().date() + timedelta(days=selected_days - 1)
+    ).strftime("%Y-%m-%d")
+    conflicts, summary = get_company_schedule_conflicts(
+        company_id,
+        date_from,
+        date_to,
+    )
+    selected_severity = (
+        severity if severity in ("critical", "warning") else ""
+    )
+    selected_type = (
+        conflict_type
+        if conflict_type in (
+            "unavailable",
+            "overload",
+            "unassigned",
+            "inactive_worker",
+        )
+        else ""
+    )
+
+    if selected_severity:
+        conflicts = [
+            conflict
+            for conflict in conflicts
+            if conflict["severity"] == selected_severity
+        ]
+
+    if selected_type:
+        conflicts = [
+            conflict
+            for conflict in conflicts
+            if any(
+                issue["type"] == selected_type
+                for issue in conflict["issues"]
+            )
+        ]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="calendar_conflicts.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "conflicts": conflicts,
+            "summary": summary,
+            "selected_days": selected_days,
+            "selected_severity": selected_severity,
+            "selected_type": selected_type,
+            "date_from": date_from,
+            "date_to": date_to,
+        },
+    )
+
+
+@app.get("/api/calendar/conflicts")
+def api_calendar_conflicts(
+    request: Request,
+    days: int = 30,
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {"ok": False, "error": "unauthorized"},
+            status_code=401,
+        )
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {"ok": False, "error": "feature_disabled"},
+            status_code=403,
+        )
+
+    selected_days = days if days in (7, 14, 30, 60) else 30
+    date_from = datetime.now().strftime("%Y-%m-%d")
+    date_to = (
+        datetime.now().date() + timedelta(days=selected_days - 1)
+    ).strftime("%Y-%m-%d")
+    conflicts, summary = get_company_schedule_conflicts(
+        company_id,
+        date_from,
+        date_to,
+    )
+
+    return {
+        "ok": True,
+        "company_id": company_id,
+        "date_from": date_from,
+        "date_to": date_to,
+        "summary": summary,
+        "items": [
+            {
+                "task_id": conflict["task_id"],
+                "client": conflict["task"]["client"] or "",
+                "description": conflict["task"]["description"] or "",
+                "task_date": conflict["task_date"],
+                "workers": conflict["workers"],
+                "severity": conflict["severity"],
+                "issues": conflict["issues"],
+                "recommendations": [
+                    {
+                        "mode": item["mode"],
+                        "date": item["date"],
+                        "workers": item["worker_names"],
+                        "score": item["score"],
+                        "reason": item["reason"],
+                    }
+                    for item in conflict["recommendations"]
+                ],
+            }
+            for conflict in conflicts
+        ],
+    }
+
+
+@app.post("/calendar/conflicts/{task_id}/resolve")
+async def resolve_calendar_conflict(request: Request, task_id: int):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return require_feature(company_id, "calendar")
+
+    form = await request.form()
+    new_date = str(form.get("new_date") or "").strip()[:10]
+    expected_date = str(form.get("expected_date") or "").strip()[:10]
+    expected_workers = str(
+        form.get("expected_workers") or ""
+    ).strip()
+    requested_workers = [
+        worker_name
+        for worker_name in dict.fromkeys(
+            part.strip()
+            for part in str(form.get("workers_csv") or "").split(",")
+            if part.strip()
+        )
+    ]
+    return_days = str(form.get("return_days") or "30").strip()
+
+    if return_days not in ("7", "14", "30", "60"):
+        return_days = "30"
+
+    redirect_base = f"/calendar/conflicts?days={return_days}"
+
+    try:
+        target_date = datetime.strptime(new_date, "%Y-%m-%d").date()
+    except Exception:
+        return RedirectResponse(
+            redirect_base + "&error=invalid_date",
+            status_code=302,
+        )
+
+    if target_date < datetime.now().date():
+        return RedirectResponse(
+            redirect_base + "&error=past_date",
+            status_code=302,
+        )
+
+    if not requested_workers:
+        return RedirectResponse(
+            redirect_base + "&error=no_workers",
+            status_code=302,
+        )
+
+    conn = connect()
+    c = conn.cursor()
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=? AND company_id=?
+    """, (task_id, company_id)).fetchone()
+
+    if not task or not can_access_task(username, role, task):
+        conn.close()
+        return RedirectResponse("/", status_code=302)
+
+    current_date = str(task["task_date"] or "")[:10]
+    current_workers = get_task_worker_names(task)
+
+    if (
+        current_date != expected_date
+        or ",".join(current_workers) != expected_workers
+    ):
+        conn.close()
+        return RedirectResponse(
+            redirect_base + "&error=stale",
+            status_code=302,
+        )
+
+    placeholders = ",".join("?" for _ in requested_workers)
+    worker_rows = c.execute(f"""
+    SELECT username, daily_capacity, telegram_chat_id
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+      AND username IN ({placeholders})
+    """, [company_id, *requested_workers]).fetchall()
+    workers_by_name = {
+        row["username"]: row
+        for row in worker_rows
+    }
+
+    if any(
+        worker_name not in workers_by_name
+        for worker_name in requested_workers
+    ):
+        conn.close()
+        return RedirectResponse(
+            redirect_base + "&error=invalid_workers",
+            status_code=302,
+        )
+
+    unavailable_dates, _ = get_worker_unavailability(
+        c,
+        company_id,
+        requested_workers,
+        new_date,
+        new_date,
+    )
+
+    if any(
+        new_date in unavailable_dates.get(worker_name, set())
+        for worker_name in requested_workers
+    ):
+        conn.close()
+        return RedirectResponse(
+            redirect_base + "&error=worker_unavailable",
+            status_code=302,
+        )
+
+    for worker_name in requested_workers:
+        active_count = c.execute(f"""
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE company_id=?
+          AND id!=?
+          AND archived=0
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND task_date LIKE ?
+          AND {worker_task_condition()}
+        """, [
+            company_id,
+            task_id,
+            f"{new_date}%",
+            *worker_task_params(worker_name),
+        ]).fetchone()[0]
+        daily_capacity = max(
+            1,
+            int(workers_by_name[worker_name]["daily_capacity"] or 3),
+        )
+
+        if active_count >= daily_capacity:
+            conn.close()
+            return RedirectResponse(
+                redirect_base + "&error=capacity_changed",
+                status_code=302,
+            )
+
+    new_workers_csv = ",".join(requested_workers)
+    c.execute("""
+    UPDATE tasks
+    SET task_date=?, worker=?, workers=?
+    WHERE id=? AND company_id=?
+    """, (
+        new_date,
+        requested_workers[0],
+        new_workers_csv,
+        task_id,
+        company_id,
+    ))
+    details = (
+        f"Дата: {current_date} → {new_date}. "
+        f"Исполнители: {', '.join(current_workers) or 'не назначены'}"
+        f" → {', '.join(requested_workers)}"
+    )
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id, username, role, action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Конфликт расписания устранён",
+        details,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    added_workers = [
+        worker_name
+        for worker_name in requested_workers
+        if worker_name not in current_workers
+    ]
+    removed_workers = [
+        worker_name
+        for worker_name in current_workers
+        if worker_name not in requested_workers
+    ]
+    notification_created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    for worker_name in added_workers:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message, link, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            f"Назначена заявка #{task_id}",
+            f"Дата: {new_date}. Конфликт расписания устранён.",
+            f"/task/{task_id}",
+            notification_created_at,
+        ))
+
+    for worker_name in removed_workers:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message, link, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            f"Снято назначение с заявки #{task_id}",
+            "Заявка перераспределена из центра конфликтов.",
+            "/my-tasks",
+            notification_created_at,
+        ))
+
+    conn.commit()
+    conn.close()
+
+    for worker_name in added_workers:
+        chat_id = str(
+            workers_by_name[worker_name]["telegram_chat_id"] or ""
+        ).strip()
+
+        if not chat_id:
+            continue
+
+        try:
+            send_message_to_chat(
+                chat_id,
+                (
+                    f"Вам назначена заявка #{task_id}\n"
+                    f"Клиент: {task['client']}\n"
+                    f"Дата: {new_date}"
+                ),
+            )
+        except Exception:
+            pass
+
+    return RedirectResponse(
+        redirect_base + f"&resolved=1&task_id={task_id}",
+        status_code=302,
+    )
 
 
 @app.get("/calendar", response_class=HTMLResponse)

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Конфликты расписания</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
+.container{max-width:1120px;margin:auto;padding:28px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+h1{margin:0;font-size:32px}
+.subtitle{margin-top:6px;color:#6b7280;font-weight:800}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.button{display:inline-flex;align-items:center;justify-content:center;padding:11px 14px;border-radius:8px;background:#111827;color:white;text-decoration:none;font-weight:900}
+.button.secondary{background:#2563eb}
+.notice{margin-bottom:16px;padding:13px 15px;border-radius:8px;background:#dcfce7;color:#166534;font-weight:900}
+.notice.error{background:#fee2e2;color:#991b1b}
+.summary{display:grid;grid-template-columns:repeat(6,minmax(110px,1fr));gap:10px;margin-bottom:16px}
+.summary-item{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.summary-label{color:#6b7280;font-size:12px;font-weight:900}
+.summary-value{margin-top:5px;font-size:24px;font-weight:900}
+.filters{margin-bottom:16px;padding:14px;border-radius:8px;background:white;border:1px solid #e5e7eb}
+.filters form{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.filters label{display:block;margin-bottom:5px;color:#6b7280;font-size:12px;font-weight:900}
+.filters select{min-width:170px;padding:10px;border:1px solid #d1d5db;border-radius:8px;background:white;font-weight:800}
+.filters button{padding:11px 14px;border:0;border-radius:8px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.filters a{padding:11px 13px;color:#1d4ed8;text-decoration:none;font-weight:900}
+.conflict-list{display:grid;gap:12px}
+.conflict{padding:18px;border:1px solid #fed7aa;border-left:5px solid #f97316;border-radius:8px;background:white}
+.conflict.critical{border-color:#fecaca;border-left-color:#dc2626}
+.conflict-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.task-title{font-size:20px;font-weight:900}
+.task-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:#4b5563;font-size:13px;font-weight:800}
+.severity{padding:6px 9px;border-radius:999px;background:#ffedd5;color:#9a3412;font-size:12px;font-weight:900;white-space:nowrap}
+.critical .severity{background:#fee2e2;color:#991b1b}
+.description{margin-top:10px;color:#4b5563}
+.issues{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.issue{padding:8px 10px;border-radius:8px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:900}
+.critical .issue{background:#fef2f2;color:#991b1b}
+.recommendations{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+.recommendation{padding:13px;border:1px solid #dbeafe;border-radius:8px;background:#f8fbff}
+.recommendation.best{border-color:#86efac;background:#f0fdf4}
+.recommendation-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.mode{font-weight:900}
+.score{padding:4px 7px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:900}
+.recommendation-date{margin-top:9px;font-size:18px;font-weight:900}
+.recommendation-workers{margin-top:5px;color:#374151;font-size:13px;font-weight:900;overflow-wrap:anywhere}
+.recommendation-reason{min-height:32px;margin-top:6px;color:#6b7280;font-size:12px;font-weight:800}
+.recommendation form{margin-top:11px}
+.recommendation button{width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.empty-recommendation{margin-top:14px;padding:12px;border-radius:8px;background:#f3f4f6;color:#6b7280;font-weight:800}
+.task-link{display:inline-flex;margin-top:12px;color:#1d4ed8;text-decoration:none;font-weight:900}
+.empty{padding:28px;border-radius:8px;background:white;border:1px solid #e5e7eb;text-align:center}
+.empty-title{font-size:22px;font-weight:900}
+.empty-text{margin-top:7px;color:#6b7280;font-weight:800}
+@media(max-width:850px){.summary{grid-template-columns:repeat(3,1fr)}.recommendations{grid-template-columns:1fr}}
+@media(max-width:600px){.container{padding:16px}h1{font-size:27px}.summary{grid-template-columns:1fr 1fr}.header-actions,.header-actions a,.filters form,.filters form>div,.filters select,.filters button{width:100%}.conflict{padding:14px}.conflict-head{display:block}.severity{display:inline-block;margin-top:10px}}
+</style>
+</head>
+<body>
+<main class="container">
+    <header class="header">
+        <div>
+            <h1>Центр конфликтов расписания</h1>
+            <div class="subtitle">{{ date_from }} — {{ date_to }} · только активные заявки</div>
+        </div>
+        <div class="header-actions">
+            <a class="button secondary" href="/calendar">Календарь</a>
+            <a class="button" href="/">Главное меню</a>
+        </div>
+    </header>
+
+    {% if request.query_params.get("resolved") == "1" %}
+    <div class="notice">Конфликт заявки #{{ request.query_params.get("task_id") }} устранён.</div>
+    {% endif %}
+    {% if request.query_params.get("error") %}
+    <div class="notice error">
+        {% if request.query_params.get("error") == "stale" %}
+        Заявка уже изменилась. Рекомендации пересчитаны.
+        {% elif request.query_params.get("error") == "worker_unavailable" %}
+        Исполнитель стал недоступен. Выберите новый вариант.
+        {% elif request.query_params.get("error") == "capacity_changed" %}
+        Свободное место уже занято. Рекомендации пересчитаны.
+        {% elif request.query_params.get("error") == "past_date" %}
+        Нельзя перенести заявку на прошедшую дату.
+        {% elif request.query_params.get("error") == "no_workers" %}
+        Для решения конфликта нужен хотя бы один исполнитель.
+        {% else %}
+        Не удалось применить решение. Проверьте выбранные данные.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <section class="summary">
+        <div class="summary-item"><div class="summary-label">Всего проблем</div><div class="summary-value">{{ summary["total"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">Критичные</div><div class="summary-value">{{ summary["critical"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">Предупреждения</div><div class="summary-value">{{ summary["warning"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">Недоступность</div><div class="summary-value">{{ summary["unavailable"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">Перегруз</div><div class="summary-value">{{ summary["overload"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">Без команды</div><div class="summary-value">{{ summary["unassigned"] }}</div></div>
+    </section>
+
+    <section class="filters">
+        <form method="get" action="/calendar/conflicts">
+            <div>
+                <label>Период</label>
+                <select name="days">
+                    <option value="7" {% if selected_days == 7 %}selected{% endif %}>7 дней</option>
+                    <option value="14" {% if selected_days == 14 %}selected{% endif %}>14 дней</option>
+                    <option value="30" {% if selected_days == 30 %}selected{% endif %}>30 дней</option>
+                    <option value="60" {% if selected_days == 60 %}selected{% endif %}>60 дней</option>
+                </select>
+            </div>
+            <div>
+                <label>Важность</label>
+                <select name="severity">
+                    <option value="">Все</option>
+                    <option value="critical" {% if selected_severity == "critical" %}selected{% endif %}>Критичные</option>
+                    <option value="warning" {% if selected_severity == "warning" %}selected{% endif %}>Предупреждения</option>
+                </select>
+            </div>
+            <div>
+                <label>Причина</label>
+                <select name="conflict_type">
+                    <option value="">Все причины</option>
+                    <option value="unavailable" {% if selected_type == "unavailable" %}selected{% endif %}>Сотрудник недоступен</option>
+                    <option value="overload" {% if selected_type == "overload" %}selected{% endif %}>Превышен лимит</option>
+                    <option value="unassigned" {% if selected_type == "unassigned" %}selected{% endif %}>Нет исполнителя</option>
+                    <option value="inactive_worker" {% if selected_type == "inactive_worker" %}selected{% endif %}>Сотрудник отключён</option>
+                </select>
+            </div>
+            <button type="submit">Показать</button>
+            <a href="/calendar/conflicts">Сбросить</a>
+        </form>
+    </section>
+
+    {% if conflicts %}
+    <section class="conflict-list">
+        {% for conflict in conflicts %}
+        {% set task = conflict["task"] %}
+        <article class="conflict {{ conflict['severity'] }}">
+            <div class="conflict-head">
+                <div>
+                    <div class="task-title">Заявка #{{ task["id"] }} · {{ task["client"] or "Клиент не указан" }}</div>
+                    <div class="task-meta">
+                        <span>Дата: {{ conflict["task_date"] }}</span>
+                        <span>Исполнители: {{ conflict["workers"]|join(", ") or "не назначены" }}</span>
+                        <span>Статус: {{ task["status"] }}</span>
+                    </div>
+                </div>
+                <span class="severity">{% if conflict["severity"] == "critical" %}Критично{% else %}Внимание{% endif %}</span>
+            </div>
+            {% if task["description"] %}<div class="description">{{ task["description"] }}</div>{% endif %}
+            <div class="issues">
+                {% for issue in conflict["issues"] %}
+                <span class="issue">{{ issue["label"] }} · {{ issue["details"] }}</span>
+                {% endfor %}
+            </div>
+
+            {% if conflict["recommendations"] %}
+            <div class="recommendations">
+                {% for recommendation in conflict["recommendations"] %}
+                <div class="recommendation {% if recommendation['mode'] == 'rebalance' %}best{% endif %}">
+                    <div class="recommendation-head">
+                        <span class="mode">{{ recommendation["mode_label"] }}</span>
+                        <span class="score">Оценка {{ recommendation["score"] }}</span>
+                    </div>
+                    <div class="recommendation-date">{{ recommendation["date_label"] }}</div>
+                    <div class="recommendation-workers">{{ recommendation["worker_names"]|join(", ") }}</div>
+                    <div class="recommendation-reason">{{ recommendation["description"] }} {{ recommendation["reason"] }}</div>
+                    <form method="post" action="/calendar/conflicts/{{ task['id'] }}/resolve">
+                        <input type="hidden" name="new_date" value="{{ recommendation['date'] }}">
+                        <input type="hidden" name="workers_csv" value="{{ recommendation['worker_names']|join(',') }}">
+                        <input type="hidden" name="expected_date" value="{{ conflict['task_date'] }}">
+                        <input type="hidden" name="expected_workers" value="{{ conflict['workers_csv'] }}">
+                        <input type="hidden" name="return_days" value="{{ selected_days }}">
+                        <button type="submit">{{ recommendation["action_label"] }}</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-recommendation">Свободных вариантов в ближайшие 14 дней не найдено. Увеличьте лимиты или измените периоды отсутствия.</div>
+            {% endif %}
+            <a class="task-link" href="/task/{{ task['id'] }}">Открыть заявку</a>
+        </article>
+        {% endfor %}
+    </section>
+    {% else %}
+    <section class="empty">
+        <div class="empty-title">Конфликтов не найдено</div>
+        <div class="empty-text">На выбранный период расписание не содержит перегрузов и назначений в дни отсутствия.</div>
+    </section>
+    {% endif %}
+</main>
+{% include 'mobile_nav.html' %}
+</body>
+</html>

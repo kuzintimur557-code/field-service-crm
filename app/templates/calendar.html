@@ -12,6 +12,7 @@
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .container{max-width:1100px;margin:auto;padding:28px}
 .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:12px;flex-wrap:wrap}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}
 h1{font-size:32px;margin:0}
 .btn{display:inline-block;padding:14px 18px;background:#2563eb;color:white;border-radius:16px;text-decoration:none;font-weight:900}
 	.day{background:white;border-radius:24px;padding:22px;margin-bottom:18px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
@@ -152,7 +153,12 @@ h1{font-size:32px;margin:0}
 
 	<div class="header">
 	    <h1>📅 Календарь заявок</h1>
-	    <a href="/" class="btn">← Главное меню</a>
+	    <div class="header-actions">
+	        {% if role in ("boss", "manager") %}
+	        <a href="/calendar/conflicts" class="btn" style="background:#dc2626">Конфликты</a>
+	        {% endif %}
+	        <a href="/" class="btn">← Главное меню</a>
+	    </div>
 	</div>
 
 	{% if role in ("boss", "manager") %}

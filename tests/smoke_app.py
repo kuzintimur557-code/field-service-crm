@@ -4838,6 +4838,324 @@ async def assert_calendar_access():
     conn.close()
 
 
+async def assert_schedule_conflicts():
+    today = datetime.now().date()
+    unavailable_date = today + timedelta(days=3)
+    overload_date = today + timedelta(days=4)
+    unassigned_date = today + timedelta(days=5)
+    conn = connect()
+    c = conn.cursor()
+    workers = c.execute("""
+    SELECT id, username
+    FROM users
+    WHERE company_id=2
+      AND username IN ('worker2', 'helper2', 'free2')
+    """).fetchall()
+    worker_ids = {
+        row["username"]: row["id"]
+        for row in workers
+    }
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=1
+    WHERE company_id=2
+      AND username IN ('worker2', 'helper2')
+    """)
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=3
+    WHERE company_id=2 AND username='free2'
+    """)
+    c.execute("""
+    INSERT INTO worker_unavailability (
+        company_id, worker_id, date_from, date_to,
+        reason, created_by, created_at
+    )
+    VALUES (2, ?, ?, ?, 'Отпуск центра конфликтов', 'owner2', ?)
+    """, (
+        worker_ids["helper2"],
+        unavailable_date.strftime("%Y-%m-%d"),
+        unavailable_date.strftime("%Y-%m-%d"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    absence_id = c.lastrowid
+    conflict_task_ids = []
+
+    for client, task_date, worker_name in (
+        (
+            "Conflict unavailable",
+            unavailable_date,
+            "helper2",
+        ),
+        (
+            "Conflict overload one",
+            overload_date,
+            "worker2",
+        ),
+        (
+            "Conflict overload two",
+            overload_date,
+            "worker2",
+        ),
+    ):
+        c.execute("""
+        INSERT INTO tasks (
+            company_id, client, description, task_date,
+            worker, workers, status, archived, created_at
+        )
+        VALUES (2, ?, 'Schedule conflict smoke', ?, ?, ?, 'Новая', 0, ?)
+        """, (
+            client,
+            task_date.strftime("%Y-%m-%d"),
+            worker_name,
+            worker_name,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+        conflict_task_ids.append(c.lastrowid)
+
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, description, task_date,
+        worker, workers, status, archived, created_at
+    )
+    VALUES (2, 'Conflict unassigned', 'No team', ?, '', '', 'Новая', 0, ?)
+    """, (
+        unassigned_date.strftime("%Y-%m-%d"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conflict_task_ids.append(c.lastrowid)
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, description, task_date,
+        worker, workers, status, archived, created_at
+    )
+    VALUES (1, 'Outsider conflict', 'Other company', ?,
+            'outsider_worker', 'outsider_worker', 'Новая', 0, ?)
+    """, (
+        unavailable_date.strftime("%Y-%m-%d"),
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    outsider_task_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    conflicts, summary = crm.get_company_schedule_conflicts(
+        2,
+        today.strftime("%Y-%m-%d"),
+        (today + timedelta(days=30)).strftime("%Y-%m-%d"),
+    )
+    created_conflicts = [
+        conflict
+        for conflict in conflicts
+        if conflict["task_id"] in conflict_task_ids
+    ]
+    assert len(created_conflicts) == 3
+    assert summary["total"] >= 3
+    assert summary["critical"] >= 2
+    assert summary["warning"] >= 1
+    assert summary["unavailable"] >= 1
+    assert summary["overload"] >= 1
+    assert summary["unassigned"] >= 1
+    unavailable_conflict = next(
+        conflict
+        for conflict in created_conflicts
+        if conflict["task"]["client"] == "Conflict unavailable"
+    )
+    assert unavailable_conflict["severity"] == "critical"
+    assert unavailable_conflict["recommendations"]
+    assert any(
+        issue["type"] == "unavailable"
+        for issue in unavailable_conflict["issues"]
+    )
+    assert all(
+        recommendation["date"] != unavailable_date.strftime("%Y-%m-%d")
+        or recommendation["worker_names"] != ["helper2"]
+        for recommendation in unavailable_conflict["recommendations"]
+    )
+
+    page = await crm.calendar_conflicts_page(
+        make_asgi_request(
+            "owner2",
+            "/calendar/conflicts",
+        ),
+        days=30,
+    )
+    assert page.status_code == 200
+    page_html = page.body.decode("utf-8")
+    assert "Центр конфликтов расписания" in page_html
+    assert "Conflict unavailable" in page_html
+    assert "Conflict overload two" in page_html
+    assert "Conflict unassigned" in page_html
+    assert "Отпуск центра конфликтов" in page_html
+    assert "Сохранить команду" in page_html
+    assert "Сохранить дату" in page_html
+    assert "Лучший вариант" in page_html
+    assert "/calendar/conflicts/" in page_html
+
+    filtered_page = await crm.calendar_conflicts_page(
+        make_asgi_request(
+            "owner2",
+            "/calendar/conflicts",
+        ),
+        days=30,
+        conflict_type="unavailable",
+    )
+    assert all(
+        any(
+            issue["type"] == "unavailable"
+            for issue in conflict["issues"]
+        )
+        for conflict in filtered_page.context["conflicts"]
+    )
+
+    api_result = crm.api_calendar_conflicts(
+        make_request("owner2"),
+        days=30,
+    )
+    assert api_result["ok"] is True
+    assert api_result["company_id"] == 2
+    assert any(
+        item["task_id"] == unavailable_conflict["task_id"]
+        for item in api_result["items"]
+    )
+    assert all(
+        item["task_id"] != outsider_task_id
+        for item in api_result["items"]
+    )
+
+    worker_api = crm.api_calendar_conflicts(
+        make_request("helper2"),
+        days=30,
+    )
+    assert worker_api.status_code == 403
+    anonymous_api = crm.api_calendar_conflicts(
+        make_request(),
+        days=30,
+    )
+    assert anonymous_api.status_code == 401
+
+    recommendation = unavailable_conflict["recommendations"][0]
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = lambda chat_id, text: True
+
+    try:
+        resolved = await crm.resolve_calendar_conflict(
+            make_form_request(
+                "owner2",
+                (
+                    "/calendar/conflicts/"
+                    f"{unavailable_conflict['task_id']}/resolve"
+                ),
+                {
+                    "new_date": recommendation["date"],
+                    "workers_csv": ",".join(
+                        recommendation["worker_names"]
+                    ),
+                    "expected_date": unavailable_conflict["task_date"],
+                    "expected_workers": unavailable_conflict["workers_csv"],
+                    "return_days": "30",
+                },
+            ),
+            unavailable_conflict["task_id"],
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert resolved.status_code == 302
+    assert resolved.headers["location"] == (
+        "/calendar/conflicts?days=30&resolved=1"
+        f"&task_id={unavailable_conflict['task_id']}"
+    )
+    conn = connect()
+    c = conn.cursor()
+    resolved_task = c.execute("""
+    SELECT task_date, worker, workers
+    FROM tasks
+    WHERE id=? AND company_id=2
+    """, (unavailable_conflict["task_id"],)).fetchone()
+    resolution_activity = c.execute("""
+    SELECT action, details
+    FROM task_activity
+    WHERE task_id=?
+      AND action='Конфликт расписания устранён'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (unavailable_conflict["task_id"],)).fetchone()
+    conn.close()
+    assert resolved_task["task_date"] == recommendation["date"]
+    assert resolved_task["workers"] == ",".join(
+        recommendation["worker_names"]
+    )
+    assert resolution_activity is not None
+    assert unavailable_conflict["task_date"] in resolution_activity["details"]
+    assert recommendation["date"] in resolution_activity["details"]
+
+    stale = await crm.resolve_calendar_conflict(
+        make_form_request(
+            "owner2",
+            (
+                "/calendar/conflicts/"
+                f"{unavailable_conflict['task_id']}/resolve"
+            ),
+            {
+                "new_date": recommendation["date"],
+                "workers_csv": ",".join(recommendation["worker_names"]),
+                "expected_date": unavailable_conflict["task_date"],
+                "expected_workers": unavailable_conflict["workers_csv"],
+                "return_days": "30",
+            },
+        ),
+        unavailable_conflict["task_id"],
+    )
+    assert stale.headers["location"] == (
+        "/calendar/conflicts?days=30&error=stale"
+    )
+
+    outsider_resolution = await crm.resolve_calendar_conflict(
+        make_form_request(
+            "owner2",
+            f"/calendar/conflicts/{outsider_task_id}/resolve",
+            {
+                "new_date": recommendation["date"],
+                "workers_csv": "free2",
+                "expected_date": "",
+                "expected_workers": "",
+                "return_days": "30",
+            },
+        ),
+        outsider_task_id,
+    )
+    assert outsider_resolution.headers["location"] == "/"
+
+    conn = connect()
+    c = conn.cursor()
+    placeholders = ",".join("?" for _ in conflict_task_ids)
+    c.execute(
+        f"DELETE FROM task_activity WHERE task_id IN ({placeholders})",
+        conflict_task_ids,
+    )
+    c.execute(
+        f"DELETE FROM tasks WHERE id IN ({placeholders})",
+        conflict_task_ids,
+    )
+    c.execute(
+        "DELETE FROM worker_unavailability WHERE id=?",
+        (absence_id,),
+    )
+    c.execute(
+        "DELETE FROM tasks WHERE id=? AND company_id=1",
+        (outsider_task_id,),
+    )
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=3
+    WHERE company_id=2
+      AND username IN ('worker2', 'helper2', 'free2')
+    """)
+    conn.commit()
+    conn.close()
+
+
 async def assert_archive_restore(task):
     conn = connect()
     c = conn.cursor()
@@ -8294,6 +8612,7 @@ def main():
         asyncio.run(assert_ai_assistant_page())
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
+        asyncio.run(assert_schedule_conflicts())
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())
         asyncio.run(assert_finance_margin(task))
