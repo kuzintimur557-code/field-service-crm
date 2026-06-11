@@ -365,7 +365,197 @@ def build_worker_timeline(
     }
 
 
-def build_daily_schedule(tasks, worker_names=None):
+def _interval_is_available(
+    assignments,
+    target_date,
+    worker_name,
+    start,
+    end,
+    exclude_task_id=0,
+):
+    for assignment in assignments:
+        if (
+            exclude_task_id
+            and int(assignment.get("task_id") or 0)
+            == int(exclude_task_id)
+        ):
+            continue
+
+        if str(assignment.get("date") or "")[:10] != target_date:
+            continue
+
+        if worker_name not in (assignment.get("workers") or []):
+            continue
+
+        assignment_start = parse_time_value(
+            assignment.get("time_from")
+        )
+        assignment_end = parse_time_value(
+            assignment.get("time_to")
+        )
+
+        if assignment_start is None or assignment_end is None:
+            continue
+
+        if time_windows_overlap(
+            start,
+            end,
+            assignment_start,
+            assignment_end,
+        ):
+            return False
+
+    return True
+
+
+def build_day_assignment_suggestions(
+    task,
+    tasks,
+    worker_names,
+    worker_capacities=None,
+    unavailable_worker_names=None,
+    limit=8,
+):
+    worker_capacities = dict(worker_capacities or {})
+    unavailable_worker_names = set(unavailable_worker_names or [])
+    task_id = int(_value(task, "id", 0) or 0)
+    target_date = str(_value(task, "task_date") or "")[:10]
+
+    if not target_date or task_workers(task):
+        return []
+
+    assignments = [
+        {
+            "task_id": int(_value(item, "id", 0) or 0),
+            "date": str(_value(item, "task_date") or "")[:10],
+            "workers": task_workers(item),
+            "time_from": str(_value(item, "time_from") or "")[:5],
+            "time_to": str(_value(item, "time_to") or "")[:5],
+        }
+        for item in tasks
+        if _task_blocks_time(item)
+    ]
+    duration_minutes = task_duration_minutes(task)
+    current_start = parse_time_value(_value(task, "time_from"))
+    current_end = parse_time_value(_value(task, "time_to"))
+    suggestions = []
+
+    for worker_name in dict.fromkeys(worker_names or []):
+        if worker_name in unavailable_worker_names:
+            continue
+
+        daily_capacity = max(
+            1,
+            int(worker_capacities.get(worker_name) or 3),
+        )
+        active_count = sum(
+            1
+            for item in tasks
+            if (
+                _task_blocks_time(item)
+                and worker_name in task_workers(item)
+                and int(_value(item, "id", 0) or 0) != task_id
+            )
+        )
+
+        if active_count >= daily_capacity:
+            continue
+
+        timeline = build_worker_timeline(tasks, worker_name)
+        selected_slot = None
+        keeps_current_time = bool(
+            current_start is not None
+            and current_end is not None
+            and WORKDAY_START <= current_start < current_end <= WORKDAY_END
+            and _interval_is_available(
+                assignments,
+                target_date,
+                worker_name,
+                current_start,
+                current_end,
+                exclude_task_id=task_id,
+            )
+        )
+
+        if keeps_current_time:
+            selected_slot = {
+                "time_from": format_time_value(current_start),
+                "time_to": format_time_value(current_end),
+                "label": (
+                    f"{format_time_value(current_start)}–"
+                    f"{format_time_value(current_end)}"
+                ),
+            }
+        else:
+            available_slots = list_common_time_slots(
+                assignments=assignments,
+                target_date=target_date,
+                target_workers=[worker_name],
+                duration_minutes=duration_minutes,
+                exclude_task_id=task_id,
+            )
+
+            if available_slots:
+                selected_slot = available_slots[0]
+
+        if not selected_slot:
+            continue
+
+        load_percent = round(active_count / daily_capacity * 100)
+        utilization_percent = timeline["utilization_percent"]
+        slot_start = parse_time_value(selected_slot["time_from"])
+        start_penalty = max(
+            ((slot_start or WORKDAY_START) - WORKDAY_START) // SLOT_STEP,
+            0,
+        )
+        score = max(
+            0,
+            100
+            - round(load_percent * 0.45)
+            - round(utilization_percent * 0.25)
+            - start_penalty,
+        )
+
+        if keeps_current_time:
+            reason = "Текущее время свободно"
+        elif active_count == 0:
+            reason = "Исполнитель свободен"
+        elif load_percent <= 50:
+            reason = "Низкая загрузка"
+        else:
+            reason = "Есть свободное окно"
+
+        suggestions.append({
+            "worker": worker_name,
+            "time_from": selected_slot["time_from"],
+            "time_to": selected_slot["time_to"],
+            "time_label": selected_slot["label"],
+            "duration_minutes": duration_minutes,
+            "active_count": active_count,
+            "daily_capacity": daily_capacity,
+            "load_percent": load_percent,
+            "utilization_percent": utilization_percent,
+            "score": score,
+            "reason": reason,
+            "keeps_current_time": keeps_current_time,
+        })
+
+    suggestions.sort(key=lambda item: (
+        -item["score"],
+        item["load_percent"],
+        item["utilization_percent"],
+        item["time_from"],
+        item["worker"],
+    ))
+    return suggestions[:max(1, int(limit or 8))]
+
+
+def build_daily_schedule(
+    tasks,
+    worker_names=None,
+    worker_capacities=None,
+    unavailable_worker_names=None,
+):
     tasks = list(tasks)
     worker_names = list(dict.fromkeys(worker_names or []))
     assignments = [
@@ -509,6 +699,22 @@ def build_daily_schedule(tasks, worker_names=None):
             ))
 
     for item in unassigned:
+        item["assignment_suggestions"] = (
+            build_day_assignment_suggestions(
+                task=item["task"],
+                tasks=tasks,
+                worker_names=worker_names,
+                worker_capacities=worker_capacities,
+                unavailable_worker_names=unavailable_worker_names,
+            )
+            if _task_blocks_time(item["task"])
+            else []
+        )
+        item["recommended_assignment"] = (
+            item["assignment_suggestions"][0]
+            if item["assignment_suggestions"]
+            else None
+        )
         unique_items.setdefault(item["task_id"], item)
 
     return {

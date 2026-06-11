@@ -75,8 +75,16 @@ h1{margin:0;font-size:30px}
 .empty{padding:24px;color:#6b7280;text-align:center;font-weight:800}
 .unassigned{margin-top:14px;padding:16px;border:1px solid #fecaca;border-radius:8px;background:#fff7f7}
 .unassigned h2{margin:0 0 10px;font-size:18px}
-.unassigned-list{display:flex;gap:8px;flex-wrap:wrap}
-.unassigned-list a{padding:8px 10px;border-radius:7px;background:white;color:#991b1b;text-decoration:none;font-weight:900}
+.unassigned-list{display:grid;gap:8px}
+.unassigned-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);gap:14px;align-items:center;padding:12px;border:1px solid #fecaca;border-radius:8px;background:white}
+.unassigned-title{color:#991b1b;text-decoration:none;font-weight:900}
+.unassigned-meta{display:flex;gap:9px;flex-wrap:wrap;margin-top:5px;color:#6b7280;font-size:11px;font-weight:800}
+.assignment-choice{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}
+.assignment-choice select{min-width:0;width:100%;padding:9px;border:1px solid #d1d5db;border-radius:7px;background:white;font-weight:800}
+.assignment-choice button{padding:9px 11px;border:0;border-radius:7px;background:#059669;color:white;font-weight:900;cursor:pointer}
+.assignment-choice button:disabled{cursor:wait;opacity:.65}
+.assignment-hint{margin-top:6px;color:#166534;font-size:11px;font-weight:800}
+.assignment-empty{padding:9px;border-radius:7px;background:#fef2f2;color:#991b1b;font-size:12px;font-weight:800}
 .toast{position:fixed;right:18px;bottom:82px;z-index:1000;max-width:420px;padding:14px 16px;border-radius:8px;background:#111827;color:white;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.22)}
 .toast.error{background:#991b1b}
 .toast[hidden]{display:none}
@@ -94,6 +102,8 @@ h1{margin:0;font-size:30px}
     .schedule-form{grid-column:1/-1}
     .quick-slots{align-items:stretch;flex-direction:column}
     .quick-slots select,.quick-slots button{width:100%}
+    .unassigned-item{grid-template-columns:1fr}
+    .assignment-choice{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -275,7 +285,45 @@ h1{margin:0;font-size:30px}
         <h2>Заявки без исполнителя</h2>
         <div class="unassigned-list">
             {% for item in schedule["unassigned"] %}
-            <a href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+            <article
+                class="unassigned-item"
+                data-task-id="{{ item['task_id'] }}"
+                data-expected-date="{{ selected_date }}"
+                data-expected-time-from="{{ item['time_from'] }}"
+                data-expected-time-to="{{ item['time_to'] }}"
+            >
+                <div>
+                    <a class="unassigned-title" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+                    <div class="unassigned-meta">
+                        <span>{{ item["address"] or "Адрес не указан" }}</span>
+                        <span>{{ item["priority"] }}</span>
+                        <span>{{ item["duration_minutes"] }} мин.</span>
+                        <span>{% if item["has_time"] %}{{ item["time_from"] }}–{{ item["time_to"] }}{% else %}Без времени{% endif %}</span>
+                    </div>
+                </div>
+                {% if role in ("boss", "manager") %}
+                {% if item["assignment_suggestions"] %}
+                <div>
+                    <div class="assignment-choice">
+                        <select aria-label="Вариант назначения заявки #{{ item['task_id'] }}">
+                            {% for suggestion in item["assignment_suggestions"] %}
+                            <option value="{{ suggestion['worker'] }}|{{ suggestion['time_from'] }}|{{ suggestion['time_to'] }}">
+                                {% if loop.first %}Рекомендуем: {% endif %}{{ suggestion["worker"] }} · {{ suggestion["time_label"] }} · загрузка {{ suggestion["active_count"] }}/{{ suggestion["daily_capacity"] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button class="assign-task-button" type="button">Назначить</button>
+                    </div>
+                    {% set recommendation = item["recommended_assignment"] %}
+                    <div class="assignment-hint">
+                        {{ recommendation["reason"] }} · оценка {{ recommendation["score"] }} из 100
+                    </div>
+                </div>
+                {% else %}
+                <div class="assignment-empty">На этот день нет доступного исполнителя и свободного окна.</div>
+                {% endif %}
+                {% endif %}
+            </article>
             {% endfor %}
         </div>
     </section>
@@ -379,6 +427,74 @@ h1{margin:0;font-size:30px}
         window.setTimeout(() => window.location.reload(), 350);
     }
 
+    async function assignTask(item) {
+        const select = item.querySelector(".assignment-choice select");
+        const button = item.querySelector(".assign-task-button");
+        const [worker, timeFrom, timeTo] = String(
+            select?.value || ""
+        ).split("|");
+
+        if (!worker || !timeFrom || !timeTo) {
+            showToast("Не удалось прочитать вариант назначения.", true);
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = "Назначаем...";
+
+        try {
+            const response = await fetch(
+                "/api/calendar/dispatch/plan/apply",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        items: [{
+                            task_id: Number(item.dataset.taskId),
+                            current_date: item.dataset.expectedDate,
+                            expected_workers: "",
+                            expected_time_from: item.dataset.expectedTimeFrom,
+                            expected_time_to: item.dataset.expectedTimeTo,
+                            target_date: selectedDate,
+                            target_workers: [worker],
+                            target_time_from: timeFrom,
+                            target_time_to: timeTo
+                        }]
+                    })
+                }
+            );
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                showToast(
+                    data.message || "Не удалось назначить заявку.",
+                    true
+                );
+                return;
+            }
+
+            if (!data.summary || data.summary.applied !== 1) {
+                const reason = data.skipped?.[0]?.reason;
+                showToast(
+                    reason || "Вариант уже недоступен. Обновите страницу.",
+                    true
+                );
+                return;
+            }
+
+            showToast(
+                `Заявка #${item.dataset.taskId}: ${worker}, ${timeFrom}–${timeTo}.`
+            );
+            window.setTimeout(() => window.location.reload(), 350);
+        } catch (error) {
+            showToast("Сервер временно недоступен.", true);
+        } finally {
+            button.disabled = false;
+            button.textContent = "Назначить";
+        }
+    }
+
     document.querySelectorAll('.route-item[draggable="true"]').forEach(card => {
         card.addEventListener("dragstart", event => {
             draggedCard = card;
@@ -423,6 +539,13 @@ h1{margin:0;font-size:30px}
                 moveTaskTime(selectedCard, slot.dataset.timeFrom);
             }
         });
+    });
+
+    document.querySelectorAll(".unassigned-item").forEach(item => {
+        item.querySelector(".assign-task-button")?.addEventListener(
+            "click",
+            () => assignTask(item)
+        );
     });
 })();
 </script>

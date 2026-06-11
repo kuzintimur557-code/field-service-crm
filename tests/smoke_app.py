@@ -5961,8 +5961,11 @@ async def assert_daily_route_schedule():
     assert "Шкала рабочего дня" in owner_html
     assert "08:00–20:00 · шаг 30 минут" in owner_html
     assert "/api/calendar/day/move-time" in owner_html
+    assert "/api/calendar/dispatch/plan/apply" in owner_html
     assert 'draggable="true"' in owner_html
     assert "Свободное окно" in owner_html
+    assert "Рекомендуем:" in owner_html
+    assert "Назначить" in owner_html
     assert owner_page.context["schedule"]["summary"] == {
         "workers": 2,
         "tasks": 4,
@@ -5995,6 +5998,13 @@ async def assert_daily_route_schedule():
     assert without_time_item["available_slots"]
     assert without_time_item["available_slots"][0]["label"] == (
         "08:00–09:00"
+    )
+    unassigned_item = owner_page.context["schedule"]["unassigned"][0]
+    assert unassigned_item["task_id"] == unassigned_id
+    assert unassigned_item["assignment_suggestions"]
+    assert unassigned_item["recommended_assignment"]["keeps_current_time"]
+    assert unassigned_item["recommended_assignment"]["time_label"] == (
+        "11:00–12:00"
     )
 
     filtered_page = await crm.calendar_day_route_page(
@@ -6280,6 +6290,98 @@ async def assert_daily_route_schedule():
     assert updated["time_from"] == "10:30"
     assert updated["time_to"] == "11:30"
     assert "10:30–11:30" in activity["details"]
+    conn.close()
+
+    assignment_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    assignment_item = next(
+        item
+        for item in assignment_page.context["schedule"]["unassigned"]
+        if item["task_id"] == unassigned_id
+    )
+    recommendation = assignment_item["recommended_assignment"]
+    assert recommendation
+    stale_assignment = await crm.api_calendar_dispatch_plan_apply(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/plan/apply",
+            {
+                "items": [{
+                    "task_id": unassigned_id,
+                    "current_date": route_date,
+                    "expected_workers": "",
+                    "expected_time_from": "10:00",
+                    "expected_time_to": "11:00",
+                    "target_date": route_date,
+                    "target_workers": [recommendation["worker"]],
+                    "target_time_from": recommendation["time_from"],
+                    "target_time_to": recommendation["time_to"],
+                }],
+            },
+        )
+    )
+    assert stale_assignment["summary"]["applied"] == 0
+    assert "изменилась после расчёта" in (
+        stale_assignment["skipped"][0]["reason"]
+    )
+    original_send_message_to_chat = crm.send_message_to_chat
+    assignment_messages = []
+    crm.send_message_to_chat = (
+        lambda chat_id, text: assignment_messages.append(
+            (chat_id, text)
+        )
+    )
+
+    try:
+        assignment_result = await crm.api_calendar_dispatch_plan_apply(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/plan/apply",
+                {
+                    "items": [{
+                        "task_id": unassigned_id,
+                        "current_date": route_date,
+                        "expected_workers": "",
+                        "expected_time_from": "11:00",
+                        "expected_time_to": "12:00",
+                        "target_date": route_date,
+                        "target_workers": [recommendation["worker"]],
+                        "target_time_from": recommendation["time_from"],
+                        "target_time_to": recommendation["time_to"],
+                    }],
+                },
+            )
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert assignment_result["summary"] == {
+        "requested": 1,
+        "applied": 1,
+        "skipped": 0,
+    }
+    conn = connect()
+    c = conn.cursor()
+    assigned = c.execute("""
+    SELECT worker, workers, time_from, time_to
+    FROM tasks
+    WHERE id=? AND company_id=2
+    """, (unassigned_id,)).fetchone()
+    assignment_activity = c.execute("""
+    SELECT details
+    FROM task_activity
+    WHERE task_id=?
+      AND action='Применён автоматический план'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (unassigned_id,)).fetchone()
+    assert assigned["worker"] == recommendation["worker"]
+    assert assigned["workers"] == recommendation["worker"]
+    assert assigned["time_from"] == recommendation["time_from"]
+    assert assigned["time_to"] == recommendation["time_to"]
+    assert recommendation["worker"] in assignment_activity["details"]
 
     placeholders = ",".join("?" for _ in task_ids)
     c.execute(
@@ -6287,8 +6389,8 @@ async def assert_daily_route_schedule():
         task_ids,
     )
     c.execute(
-        "DELETE FROM notifications WHERE title=?",
-        (f"Изменено расписание заявки #{without_time_id}",),
+        f"DELETE FROM notifications WHERE link IN ({placeholders})",
+        [f"/task/{task_id}" for task_id in task_ids],
     )
     c.execute(
         f"DELETE FROM tasks WHERE id IN ({placeholders})",

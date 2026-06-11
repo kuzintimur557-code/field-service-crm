@@ -8600,7 +8600,7 @@ async def calendar_day_route_page(
     conn = connect()
     c = conn.cursor()
     worker_rows = c.execute("""
-    SELECT username, full_name
+    SELECT username, full_name, daily_capacity
     FROM users
     WHERE company_id=?
       AND role='worker'
@@ -8608,6 +8608,10 @@ async def calendar_day_route_page(
     ORDER BY COALESCE(NULLIF(full_name, ''), username), username
     """, (company_id,)).fetchall()
     worker_names = [row["username"] for row in worker_rows]
+    worker_capacities = {
+        row["username"]: max(1, int(row["daily_capacity"] or 3))
+        for row in worker_rows
+    }
 
     if role == "worker":
         selected_worker = username
@@ -8639,10 +8643,24 @@ async def calendar_day_route_page(
       id
     """
     tasks = c.execute(query, params).fetchall()
+    unavailable_dates, _ = get_worker_unavailability(
+        c,
+        company_id,
+        visible_worker_names,
+        selected_date,
+        selected_date,
+    )
     conn.close()
     schedule = build_daily_schedule(
         tasks,
         visible_worker_names,
+        worker_capacities=worker_capacities,
+        unavailable_worker_names={
+            worker_name
+            for worker_name in visible_worker_names
+            if selected_date
+            in unavailable_dates.get(worker_name, set())
+        },
     )
 
     def day_url(day_value):
@@ -9265,6 +9283,16 @@ async def api_calendar_dispatch_plan_apply(request: Request):
         expected_date = str(
             raw_item.get("current_date") or ""
         ).strip()[:10]
+        checks_expected_time = (
+            "expected_time_from" in raw_item
+            or "expected_time_to" in raw_item
+        )
+        expected_time_from = str(
+            raw_item.get("expected_time_from") or ""
+        ).strip()[:5]
+        expected_time_to = str(
+            raw_item.get("expected_time_to") or ""
+        ).strip()[:5]
         expected_workers_value = raw_item.get("expected_workers")
 
         if isinstance(expected_workers_value, list):
@@ -9371,12 +9399,21 @@ async def api_calendar_dispatch_plan_apply(request: Request):
             continue
 
         current_date = str(task["task_date"] or "")[:10]
+        current_time_from = str(task["time_from"] or "")[:5]
+        current_time_to = str(task["time_to"] or "")[:5]
         current_workers = get_task_worker_names(task)
         current_workers_csv = ",".join(current_workers)
 
         if (
             current_date != expected_date
             or current_workers_csv != expected_workers
+            or (
+                checks_expected_time
+                and (
+                    current_time_from != expected_time_from
+                    or current_time_to != expected_time_to
+                )
+            )
         ):
             skipped.append({
                 "task_id": task_id,
