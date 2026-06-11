@@ -24,6 +24,26 @@ h1{margin:0;font-size:30px}
 .metric{padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:white}
 .metric span{display:block;color:#6b7280;font-size:11px;font-weight:900}
 .metric strong{display:block;margin-top:4px;font-size:22px}
+.auto-plan{margin:14px 0;padding:16px;border:1px solid #bfdbfe;border-left:4px solid #2563eb;background:white}
+.auto-plan-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.auto-plan-title{font-size:18px;font-weight:900}
+.auto-plan-subtitle{margin-top:4px;color:#6b7280;font-size:12px;font-weight:800}
+.auto-plan-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.auto-plan-toggle{display:inline-flex;gap:7px;align-items:center;color:#374151;font-size:12px;font-weight:900}
+.auto-plan-toggle input,.auto-plan-check{width:17px;height:17px;accent-color:#2563eb}
+.auto-plan-apply{padding:10px 13px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.auto-plan-apply:disabled{cursor:wait;opacity:.65}
+.auto-plan-summary{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.auto-plan-summary span{padding:5px 7px;border-radius:6px;background:#eff6ff;color:#1e40af;font-size:11px;font-weight:900}
+.auto-plan-list{display:grid;margin-top:12px;border-top:1px solid #e5e7eb}
+.auto-plan-row{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(260px,390px);gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid #e5e7eb}
+.auto-plan-task{color:#111827;text-decoration:none;font-weight:900}
+.auto-plan-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;color:#6b7280;font-size:11px;font-weight:800}
+.auto-plan-target{font-size:12px;font-weight:900}
+.auto-plan-reason{margin-top:4px;color:#166534;font-size:11px;font-weight:800}
+.auto-plan-problems{margin-top:10px;color:#92400e;font-size:12px;font-weight:800}
+.auto-plan-problems summary{cursor:pointer}
+.auto-plan-problems ul{margin:8px 0 0;padding-left:20px}
 .worker-section{margin-top:14px;border-top:4px solid #111827;background:white}
 .worker-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid #e5e7eb}
 .worker-name{font-size:18px;font-weight:900}
@@ -93,6 +113,10 @@ h1{margin:0;font-size:30px}
     h1{font-size:26px}
     .actions,.actions a,.controls,.filter,.filter>div,.filter input,.filter select,.filter button,.day-nav,.day-nav a{width:100%}
     .summary{grid-template-columns:1fr 1fr}
+    .auto-plan-actions,.auto-plan-apply{width:100%}
+    .auto-plan-apply{justify-content:center}
+    .auto-plan-row{grid-template-columns:28px minmax(0,1fr)}
+    .auto-plan-target{grid-column:2}
     .worker-head{align-items:flex-start;flex-direction:column}
     .worker-stats{line-height:1.5}
     .timeline-top{display:block}
@@ -154,6 +178,81 @@ h1{margin:0;font-size:30px}
         <div class="metric"><span>Конфликты</span><strong>{{ schedule["summary"]["conflicts"] }}</strong></div>
         <div class="metric"><span>Без исполнителя</span><strong>{{ schedule["summary"]["unassigned"] }}</strong></div>
     </section>
+
+    {% if role in ("boss", "manager") and day_auto_plan["summary"]["eligible"] %}
+    <section class="auto-plan">
+        <div class="auto-plan-head">
+            <div>
+                <div class="auto-plan-title">Автозаполнение дня</div>
+                <div class="auto-plan-subtitle">
+                    Распределяет заявки без исполнителя и подбирает время заявкам без окна.
+                </div>
+            </div>
+            {% if day_auto_plan["items"] %}
+            <div class="auto-plan-actions">
+                <label class="auto-plan-toggle">
+                    <input id="auto-plan-select-all" type="checkbox" checked>
+                    Выбрать все
+                </label>
+                <button class="auto-plan-apply" id="auto-plan-apply" type="button">
+                    Применить план ({{ day_auto_plan["items"]|length }})
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        <div class="auto-plan-summary">
+            <span>Нужно спланировать: {{ day_auto_plan["summary"]["eligible"] }}</span>
+            <span>Готово к применению: {{ day_auto_plan["summary"]["planned"] }}</span>
+            {% if day_auto_plan["summary"]["unscheduled"] %}
+            <span>Без решения: {{ day_auto_plan["summary"]["unscheduled"] }}</span>
+            {% endif %}
+            {% if day_auto_plan["summary"]["limited"] %}
+            <span>За пределами текущего плана: {{ day_auto_plan["summary"]["limited"] }}</span>
+            {% endif %}
+        </div>
+        {% if day_auto_plan["items"] %}
+        <div class="auto-plan-list">
+            {% for item in day_auto_plan["items"] %}
+            <article
+                class="auto-plan-row"
+                data-task-id="{{ item['task_id'] }}"
+                data-current-date="{{ item['current_date'] }}"
+                data-expected-workers="{{ item['expected_workers'] }}"
+                data-expected-time-from="{{ item['expected_time_from'] }}"
+                data-expected-time-to="{{ item['expected_time_to'] }}"
+                data-target-date="{{ item['target_date'] }}"
+                data-target-workers="{{ item['target_workers_csv'] }}"
+                data-target-time-from="{{ item['target_time_from'] }}"
+                data-target-time-to="{{ item['target_time_to'] }}"
+            >
+                <input class="auto-plan-check" type="checkbox" checked aria-label="Выбрать заявку #{{ item['task_id'] }}">
+                <div>
+                    <a class="auto-plan-task" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+                    <div class="auto-plan-meta">
+                        <span>{{ item["priority"] }}</span>
+                        <span>{{ item["change_label"] }}</span>
+                    </div>
+                </div>
+                <div class="auto-plan-target">
+                    {{ item["target_workers"]|join(", ") }} · {{ item["target_time_label"] }}
+                    <div class="auto-plan-reason">{{ item["reason"] }} · оценка {{ item["score"] }}</div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if day_auto_plan["unscheduled"] %}
+        <details class="auto-plan-problems">
+            <summary>Почему часть заявок не вошла в план</summary>
+            <ul>
+                {% for item in day_auto_plan["unscheduled"] %}
+                <li>#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}: {{ item["reason"] }}</li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+    </section>
+    {% endif %}
 
     {% if schedule["summary"]["tasks"] %}
     {% for worker in schedule["workers"] %}
@@ -495,6 +594,92 @@ h1{margin:0;font-size:30px}
         }
     }
 
+    function selectedAutoPlanItems() {
+        return [...document.querySelectorAll(".auto-plan-row")]
+            .filter(row => row.querySelector(".auto-plan-check")?.checked)
+            .map(row => ({
+                task_id: Number(row.dataset.taskId),
+                current_date: row.dataset.currentDate,
+                expected_workers: row.dataset.expectedWorkers,
+                expected_time_from: row.dataset.expectedTimeFrom,
+                expected_time_to: row.dataset.expectedTimeTo,
+                target_date: row.dataset.targetDate,
+                target_workers: String(
+                    row.dataset.targetWorkers || ""
+                ).split(",").filter(Boolean),
+                target_time_from: row.dataset.targetTimeFrom,
+                target_time_to: row.dataset.targetTimeTo
+            }));
+    }
+
+    function updateAutoPlanButton() {
+        const button = document.getElementById("auto-plan-apply");
+
+        if (!button) {
+            return;
+        }
+
+        const count = selectedAutoPlanItems().length;
+        button.textContent = `Применить план (${count})`;
+        button.disabled = count === 0;
+    }
+
+    async function applyAutoPlan() {
+        const button = document.getElementById("auto-plan-apply");
+        const items = selectedAutoPlanItems();
+
+        if (!items.length) {
+            showToast("Выберите хотя бы одну заявку.", true);
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = "Применяем...";
+
+        try {
+            const response = await fetch(
+                "/api/calendar/dispatch/plan/apply",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({items})
+                }
+            );
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                showToast(
+                    data.message || "Не удалось применить план.",
+                    true
+                );
+                return;
+            }
+
+            const applied = data.summary?.applied || 0;
+            const skipped = data.summary?.skipped || 0;
+            let message = `Запланировано заявок: ${applied}.`;
+
+            if (skipped) {
+                message += ` Пропущено: ${skipped}.`;
+
+                if (data.skipped?.[0]?.reason) {
+                    message += ` ${data.skipped[0].reason}`;
+                }
+            }
+
+            showToast(message, applied === 0);
+
+            if (applied) {
+                window.setTimeout(() => window.location.reload(), 700);
+            }
+        } catch (error) {
+            showToast("Сервер временно недоступен.", true);
+        } finally {
+            updateAutoPlanButton();
+        }
+    }
+
     document.querySelectorAll('.route-item[draggable="true"]').forEach(card => {
         card.addEventListener("dragstart", event => {
             draggedCard = card;
@@ -547,6 +732,32 @@ h1{margin:0;font-size:30px}
             () => assignTask(item)
         );
     });
+
+    const autoPlanSelectAll = document.getElementById(
+        "auto-plan-select-all"
+    );
+    const autoPlanChecks = [
+        ...document.querySelectorAll(".auto-plan-check")
+    ];
+
+    autoPlanSelectAll?.addEventListener("change", () => {
+        autoPlanChecks.forEach(input => {
+            input.checked = autoPlanSelectAll.checked;
+        });
+        updateAutoPlanButton();
+    });
+    autoPlanChecks.forEach(input => {
+        input.addEventListener("change", () => {
+            autoPlanSelectAll.checked = autoPlanChecks.every(
+                item => item.checked
+            );
+            updateAutoPlanButton();
+        });
+    });
+    document.getElementById("auto-plan-apply")?.addEventListener(
+        "click",
+        applyAutoPlan
+    );
 })();
 </script>
 {% endif %}

@@ -550,6 +550,342 @@ def build_day_assignment_suggestions(
     return suggestions[:max(1, int(limit or 8))]
 
 
+def _priority_rank(task):
+    priority = str(_value(task, "priority") or "").strip().lower()
+
+    if priority in ("срочно", "urgent", "emergency"):
+        return 0
+
+    if priority in ("высокий", "high"):
+        return 1
+
+    return 2
+
+
+def build_daily_auto_plan(
+    tasks,
+    worker_names,
+    worker_capacities=None,
+    unavailable_worker_names=None,
+    target_date="",
+    limit=50,
+):
+    tasks = list(tasks)
+    worker_names = list(dict.fromkeys(worker_names or []))
+    worker_capacities = {
+        worker_name: max(
+            1,
+            int((worker_capacities or {}).get(worker_name) or 3),
+        )
+        for worker_name in worker_names
+    }
+    unavailable_worker_names = set(unavailable_worker_names or [])
+    active_tasks = [
+        task for task in tasks if _task_blocks_time(task)
+    ]
+    target_date = str(target_date or "")[:10] or next(
+        (
+            str(_value(task, "task_date") or "")[:10]
+            for task in active_tasks
+            if str(_value(task, "task_date") or "")[:10]
+        ),
+        "",
+    )
+    assignments = [
+        {
+            "task_id": int(_value(task, "id", 0) or 0),
+            "date": str(_value(task, "task_date") or "")[:10],
+            "workers": task_workers(task),
+            "time_from": str(_value(task, "time_from") or "")[:5],
+            "time_to": str(_value(task, "time_to") or "")[:5],
+        }
+        for task in active_tasks
+        if task_workers(task)
+        and parse_time_value(_value(task, "time_from")) is not None
+        and parse_time_value(_value(task, "time_to")) is not None
+    ]
+    worker_counts = {
+        worker_name: sum(
+            1
+            for task in active_tasks
+            if worker_name in task_workers(task)
+        )
+        for worker_name in worker_names
+    }
+    eligible_tasks = [
+        task
+        for task in active_tasks
+        if (
+            not task_workers(task)
+            or parse_time_value(_value(task, "time_from")) is None
+            or parse_time_value(_value(task, "time_to")) is None
+        )
+    ]
+    eligible_tasks.sort(key=lambda task: (
+        _priority_rank(task),
+        0
+        if (
+            parse_time_value(_value(task, "time_from")) is not None
+            and parse_time_value(_value(task, "time_to")) is not None
+        )
+        else 1,
+        int(_value(task, "id", 0) or 0),
+    ))
+    plan_items = []
+    unscheduled = []
+
+    plan_limit = max(1, min(int(limit or 50), 50))
+
+    for task in eligible_tasks[:plan_limit]:
+        task_id = int(_value(task, "id", 0) or 0)
+        current_workers = task_workers(task)
+        current_time_from = str(_value(task, "time_from") or "")[:5]
+        current_time_to = str(_value(task, "time_to") or "")[:5]
+        current_start = parse_time_value(current_time_from)
+        current_end = parse_time_value(current_time_to)
+        duration_minutes = task_duration_minutes(task)
+        target_workers = list(current_workers)
+        target_slot = None
+        reason = ""
+        score = 0
+
+        if current_workers:
+            inactive_workers = [
+                worker_name
+                for worker_name in current_workers
+                if worker_name not in worker_capacities
+            ]
+
+            if inactive_workers:
+                unscheduled.append({
+                    "task_id": task_id,
+                    "client": str(_value(task, "client") or ""),
+                    "reason": (
+                        "Исполнитель отключён: "
+                        + ", ".join(inactive_workers)
+                    ),
+                })
+                continue
+
+            unavailable_workers = [
+                worker_name
+                for worker_name in current_workers
+                if worker_name in unavailable_worker_names
+            ]
+
+            if unavailable_workers:
+                unscheduled.append({
+                    "task_id": task_id,
+                    "client": str(_value(task, "client") or ""),
+                    "reason": (
+                        "Исполнитель недоступен: "
+                        + ", ".join(unavailable_workers)
+                    ),
+                })
+                continue
+
+            overloaded_workers = [
+                worker_name
+                for worker_name in current_workers
+                if (
+                    worker_counts.get(worker_name, 0) - 1
+                    >= worker_capacities[worker_name]
+                )
+            ]
+
+            if overloaded_workers:
+                unscheduled.append({
+                    "task_id": task_id,
+                    "client": str(_value(task, "client") or ""),
+                    "reason": (
+                        "Дневной лимит заполнен: "
+                        + ", ".join(overloaded_workers)
+                    ),
+                })
+                continue
+
+            available_slots = list_common_time_slots(
+                assignments=assignments,
+                target_date=target_date,
+                target_workers=current_workers,
+                duration_minutes=duration_minutes,
+                exclude_task_id=task_id,
+            )
+
+            if available_slots:
+                target_slot = available_slots[0]
+                reason = "Найдено общее окно команды"
+                score = 100 - min(
+                    (
+                        parse_time_value(target_slot["time_from"])
+                        or WORKDAY_START
+                    ) - WORKDAY_START,
+                    600,
+                ) // SLOT_STEP
+        else:
+            candidates = []
+
+            for worker_name in worker_names:
+                if worker_name in unavailable_worker_names:
+                    continue
+
+                daily_capacity = worker_capacities[worker_name]
+                active_count = worker_counts.get(worker_name, 0)
+
+                if active_count >= daily_capacity:
+                    continue
+
+                keeps_current_time = bool(
+                    current_start is not None
+                    and current_end is not None
+                    and WORKDAY_START
+                    <= current_start
+                    < current_end
+                    <= WORKDAY_END
+                    and _interval_is_available(
+                        assignments,
+                        target_date,
+                        worker_name,
+                        current_start,
+                        current_end,
+                        exclude_task_id=task_id,
+                    )
+                )
+
+                if keeps_current_time:
+                    slot = {
+                        "time_from": format_time_value(current_start),
+                        "time_to": format_time_value(current_end),
+                        "label": (
+                            f"{format_time_value(current_start)}–"
+                            f"{format_time_value(current_end)}"
+                        ),
+                    }
+                else:
+                    slots = list_common_time_slots(
+                        assignments=assignments,
+                        target_date=target_date,
+                        target_workers=[worker_name],
+                        duration_minutes=duration_minutes,
+                        exclude_task_id=task_id,
+                    )
+                    slot = slots[0] if slots else None
+
+                if not slot:
+                    continue
+
+                load_after = (active_count + 1) / daily_capacity
+                slot_start = (
+                    parse_time_value(slot["time_from"])
+                    or WORKDAY_START
+                )
+                candidate_score = max(
+                    0,
+                    round(
+                        100
+                        - load_after * 55
+                        - (
+                            (slot_start - WORKDAY_START)
+                            / SLOT_STEP
+                        )
+                        + (10 if keeps_current_time else 0)
+                    ),
+                )
+                candidates.append({
+                    "worker": worker_name,
+                    "slot": slot,
+                    "active_count": active_count,
+                    "daily_capacity": daily_capacity,
+                    "keeps_current_time": keeps_current_time,
+                    "score": candidate_score,
+                })
+
+            candidates.sort(key=lambda item: (
+                -item["score"],
+                item["active_count"] / item["daily_capacity"],
+                item["slot"]["time_from"],
+                item["worker"],
+            ))
+
+            if candidates:
+                best = candidates[0]
+                target_workers = [best["worker"]]
+                target_slot = best["slot"]
+                score = best["score"]
+                reason = (
+                    "Сохранено текущее время"
+                    if best["keeps_current_time"]
+                    else "Минимальная загрузка и ближайшее окно"
+                )
+
+        if not target_workers or not target_slot:
+            unscheduled.append({
+                "task_id": task_id,
+                "client": str(_value(task, "client") or ""),
+                "reason": (
+                    "Нет общего свободного окна."
+                    if current_workers
+                    else "Нет доступного исполнителя и свободного окна."
+                ),
+            })
+            continue
+
+        if not current_workers:
+            for worker_name in target_workers:
+                worker_counts[worker_name] = (
+                    worker_counts.get(worker_name, 0) + 1
+                )
+
+        assignments.append({
+            "task_id": task_id,
+            "date": target_date,
+            "workers": target_workers,
+            "time_from": target_slot["time_from"],
+            "time_to": target_slot["time_to"],
+        })
+        plan_items.append({
+            "task_id": task_id,
+            "client": str(_value(task, "client") or ""),
+            "priority": str(
+                _value(task, "priority") or "Обычный"
+            ),
+            "current_date": target_date,
+            "expected_workers": ",".join(current_workers),
+            "expected_time_from": current_time_from,
+            "expected_time_to": current_time_to,
+            "target_date": target_date,
+            "target_workers": target_workers,
+            "target_workers_csv": ",".join(target_workers),
+            "target_time_from": target_slot["time_from"],
+            "target_time_to": target_slot["time_to"],
+            "target_time_label": (
+                f"{target_slot['time_from']}–"
+                f"{target_slot['time_to']}"
+            ),
+            "change_type": (
+                "time" if current_workers else "worker_and_time"
+            ),
+            "change_label": (
+                "Назначить время"
+                if current_workers
+                else "Назначить исполнителя и время"
+            ),
+            "reason": reason,
+            "score": score,
+        })
+
+    return {
+        "items": plan_items,
+        "unscheduled": unscheduled,
+        "summary": {
+            "eligible": len(eligible_tasks),
+            "planned": len(plan_items),
+            "unscheduled": len(unscheduled),
+            "limited": max(len(eligible_tasks) - plan_limit, 0),
+        },
+    }
+
+
 def build_daily_schedule(
     tasks,
     worker_names=None,

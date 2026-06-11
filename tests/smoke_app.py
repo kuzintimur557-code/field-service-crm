@@ -5966,6 +5966,8 @@ async def assert_daily_route_schedule():
     assert "Свободное окно" in owner_html
     assert "Рекомендуем:" in owner_html
     assert "Назначить" in owner_html
+    assert "Автозаполнение дня" in owner_html
+    assert "Применить план (2)" in owner_html
     assert owner_page.context["schedule"]["summary"] == {
         "workers": 2,
         "tasks": 4,
@@ -6006,6 +6008,28 @@ async def assert_daily_route_schedule():
     assert unassigned_item["recommended_assignment"]["time_label"] == (
         "11:00–12:00"
     )
+    day_auto_plan = owner_page.context["day_auto_plan"]
+    assert day_auto_plan["summary"] == {
+        "eligible": 2,
+        "planned": 2,
+        "unscheduled": 0,
+        "limited": 0,
+    }
+    auto_plan_by_id = {
+        item["task_id"]: item
+        for item in day_auto_plan["items"]
+    }
+    assert set(auto_plan_by_id) == {
+        without_time_id,
+        unassigned_id,
+    }
+    assert auto_plan_by_id[without_time_id]["target_workers"] == [
+        "helper2"
+    ]
+    assert auto_plan_by_id[without_time_id]["target_time_from"]
+    assert auto_plan_by_id[unassigned_id]["target_time_label"] == (
+        "11:00–12:00"
+    )
 
     filtered_page = await crm.calendar_day_route_page(
         make_asgi_request("owner2", "/calendar/day"),
@@ -6017,6 +6041,7 @@ async def assert_daily_route_schedule():
     assert "Route without time" in filtered_html
     assert "Route morning" not in filtered_html
     assert "Route unassigned" not in filtered_html
+    assert "Автозаполнение дня" not in filtered_html
 
     worker_page = await crm.calendar_day_route_page(
         make_asgi_request("worker2", "/calendar/day"),
@@ -6030,6 +6055,7 @@ async def assert_daily_route_schedule():
     assert 'class="schedule-form"' not in worker_html
     assert f'data-task-id="{morning_id}"' not in worker_html
     assert "/api/calendar/day/move-time" not in worker_html
+    assert "Автозаполнение дня" not in worker_html
 
     outsider_page = await crm.calendar_day_route_page(
         make_asgi_request("outsider_worker", "/calendar/day"),
@@ -6382,6 +6408,51 @@ async def assert_daily_route_schedule():
     assert assigned["time_from"] == recommendation["time_from"]
     assert assigned["time_to"] == recommendation["time_to"]
     assert recommendation["worker"] in assignment_activity["details"]
+
+    c.execute("""
+    UPDATE tasks
+    SET time_from='', time_to=''
+    WHERE id=? AND company_id=2
+    """, (without_time_id,))
+    c.execute("""
+    UPDATE tasks
+    SET worker='', workers='', time_from='11:00', time_to='12:00'
+    WHERE id=? AND company_id=2
+    """, (unassigned_id,))
+    conn.commit()
+    conn.close()
+    bulk_plan_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    bulk_plan = bulk_plan_page.context["day_auto_plan"]
+    assert bulk_plan["summary"]["planned"] == 2
+    assert {
+        item["task_id"]
+        for item in bulk_plan["items"]
+    } == {without_time_id, unassigned_id}
+    bulk_result = await crm.api_calendar_dispatch_plan_apply(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/plan/apply",
+            {"items": bulk_plan["items"]},
+        )
+    )
+    assert bulk_result["summary"] == {
+        "requested": 2,
+        "applied": 2,
+        "skipped": 0,
+    }
+    conn = connect()
+    c = conn.cursor()
+    bulk_rows = c.execute("""
+    SELECT id, worker, workers, time_from, time_to
+    FROM tasks
+    WHERE id IN (?, ?)
+    ORDER BY id
+    """, (without_time_id, unassigned_id)).fetchall()
+    assert all(row["workers"] for row in bulk_rows)
+    assert all(row["time_from"] and row["time_to"] for row in bulk_rows)
 
     placeholders = ",".join("?" for _ in task_ids)
     c.execute(

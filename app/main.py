@@ -44,6 +44,7 @@ from app.services.daily_schedule import (
     SLOT_STEP,
     WORKDAY_END,
     WORKDAY_START,
+    build_daily_auto_plan,
     build_daily_schedule,
     format_time_value,
     find_time_conflicts,
@@ -8662,6 +8663,34 @@ async def calendar_day_route_page(
             in unavailable_dates.get(worker_name, set())
         },
     )
+    day_auto_plan = {
+        "items": [],
+        "unscheduled": [],
+        "summary": {
+            "eligible": 0,
+            "planned": 0,
+            "unscheduled": 0,
+            "limited": 0,
+        },
+    }
+
+    if (
+        role in ("boss", "manager")
+        and not selected_worker
+        and selected_day >= datetime.now().date()
+    ):
+        day_auto_plan = build_daily_auto_plan(
+            tasks=tasks,
+            worker_names=worker_names,
+            worker_capacities=worker_capacities,
+            unavailable_worker_names={
+                worker_name
+                for worker_name in worker_names
+                if selected_date
+                in unavailable_dates.get(worker_name, set())
+            },
+            target_date=selected_date,
+        )
 
     def day_url(day_value):
         params = {"date": day_value.strftime("%Y-%m-%d")}
@@ -8682,6 +8711,7 @@ async def calendar_day_route_page(
             "selected_worker": selected_worker,
             "selected_date": selected_date,
             "schedule": schedule,
+            "day_auto_plan": day_auto_plan,
             "previous_day_url": day_url(
                 selected_day - timedelta(days=1)
             ),
