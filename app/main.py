@@ -39,6 +39,7 @@ from app.services.schedule_conflicts import (
     detect_schedule_conflicts,
 )
 from app.services.dispatch_board import build_dispatch_board
+from app.services.dispatch_planner import build_dispatch_plan
 from app.services.workflow_graph import (
     get_company_workflow_graphs,
     get_rule_workflow_debug,
@@ -699,6 +700,84 @@ def _get_dispatch_date_suggestions(
         }
         for item in result["items"]
     ]
+
+
+def _build_company_dispatch_plan(
+    cursor,
+    company_id,
+    start_date,
+    search_days,
+    limit=25,
+):
+    worker_rows = cursor.execute("""
+    SELECT username, daily_capacity
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY username
+    """, (company_id,)).fetchall()
+    worker_capacities = {
+        row["username"]: max(1, int(row["daily_capacity"] or 3))
+        for row in worker_rows
+    }
+    end_date = start_date + timedelta(days=search_days - 1)
+    task_rows = cursor.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND (
+          task_date IS NULL
+          OR task_date=''
+          OR (
+              TRIM(COALESCE(worker, ''))=''
+              AND TRIM(COALESCE(workers, ''))=''
+          )
+      )
+    ORDER BY id
+    """, (company_id,)).fetchall()
+    assignment_rows = cursor.execute("""
+    SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date IS NOT NULL
+      AND task_date!=''
+      AND substr(task_date, 1, 10) BETWEEN ? AND ?
+    """, (
+        company_id,
+        start_date.strftime("%Y-%m-%d"),
+        end_date.strftime("%Y-%m-%d"),
+    )).fetchall()
+    unavailable_dates, _ = get_worker_unavailability(
+        cursor,
+        company_id,
+        worker_capacities.keys(),
+        start_date.strftime("%Y-%m-%d"),
+        end_date.strftime("%Y-%m-%d"),
+    )
+    plan = build_dispatch_plan(
+        tasks=task_rows,
+        worker_capacities=worker_capacities,
+        assignments=[
+            {
+                "date": row["work_date"],
+                "workers": get_task_worker_names(row),
+            }
+            for row in assignment_rows
+        ],
+        unavailable_dates=unavailable_dates,
+        start_date=start_date,
+        search_days=search_days,
+        limit=limit,
+    )
+    plan["workers_count"] = len(worker_capacities)
+    plan["start"] = start_date.strftime("%Y-%m-%d")
+    plan["end"] = end_date.strftime("%Y-%m-%d")
+    return plan
 
 
 def worker_task_condition():
@@ -8365,6 +8444,21 @@ async def calendar_dispatch_page(
             ),
         }
 
+    planning_queue_count = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND (
+          task_date IS NULL
+          OR task_date=''
+          OR (
+              TRIM(COALESCE(worker, ''))=''
+              AND TRIM(COALESCE(workers, ''))=''
+          )
+      )
+    """, (company_id,)).fetchone()[0]
     conn.close()
     board_columns = build_dispatch_board(
         tasks=display_tasks,
@@ -8431,6 +8525,7 @@ async def calendar_dispatch_page(
             "selected_status": selected_status,
             "selected_week_start": selected_week_start,
             "selected_week_end": selected_week_end,
+            "planning_queue_count": planning_queue_count,
             "previous_week_url": dispatch_week_url(
                 board_week_start - timedelta(days=7)
             ),
@@ -8443,6 +8538,492 @@ async def calendar_dispatch_page(
             ),
         },
     )
+
+
+@app.get("/api/calendar/dispatch/plan")
+def api_calendar_dispatch_plan(
+    request: Request,
+    start: str = "",
+    days: int = 14,
+    limit: int = 25,
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "message": "Требуется авторизация.",
+            },
+            status_code=401,
+        )
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Недостаточно прав.",
+            },
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "feature_disabled",
+                "message": "Модуль календаря отключён.",
+            },
+            status_code=403,
+        )
+
+    try:
+        start_date = datetime.strptime(
+            str(start or datetime.now().strftime("%Y-%m-%d")),
+            "%Y-%m-%d",
+        ).date()
+    except Exception:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_start_date",
+                "message": "Указана некорректная начальная дата.",
+            },
+            status_code=400,
+        )
+
+    if start_date < datetime.now().date():
+        start_date = datetime.now().date()
+
+    search_days = days if days in (7, 14, 30) else 14
+    plan_limit = min(max(int(limit or 25), 1), 50)
+    conn = connect()
+    plan = _build_company_dispatch_plan(
+        conn.cursor(),
+        company_id,
+        start_date,
+        search_days,
+        plan_limit,
+    )
+    conn.close()
+    return {
+        "ok": True,
+        "company_id": company_id,
+        **plan,
+    }
+
+
+@app.post("/api/calendar/dispatch/plan/apply")
+async def api_calendar_dispatch_plan_apply(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "message": "Требуется авторизация.",
+            },
+            status_code=401,
+        )
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Недостаточно прав.",
+            },
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "feature_disabled",
+                "message": "Модуль календаря отключён.",
+            },
+            status_code=403,
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_json",
+                "message": "Не удалось прочитать план.",
+            },
+            status_code=400,
+        )
+
+    plan_items = payload.get("items")
+
+    if not isinstance(plan_items, list) or not plan_items:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "empty_plan",
+                "message": "Не выбраны заявки для планирования.",
+            },
+            status_code=400,
+        )
+
+    if len(plan_items) > 50:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "plan_too_large",
+                "message": "За один раз можно применить не более 50 строк.",
+            },
+            status_code=400,
+        )
+
+    conn = connect()
+    c = conn.cursor()
+    worker_rows = c.execute("""
+    SELECT username, daily_capacity, telegram_chat_id
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY username
+    """, (company_id,)).fetchall()
+    workers_by_name = {
+        row["username"]: row
+        for row in worker_rows
+    }
+    applied = []
+    skipped = []
+    telegram_messages = []
+    processed_task_ids = set()
+    now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+    today = datetime.now().date()
+
+    for raw_item in plan_items:
+        try:
+            task_id = int(raw_item.get("task_id") or 0)
+        except (TypeError, ValueError, AttributeError):
+            task_id = 0
+
+        if not task_id or task_id in processed_task_ids:
+            skipped.append({
+                "task_id": task_id,
+                "reason": "Некорректная или повторяющаяся заявка.",
+            })
+            continue
+
+        processed_task_ids.add(task_id)
+        target_date = str(
+            raw_item.get("target_date") or ""
+        ).strip()[:10]
+        expected_date = str(
+            raw_item.get("current_date") or ""
+        ).strip()[:10]
+        expected_workers_value = raw_item.get("expected_workers")
+
+        if isinstance(expected_workers_value, list):
+            expected_workers = ",".join(
+                str(value).strip()
+                for value in expected_workers_value
+                if str(value).strip()
+            )
+        else:
+            expected_workers = ",".join(
+                value.strip()
+                for value in str(
+                    expected_workers_value or ""
+                ).split(",")
+                if value.strip()
+            )
+
+        raw_target_workers = raw_item.get("target_workers")
+
+        if isinstance(raw_target_workers, list):
+            target_workers = [
+                str(value).strip()
+                for value in raw_target_workers
+                if str(value).strip()
+            ]
+        else:
+            target_workers = [
+                value.strip()
+                for value in str(
+                    raw_item.get("target_workers_csv") or ""
+                ).split(",")
+                if value.strip()
+            ]
+
+        target_workers = list(dict.fromkeys(target_workers))
+
+        try:
+            parsed_target_date = datetime.strptime(
+                target_date,
+                "%Y-%m-%d",
+            ).date()
+        except ValueError:
+            skipped.append({
+                "task_id": task_id,
+                "reason": "Некорректная дата назначения.",
+            })
+            continue
+
+        if parsed_target_date < today:
+            skipped.append({
+                "task_id": task_id,
+                "reason": "Нельзя назначить заявку на прошедшую дату.",
+            })
+            continue
+
+        if not target_workers or len(target_workers) > 5:
+            skipped.append({
+                "task_id": task_id,
+                "reason": "Не выбрана допустимая команда.",
+            })
+            continue
+
+        task = c.execute("""
+        SELECT *
+        FROM tasks
+        WHERE id=? AND company_id=?
+        """, (task_id, company_id)).fetchone()
+
+        if not task:
+            skipped.append({
+                "task_id": task_id,
+                "reason": "Заявка не найдена.",
+            })
+            continue
+
+        if (
+            int(task["archived"] or 0) == 1
+            or task["status"] in ("Завершено", "Отменено")
+        ):
+            skipped.append({
+                "task_id": task_id,
+                "reason": "Заявка уже закрыта или находится в архиве.",
+            })
+            continue
+
+        current_date = str(task["task_date"] or "")[:10]
+        current_workers = get_task_worker_names(task)
+        current_workers_csv = ",".join(current_workers)
+
+        if (
+            current_date != expected_date
+            or current_workers_csv != expected_workers
+        ):
+            skipped.append({
+                "task_id": task_id,
+                "reason": "Заявка изменилась после расчёта плана.",
+            })
+            continue
+
+        invalid_workers = [
+            worker_name
+            for worker_name in target_workers
+            if worker_name not in workers_by_name
+        ]
+
+        if invalid_workers:
+            skipped.append({
+                "task_id": task_id,
+                "reason": (
+                    "Исполнитель отключён: "
+                    + ", ".join(invalid_workers)
+                ),
+            })
+            continue
+
+        unavailable_dates, unavailable_reasons = (
+            get_worker_unavailability(
+                c,
+                company_id,
+                target_workers,
+                target_date,
+                target_date,
+            )
+        )
+        unavailable_worker = next(
+            (
+                worker_name
+                for worker_name in target_workers
+                if target_date
+                in unavailable_dates.get(worker_name, set())
+            ),
+            "",
+        )
+
+        if unavailable_worker:
+            reason = unavailable_reasons.get(
+                (unavailable_worker, target_date),
+                "Сотрудник недоступен.",
+            )
+            skipped.append({
+                "task_id": task_id,
+                "reason": f"{unavailable_worker}: {reason}",
+            })
+            continue
+
+        capacity_error = None
+
+        for worker_name in target_workers:
+            active_count = c.execute(f"""
+            SELECT COUNT(*)
+            FROM tasks
+            WHERE company_id=?
+              AND id!=?
+              AND archived=0
+              AND status NOT IN ('Завершено', 'Отменено')
+              AND task_date LIKE ?
+              AND {worker_task_condition()}
+            """, [
+                company_id,
+                task_id,
+                f"{target_date}%",
+                *worker_task_params(worker_name),
+            ]).fetchone()[0]
+            daily_capacity = max(
+                1,
+                int(
+                    workers_by_name[worker_name]["daily_capacity"]
+                    or 3
+                ),
+            )
+
+            if active_count >= daily_capacity:
+                capacity_error = (
+                    f"{worker_name}: дневной лимит "
+                    f"{daily_capacity} уже заполнен."
+                )
+                break
+
+        if capacity_error:
+            skipped.append({
+                "task_id": task_id,
+                "reason": capacity_error,
+            })
+            continue
+
+        target_workers_csv = ",".join(target_workers)
+        c.execute("""
+        UPDATE tasks
+        SET task_date=?, worker=?, workers=?
+        WHERE id=? AND company_id=?
+        """, (
+            target_date,
+            target_workers[0],
+            target_workers_csv,
+            task_id,
+            company_id,
+        ))
+        details = (
+            f"Дата: {current_date or 'не назначена'} → {target_date}. "
+            f"Исполнители: "
+            f"{', '.join(current_workers) or 'не назначены'} → "
+            f"{', '.join(target_workers)}"
+        )
+        c.execute("""
+        INSERT INTO task_activity (
+            task_id, username, role, action, details, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            task_id,
+            username,
+            role,
+            "Применён автоматический план",
+            details,
+            now_value,
+        ))
+
+        for worker_name in target_workers:
+            c.execute("""
+            INSERT INTO notifications (
+                company_id, username, title, message, link, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                worker_name,
+                f"Запланирована заявка #{task_id}",
+                f"Дата: {target_date}. Автоматическое планирование.",
+                f"/task/{task_id}",
+                now_value,
+            ))
+            chat_id = str(
+                workers_by_name[worker_name]["telegram_chat_id"] or ""
+            ).strip()
+
+            if chat_id:
+                telegram_messages.append((
+                    chat_id,
+                    (
+                        f"Запланирована заявка #{task_id}\n"
+                        f"Клиент: {task['client']}\n"
+                        f"Дата: {target_date}"
+                    ),
+                ))
+
+        for worker_name in current_workers:
+            if worker_name in target_workers:
+                continue
+
+            c.execute("""
+            INSERT INTO notifications (
+                company_id, username, title, message, link, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                worker_name,
+                f"Снято назначение с заявки #{task_id}",
+                "Команда изменена автоматическим планировщиком.",
+                "/my-tasks",
+                now_value,
+            ))
+
+        applied.append({
+            "task_id": task_id,
+            "target_date": target_date,
+            "target_workers": target_workers,
+        })
+
+    conn.commit()
+    conn.close()
+
+    for chat_id, message in telegram_messages:
+        try:
+            send_message_to_chat(chat_id, message)
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "applied": applied,
+        "skipped": skipped,
+        "summary": {
+            "requested": len(plan_items),
+            "applied": len(applied),
+            "skipped": len(skipped),
+        },
+        "message": (
+            f"Применено: {len(applied)}. "
+            f"Пропущено: {len(skipped)}."
+        ),
+    }
 
 
 @app.post("/api/calendar/dispatch/move")

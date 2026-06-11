@@ -5476,6 +5476,325 @@ async def assert_dispatch_board():
     conn.close()
 
 
+async def assert_dispatch_planner():
+    plan_start = datetime.now().date() + timedelta(days=35)
+    plan_start -= timedelta(days=plan_start.weekday())
+    start_value = plan_start.strftime("%Y-%m-%d")
+    dated_value = (plan_start + timedelta(days=3)).strftime("%Y-%m-%d")
+    past_value = (
+        datetime.now().date() - timedelta(days=1)
+    ).strftime("%Y-%m-%d")
+    conn = connect()
+    c = conn.cursor()
+    original_workers = c.execute("""
+    SELECT username, daily_capacity, telegram_chat_id
+    FROM users
+    WHERE company_id=2
+      AND username IN ('worker2', 'helper2', 'free2')
+    ORDER BY username
+    """).fetchall()
+    c.execute("""
+    UPDATE users
+    SET daily_capacity=1
+    WHERE company_id=2
+      AND username IN ('worker2', 'helper2', 'free2')
+    """)
+    c.execute("""
+    UPDATE users
+    SET telegram_chat_id='planner-helper-chat'
+    WHERE company_id=2 AND username='helper2'
+    """)
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    task_values = [
+        (
+            2,
+            "Planner urgent",
+            "Dispatch planner smoke",
+            "",
+            "",
+            "",
+            "Срочно",
+            "Новая",
+            created_at,
+        ),
+        (
+            2,
+            "Planner normal",
+            "Dispatch planner smoke",
+            "",
+            "",
+            "",
+            "Обычный",
+            "Новая",
+            created_at,
+        ),
+        (
+            2,
+            "Planner fixed team",
+            "Dispatch planner smoke",
+            "",
+            "helper2",
+            "helper2",
+            "Обычный",
+            "Новая",
+            created_at,
+        ),
+        (
+            2,
+            "Planner dated",
+            "Dispatch planner smoke",
+            dated_value,
+            "",
+            "",
+            "Обычный",
+            "Новая",
+            created_at,
+        ),
+        (
+            2,
+            "Planner past",
+            "Dispatch planner smoke",
+            past_value,
+            "",
+            "",
+            "Обычный",
+            "Новая",
+            created_at,
+        ),
+        (
+            1,
+            "Planner outsider",
+            "Dispatch planner smoke",
+            "",
+            "",
+            "",
+            "Срочно",
+            "Новая",
+            created_at,
+        ),
+    ]
+    task_ids = []
+
+    for task_values_row in task_values:
+        c.execute("""
+        INSERT INTO tasks (
+            company_id, client, description, task_date,
+            worker, workers, priority, status, archived, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+        """, task_values_row)
+        task_ids.append(c.lastrowid)
+
+    urgent_id, normal_id, fixed_id, dated_id, past_id, outsider_id = (
+        task_ids
+    )
+    conn.commit()
+    conn.close()
+
+    page = await crm.calendar_dispatch_page(
+        make_asgi_request("owner2", "/calendar/dispatch"),
+        week_start=start_value,
+    )
+    page_html = page.body.decode("utf-8")
+    assert "Автопланирование" in page_html
+    assert "/api/calendar/dispatch/plan" in page_html
+    assert "/api/calendar/dispatch/plan/apply" in page_html
+    assert page.context["planning_queue_count"] >= 5
+
+    anonymous_preview = crm.api_calendar_dispatch_plan(
+        make_request(),
+        start=start_value,
+    )
+    assert anonymous_preview.status_code == 401
+    worker_preview = crm.api_calendar_dispatch_plan(
+        make_request("helper2"),
+        start=start_value,
+    )
+    assert worker_preview.status_code == 403
+    invalid_preview = crm.api_calendar_dispatch_plan(
+        make_request("owner2"),
+        start="bad-date",
+    )
+    assert invalid_preview.status_code == 400
+
+    preview = crm.api_calendar_dispatch_plan(
+        make_request("owner2"),
+        start=start_value,
+        days=14,
+        limit=50,
+    )
+    assert preview["ok"] is True
+    assert preview["company_id"] == 2
+    preview_items = {
+        item["task_id"]: item
+        for item in preview["items"]
+    }
+    assert outsider_id not in preview_items
+    assert urgent_id in preview_items
+    assert normal_id in preview_items
+    assert fixed_id in preview_items
+    assert dated_id in preview_items
+    assert preview["items"][0]["task_id"] == urgent_id
+    assert preview_items[fixed_id]["target_workers"] == ["helper2"]
+    assert preview_items[dated_id]["target_date"] == dated_value
+    assert any(
+        item["task_id"] == past_id
+        and item["reason"] == "Дата заявки уже прошла."
+        for item in preview["unscheduled"]
+    )
+    reserved_slots = [
+        (item["target_date"], worker_name)
+        for item in preview["items"]
+        for worker_name in item["target_workers"]
+    ]
+    assert len(reserved_slots) == len(set(reserved_slots))
+
+    anonymous_apply = await crm.api_calendar_dispatch_plan_apply(
+        make_json_request(
+            None,
+            "/api/calendar/dispatch/plan/apply",
+            {"items": [preview_items[urgent_id]]},
+        )
+    )
+    assert anonymous_apply.status_code == 401
+    worker_apply = await crm.api_calendar_dispatch_plan_apply(
+        make_json_request(
+            "helper2",
+            "/api/calendar/dispatch/plan/apply",
+            {"items": [preview_items[urgent_id]]},
+        )
+    )
+    assert worker_apply.status_code == 403
+    empty_apply = await crm.api_calendar_dispatch_plan_apply(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/plan/apply",
+            {"items": []},
+        )
+    )
+    assert empty_apply.status_code == 400
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE tasks
+    SET worker='worker2', workers='worker2'
+    WHERE id=? AND company_id=2
+    """, (normal_id,))
+    conn.commit()
+    conn.close()
+    forged_outsider = {
+        **preview_items[urgent_id],
+        "task_id": outsider_id,
+    }
+    original_send_message_to_chat = crm.send_message_to_chat
+    telegram_messages = []
+    crm.send_message_to_chat = lambda chat_id, text: telegram_messages.append(
+        (chat_id, text)
+    )
+
+    try:
+        apply_result = await crm.api_calendar_dispatch_plan_apply(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/plan/apply",
+                {
+                    "items": [
+                        preview_items[urgent_id],
+                        preview_items[normal_id],
+                        preview_items[fixed_id],
+                        preview_items[dated_id],
+                        forged_outsider,
+                    ],
+                },
+            )
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert apply_result["ok"] is True
+    assert apply_result["summary"] == {
+        "requested": 5,
+        "applied": 3,
+        "skipped": 2,
+    }
+    assert {
+        item["task_id"]
+        for item in apply_result["applied"]
+    } == {urgent_id, fixed_id, dated_id}
+    skipped_by_id = {
+        item["task_id"]: item["reason"]
+        for item in apply_result["skipped"]
+    }
+    assert "изменилась после расчёта" in skipped_by_id[normal_id]
+    assert skipped_by_id[outsider_id] == "Заявка не найдена."
+
+    conn = connect()
+    c = conn.cursor()
+    planned_tasks = c.execute(f"""
+    SELECT id, task_date, worker, workers
+    FROM tasks
+    WHERE id IN ({",".join("?" for _ in task_ids)})
+    """, task_ids).fetchall()
+    planned_by_id = {
+        row["id"]: row
+        for row in planned_tasks
+    }
+
+    for task_id in (urgent_id, fixed_id, dated_id):
+        planned = planned_by_id[task_id]
+        preview_item = preview_items[task_id]
+        assert planned["task_date"] == preview_item["target_date"]
+        assert planned["workers"] == preview_item["target_workers_csv"]
+
+    activity_count = c.execute(f"""
+    SELECT COUNT(*)
+    FROM task_activity
+    WHERE task_id IN ({",".join("?" for _ in task_ids)})
+      AND action='Применён автоматический план'
+    """, task_ids).fetchone()[0]
+    notification_count = c.execute(f"""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE link IN ({",".join("?" for _ in task_ids)})
+      AND title LIKE 'Запланирована заявка #%'
+    """, [f"/task/{task_id}" for task_id in task_ids]).fetchone()[0]
+    assert activity_count == 3
+    assert notification_count >= 3
+    assert any(
+        chat_id == "planner-helper-chat"
+        for chat_id, _ in telegram_messages
+    )
+
+    placeholders = ",".join("?" for _ in task_ids)
+    c.execute(
+        f"DELETE FROM task_activity WHERE task_id IN ({placeholders})",
+        task_ids,
+    )
+    c.execute(
+        f"DELETE FROM notifications WHERE link IN ({placeholders})",
+        [f"/task/{task_id}" for task_id in task_ids],
+    )
+    c.execute(
+        f"DELETE FROM tasks WHERE id IN ({placeholders})",
+        task_ids,
+    )
+
+    for worker_row in original_workers:
+        c.execute("""
+        UPDATE users
+        SET daily_capacity=?, telegram_chat_id=?
+        WHERE company_id=2 AND username=?
+        """, (
+            worker_row["daily_capacity"],
+            worker_row["telegram_chat_id"],
+            worker_row["username"],
+        ))
+
+    conn.commit()
+    conn.close()
+
+
 async def assert_archive_restore(task):
     conn = connect()
     c = conn.cursor()
@@ -8934,6 +9253,7 @@ def main():
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_schedule_conflicts())
         asyncio.run(assert_dispatch_board())
+        asyncio.run(assert_dispatch_planner())
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())
         asyncio.run(assert_finance_margin(task))

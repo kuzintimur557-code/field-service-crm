@@ -14,9 +14,10 @@ body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
 h1{margin:0;font-size:32px}
 .subtitle{margin-top:5px;color:#6b7280;font-weight:800}
 .header-actions,.week-nav{display:flex;gap:8px;flex-wrap:wrap}
-.button{display:inline-flex;align-items:center;justify-content:center;padding:11px 14px;border-radius:8px;background:#111827;color:white;text-decoration:none;font-weight:900}
+.button{display:inline-flex;align-items:center;justify-content:center;padding:11px 14px;border:0;border-radius:8px;background:#111827;color:white;text-decoration:none;font-weight:900;cursor:pointer}
 .button.primary{background:#2563eb}
 .button.danger{background:#dc2626}
+.button.success{background:#047857}
 .summary{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin-bottom:14px}
 .summary-item{padding:13px;border:1px solid #e5e7eb;border-radius:8px;background:white}
 .summary-label{color:#6b7280;font-size:12px;font-weight:900}
@@ -61,17 +62,67 @@ h1{margin:0;font-size:32px}
 .toast{position:fixed;right:18px;bottom:82px;z-index:1000;max-width:390px;padding:14px 16px;border-radius:8px;background:#111827;color:white;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.22)}
 .toast.error{background:#991b1b}
 .toast[hidden]{display:none}
+.planner-dialog{width:min(980px,calc(100% - 24px));max-height:calc(100vh - 30px);padding:0;border:0;border-radius:8px;background:#f9fafb;box-shadow:0 24px 70px rgba(0,0,0,.3)}
+.planner-dialog::backdrop{background:rgba(17,24,39,.64)}
+.planner-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:20px;border-bottom:1px solid #e5e7eb;background:white}
+.planner-head h2{margin:0;font-size:24px}
+.planner-head .subtitle{font-size:13px}
+.planner-close{width:40px;height:40px;border:0;border-radius:8px;background:#f3f4f6;color:#111827;font-size:24px;font-weight:900;cursor:pointer}
+.planner-body{padding:18px}
+.planner-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.planner-controls label{display:block;margin-bottom:5px;color:#6b7280;font-size:12px;font-weight:900}
+.planner-controls input,.planner-controls select{min-width:170px;padding:10px;border:1px solid #d1d5db;border-radius:8px;background:white;font-weight:800}
+.planner-state{min-height:22px;margin-bottom:10px;color:#4b5563;font-size:13px;font-weight:800}
+.planner-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.planner-summary[hidden]{display:none}
+.planner-summary div{padding:11px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.planner-summary span{display:block;color:#6b7280;font-size:11px;font-weight:900}
+.planner-summary strong{display:block;margin-top:4px;font-size:20px}
+.planner-table-wrap{overflow:auto;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.planner-table{width:100%;border-collapse:collapse;min-width:760px}
+.planner-table th,.planner-table td{padding:11px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top;font-size:12px}
+.planner-table th{background:#f3f4f6;color:#4b5563;font-size:11px}
+.planner-table tr:last-child td{border-bottom:0}
+.planner-task{font-size:13px;font-weight:900}
+.planner-muted{margin-top:3px;color:#6b7280;font-size:11px}
+.planner-target{font-weight:900}
+.planner-score{display:inline-flex;padding:4px 7px;border-radius:999px;background:#dcfce7;color:#166534;font-size:10px;font-weight:900}
+.planner-empty{padding:24px;color:#6b7280;text-align:center;font-weight:800}
+.planner-select-bar{display:flex;align-items:center;gap:7px;margin-bottom:8px;color:#4b5563;font-size:12px;font-weight:900}
+.planner-problems{margin-top:14px;padding:13px;border:1px solid #fecaca;border-radius:8px;background:#fff7f7}
+.planner-problems[hidden]{display:none}
+.planner-problems h3{margin:0 0 8px;font-size:14px}
+.planner-problems ul{margin:0;padding-left:20px;color:#7f1d1d;font-size:12px;font-weight:800}
+.planner-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 18px;border-top:1px solid #e5e7eb;background:white}
+.planner-selected{color:#4b5563;font-size:13px;font-weight:900}
 @media(max-width:850px){
     .container{padding:16px}
     h1{font-size:27px}
     .summary{grid-template-columns:1fr 1fr}
-    .header-actions,.header-actions a,.toolbar,.filters,.filters>div,.filters select,.filters button,.filters a,.week-nav,.week-nav a,.week-jump,.week-jump input,.week-jump button{width:100%}
+    .header-actions,.header-actions .button,.toolbar,.filters,.filters>div,.filters select,.filters button,.filters a,.week-nav,.week-nav a,.week-jump,.week-jump input,.week-jump button{width:100%}
     .board-scroll{overflow:visible}
     .board{grid-template-columns:1fr;min-width:0}
     .column{min-height:0}
     .column.past{display:none}
     .task-card{cursor:default}
     .mobile-move{display:block}
+    .planner-head{padding:16px}
+    .planner-body{padding:14px}
+    .planner-controls,.planner-controls>div,.planner-controls input,.planner-controls select,.planner-controls button{width:100%}
+    .planner-summary{grid-template-columns:1fr 1fr}
+    .planner-footer{align-items:stretch;flex-direction:column}
+    .planner-footer button{width:100%}
+}
+@media(max-width:620px){
+    .planner-table-wrap{overflow:visible;border:0;background:transparent}
+    .planner-table{display:block;min-width:0}
+    .planner-table thead{display:none}
+    .planner-table tbody{display:grid;gap:9px}
+    .planner-table tr{position:relative;display:block;padding:10px 10px 10px 42px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+    .planner-table td{display:block;padding:4px 0;border:0}
+    .planner-table td[data-label]::before{display:block;margin-bottom:2px;color:#6b7280;font-size:10px;font-weight:900;content:attr(data-label)}
+    .planner-table .planner-pick{position:absolute;top:13px;left:13px}
+    .planner-table .planner-empty{padding:20px 10px;text-align:center}
 }
 </style>
 </head>
@@ -83,6 +134,9 @@ h1{margin:0;font-size:32px}
             <div class="subtitle">{{ selected_week_start }} — {{ selected_week_end }}</div>
         </div>
         <div class="header-actions">
+            <button class="button success" id="planner-open" type="button">
+                Автопланирование{% if planning_queue_count %} · {{ planning_queue_count }}{% endif %}
+            </button>
             <a class="button danger" href="/calendar/conflicts">Конфликты</a>
             <a class="button primary" href="/calendar">Календарь</a>
             <a class="button" href="/">Главное меню</a>
@@ -191,12 +245,95 @@ h1{margin:0;font-size:32px}
         </section>
     </div>
 </main>
+<dialog class="planner-dialog" id="planner-dialog">
+    <header class="planner-head">
+        <div>
+            <h2>Автопланирование очереди</h2>
+            <div class="subtitle">Предварительный план</div>
+        </div>
+        <button class="planner-close" id="planner-close" type="button" aria-label="Закрыть">×</button>
+    </header>
+    <div class="planner-body">
+        <div class="planner-controls">
+            <div>
+                <label for="planner-start">Начальная дата</label>
+                <input id="planner-start" type="date" value="{{ selected_week_start }}">
+            </div>
+            <div>
+                <label for="planner-days">Период</label>
+                <select id="planner-days">
+                    <option value="7">7 дней</option>
+                    <option value="14" selected>14 дней</option>
+                    <option value="30">30 дней</option>
+                </select>
+            </div>
+            <button class="button primary" id="planner-preview" type="button">Рассчитать план</button>
+        </div>
+        <div class="planner-state" id="planner-state"></div>
+        <section class="planner-summary" id="planner-summary" hidden>
+            <div><span>Требуют план</span><strong id="planner-eligible">0</strong></div>
+            <div><span>Готовы к применению</span><strong id="planner-ready">0</strong></div>
+            <div><span>Без решения</span><strong id="planner-unresolved">0</strong></div>
+            <div><span>Исполнителей</span><strong id="planner-workers">0</strong></div>
+        </section>
+        <label class="planner-select-bar">
+            <input id="planner-select-all" type="checkbox">
+            Выбрать все предложения
+        </label>
+        <div class="planner-table-wrap">
+            <table class="planner-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Заявка</th>
+                        <th>Сейчас</th>
+                        <th>План</th>
+                        <th>Причина</th>
+                    </tr>
+                </thead>
+                <tbody id="planner-rows">
+                    <tr><td colspan="5" class="planner-empty">Нажмите «Рассчитать план».</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <section class="planner-problems" id="planner-problems" hidden>
+            <h3>Не удалось запланировать</h3>
+            <ul id="planner-problem-list"></ul>
+        </section>
+    </div>
+    <footer class="planner-footer">
+        <div class="planner-selected" id="planner-selected">Выбрано: 0</div>
+        <button class="button success" id="planner-apply" type="button" disabled>Применить выбранное</button>
+    </footer>
+</dialog>
 <div id="dispatch-toast" class="toast" hidden></div>
 {% include 'mobile_nav.html' %}
 <script>
 (() => {
     const toast = document.getElementById("dispatch-toast");
+    const plannerDialog = document.getElementById("planner-dialog");
+    const plannerOpen = document.getElementById("planner-open");
+    const plannerClose = document.getElementById("planner-close");
+    const plannerPreview = document.getElementById("planner-preview");
+    const plannerApply = document.getElementById("planner-apply");
+    const plannerRows = document.getElementById("planner-rows");
+    const plannerState = document.getElementById("planner-state");
+    const plannerSummary = document.getElementById("planner-summary");
+    const plannerProblems = document.getElementById("planner-problems");
+    const plannerProblemList = document.getElementById("planner-problem-list");
+    const plannerSelectAll = document.getElementById("planner-select-all");
+    const plannerSelected = document.getElementById("planner-selected");
+    let plannerItems = [];
     let draggedCard = null;
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
 
     function showToast(message, isError = false) {
         toast.textContent = message;
@@ -225,6 +362,150 @@ h1{margin:0;font-size:32px}
         }
 
         return message;
+    }
+
+    function updatePlannerSelection() {
+        const checkboxes = plannerRows.querySelectorAll(".planner-check");
+        const selected = [...checkboxes].filter(item => item.checked);
+        plannerSelected.textContent = `Выбрано: ${selected.length}`;
+        plannerApply.disabled = selected.length === 0;
+        plannerSelectAll.checked = (
+            checkboxes.length > 0
+            && selected.length === checkboxes.length
+        );
+        plannerSelectAll.indeterminate = (
+            selected.length > 0
+            && selected.length < checkboxes.length
+        );
+    }
+
+    function setPlannerLoading(isLoading) {
+        plannerPreview.disabled = isLoading;
+        plannerApply.disabled = isLoading || plannerApply.disabled;
+        plannerState.textContent = isLoading
+            ? "Выполняется расчёт..."
+            : "";
+    }
+
+    function renderPlanner(data) {
+        plannerItems = data.items || [];
+        const summary = data.summary || {};
+        document.getElementById("planner-eligible").textContent = summary.eligible || 0;
+        document.getElementById("planner-ready").textContent = summary.planned || 0;
+        document.getElementById("planner-unresolved").textContent = summary.unscheduled || 0;
+        document.getElementById("planner-workers").textContent = data.workers_count || 0;
+        document.getElementById("planner-start").value = data.start;
+        plannerSummary.hidden = false;
+        plannerState.textContent = `${data.start} — ${data.end}${
+            summary.limited ? ` · не показано: ${summary.limited}` : ""
+        }`;
+
+        if (!plannerItems.length) {
+            plannerRows.innerHTML = '<tr><td colspan="5" class="planner-empty">Нет заявок, готовых к автоматическому назначению.</td></tr>';
+        } else {
+            plannerRows.innerHTML = plannerItems.map((item, index) => {
+                const currentDate = item.current_date || "Без даты";
+                const currentWorkers = item.current_workers.length
+                    ? item.current_workers.join(", ")
+                    : "Не назначены";
+                return `
+                    <tr>
+                        <td class="planner-pick"><input class="planner-check" type="checkbox" data-index="${index}" checked aria-label="Выбрать заявку #${item.task_id}"></td>
+                        <td data-label="Заявка">
+                            <div class="planner-task">#${item.task_id} · ${escapeHtml(item.client || "Клиент не указан")}</div>
+                            <div class="planner-muted">${escapeHtml(item.priority || "Обычный")} · ${escapeHtml(item.change_label)}</div>
+                        </td>
+                        <td data-label="Сейчас">
+                            <div>${escapeHtml(currentDate)}</div>
+                            <div class="planner-muted">${escapeHtml(currentWorkers)}</div>
+                        </td>
+                        <td data-label="План">
+                            <div class="planner-target">${escapeHtml(item.target_date_label)}</div>
+                            <div class="planner-muted">${escapeHtml(item.target_workers.join(", "))}</div>
+                        </td>
+                        <td data-label="Причина">
+                            <span class="planner-score">Оценка ${item.score}</span>
+                            <div class="planner-muted">${escapeHtml(item.reason)}</div>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        const unscheduled = data.unscheduled || [];
+        plannerProblems.hidden = unscheduled.length === 0;
+        plannerProblemList.innerHTML = unscheduled.map(item => (
+            `<li>#${item.task_id} · ${escapeHtml(item.client || "Клиент не указан")}: ${escapeHtml(item.reason)}</li>`
+        )).join("");
+        updatePlannerSelection();
+    }
+
+    async function loadPlanner() {
+        setPlannerLoading(true);
+
+        try {
+            const params = new URLSearchParams({
+                start: document.getElementById("planner-start").value,
+                days: document.getElementById("planner-days").value,
+                limit: "50"
+            });
+            const response = await fetch(`/api/calendar/dispatch/plan?${params}`, {
+                credentials: "same-origin"
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                throw new Error(data.message || "Не удалось рассчитать план.");
+            }
+
+            renderPlanner(data);
+        } catch (error) {
+            plannerState.textContent = error.message || "Не удалось рассчитать план.";
+            showToast(plannerState.textContent, true);
+        } finally {
+            plannerPreview.disabled = false;
+            updatePlannerSelection();
+        }
+    }
+
+    async function applyPlanner() {
+        const selectedItems = [...plannerRows.querySelectorAll(".planner-check:checked")]
+            .map(checkbox => plannerItems[Number(checkbox.dataset.index)])
+            .filter(Boolean);
+
+        if (!selectedItems.length) {
+            return;
+        }
+
+        plannerApply.disabled = true;
+        plannerPreview.disabled = true;
+        plannerState.textContent = "Проверяем и применяем назначения...";
+
+        try {
+            const response = await fetch("/api/calendar/dispatch/plan/apply", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({items: selectedItems})
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                throw new Error(data.message || "Не удалось применить план.");
+            }
+
+            const skippedText = data.skipped && data.skipped.length
+                ? ` ${data.skipped.map(item => `#${item.task_id}: ${item.reason}`).join(" ")}`
+                : "";
+            showToast(data.message + skippedText, data.summary.applied === 0);
+            plannerState.textContent = data.message;
+            window.setTimeout(() => window.location.reload(), 1600);
+        } catch (error) {
+            plannerState.textContent = error.message || "Не удалось применить план.";
+            showToast(plannerState.textContent, true);
+            plannerApply.disabled = false;
+            plannerPreview.disabled = false;
+        }
     }
 
     async function moveTask(card, targetDate) {
@@ -298,6 +579,30 @@ h1{margin:0;font-size:32px}
             column.classList.remove("drag-over");
             moveTask(draggedCard, column.dataset.dropDate);
         });
+    });
+
+    plannerOpen.addEventListener("click", () => {
+        plannerDialog.showModal();
+        loadPlanner();
+    });
+    plannerClose.addEventListener("click", () => plannerDialog.close());
+    plannerPreview.addEventListener("click", loadPlanner);
+    plannerApply.addEventListener("click", applyPlanner);
+    plannerSelectAll.addEventListener("change", () => {
+        plannerRows.querySelectorAll(".planner-check").forEach(checkbox => {
+            checkbox.checked = plannerSelectAll.checked;
+        });
+        updatePlannerSelection();
+    });
+    plannerRows.addEventListener("change", event => {
+        if (event.target.classList.contains("planner-check")) {
+            updatePlannerSelection();
+        }
+    });
+    plannerDialog.addEventListener("click", event => {
+        if (event.target === plannerDialog) {
+            plannerDialog.close();
+        }
     });
 })();
 </script>
