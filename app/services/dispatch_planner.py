@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.services.daily_schedule import find_common_time_slot
 from app.services.smart_scheduling import build_scheduling_recommendations
 
 
@@ -66,6 +67,8 @@ def build_dispatch_plan(
         {
             "date": str(item.get("date") or "")[:10],
             "workers": list(item.get("workers") or []),
+            "time_from": str(item.get("time_from") or "")[:5],
+            "time_to": str(item.get("time_to") or "")[:5],
         }
         for item in assignments
     ]
@@ -165,6 +168,22 @@ def build_dispatch_plan(
 
         best = recommendation["items"][0]
         target_workers = best["worker_names"]
+        time_slot = find_common_time_slot(
+            assignments=simulated_assignments,
+            target_date=best["date"],
+            target_workers=target_workers,
+        )
+
+        if not time_slot:
+            unscheduled_items.append({
+                "task_id": task_id,
+                "client": str(_value(task, "client") or ""),
+                "priority": _priority_label(task),
+                "current_date": current_date,
+                "current_workers": current_workers,
+                "reason": "В рабочем дне нет общего часового окна.",
+            })
+            continue
 
         if not current_date and not current_workers:
             change_type = "full"
@@ -192,6 +211,11 @@ def build_dispatch_plan(
             "target_date_label": best["date_label"],
             "target_workers": target_workers,
             "target_workers_csv": ",".join(target_workers),
+            "target_time_from": time_slot["time_from"],
+            "target_time_to": time_slot["time_to"],
+            "target_time_label": (
+                f"{time_slot['time_from']}–{time_slot['time_to']}"
+            ),
             "change_type": change_type,
             "change_label": change_label,
             "score": best["score"],
@@ -202,6 +226,8 @@ def build_dispatch_plan(
         simulated_assignments.append({
             "date": best["date"],
             "workers": target_workers,
+            "time_from": time_slot["time_from"],
+            "time_to": time_slot["time_to"],
         })
 
     return {

@@ -433,6 +433,15 @@ button{
 <div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
 Укажите корректную дату переноса.
 </div>
+{% elif request.query_params.get("date_error") == "invalid_time" %}
+<div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+Проверьте время: окончание должно быть позже начала.
+</div>
+{% elif request.query_params.get("date_error") == "time_conflict" %}
+<div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+Выбранное время пересекается с заявкой
+<a href="/task/{{ request.query_params.get('conflict_task_id') }}" style="color:#991b1b">#{{ request.query_params.get("conflict_task_id") }}</a>.
+</div>
 {% endif %}
 
 <div class="page">
@@ -516,8 +525,15 @@ button{
 
 <div class="info-row">
 <div class="icon">📅</div>
-<div class="label">Дата и время</div>
-<div class="value">{{ task["task_date"] }}</div>
+<div class="label">Расписание</div>
+<div class="value">
+{{ task["task_date"] or "Дата не указана" }}
+{% if task["time_from"] and task["time_to"] %}
+· {{ task["time_from"][:5] }}–{{ task["time_to"][:5] }}
+{% else %}
+· Время не указано
+{% endif %}
+</div>
 <button class="edit-btn" onclick="openDate()">✎</button>
 </div>
 
@@ -1048,13 +1064,20 @@ button{
 <div class="modal" id="dateModal">
 	<div class="modal-content">
 
-<h3>Изменить дату</h3>
+<h3>Изменить расписание</h3>
 
 <form method="post" action="/task/{{ task['id'] }}/date">
 
-<input type="datetime-local" name="task_date" required>
+<label>Дата</label>
+<input type="date" name="task_date" value="{{ (task['task_date'] or '')[:10] }}" required>
 
-<button class="btn blue">Сохранить дату</button>
+<label>Начало</label>
+<input type="time" name="time_from" value="{{ (task['time_from'] or '')[:5] }}">
+
+<label>Окончание</label>
+<input type="time" name="time_to" value="{{ (task['time_to'] or '')[:5] }}">
+
+<button class="btn blue">Сохранить расписание</button>
 
 </form>
 

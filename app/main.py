@@ -40,6 +40,11 @@ from app.services.schedule_conflicts import (
 )
 from app.services.dispatch_board import build_dispatch_board
 from app.services.dispatch_planner import build_dispatch_plan
+from app.services.daily_schedule import (
+    build_daily_schedule,
+    find_time_conflicts,
+    normalize_time_window,
+)
 from app.services.workflow_graph import (
     get_company_workflow_graphs,
     get_rule_workflow_debug,
@@ -618,6 +623,14 @@ def get_company_schedule_conflicts(
                 for issue in conflict["issues"]
             )
         ),
+        "time_overlap": sum(
+            1
+            for conflict in conflicts
+            if any(
+                issue["type"] == "time_overlap"
+                for issue in conflict["issues"]
+            )
+        ),
         "unassigned": sum(
             1
             for conflict in conflicts
@@ -648,7 +661,8 @@ def _get_dispatch_date_suggestions(
 
     search_end = search_start + timedelta(days=13)
     assignment_rows = cursor.execute("""
-    SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+    SELECT worker, workers, time_from, time_to,
+           substr(task_date, 1, 10) AS work_date
     FROM tasks
     WHERE company_id=?
       AND id!=?
@@ -683,6 +697,8 @@ def _get_dispatch_date_suggestions(
             {
                 "date": row["work_date"],
                 "workers": get_task_worker_names(row),
+                "time_from": row["time_from"],
+                "time_to": row["time_to"],
             }
             for row in assignment_rows
         ],
@@ -739,7 +755,8 @@ def _build_company_dispatch_plan(
     ORDER BY id
     """, (company_id,)).fetchall()
     assignment_rows = cursor.execute("""
-    SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+    SELECT worker, workers, time_from, time_to,
+           substr(task_date, 1, 10) AS work_date
     FROM tasks
     WHERE company_id=?
       AND archived=0
@@ -766,6 +783,8 @@ def _build_company_dispatch_plan(
             {
                 "date": row["work_date"],
                 "workers": get_task_worker_names(row),
+                "time_from": row["time_from"],
+                "time_to": row["time_to"],
             }
             for row in assignment_rows
         ],
@@ -8540,6 +8559,115 @@ async def calendar_dispatch_page(
     )
 
 
+@app.get("/calendar/day", response_class=HTMLResponse)
+async def calendar_day_route_page(
+    request: Request,
+    date: str = "",
+    worker: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager", "worker"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calendar")
+
+    if disabled_response:
+        return disabled_response
+
+    try:
+        selected_day = datetime.strptime(
+            str(date or datetime.now().strftime("%Y-%m-%d")),
+            "%Y-%m-%d",
+        ).date()
+    except ValueError:
+        selected_day = datetime.now().date()
+
+    selected_date = selected_day.strftime("%Y-%m-%d")
+    conn = connect()
+    c = conn.cursor()
+    worker_rows = c.execute("""
+    SELECT username, full_name
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY COALESCE(NULLIF(full_name, ''), username), username
+    """, (company_id,)).fetchall()
+    worker_names = [row["username"] for row in worker_rows]
+
+    if role == "worker":
+        selected_worker = username
+        visible_worker_names = [username]
+    else:
+        selected_worker = worker if worker in worker_names else ""
+        visible_worker_names = (
+            [selected_worker] if selected_worker else worker_names
+        )
+
+    query = """
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status!='Отменено'
+      AND task_date LIKE ?
+    """
+    params = [company_id, f"{selected_date}%"]
+
+    if selected_worker:
+        query += f" AND {worker_task_condition()}"
+        params.extend(worker_task_params(selected_worker))
+
+    query += """
+    ORDER BY
+      CASE WHEN time_from IS NULL OR time_from='' THEN 1 ELSE 0 END,
+      time_from,
+      id
+    """
+    tasks = c.execute(query, params).fetchall()
+    conn.close()
+    schedule = build_daily_schedule(
+        tasks,
+        visible_worker_names,
+    )
+
+    def day_url(day_value):
+        params = {"date": day_value.strftime("%Y-%m-%d")}
+
+        if selected_worker and role != "worker":
+            params["worker"] = selected_worker
+
+        return "/calendar/day?" + urlencode(params)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="calendar_day_route.html",
+        context={
+            "request": request,
+            "username": username,
+            "role": role,
+            "workers": worker_rows,
+            "selected_worker": selected_worker,
+            "selected_date": selected_date,
+            "schedule": schedule,
+            "previous_day_url": day_url(
+                selected_day - timedelta(days=1)
+            ),
+            "today_day_url": day_url(datetime.now().date()),
+            "next_day_url": day_url(
+                selected_day + timedelta(days=1)
+            ),
+        },
+    )
+
+
 @app.get("/api/calendar/dispatch/plan")
 def api_calendar_dispatch_plan(
     request: Request,
@@ -8767,6 +8895,12 @@ async def api_calendar_dispatch_plan_apply(request: Request):
             ]
 
         target_workers = list(dict.fromkeys(target_workers))
+        target_time_from, target_time_to, time_error = (
+            normalize_time_window(
+                raw_item.get("target_time_from"),
+                raw_item.get("target_time_to"),
+            )
+        )
 
         try:
             parsed_target_date = datetime.strptime(
@@ -8791,6 +8925,20 @@ async def api_calendar_dispatch_plan_apply(request: Request):
             skipped.append({
                 "task_id": task_id,
                 "reason": "Не выбрана допустимая команда.",
+            })
+            continue
+
+        if time_error:
+            skipped.append({
+                "task_id": task_id,
+                "reason": time_error,
+            })
+            continue
+
+        if not target_time_from or not target_time_to:
+            skipped.append({
+                "task_id": task_id,
+                "reason": "Не выбрано временное окно.",
             })
             continue
 
@@ -8877,6 +9025,37 @@ async def api_calendar_dispatch_plan_apply(request: Request):
             })
             continue
 
+        day_tasks = c.execute("""
+        SELECT *
+        FROM tasks
+        WHERE company_id=?
+          AND id!=?
+          AND archived=0
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND task_date LIKE ?
+        """, (
+            company_id,
+            task_id,
+            f"{target_date}%",
+        )).fetchall()
+        time_conflicts = find_time_conflicts(
+            day_tasks,
+            target_workers,
+            target_time_from,
+            target_time_to,
+        )
+
+        if time_conflicts:
+            conflict = time_conflicts[0]
+            skipped.append({
+                "task_id": task_id,
+                "reason": (
+                    f"Пересечение с заявкой #{conflict['task_id']} "
+                    f"({conflict['time_from']}–{conflict['time_to']})."
+                ),
+            })
+            continue
+
         capacity_error = None
 
         for worker_name in target_workers:
@@ -8920,17 +9099,20 @@ async def api_calendar_dispatch_plan_apply(request: Request):
         target_workers_csv = ",".join(target_workers)
         c.execute("""
         UPDATE tasks
-        SET task_date=?, worker=?, workers=?
+        SET task_date=?, worker=?, workers=?, time_from=?, time_to=?
         WHERE id=? AND company_id=?
         """, (
             target_date,
             target_workers[0],
             target_workers_csv,
+            target_time_from,
+            target_time_to,
             task_id,
             company_id,
         ))
         details = (
             f"Дата: {current_date or 'не назначена'} → {target_date}. "
+            f"Время: {target_time_from}–{target_time_to}. "
             f"Исполнители: "
             f"{', '.join(current_workers) or 'не назначены'} → "
             f"{', '.join(target_workers)}"
@@ -8959,7 +9141,11 @@ async def api_calendar_dispatch_plan_apply(request: Request):
                 company_id,
                 worker_name,
                 f"Запланирована заявка #{task_id}",
-                f"Дата: {target_date}. Автоматическое планирование.",
+                (
+                    f"Дата: {target_date}. "
+                    f"Время: {target_time_from}–{target_time_to}. "
+                    "Автоматическое планирование."
+                ),
                 f"/task/{task_id}",
                 now_value,
             ))
@@ -8973,7 +9159,8 @@ async def api_calendar_dispatch_plan_apply(request: Request):
                     (
                         f"Запланирована заявка #{task_id}\n"
                         f"Клиент: {task['client']}\n"
-                        f"Дата: {target_date}"
+                        f"Дата: {target_date}\n"
+                        f"Время: {target_time_from}–{target_time_to}"
                     ),
                 ))
 
@@ -8999,6 +9186,8 @@ async def api_calendar_dispatch_plan_apply(request: Request):
             "task_id": task_id,
             "target_date": target_date,
             "target_workers": target_workers,
+            "target_time_from": target_time_from,
+            "target_time_to": target_time_to,
         })
 
     conn.commit()
@@ -9361,6 +9550,7 @@ async def calendar_conflicts_page(
         if conflict_type in (
             "unavailable",
             "overload",
+            "time_overlap",
             "unassigned",
             "inactive_worker",
         )
@@ -17772,6 +17962,8 @@ async def logout():
 async def create_task_page(
     request: Request,
     task_date: str = "",
+    time_from: str = "",
+    time_to: str = "",
     worker: str = "",
     workers_csv: str = "",
     return_to: str = "",
@@ -17804,6 +17996,10 @@ async def create_task_page(
     except Exception:
         selected_task_date = ""
 
+    selected_time_from, selected_time_to, _ = normalize_time_window(
+        time_from,
+        time_to,
+    )
     conn = connect()
     c = conn.cursor()
 
@@ -17979,8 +18175,12 @@ async def create_task_page(
                 if recommended_worker:
                     switch_params = {
                         "task_date": selected_task_date,
-                        "worker": recommended_worker["username"]
+                        "worker": recommended_worker["username"],
                     }
+
+                    if selected_time_from and selected_time_to:
+                        switch_params["time_from"] = selected_time_from
+                        switch_params["time_to"] = selected_time_to
 
                     if selected_return_to:
                         switch_params["return_to"] = selected_return_to
@@ -18088,6 +18288,8 @@ async def create_task_page(
             "selected_source_task_id": selected_source_task_id,
             "selected_ai_note_id": selected_ai_note_id,
             "selected_task_date": selected_task_date,
+            "selected_time_from": selected_time_from,
+            "selected_time_to": selected_time_to,
             "selected_workers": selected_workers,
             "selected_return_to": selected_return_to,
             "selected_worker_active_count": selected_worker_active_count,
@@ -18130,6 +18332,10 @@ async def create_task(
     address = form.get("address")
     description = form.get("description")
     task_date = form.get("task_date")
+    time_from, time_to, time_error = normalize_time_window(
+        form.get("time_from"),
+        form.get("time_to"),
+    )
     deadline_at = (form.get("deadline_at") or "").strip()
     selected_workers = form.getlist("workers")
     return_to = (form.get("return_to") or "").strip()
@@ -18142,6 +18348,17 @@ async def create_task(
     priority = form.get("priority")
     price = form.get("price")
     company_id = get_user_company_id(username)
+
+    if time_error:
+        error_params = {"error": "invalid_time"}
+
+        if str(task_date or "")[:10]:
+            error_params["task_date"] = str(task_date or "")[:10]
+
+        return RedirectResponse(
+            f"/create-task?{urlencode(error_params)}",
+            status_code=302,
+        )
 
     conn = connect()
     c = conn.cursor()
@@ -18169,6 +18386,12 @@ async def create_task(
                     error_params["task_date"] = selected_task_date
             except Exception:
                 pass
+
+            if time_from:
+                error_params["time_from"] = time_from
+
+            if time_to:
+                error_params["time_to"] = time_to
 
             selected_worker = next(
                 (worker_name.strip() for worker_name in selected_workers if worker_name.strip()),
@@ -18330,6 +18553,10 @@ async def create_task(
             "workers_csv": ",".join(valid_workers),
         }
 
+        if time_from and time_to:
+            error_params["time_from"] = time_from
+            error_params["time_to"] = time_to
+
         if return_to == "calendar":
             error_params["return_to"] = "calendar"
         elif return_to == "client" and client_id:
@@ -18349,6 +18576,11 @@ async def create_task(
             error_params["task_date"] = selected_task_date
 
         error_params["worker"] = over_capacity_workers[0]["username"]
+        error_params["workers_csv"] = ",".join(valid_workers)
+
+        if time_from and time_to:
+            error_params["time_from"] = time_from
+            error_params["time_to"] = time_to
 
         if return_to == "calendar":
             error_params["return_to"] = "calendar"
@@ -18362,6 +18594,39 @@ async def create_task(
             status_code=302,
         )
 
+    if selected_task_date and valid_workers and time_from and time_to:
+        day_tasks = c.execute("""
+        SELECT *
+        FROM tasks
+        WHERE company_id=?
+          AND archived=0
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND task_date LIKE ?
+        """, (company_id, f"{selected_task_date}%")).fetchall()
+        time_conflicts = find_time_conflicts(
+            day_tasks,
+            valid_workers,
+            time_from,
+            time_to,
+        )
+
+        if time_conflicts:
+            conflict = time_conflicts[0]
+            error_params = {
+                "error": "time_conflict",
+                "task_date": selected_task_date,
+                "worker": valid_workers[0],
+                "workers_csv": ",".join(valid_workers),
+                "time_from": time_from,
+                "time_to": time_to,
+                "conflict_task_id": conflict["task_id"],
+            }
+            conn.close()
+            return RedirectResponse(
+                f"/create-task?{urlencode(error_params)}",
+                status_code=302,
+            )
+
     c.execute("""
     INSERT INTO tasks (
         company_id,
@@ -18371,6 +18636,8 @@ async def create_task(
         address,
         description,
         task_date,
+        time_from,
+        time_to,
         worker,
         workers,
         priority,
@@ -18381,7 +18648,7 @@ async def create_task(
         after_photo,
         created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         client_id,
@@ -18390,6 +18657,8 @@ async def create_task(
         address,
         description,
         task_date,
+        time_from,
+        time_to,
         worker,
         workers_text,
         priority,
@@ -18406,6 +18675,8 @@ async def create_task(
     notification_message = (
         f"Клиент: {client}. "
         f"Дата: {task_date or 'не указана'}. "
+        f"Время: {time_from or 'не указано'}"
+        f"{'–' + time_to if time_to else ''}. "
         f"Приоритет: {priority or 'не указан'}"
     )
 
@@ -18494,7 +18765,13 @@ async def create_task(
         username,
         role,
         "Создана заявка",
-        f"Клиент: {client}. Исполнители: {format_task_workers({'worker': worker, 'workers': workers_text})}. Дата: {task_date}"
+        (
+            f"Клиент: {client}. "
+            f"Исполнители: {format_task_workers({'worker': worker, 'workers': workers_text})}. "
+            f"Дата: {task_date}. "
+            f"Время: {time_from or 'не указано'}"
+            f"{'–' + time_to if time_to else ''}"
+        )
     )
 
     if over_capacity_workers:
@@ -18517,7 +18794,8 @@ async def create_task(
 👤 Клиент: {client}
 📞 Телефон: {phone}
 📍 Адрес: {address}
-📅 Дата: {task_date}
+	📅 Дата: {task_date}
+	⏰ Время: {time_from or 'не указано'}{'–' + time_to if time_to else ''}
 👷 Исполнители: {format_task_workers({'worker': worker, 'workers': workers_text})}
 🔥 Приоритет: {priority}
 💰 Цена: {price}
@@ -18535,7 +18813,8 @@ async def create_task(
 👤 Клиент: {client}
 📞 Телефон: {phone}
 📍 Адрес: {address}
-📅 Дата: {task_date}
+	📅 Дата: {task_date}
+	⏰ Время: {time_from or 'не указано'}{'–' + time_to if time_to else ''}
 🔥 Приоритет: {priority}
 """
             )
@@ -20219,6 +20498,10 @@ async def update_task_date(request: Request, task_id: int):
     form = await request.form()
     new_date = (form.get("task_date") or "").strip()
     return_to = (form.get("return_to") or "").strip()
+    has_time_fields = (
+        form.get("time_from") is not None
+        or form.get("time_to") is not None
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -20250,6 +20533,21 @@ async def update_task_date(request: Request, task_id: int):
         )
 
     task_workers = get_task_worker_names(task)
+    new_time_from = str(task["time_from"] or "")[:5]
+    new_time_to = str(task["time_to"] or "")[:5]
+
+    if has_time_fields:
+        new_time_from, new_time_to, time_error = normalize_time_window(
+            form.get("time_from"),
+            form.get("time_to"),
+        )
+
+        if time_error:
+            conn.close()
+            return RedirectResponse(
+                f"/task/{task_id}?date_error=invalid_time",
+                status_code=302,
+            )
 
     if selected_date and task_workers:
         unavailable_dates, _ = get_worker_unavailability(
@@ -20279,14 +20577,62 @@ async def update_task_date(request: Request, task_id: int):
                 status_code=302,
             )
 
+    if (
+        selected_date
+        and task_workers
+        and new_time_from
+        and new_time_to
+    ):
+        day_tasks = c.execute("""
+        SELECT *
+        FROM tasks
+        WHERE company_id=?
+          AND id!=?
+          AND archived=0
+          AND status NOT IN ('Завершено', 'Отменено')
+          AND task_date LIKE ?
+        """, (
+            task["company_id"],
+            task_id,
+            f"{selected_date}%",
+        )).fetchall()
+        time_conflicts = find_time_conflicts(
+            day_tasks,
+            task_workers,
+            new_time_from,
+            new_time_to,
+        )
+
+        if time_conflicts:
+            conflict = time_conflicts[0]
+            conn.close()
+            return RedirectResponse(
+                (
+                    f"/task/{task_id}?date_error=time_conflict"
+                    f"&conflict_task_id={conflict['task_id']}"
+                ),
+                status_code=302,
+            )
+
     old_date = task["task_date"]
+    old_time = (
+        f"{str(task['time_from'] or '')[:5]}–"
+        f"{str(task['time_to'] or '')[:5]}"
+        if task["time_from"] and task["time_to"]
+        else "Без времени"
+    )
     worker_chat_ids = get_task_worker_chat_ids(c, task)
 
     c.execute("""
     UPDATE tasks
-    SET task_date=?
+    SET task_date=?, time_from=?, time_to=?
     WHERE id=?
-    """, (new_date, task_id))
+    """, (
+        selected_date,
+        new_time_from,
+        new_time_to,
+        task_id,
+    ))
 
     conn.commit()
     conn.close()
@@ -20295,19 +20641,24 @@ async def update_task_date(request: Request, task_id: int):
         task_id,
         username,
         role,
-        "Дата заявки изменена",
-        f"Было: {old_date or 'Без даты'}. Стало: {new_date or 'Без даты'}"
+        "Расписание заявки изменено",
+        (
+            f"Было: {old_date or 'Без даты'}, {old_time}. "
+            f"Стало: {selected_date or 'Без даты'}, "
+            f"{new_time_from + '–' + new_time_to if new_time_from else 'Без времени'}"
+        ),
     )
 
     try:
         date_text = f"""
-📅 Дата заявки изменена
+	📅 Расписание заявки изменено
 
 Заявка: #{task_id}
 Клиент: {task['client']}
 Адрес: {task['address']}
 Старая дата: {old_date or 'Без даты'}
-Новая дата: {new_date}
+	Новая дата: {selected_date}
+	Новое время: {new_time_from + '–' + new_time_to if new_time_from else 'Без времени'}
 
 Изменил: {username} ({get_role_title(role)})
 """

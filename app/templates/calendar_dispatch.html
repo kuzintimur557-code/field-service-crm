@@ -136,9 +136,10 @@ h1{margin:0;font-size:32px}
         <div class="header-actions">
             <button class="button success" id="planner-open" type="button">
                 Автопланирование{% if planning_queue_count %} · {{ planning_queue_count }}{% endif %}
-            </button>
-            <a class="button danger" href="/calendar/conflicts">Конфликты</a>
-            <a class="button primary" href="/calendar">Календарь</a>
+	            </button>
+	            <a class="button danger" href="/calendar/conflicts">Конфликты</a>
+	            <a class="button primary" href="/calendar/day?date={{ selected_week_start }}">Маршрут дня</a>
+	            <a class="button primary" href="/calendar">Календарь</a>
             <a class="button" href="/">Главное меню</a>
         </div>
     </header>
@@ -218,9 +219,16 @@ h1{margin:0;font-size:32px}
                             <span class="task-number">#{{ task["id"] }}</span>
                             <span class="priority {% if task['priority'] == 'Срочно' %}urgent{% endif %}">{{ task["priority"] or "Обычный" }}</span>
                         </div>
-                        <div class="task-client">{{ task["client"] or "Клиент не указан" }}</div>
-                        {% if task["description"] %}<div class="task-description">{{ task["description"] }}</div>{% endif %}
-                        <div class="task-workers">{{ item["workers_label"] }}</div>
+	                        <div class="task-client">{{ task["client"] or "Клиент не указан" }}</div>
+	                        {% if task["description"] %}<div class="task-description">{{ task["description"] }}</div>{% endif %}
+	                        <div class="task-workers">{{ item["workers_label"] }}</div>
+	                        <div class="task-workers">
+	                            {% if task["time_from"] and task["time_to"] %}
+	                            Время: {{ task["time_from"][:5] }}–{{ task["time_to"][:5] }}
+	                            {% else %}
+	                            Время не назначено
+	                            {% endif %}
+	                        </div>
                         {% if item["has_conflict"] %}
                         <div class="task-flags"><span class="flag">Конфликт расписания</span></div>
                         {% endif %}
@@ -419,9 +427,10 @@ h1{margin:0;font-size:32px}
                             <div>${escapeHtml(currentDate)}</div>
                             <div class="planner-muted">${escapeHtml(currentWorkers)}</div>
                         </td>
-                        <td data-label="План">
-                            <div class="planner-target">${escapeHtml(item.target_date_label)}</div>
-                            <div class="planner-muted">${escapeHtml(item.target_workers.join(", "))}</div>
+	                        <td data-label="План">
+	                            <div class="planner-target">${escapeHtml(item.target_date_label)}</div>
+	                            <div class="planner-muted">${escapeHtml(item.target_time_label || "Время не назначено")}</div>
+	                            <div class="planner-muted">${escapeHtml(item.target_workers.join(", "))}</div>
                         </td>
                         <td data-label="Причина">
                             <span class="planner-score">Оценка ${item.score}</span>

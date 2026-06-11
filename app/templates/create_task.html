@@ -74,6 +74,21 @@ button:hover{background:#1d4ed8}
 	</div>
 	{% endif %}
 
+	{% if request.query_params.get("error") == "invalid_time" %}
+	<div class="note" style="background:#fee2e2;color:#991b1b">
+	Проверьте временной интервал: время окончания должно быть позже времени начала.
+	</div>
+	{% endif %}
+
+	{% if request.query_params.get("error") == "time_conflict" %}
+	<div class="note" style="background:#fee2e2;color:#991b1b">
+	У выбранного исполнителя уже есть заявка в это время.
+	{% if request.query_params.get("conflict_task_id") %}
+	<a href="/task/{{ request.query_params.get('conflict_task_id') }}" style="color:#991b1b;font-weight:900">Открыть конфликтующую заявку</a>
+	{% endif %}
+	</div>
+	{% endif %}
+
 	{% if selected_worker_active_count or selected_worker_unavailable %}
 	<div class="note" style="{% if selected_worker_at_capacity or selected_worker_unavailable %}background:#fee2e2;color:#991b1b{% else %}background:#fff7ed;color:#9a3412{% endif %}">
 	{% if selected_worker_unavailable %}
@@ -129,6 +144,17 @@ button:hover{background:#1d4ed8}
 <div>
 <label>Дата {{ (settings["task_label"] or "заявки")|lower }}</label>
 <input name="task_date" type="date" value="{{ selected_task_date }}">
+</div>
+</div>
+
+<div class="grid">
+<div>
+<label>Начало работы</label>
+<input name="time_from" type="time" value="{{ selected_time_from }}">
+</div>
+<div>
+<label>Окончание работы</label>
+<input name="time_to" type="time" value="{{ selected_time_to }}">
 </div>
 </div>
 

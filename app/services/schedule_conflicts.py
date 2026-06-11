@@ -1,5 +1,10 @@
 from datetime import datetime
 
+from app.services.daily_schedule import (
+    format_time_value,
+    parse_time_value,
+    time_windows_overlap,
+)
 from app.services.smart_scheduling import build_scheduling_recommendations
 
 
@@ -30,15 +35,26 @@ def detect_schedule_conflicts(
     }
     unavailable_reasons = unavailable_reasons or {}
     assignments_by_worker_date = {}
+    timed_assignments_by_worker_date = {}
 
     for task in tasks:
         task_date = str(task["task_date"] or "")[:10]
+        task_start = parse_time_value(task["time_from"])
+        task_end = parse_time_value(task["time_to"])
 
         for worker_name in _task_workers(task):
             key = (worker_name, task_date)
             assignments_by_worker_date.setdefault(key, []).append(task["id"])
 
+            if task_date and task_start is not None and task_end is not None:
+                timed_assignments_by_worker_date.setdefault(key, []).append({
+                    "task_id": task["id"],
+                    "time_from": task_start,
+                    "time_to": task_end,
+                })
+
     overloaded_task_ids = {}
+    time_overlaps_by_task = {}
 
     for key, task_ids in assignments_by_worker_date.items():
         worker_name = key[0]
@@ -57,6 +73,41 @@ def detect_schedule_conflicts(
                 "assigned": len(task_ids),
                 "capacity": capacity,
             })
+
+    for (worker_name, _), assignments in (
+        timed_assignments_by_worker_date.items()
+    ):
+        for index, assignment in enumerate(assignments):
+            for other in assignments[index + 1:]:
+                if not time_windows_overlap(
+                    assignment["time_from"],
+                    assignment["time_to"],
+                    other["time_from"],
+                    other["time_to"],
+                ):
+                    continue
+
+                for current, conflict in (
+                    (assignment, other),
+                    (other, assignment),
+                ):
+                    conflict_entry = time_overlaps_by_task.setdefault(
+                        current["task_id"],
+                        {},
+                    ).setdefault(
+                        conflict["task_id"],
+                        {
+                            "task_id": conflict["task_id"],
+                            "time_from": format_time_value(
+                                conflict["time_from"]
+                            ),
+                            "time_to": format_time_value(
+                                conflict["time_to"]
+                            ),
+                            "workers": set(),
+                        },
+                    )
+                    conflict_entry["workers"].add(worker_name)
 
     conflicts = []
 
@@ -122,6 +173,22 @@ def detect_schedule_conflicts(
                 ),
                 "severity": "warning",
                 **overload,
+            })
+
+        for overlap in time_overlaps_by_task.get(task["id"], {}).values():
+            overlap_workers = sorted(overlap["workers"])
+            issues.append({
+                "type": "time_overlap",
+                "label": (
+                    f"Пересечение с заявкой #{overlap['task_id']}"
+                ),
+                "details": (
+                    f"{overlap['time_from']}–{overlap['time_to']}; "
+                    f"исполнители: {', '.join(overlap_workers)}."
+                ),
+                "severity": "critical",
+                "conflict_task_id": overlap["task_id"],
+                "workers": overlap_workers,
             })
 
         if not issues:

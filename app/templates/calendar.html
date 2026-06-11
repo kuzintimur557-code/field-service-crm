@@ -152,10 +152,11 @@ h1{font-size:32px;margin:0}
 <div class="container">
 
 	<div class="header">
-	    <h1>📅 Календарь заявок</h1>
-	    <div class="header-actions">
-	        {% if role in ("boss", "manager") %}
-	        <a href="/calendar/dispatch" class="btn" style="background:#111827">Диспетчерская</a>
+		    <h1>📅 Календарь заявок</h1>
+		    <div class="header-actions">
+		        <a href="/calendar/day?date={{ availability_date }}" class="btn" style="background:#2563eb">Маршрут дня</a>
+		        {% if role in ("boss", "manager") %}
+		        <a href="/calendar/dispatch" class="btn" style="background:#111827">Диспетчерская</a>
 	        <a href="/calendar/conflicts" class="btn" style="background:#dc2626">Конфликты</a>
 	        {% endif %}
 	        <a href="/" class="btn">← Главное меню</a>
@@ -491,9 +492,14 @@ h1{font-size:32px;margin:0}
 	            #{{ task["id"] }} — {{ task["client"] }}
 	        </a>
 
-		        <div class="meta">📍 {{ task["address"] }}</div>
-		        <div class="meta">👷 {{ entry["workers"] }}</div>
-		        <div class="badge">{{ task["status"] }}</div>
+			        <div class="meta">📍 {{ task["address"] }}</div>
+			        <div class="meta">👷 {{ entry["workers"] }}</div>
+			        {% if task["time_from"] and task["time_to"] %}
+			        <div class="meta">⏰ {{ task["time_from"][:5] }}–{{ task["time_to"][:5] }}</div>
+			        {% else %}
+			        <div class="meta">⏰ Время не назначено</div>
+			        {% endif %}
+			        <div class="badge">{{ task["status"] }}</div>
 		        {% if role in ("boss", "manager") %}
 		        <form class="reschedule" method="post" action="/task/{{ task['id'] }}/date">
 		            <input type="date" name="task_date" value="{{ task['task_date'][:10] if task['task_date'] else '' }}">

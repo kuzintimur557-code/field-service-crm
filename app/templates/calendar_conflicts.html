@@ -18,7 +18,7 @@ h1{margin:0;font-size:32px}
 .button.secondary{background:#2563eb}
 .notice{margin-bottom:16px;padding:13px 15px;border-radius:8px;background:#dcfce7;color:#166534;font-weight:900}
 .notice.error{background:#fee2e2;color:#991b1b}
-.summary{display:grid;grid-template-columns:repeat(6,minmax(110px,1fr));gap:10px;margin-bottom:16px}
+	.summary{display:grid;grid-template-columns:repeat(7,minmax(105px,1fr));gap:10px;margin-bottom:16px}
 .summary-item{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
 .summary-label{color:#6b7280;font-size:12px;font-weight:900}
 .summary-value{margin-top:5px;font-size:24px;font-weight:900}
@@ -99,9 +99,10 @@ h1{margin:0;font-size:32px}
         <div class="summary-item"><div class="summary-label">Всего проблем</div><div class="summary-value">{{ summary["total"] }}</div></div>
         <div class="summary-item"><div class="summary-label">Критичные</div><div class="summary-value">{{ summary["critical"] }}</div></div>
         <div class="summary-item"><div class="summary-label">Предупреждения</div><div class="summary-value">{{ summary["warning"] }}</div></div>
-        <div class="summary-item"><div class="summary-label">Недоступность</div><div class="summary-value">{{ summary["unavailable"] }}</div></div>
-        <div class="summary-item"><div class="summary-label">Перегруз</div><div class="summary-value">{{ summary["overload"] }}</div></div>
-        <div class="summary-item"><div class="summary-label">Без команды</div><div class="summary-value">{{ summary["unassigned"] }}</div></div>
+	        <div class="summary-item"><div class="summary-label">Недоступность</div><div class="summary-value">{{ summary["unavailable"] }}</div></div>
+	        <div class="summary-item"><div class="summary-label">Перегруз</div><div class="summary-value">{{ summary["overload"] }}</div></div>
+	        <div class="summary-item"><div class="summary-label">По времени</div><div class="summary-value">{{ summary["time_overlap"] }}</div></div>
+	        <div class="summary-item"><div class="summary-label">Без команды</div><div class="summary-value">{{ summary["unassigned"] }}</div></div>
     </section>
 
     <section class="filters">
@@ -128,8 +129,9 @@ h1{margin:0;font-size:32px}
                 <select name="conflict_type">
                     <option value="">Все причины</option>
                     <option value="unavailable" {% if selected_type == "unavailable" %}selected{% endif %}>Сотрудник недоступен</option>
-                    <option value="overload" {% if selected_type == "overload" %}selected{% endif %}>Превышен лимит</option>
-                    <option value="unassigned" {% if selected_type == "unassigned" %}selected{% endif %}>Нет исполнителя</option>
+	                    <option value="overload" {% if selected_type == "overload" %}selected{% endif %}>Превышен лимит</option>
+	                    <option value="time_overlap" {% if selected_type == "time_overlap" %}selected{% endif %}>Пересечение времени</option>
+	                    <option value="unassigned" {% if selected_type == "unassigned" %}selected{% endif %}>Нет исполнителя</option>
                     <option value="inactive_worker" {% if selected_type == "inactive_worker" %}selected{% endif %}>Сотрудник отключён</option>
                 </select>
             </div>
@@ -146,9 +148,12 @@ h1{margin:0;font-size:32px}
             <div class="conflict-head">
                 <div>
                     <div class="task-title">Заявка #{{ task["id"] }} · {{ task["client"] or "Клиент не указан" }}</div>
-                    <div class="task-meta">
-                        <span>Дата: {{ conflict["task_date"] }}</span>
-                        <span>Исполнители: {{ conflict["workers"]|join(", ") or "не назначены" }}</span>
+	                    <div class="task-meta">
+	                        <span>Дата: {{ conflict["task_date"] }}</span>
+	                        {% if task["time_from"] and task["time_to"] %}
+	                        <span>Время: {{ task["time_from"][:5] }}–{{ task["time_to"][:5] }}</span>
+	                        {% endif %}
+	                        <span>Исполнители: {{ conflict["workers"]|join(", ") or "не назначены" }}</span>
                         <span>Статус: {{ task["status"] }}</span>
                     </div>
                 </div>

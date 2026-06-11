@@ -21,6 +21,7 @@ os.environ["SECRET_KEY"] = "smoke-test-secret"
 
 from app import main as crm  # noqa: E402
 from app.database import connect  # noqa: E402
+from app.services.daily_schedule import find_common_time_slot  # noqa: E402
 
 
 def make_request(username=None, cookies=None):
@@ -5637,6 +5638,15 @@ async def assert_dispatch_planner():
     assert preview["items"][0]["task_id"] == urgent_id
     assert preview_items[fixed_id]["target_workers"] == ["helper2"]
     assert preview_items[dated_id]["target_date"] == dated_value
+    assert preview_items[urgent_id]["target_time_from"]
+    assert preview_items[urgent_id]["target_time_to"]
+    assert (
+        preview_items[urgent_id]["target_time_label"]
+        == (
+            f"{preview_items[urgent_id]['target_time_from']}–"
+            f"{preview_items[urgent_id]['target_time_to']}"
+        )
+    )
     assert any(
         item["task_id"] == past_id
         and item["reason"] == "Дата заявки уже прошла."
@@ -5673,6 +5683,27 @@ async def assert_dispatch_planner():
         )
     )
     assert empty_apply.status_code == 400
+
+    missing_time_item = {
+        **preview_items[urgent_id],
+        "target_time_from": "",
+        "target_time_to": "",
+    }
+    missing_time_apply = await crm.api_calendar_dispatch_plan_apply(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/plan/apply",
+            {"items": [missing_time_item]},
+        )
+    )
+    assert missing_time_apply["summary"] == {
+        "requested": 1,
+        "applied": 0,
+        "skipped": 1,
+    }
+    assert missing_time_apply["skipped"][0]["reason"] == (
+        "Не выбрано временное окно."
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -5732,7 +5763,7 @@ async def assert_dispatch_planner():
     conn = connect()
     c = conn.cursor()
     planned_tasks = c.execute(f"""
-    SELECT id, task_date, worker, workers
+    SELECT id, task_date, worker, workers, time_from, time_to
     FROM tasks
     WHERE id IN ({",".join("?" for _ in task_ids)})
     """, task_ids).fetchall()
@@ -5746,6 +5777,8 @@ async def assert_dispatch_planner():
         preview_item = preview_items[task_id]
         assert planned["task_date"] == preview_item["target_date"]
         assert planned["workers"] == preview_item["target_workers_csv"]
+        assert planned["time_from"] == preview_item["target_time_from"]
+        assert planned["time_to"] == preview_item["target_time_to"]
 
     activity_count = c.execute(f"""
     SELECT COUNT(*)
@@ -5791,6 +5824,294 @@ async def assert_dispatch_planner():
             worker_row["username"],
         ))
 
+    conn.commit()
+    conn.close()
+
+
+async def assert_daily_route_schedule():
+    route_date = (
+        datetime.now().date() + timedelta(days=42)
+    ).strftime("%Y-%m-%d")
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    task_values = [
+        (
+            2,
+            "Route morning",
+            "Daily route smoke",
+            route_date,
+            "worker2",
+            "worker2",
+            "09:00",
+            "10:00",
+        ),
+        (
+            2,
+            "Route overlap",
+            "Daily route smoke",
+            route_date,
+            "worker2",
+            "worker2,helper2",
+            "09:30",
+            "10:30",
+        ),
+        (
+            2,
+            "Route without time",
+            "Daily route smoke",
+            route_date,
+            "helper2",
+            "helper2",
+            "",
+            "",
+        ),
+        (
+            2,
+            "Route unassigned",
+            "Daily route smoke",
+            route_date,
+            "",
+            "",
+            "11:00",
+            "12:00",
+        ),
+        (
+            1,
+            "Route outsider",
+            "Other company",
+            route_date,
+            "outsider_worker",
+            "outsider_worker",
+            "09:00",
+            "10:00",
+        ),
+    ]
+    task_ids = []
+
+    for values in task_values:
+        c.execute("""
+        INSERT INTO tasks (
+            company_id, client, description, task_date,
+            worker, workers, time_from, time_to,
+            priority, status, archived, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Обычный', 'Новая', 0, ?)
+        """, (*values, created_at))
+        task_ids.append(c.lastrowid)
+
+    morning_id, overlap_id, without_time_id, unassigned_id, outsider_id = (
+        task_ids
+    )
+    conn.commit()
+    conn.close()
+
+    assert crm.normalize_time_window("09:00", "10:00") == (
+        "09:00",
+        "10:00",
+        None,
+    )
+    assert crm.normalize_time_window("10:00", "09:00")[2]
+    slot = find_common_time_slot(
+        assignments=[
+            {
+                "date": route_date,
+                "workers": ["worker2"],
+                "time_from": "08:00",
+                "time_to": "09:30",
+            },
+            {
+                "date": route_date,
+                "workers": ["helper2"],
+                "time_from": "09:30",
+                "time_to": "10:30",
+            },
+        ],
+        target_date=route_date,
+        target_workers=["worker2", "helper2"],
+    )
+    assert slot == {
+        "time_from": "10:30",
+        "time_to": "11:30",
+        "duration_minutes": 60,
+    }
+
+    anonymous_page = await crm.calendar_day_route_page(
+        make_public_asgi_request("/calendar/day"),
+        date=route_date,
+    )
+    assert anonymous_page.status_code == 302
+    assert anonymous_page.headers["location"] == "/login"
+
+    owner_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    assert owner_page.status_code == 200
+    owner_html = owner_page.body.decode("utf-8")
+    assert "Маршрут дня" in owner_html
+    assert "Route morning" in owner_html
+    assert "Route overlap" in owner_html
+    assert "Route without time" in owner_html
+    assert "Route unassigned" in owner_html
+    assert "Route outsider" not in owner_html
+    assert "09:00–10:00" in owner_html
+    assert f"#{overlap_id}" in owner_html
+    assert "Пересечение:" in owner_html
+    assert owner_page.context["schedule"]["summary"] == {
+        "workers": 2,
+        "tasks": 4,
+        "scheduled": 3,
+        "without_time": 1,
+        "conflicts": 2,
+        "unassigned": 1,
+    }
+
+    filtered_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+        worker="helper2",
+    )
+    filtered_html = filtered_page.body.decode("utf-8")
+    assert "Route overlap" in filtered_html
+    assert "Route without time" in filtered_html
+    assert "Route morning" not in filtered_html
+    assert "Route unassigned" not in filtered_html
+
+    worker_page = await crm.calendar_day_route_page(
+        make_asgi_request("worker2", "/calendar/day"),
+        date=route_date,
+        worker="helper2",
+    )
+    worker_html = worker_page.body.decode("utf-8")
+    assert "Route morning" in worker_html
+    assert "Route overlap" in worker_html
+    assert "Route without time" not in worker_html
+    assert 'class="schedule-form"' not in worker_html
+
+    outsider_page = await crm.calendar_day_route_page(
+        make_asgi_request("outsider_worker", "/calendar/day"),
+        date=route_date,
+    )
+    outsider_html = outsider_page.body.decode("utf-8")
+    assert "Route outsider" in outsider_html
+    assert "Route morning" not in outsider_html
+
+    conflicts, summary = crm.get_company_schedule_conflicts(
+        2,
+        route_date,
+        route_date,
+    )
+    overlap_conflicts = [
+        conflict
+        for conflict in conflicts
+        if conflict["task_id"] in (morning_id, overlap_id)
+    ]
+    assert len(overlap_conflicts) == 2
+    assert summary["time_overlap"] >= 2
+    assert all(
+        any(
+            issue["type"] == "time_overlap"
+            for issue in conflict["issues"]
+        )
+        for conflict in overlap_conflicts
+    )
+    conflict_page = await crm.calendar_conflicts_page(
+        make_asgi_request("owner2", "/calendar/conflicts"),
+        days=60,
+        conflict_type="time_overlap",
+    )
+    assert conflict_page.status_code == 200
+    assert "Пересечение времени" in conflict_page.body.decode("utf-8")
+
+    invalid_time = await crm.update_task_date(
+        make_form_request(
+            "owner2",
+            f"/task/{without_time_id}/date",
+            {
+                "task_date": route_date,
+                "time_from": "12:00",
+                "time_to": "11:00",
+            },
+        ),
+        without_time_id,
+    )
+    assert invalid_time.headers["location"] == (
+        f"/task/{without_time_id}?date_error=invalid_time"
+    )
+
+    overlap_update = await crm.update_task_date(
+        make_form_request(
+            "owner2",
+            f"/task/{without_time_id}/date",
+            {
+                "task_date": route_date,
+                "time_from": "10:00",
+                "time_to": "11:00",
+            },
+        ),
+        without_time_id,
+    )
+    assert overlap_update.headers["location"] == (
+        f"/task/{without_time_id}?date_error=time_conflict"
+        f"&conflict_task_id={overlap_id}"
+    )
+
+    original_send_message = crm.send_message
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message = lambda text: True
+    crm.send_message_to_chat = lambda chat_id, text: True
+
+    try:
+        valid_update = await crm.update_task_date(
+            make_form_request(
+                "owner2",
+                f"/task/{without_time_id}/date",
+                {
+                    "task_date": route_date,
+                    "time_from": "10:30",
+                    "time_to": "11:30",
+                    "return_to": (
+                        f"/calendar/day?date={route_date}&worker=helper2"
+                    ),
+                },
+            ),
+            without_time_id,
+        )
+    finally:
+        crm.send_message = original_send_message
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert valid_update.headers["location"] == (
+        f"/calendar/day?date={route_date}&worker=helper2"
+    )
+    conn = connect()
+    c = conn.cursor()
+    updated = c.execute("""
+    SELECT time_from, time_to
+    FROM tasks
+    WHERE id=? AND company_id=2
+    """, (without_time_id,)).fetchone()
+    activity = c.execute("""
+    SELECT details
+    FROM task_activity
+    WHERE task_id=? AND action='Расписание заявки изменено'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (without_time_id,)).fetchone()
+    assert updated["time_from"] == "10:30"
+    assert updated["time_to"] == "11:30"
+    assert "10:30–11:30" in activity["details"]
+
+    placeholders = ",".join("?" for _ in task_ids)
+    c.execute(
+        f"DELETE FROM task_activity WHERE task_id IN ({placeholders})",
+        task_ids,
+    )
+    c.execute(
+        f"DELETE FROM tasks WHERE id IN ({placeholders})",
+        task_ids,
+    )
     conn.commit()
     conn.close()
 
@@ -8481,7 +8802,8 @@ async def assert_task_custom_fields():
     assert blocked_response.status_code == 302
     assert blocked_response.headers["location"] == (
         "/create-task?error=capacity_confirmation"
-        "&task_date=2026-05-17&worker=worker2&return_to=calendar"
+        "&task_date=2026-05-17&worker=worker2"
+        "&workers_csv=free2%2Cworker2&return_to=calendar"
     )
 
     conn = connect()
@@ -9254,6 +9576,7 @@ def main():
         asyncio.run(assert_schedule_conflicts())
         asyncio.run(assert_dispatch_board())
         asyncio.run(assert_dispatch_planner())
+        asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())
         asyncio.run(assert_finance_margin(task))

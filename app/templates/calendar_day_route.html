@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Маршрут дня</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
+.container{max-width:1180px;margin:auto;padding:24px}
+.header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px}
+h1{margin:0;font-size:30px}
+.subtitle{margin-top:5px;color:#6b7280;font-weight:800}
+.actions,.day-nav{display:flex;gap:8px;flex-wrap:wrap}
+.button{display:inline-flex;align-items:center;justify-content:center;padding:11px 14px;border:0;border-radius:8px;background:#111827;color:white;text-decoration:none;font-weight:900;cursor:pointer}
+.button.primary{background:#2563eb}
+.controls{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.filter{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.filter label{display:block;margin-bottom:5px;color:#6b7280;font-size:12px;font-weight:900}
+.filter input,.filter select{min-width:180px;padding:10px;border:1px solid #d1d5db;border-radius:8px;background:white;font-weight:800}
+.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:14px 0}
+.metric{padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.metric span{display:block;color:#6b7280;font-size:11px;font-weight:900}
+.metric strong{display:block;margin-top:4px;font-size:22px}
+.worker-section{margin-top:14px;border-top:4px solid #111827;background:white}
+.worker-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid #e5e7eb}
+.worker-name{font-size:18px;font-weight:900}
+.worker-stats{color:#6b7280;font-size:12px;font-weight:900}
+.route-list{display:grid}
+.route-item{display:grid;grid-template-columns:72px minmax(0,1fr) 210px;gap:14px;align-items:start;padding:14px 16px;border-bottom:1px solid #e5e7eb}
+.route-item:last-child{border-bottom:0}
+.route-item.conflict{background:#fff7f7}
+.route-order{display:flex;width:38px;height:38px;align-items:center;justify-content:center;border-radius:50%;background:#111827;color:white;font-weight:900}
+.route-time{margin-top:6px;color:#1d4ed8;font-size:12px;font-weight:900}
+.route-time.empty{color:#9a3412}
+.task-title{color:#111827;text-decoration:none;font-size:16px;font-weight:900}
+.task-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;color:#6b7280;font-size:12px;font-weight:800}
+.conflict-label{display:inline-flex;margin-top:7px;padding:4px 7px;border-radius:6px;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:900}
+.schedule-form{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.schedule-form input{min-width:0;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:7px;background:white;font-weight:800}
+.schedule-form button{grid-column:1/-1;padding:8px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.empty{padding:24px;color:#6b7280;text-align:center;font-weight:800}
+.unassigned{margin-top:14px;padding:16px;border:1px solid #fecaca;border-radius:8px;background:#fff7f7}
+.unassigned h2{margin:0 0 10px;font-size:18px}
+.unassigned-list{display:flex;gap:8px;flex-wrap:wrap}
+.unassigned-list a{padding:8px 10px;border-radius:7px;background:white;color:#991b1b;text-decoration:none;font-weight:900}
+@media(max-width:760px){
+    .container{padding:16px}
+    h1{font-size:26px}
+    .actions,.actions a,.controls,.filter,.filter>div,.filter input,.filter select,.filter button,.day-nav,.day-nav a{width:100%}
+	    .summary{grid-template-columns:1fr 1fr}
+	    .worker-head{align-items:flex-start;flex-direction:column}
+	    .worker-stats{line-height:1.5}
+	    .route-item{grid-template-columns:52px minmax(0,1fr)}
+	    .schedule-form{grid-column:1/-1}
+	}
+</style>
+</head>
+<body>
+<main class="container">
+    <header class="header">
+        <div>
+            <h1>Маршрут дня</h1>
+            <div class="subtitle">{{ selected_date }}</div>
+        </div>
+        <div class="actions">
+            <a class="button primary" href="/calendar/dispatch?week_start={{ selected_date }}">Диспетчерская</a>
+            <a class="button" href="/calendar?date={{ selected_date }}">Календарь</a>
+            <a class="button" href="/">Главное меню</a>
+        </div>
+    </header>
+
+    <section class="controls">
+        <form class="filter" method="get" action="/calendar/day">
+            <div>
+                <label for="day-date">Дата</label>
+                <input id="day-date" type="date" name="date" value="{{ selected_date }}">
+            </div>
+            {% if role in ("boss", "manager") %}
+            <div>
+                <label for="day-worker">Исполнитель</label>
+                <select id="day-worker" name="worker">
+                    <option value="">Все исполнители</option>
+                    {% for worker in workers %}
+                    <option value="{{ worker['username'] }}" {% if selected_worker == worker['username'] %}selected{% endif %}>{{ worker["full_name"] or worker["username"] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <button class="button primary" type="submit">Показать</button>
+        </form>
+        <nav class="day-nav">
+            <a class="button" href="{{ previous_day_url }}">Предыдущий</a>
+            <a class="button primary" href="{{ today_day_url }}">Сегодня</a>
+            <a class="button" href="{{ next_day_url }}">Следующий</a>
+        </nav>
+    </section>
+
+    <section class="summary">
+        <div class="metric"><span>Заявок</span><strong>{{ schedule["summary"]["tasks"] }}</strong></div>
+        <div class="metric"><span>Со временем</span><strong>{{ schedule["summary"]["scheduled"] }}</strong></div>
+        <div class="metric"><span>Без времени</span><strong>{{ schedule["summary"]["without_time"] }}</strong></div>
+        <div class="metric"><span>Конфликты</span><strong>{{ schedule["summary"]["conflicts"] }}</strong></div>
+        <div class="metric"><span>Без исполнителя</span><strong>{{ schedule["summary"]["unassigned"] }}</strong></div>
+    </section>
+
+	    {% if schedule["summary"]["tasks"] %}
+	    {% for worker in schedule["workers"] %}
+	    {% if worker["items"] %}
+    <section class="worker-section">
+        <header class="worker-head">
+            <div class="worker-name">{{ worker["username"] }}</div>
+            <div class="worker-stats">
+                По времени: {{ worker["scheduled_count"] }} ·
+                без времени: {{ worker["unscheduled_count"] }} ·
+                конфликтов: {{ worker["conflict_count"] }}
+            </div>
+        </header>
+        <div class="route-list">
+            {% for item in worker["items"] %}
+            {% set task = item["task"] %}
+            <article class="route-item {% if item['conflicts'] %}conflict{% endif %}">
+                <div>
+                    <div class="route-order">{{ item["route_order"] }}</div>
+                    <div class="route-time {% if not item['has_time'] %}empty{% endif %}">
+                        {% if item["has_time"] %}
+                        {{ item["time_from"] }}–{{ item["time_to"] }}
+                        {% else %}
+                        Без времени
+                        {% endif %}
+                    </div>
+                </div>
+                <div>
+                    <a class="task-title" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+                    <div class="task-meta">
+                        <span>{{ item["address"] or "Адрес не указан" }}</span>
+                        <span>{{ item["status"] }}</span>
+                        <span>{{ item["priority"] }}</span>
+                    </div>
+	                    {% if item["conflicts"] %}
+	                    <div class="conflict-label">
+	                        Пересечение:
+	                        {% for conflict_id in item["conflicts"] %}
+	                        #{{ conflict_id }}{% if not loop.last %}, {% endif %}
+	                        {% endfor %}
+	                    </div>
+	                    {% endif %}
+                </div>
+                {% if role in ("boss", "manager") %}
+                <form class="schedule-form" method="post" action="/task/{{ item['task_id'] }}/date">
+                    <input type="hidden" name="task_date" value="{{ selected_date }}">
+                    <input type="hidden" name="return_to" value="/calendar/day?date={{ selected_date }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}">
+                    <input type="time" name="time_from" value="{{ item['time_from'] }}" aria-label="Начало заявки #{{ item['task_id'] }}">
+                    <input type="time" name="time_to" value="{{ item['time_to'] }}" aria-label="Окончание заявки #{{ item['task_id'] }}">
+                    <button type="submit">Сохранить время</button>
+                </form>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+	    {% endfor %}
+	    {% else %}
+	    <div class="empty">На выбранный день нет заявок.</div>
+	    {% endif %}
+
+    {% if schedule["unassigned"] %}
+    <section class="unassigned">
+        <h2>Заявки без исполнителя</h2>
+        <div class="unassigned-list">
+            {% for item in schedule["unassigned"] %}
+            <a href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</main>
+{% include 'mobile_nav.html' %}
+</body>
+</html>
