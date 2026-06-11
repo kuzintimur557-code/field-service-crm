@@ -9,7 +9,7 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
-.container{max-width:1180px;margin:auto;padding:24px}
+.container{max-width:1220px;margin:auto;padding:24px}
 .header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px}
 h1{margin:0;font-size:30px}
 .subtitle{margin-top:5px;color:#6b7280;font-weight:800}
@@ -28,16 +28,47 @@ h1{margin:0;font-size:30px}
 .worker-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid #e5e7eb}
 .worker-name{font-size:18px;font-weight:900}
 .worker-stats{color:#6b7280;font-size:12px;font-weight:900}
+.timeline-panel{padding:14px 16px;border-bottom:1px solid #e5e7eb;background:#f9fafb}
+.timeline-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.timeline-title{font-size:13px;font-weight:900}
+.timeline-caption{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800}
+.free-windows{display:flex;gap:6px;flex-wrap:wrap}
+.free-window{padding:5px 7px;border:1px solid #bbf7d0;border-radius:6px;background:#f0fdf4;color:#166534;font-size:11px;font-weight:900}
+.free-window.empty{border-color:#fecaca;background:#fef2f2;color:#991b1b}
+.timeline-scroll{margin-top:12px;overflow-x:auto;padding-bottom:5px}
+.timeline-grid{display:grid;grid-template-columns:repeat(24,minmax(34px,1fr));min-width:840px;border:1px solid #d1d5db;border-radius:7px;overflow:hidden;background:white}
+.timeline-slot{position:relative;height:54px;padding:0;border:0;border-right:1px solid #e5e7eb;background:#ecfdf5;color:#166534;font:inherit;cursor:default}
+.timeline-slot:last-child{border-right:0}
+.timeline-slot.busy{background:#dbeafe;color:#1e40af}
+.timeline-slot.conflict{background:#fee2e2;color:#991b1b}
+.timeline-slot.free.manageable{cursor:pointer}
+.timeline-slot.free.manageable:hover,.timeline-slot.free.manageable.drag-over{background:#bbf7d0;box-shadow:inset 0 0 0 2px #16a34a}
+.timeline-hour{position:absolute;top:5px;left:5px;font-size:9px;font-weight:900}
+.timeline-count{display:flex;height:100%;align-items:center;justify-content:center;font-size:12px;font-weight:900}
+.timeline-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:7px;color:#6b7280;font-size:10px;font-weight:900}
+.legend-item{display:inline-flex;gap:5px;align-items:center}
+.legend-dot{width:9px;height:9px;border-radius:2px;background:#bbf7d0}
+.legend-dot.busy{background:#93c5fd}
+.legend-dot.conflict{background:#fca5a5}
 .route-list{display:grid}
-.route-item{display:grid;grid-template-columns:72px minmax(0,1fr) 210px;gap:14px;align-items:start;padding:14px 16px;border-bottom:1px solid #e5e7eb}
+.route-item{display:grid;grid-template-columns:72px minmax(0,1fr) 230px;gap:14px;align-items:start;padding:14px 16px;border-bottom:1px solid #e5e7eb}
 .route-item:last-child{border-bottom:0}
 .route-item.conflict{background:#fff7f7}
+.route-item[draggable="true"]{cursor:grab}
+.route-item.dragging{opacity:.45}
+.route-item.selected{box-shadow:inset 4px 0 #2563eb;background:#eff6ff}
+.route-order-line{display:flex;gap:6px;align-items:center}
 .route-order{display:flex;width:38px;height:38px;align-items:center;justify-content:center;border-radius:50%;background:#111827;color:white;font-weight:900}
+.pick-task{display:flex;width:28px;height:28px;align-items:center;justify-content:center;border:0;border-radius:7px;background:#e5e7eb;color:#111827;font-size:17px;font-weight:900;cursor:pointer}
+.pick-task.active{background:#2563eb;color:white}
 .route-time{margin-top:6px;color:#1d4ed8;font-size:12px;font-weight:900}
 .route-time.empty{color:#9a3412}
 .task-title{color:#111827;text-decoration:none;font-size:16px;font-weight:900}
 .task-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;color:#6b7280;font-size:12px;font-weight:800}
 .conflict-label{display:inline-flex;margin-top:7px;padding:4px 7px;border-radius:6px;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:900}
+.quick-slots{display:flex;gap:6px;align-items:center;margin-top:9px}
+.quick-slots select{min-width:150px;padding:8px;border:1px solid #d1d5db;border-radius:7px;background:white;font-weight:800}
+.quick-slots button{padding:8px 10px;border:0;border-radius:7px;background:#059669;color:white;font-weight:900;cursor:pointer}
 .schedule-form{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .schedule-form input{min-width:0;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:7px;background:white;font-weight:800}
 .schedule-form button{grid-column:1/-1;padding:8px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
@@ -46,16 +77,24 @@ h1{margin:0;font-size:30px}
 .unassigned h2{margin:0 0 10px;font-size:18px}
 .unassigned-list{display:flex;gap:8px;flex-wrap:wrap}
 .unassigned-list a{padding:8px 10px;border-radius:7px;background:white;color:#991b1b;text-decoration:none;font-weight:900}
+.toast{position:fixed;right:18px;bottom:82px;z-index:1000;max-width:420px;padding:14px 16px;border-radius:8px;background:#111827;color:white;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.22)}
+.toast.error{background:#991b1b}
+.toast[hidden]{display:none}
 @media(max-width:760px){
     .container{padding:16px}
     h1{font-size:26px}
     .actions,.actions a,.controls,.filter,.filter>div,.filter input,.filter select,.filter button,.day-nav,.day-nav a{width:100%}
-	    .summary{grid-template-columns:1fr 1fr}
-	    .worker-head{align-items:flex-start;flex-direction:column}
-	    .worker-stats{line-height:1.5}
-	    .route-item{grid-template-columns:52px minmax(0,1fr)}
-	    .schedule-form{grid-column:1/-1}
-	}
+    .summary{grid-template-columns:1fr 1fr}
+    .worker-head{align-items:flex-start;flex-direction:column}
+    .worker-stats{line-height:1.5}
+    .timeline-top{display:block}
+    .free-windows{margin-top:8px}
+    .route-item{grid-template-columns:52px minmax(0,1fr)}
+    .route-order-line{align-items:flex-start;flex-direction:column}
+    .schedule-form{grid-column:1/-1}
+    .quick-slots{align-items:stretch;flex-direction:column}
+    .quick-slots select,.quick-slots button{width:100%}
+}
 </style>
 </head>
 <body>
@@ -106,24 +145,76 @@ h1{margin:0;font-size:30px}
         <div class="metric"><span>Без исполнителя</span><strong>{{ schedule["summary"]["unassigned"] }}</strong></div>
     </section>
 
-	    {% if schedule["summary"]["tasks"] %}
-	    {% for worker in schedule["workers"] %}
-	    {% if worker["items"] %}
-    <section class="worker-section">
+    {% if schedule["summary"]["tasks"] %}
+    {% for worker in schedule["workers"] %}
+    {% if worker["items"] %}
+    <section class="worker-section" data-worker="{{ worker['username'] }}">
         <header class="worker-head">
             <div class="worker-name">{{ worker["username"] }}</div>
             <div class="worker-stats">
                 По времени: {{ worker["scheduled_count"] }} ·
                 без времени: {{ worker["unscheduled_count"] }} ·
-                конфликтов: {{ worker["conflict_count"] }}
+                конфликтов: {{ worker["conflict_count"] }} ·
+                занятость: {{ worker["timeline"]["utilization_percent"] }}%
             </div>
         </header>
+
+        <div class="timeline-panel">
+            <div class="timeline-top">
+                <div>
+                    <div class="timeline-title">Шкала рабочего дня</div>
+                    <div class="timeline-caption">08:00–20:00 · шаг 30 минут</div>
+                </div>
+                <div class="free-windows">
+                    {% for window in worker["timeline"]["free_windows"] %}
+                    <span class="free-window">{{ window["label"] }}</span>
+                    {% else %}
+                    <span class="free-window empty">Свободных окон нет</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="timeline-scroll">
+                <div class="timeline-grid">
+                    {% for slot in worker["timeline"]["slots"] %}
+                    <div
+                        class="timeline-slot {{ slot['status'] }} {% if role in ('boss', 'manager') %}manageable{% endif %}"
+                        data-time-from="{{ slot['time_from'] }}"
+                        data-worker="{{ worker['username'] }}"
+                        title="{{ slot['time_from'] }}–{{ slot['time_to'] }}{% if slot['task_ids'] %} · заявки: #{{ slot['task_ids']|join(', #') }}{% else %} · свободно{% endif %}"
+                    >
+                        {% if slot["hour_label"] %}<span class="timeline-hour">{{ slot["hour_label"] }}</span>{% endif %}
+                        {% if slot["task_count"] %}<span class="timeline-count">{{ slot["task_count"] }}</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="timeline-legend">
+                <span class="legend-item"><span class="legend-dot"></span>Свободно</span>
+                <span class="legend-item"><span class="legend-dot busy"></span>Занято</span>
+                <span class="legend-item"><span class="legend-dot conflict"></span>Пересечение</span>
+            </div>
+        </div>
+
         <div class="route-list">
             {% for item in worker["items"] %}
             {% set task = item["task"] %}
-            <article class="route-item {% if item['conflicts'] %}conflict{% endif %}">
+            <article
+                class="route-item {% if item['conflicts'] %}conflict{% endif %}"
+                {% if role in ("boss", "manager") %}
+                draggable="true"
+                data-task-id="{{ item['task_id'] }}"
+                data-expected-date="{{ selected_date }}"
+                data-expected-time-from="{{ item['time_from'] }}"
+                data-expected-time-to="{{ item['time_to'] }}"
+                {% endif %}
+            >
                 <div>
-                    <div class="route-order">{{ item["route_order"] }}</div>
+                    <div class="route-order-line">
+                        <div class="route-order">{{ item["route_order"] }}</div>
+                        {% if role in ("boss", "manager") %}
+                        <button class="pick-task" type="button" title="Выбрать заявку для переноса" aria-label="Выбрать заявку #{{ item['task_id'] }} для переноса">↔</button>
+                        {% endif %}
+                    </div>
                     <div class="route-time {% if not item['has_time'] %}empty{% endif %}">
                         {% if item["has_time"] %}
                         {{ item["time_from"] }}–{{ item["time_to"] }}
@@ -138,15 +229,27 @@ h1{margin:0;font-size:30px}
                         <span>{{ item["address"] or "Адрес не указан" }}</span>
                         <span>{{ item["status"] }}</span>
                         <span>{{ item["priority"] }}</span>
+                        <span>{{ item["duration_minutes"] }} мин.</span>
                     </div>
-	                    {% if item["conflicts"] %}
-	                    <div class="conflict-label">
-	                        Пересечение:
-	                        {% for conflict_id in item["conflicts"] %}
-	                        #{{ conflict_id }}{% if not loop.last %}, {% endif %}
-	                        {% endfor %}
-	                    </div>
-	                    {% endif %}
+                    {% if item["conflicts"] %}
+                    <div class="conflict-label">
+                        Пересечение:
+                        {% for conflict_id in item["conflicts"] %}
+                        #{{ conflict_id }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if role in ("boss", "manager") %}
+                    <div class="quick-slots">
+                        <select aria-label="Свободное окно для заявки #{{ item['task_id'] }}">
+                            <option value="">Свободное окно</option>
+                            {% for slot in item["available_slots"] %}
+                            <option value="{{ slot['time_from'] }}">{{ slot["label"] }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="quick-time-button" type="button">Перенести</button>
+                    </div>
+                    {% endif %}
                 </div>
                 {% if role in ("boss", "manager") %}
                 <form class="schedule-form" method="post" action="/task/{{ item['task_id'] }}/date">
@@ -162,10 +265,10 @@ h1{margin:0;font-size:30px}
         </div>
     </section>
     {% endif %}
-	    {% endfor %}
-	    {% else %}
-	    <div class="empty">На выбранный день нет заявок.</div>
-	    {% endif %}
+    {% endfor %}
+    {% else %}
+    <div class="empty">На выбранный день нет заявок.</div>
+    {% endif %}
 
     {% if schedule["unassigned"] %}
     <section class="unassigned">
@@ -178,6 +281,151 @@ h1{margin:0;font-size:30px}
     </section>
     {% endif %}
 </main>
+<div class="toast" id="schedule-toast" hidden></div>
 {% include 'mobile_nav.html' %}
+{% if role in ("boss", "manager") %}
+<script>
+(() => {
+    const toast = document.getElementById("schedule-toast");
+    const selectedDate = "{{ selected_date }}";
+    let draggedCard = null;
+    let selectedCard = null;
+
+    function showToast(message, isError = false) {
+        toast.textContent = message;
+        toast.classList.toggle("error", isError);
+        toast.hidden = false;
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => {
+            toast.hidden = true;
+        }, 4200);
+    }
+
+    function errorMessage(data) {
+        const messages = {
+            invalid_date: "Указана некорректная дата.",
+            past_date: "Нельзя переносить заявку на прошедший день.",
+            invalid_time: "Выберите время с шагом 30 минут.",
+            outside_workday: "Интервал выходит за рабочий день 08:00–20:00.",
+            stale: "Расписание уже изменилось. Страница будет обновлена.",
+            time_conflict: "Это время уже занято.",
+            worker_unavailable: `Исполнитель ${data.worker || ""} недоступен${data.reason ? ": " + data.reason : "."}`,
+            capacity_reached: `У исполнителя ${data.worker || ""} заполнен дневной лимит.`,
+            inactive_worker: `Исполнитель ${data.worker || ""} отключён.`,
+            unassigned: "Сначала назначьте исполнителя.",
+            task_closed: "Заявка уже завершена или отменена.",
+            not_found: "Заявка не найдена."
+        };
+        let message = messages[data.error] || "Не удалось изменить время.";
+
+        if (data.suggestions && data.suggestions.length) {
+            message += " Свободно: " + data.suggestions
+                .slice(0, 4)
+                .map(item => item.label)
+                .join(", ") + ".";
+        }
+
+        return message;
+    }
+
+    function setSelectedCard(card) {
+        document.querySelectorAll(".route-item.selected").forEach(item => {
+            item.classList.remove("selected");
+            item.querySelector(".pick-task")?.classList.remove("active");
+        });
+        selectedCard = selectedCard === card ? null : card;
+
+        if (selectedCard) {
+            selectedCard.classList.add("selected");
+            selectedCard.querySelector(".pick-task")?.classList.add("active");
+            showToast(`Выбрана заявка #${selectedCard.dataset.taskId}.`);
+        }
+    }
+
+    async function moveTaskTime(card, targetTimeFrom) {
+        if (!card || !targetTimeFrom) {
+            showToast("Сначала выберите заявку и свободное окно.", true);
+            return;
+        }
+
+        const response = await fetch("/api/calendar/day/move-time", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                task_id: Number(card.dataset.taskId),
+                target_date: selectedDate,
+                target_time_from: targetTimeFrom,
+                expected_date: card.dataset.expectedDate,
+                expected_time_from: card.dataset.expectedTimeFrom,
+                expected_time_to: card.dataset.expectedTimeTo
+            })
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            showToast(errorMessage(data), true);
+
+            if (data.error === "stale") {
+                window.setTimeout(() => window.location.reload(), 700);
+            }
+
+            return;
+        }
+
+        showToast(
+            `Заявка #${data.task_id}: ${data.target_time_from}–${data.target_time_to}.`
+        );
+        window.setTimeout(() => window.location.reload(), 350);
+    }
+
+    document.querySelectorAll('.route-item[draggable="true"]').forEach(card => {
+        card.addEventListener("dragstart", event => {
+            draggedCard = card;
+            card.classList.add("dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", card.dataset.taskId);
+        });
+        card.addEventListener("dragend", () => {
+            card.classList.remove("dragging");
+            draggedCard = null;
+            document.querySelectorAll(".timeline-slot.drag-over").forEach(slot => {
+                slot.classList.remove("drag-over");
+            });
+        });
+        card.querySelector(".pick-task").addEventListener("click", event => {
+            event.stopPropagation();
+            setSelectedCard(card);
+        });
+        const quickButton = card.querySelector(".quick-time-button");
+        const quickSelect = card.querySelector(".quick-slots select");
+        quickButton.addEventListener("click", () => {
+            moveTaskTime(card, quickSelect.value);
+        });
+    });
+
+    document.querySelectorAll(".timeline-slot.free.manageable").forEach(slot => {
+        slot.addEventListener("dragover", event => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            slot.classList.add("drag-over");
+        });
+        slot.addEventListener("dragleave", () => {
+            slot.classList.remove("drag-over");
+        });
+        slot.addEventListener("drop", event => {
+            event.preventDefault();
+            slot.classList.remove("drag-over");
+            moveTaskTime(draggedCard, slot.dataset.timeFrom);
+        });
+        slot.addEventListener("click", () => {
+            if (selectedCard) {
+                moveTaskTime(selectedCard, slot.dataset.timeFrom);
+            }
+        });
+    });
+})();
+</script>
+{% endif %}
 </body>
 </html>

@@ -66,6 +66,118 @@ def time_windows_overlap(start_a, end_a, start_b, end_b):
     return start_a < end_b and start_b < end_a
 
 
+def task_duration_minutes(task, default=DEFAULT_DURATION):
+    start = parse_time_value(_value(task, "time_from"))
+    end = parse_time_value(_value(task, "time_to"))
+
+    if start is None or end is None or start >= end:
+        return int(default or DEFAULT_DURATION)
+
+    return end - start
+
+
+def _task_blocks_time(task):
+    return str(_value(task, "status") or "") not in (
+        "Завершено",
+        "Отменено",
+    )
+
+
+def _merge_intervals(intervals):
+    merged = []
+
+    for start, end in sorted(intervals):
+        if not merged or start > merged[-1][1]:
+            merged.append([start, end])
+            continue
+
+        merged[-1][1] = max(merged[-1][1], end)
+
+    return merged
+
+
+def list_common_time_slots(
+    assignments,
+    target_date,
+    target_workers,
+    duration_minutes=DEFAULT_DURATION,
+    workday_start=WORKDAY_START,
+    workday_end=WORKDAY_END,
+    step_minutes=SLOT_STEP,
+    exclude_task_id=0,
+):
+    target_workers = list(dict.fromkeys(target_workers or []))
+
+    if not target_workers:
+        return []
+
+    duration_minutes = max(
+        step_minutes,
+        int(duration_minutes or DEFAULT_DURATION),
+    )
+    target_date = str(target_date or "")[:10]
+    available_slots = []
+
+    for start in range(
+        workday_start,
+        workday_end - duration_minutes + 1,
+        step_minutes,
+    ):
+        end = start + duration_minutes
+        has_conflict = False
+
+        for assignment in assignments:
+            assignment_task_id = int(
+                assignment.get("task_id") or 0
+            )
+
+            if (
+                exclude_task_id
+                and assignment_task_id == int(exclude_task_id)
+            ):
+                continue
+
+            if str(assignment.get("date") or "")[:10] != target_date:
+                continue
+
+            if not set(target_workers).intersection(
+                assignment.get("workers") or []
+            ):
+                continue
+
+            assignment_start = parse_time_value(
+                assignment.get("time_from")
+            )
+            assignment_end = parse_time_value(
+                assignment.get("time_to")
+            )
+
+            if assignment_start is None or assignment_end is None:
+                continue
+
+            if time_windows_overlap(
+                start,
+                end,
+                assignment_start,
+                assignment_end,
+            ):
+                has_conflict = True
+                break
+
+        if not has_conflict:
+            available_slots.append({
+                "time_from": format_time_value(start),
+                "time_to": format_time_value(end),
+                "label": (
+                    f"{format_time_value(start)}–"
+                    f"{format_time_value(end)}"
+                ),
+                "duration_minutes": duration_minutes,
+            })
+
+    return available_slots
+
+
 def find_time_conflicts(
     tasks,
     target_workers,
@@ -124,65 +236,149 @@ def find_common_time_slot(
     workday_end=WORKDAY_END,
     step_minutes=SLOT_STEP,
 ):
-    target_workers = list(dict.fromkeys(target_workers or []))
-
-    if not target_workers:
+    slots = list_common_time_slots(
+        assignments=assignments,
+        target_date=target_date,
+        target_workers=target_workers,
+        duration_minutes=duration_minutes,
+        workday_start=workday_start,
+        workday_end=workday_end,
+        step_minutes=step_minutes,
+    )
+    if not slots:
         return None
 
-    duration_minutes = max(
-        step_minutes,
-        int(duration_minutes or DEFAULT_DURATION),
-    )
-    target_date = str(target_date or "")[:10]
+    return {
+        "time_from": slots[0]["time_from"],
+        "time_to": slots[0]["time_to"],
+        "duration_minutes": slots[0]["duration_minutes"],
+    }
 
-    for start in range(
-        workday_start,
-        workday_end - duration_minutes + 1,
-        step_minutes,
-    ):
-        end = start + duration_minutes
-        has_conflict = False
 
-        for assignment in assignments:
-            if str(assignment.get("date") or "")[:10] != target_date:
-                continue
+def build_worker_timeline(
+    tasks,
+    worker_name,
+    workday_start=WORKDAY_START,
+    workday_end=WORKDAY_END,
+    step_minutes=SLOT_STEP,
+):
+    busy_intervals = []
+    timed_tasks = []
 
-            if not set(target_workers).intersection(
-                assignment.get("workers") or []
-            ):
-                continue
+    for task in tasks:
+        if worker_name not in task_workers(task):
+            continue
 
-            assignment_start = parse_time_value(
-                assignment.get("time_from")
-            )
-            assignment_end = parse_time_value(
-                assignment.get("time_to")
-            )
+        if not _task_blocks_time(task):
+            continue
 
-            if assignment_start is None or assignment_end is None:
-                continue
+        start = parse_time_value(_value(task, "time_from"))
+        end = parse_time_value(_value(task, "time_to"))
 
+        if start is None or end is None:
+            continue
+
+        clipped_start = max(start, workday_start)
+        clipped_end = min(end, workday_end)
+
+        if clipped_start >= clipped_end:
+            continue
+
+        busy_intervals.append((clipped_start, clipped_end))
+        timed_tasks.append({
+            "task_id": int(_value(task, "id", 0) or 0),
+            "start": clipped_start,
+            "end": clipped_end,
+        })
+
+    merged_busy = _merge_intervals(busy_intervals)
+    free_intervals = []
+    cursor = workday_start
+
+    for start, end in merged_busy:
+        if cursor < start:
+            free_intervals.append((cursor, start))
+
+        cursor = max(cursor, end)
+
+    if cursor < workday_end:
+        free_intervals.append((cursor, workday_end))
+
+    timeline_slots = []
+
+    for start in range(workday_start, workday_end, step_minutes):
+        end = min(start + step_minutes, workday_end)
+        task_ids = sorted({
+            item["task_id"]
+            for item in timed_tasks
             if time_windows_overlap(
                 start,
                 end,
-                assignment_start,
-                assignment_end,
-            ):
-                has_conflict = True
-                break
+                item["start"],
+                item["end"],
+            )
+        })
+        status = (
+            "conflict"
+            if len(task_ids) > 1
+            else "busy"
+            if task_ids
+            else "free"
+        )
+        timeline_slots.append({
+            "time_from": format_time_value(start),
+            "time_to": format_time_value(end),
+            "label": format_time_value(start),
+            "hour_label": (
+                format_time_value(start)
+                if start % 60 == 0
+                else ""
+            ),
+            "status": status,
+            "task_ids": task_ids,
+            "task_count": len(task_ids),
+        })
 
-        if not has_conflict:
-            return {
+    busy_minutes = sum(end - start for start, end in merged_busy)
+    workday_minutes = max(workday_end - workday_start, 1)
+
+    return {
+        "slots": timeline_slots,
+        "free_windows": [
+            {
                 "time_from": format_time_value(start),
                 "time_to": format_time_value(end),
-                "duration_minutes": duration_minutes,
+                "label": (
+                    f"{format_time_value(start)}–"
+                    f"{format_time_value(end)}"
+                ),
+                "duration_minutes": end - start,
             }
-
-    return None
+            for start, end in free_intervals
+        ],
+        "busy_minutes": busy_minutes,
+        "free_minutes": workday_minutes - busy_minutes,
+        "utilization_percent": min(
+            round(busy_minutes / workday_minutes * 100),
+            100,
+        ),
+    }
 
 
 def build_daily_schedule(tasks, worker_names=None):
+    tasks = list(tasks)
     worker_names = list(dict.fromkeys(worker_names or []))
+    assignments = [
+        {
+            "task_id": int(_value(task, "id", 0) or 0),
+            "date": str(_value(task, "task_date") or "")[:10],
+            "workers": task_workers(task),
+            "time_from": str(_value(task, "time_from") or "")[:5],
+            "time_to": str(_value(task, "time_to") or "")[:5],
+        }
+        for task in tasks
+        if _task_blocks_time(task)
+    ]
     schedule_workers = {
         worker_name: {
             "username": worker_name,
@@ -197,6 +393,7 @@ def build_daily_schedule(tasks, worker_names=None):
 
     for task in tasks:
         workers = task_workers(task)
+        duration_minutes = task_duration_minutes(task)
         item = {
             "task": task,
             "task_id": int(_value(task, "id", 0) or 0),
@@ -207,11 +404,21 @@ def build_daily_schedule(tasks, worker_names=None):
             "time_from": str(_value(task, "time_from") or "")[:5],
             "time_to": str(_value(task, "time_to") or "")[:5],
             "workers": workers,
+            "duration_minutes": duration_minutes,
             "has_time": bool(
                 parse_time_value(_value(task, "time_from")) is not None
                 and parse_time_value(_value(task, "time_to")) is not None
             ),
             "conflicts": [],
+            "available_slots": list_common_time_slots(
+                assignments=assignments,
+                target_date=str(
+                    _value(task, "task_date") or ""
+                )[:10],
+                target_workers=workers,
+                duration_minutes=duration_minutes,
+                exclude_task_id=int(_value(task, "id", 0) or 0),
+            ) if workers and _task_blocks_time(task) else [],
         }
 
         if not workers:
@@ -273,6 +480,10 @@ def build_daily_schedule(tasks, worker_names=None):
         )
         worker_schedule["conflict_count"] = sum(
             1 for item in items if item["conflicts"]
+        )
+        worker_schedule["timeline"] = build_worker_timeline(
+            tasks,
+            worker_schedule["username"],
         )
 
         for route_order, item in enumerate(items, start=1):

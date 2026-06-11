@@ -5958,6 +5958,11 @@ async def assert_daily_route_schedule():
     assert "09:00–10:00" in owner_html
     assert f"#{overlap_id}" in owner_html
     assert "Пересечение:" in owner_html
+    assert "Шкала рабочего дня" in owner_html
+    assert "08:00–20:00 · шаг 30 минут" in owner_html
+    assert "/api/calendar/day/move-time" in owner_html
+    assert 'draggable="true"' in owner_html
+    assert "Свободное окно" in owner_html
     assert owner_page.context["schedule"]["summary"] == {
         "workers": 2,
         "tasks": 4,
@@ -5966,6 +5971,31 @@ async def assert_daily_route_schedule():
         "conflicts": 2,
         "unassigned": 1,
     }
+    worker2_schedule = next(
+        item
+        for item in owner_page.context["schedule"]["workers"]
+        if item["username"] == "worker2"
+    )
+    assert len(worker2_schedule["timeline"]["slots"]) == 24
+    assert worker2_schedule["timeline"]["free_windows"][0]["label"] == (
+        "08:00–09:00"
+    )
+    assert any(
+        item["status"] == "conflict"
+        and set(item["task_ids"]) == {morning_id, overlap_id}
+        for item in worker2_schedule["timeline"]["slots"]
+    )
+    without_time_item = next(
+        item
+        for worker_schedule in owner_page.context["schedule"]["workers"]
+        for item in worker_schedule["items"]
+        if item["task_id"] == without_time_id
+    )
+    assert without_time_item["duration_minutes"] == 60
+    assert without_time_item["available_slots"]
+    assert without_time_item["available_slots"][0]["label"] == (
+        "08:00–09:00"
+    )
 
     filtered_page = await crm.calendar_day_route_page(
         make_asgi_request("owner2", "/calendar/day"),
@@ -5988,6 +6018,8 @@ async def assert_daily_route_schedule():
     assert "Route overlap" in worker_html
     assert "Route without time" not in worker_html
     assert 'class="schedule-form"' not in worker_html
+    assert f'data-task-id="{morning_id}"' not in worker_html
+    assert "/api/calendar/day/move-time" not in worker_html
 
     outsider_page = await crm.calendar_day_route_page(
         make_asgi_request("outsider_worker", "/calendar/day"),
@@ -6023,6 +6055,152 @@ async def assert_daily_route_schedule():
     )
     assert conflict_page.status_code == 200
     assert "Пересечение времени" in conflict_page.body.decode("utf-8")
+
+    move_payload = {
+        "task_id": without_time_id,
+        "target_date": route_date,
+        "target_time_from": "11:00",
+        "expected_date": route_date,
+        "expected_time_from": "",
+        "expected_time_to": "",
+    }
+    anonymous_move = await crm.api_calendar_day_move_time(
+        make_json_request(
+            None,
+            "/api/calendar/day/move-time",
+            move_payload,
+        )
+    )
+    assert anonymous_move.status_code == 401
+    worker_move = await crm.api_calendar_day_move_time(
+        make_json_request(
+            "helper2",
+            "/api/calendar/day/move-time",
+            move_payload,
+        )
+    )
+    assert worker_move.status_code == 403
+    invalid_time_move = await crm.api_calendar_day_move_time(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/move-time",
+            {
+                **move_payload,
+                "target_time_from": "11:15",
+            },
+        )
+    )
+    assert invalid_time_move.status_code == 400
+    assert json.loads(invalid_time_move.body)["error"] == "invalid_time"
+    stale_move = await crm.api_calendar_day_move_time(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/move-time",
+            {
+                **move_payload,
+                "expected_time_from": "08:00",
+            },
+        )
+    )
+    assert stale_move.status_code == 409
+    assert json.loads(stale_move.body)["error"] == "stale"
+    outsider_move = await crm.api_calendar_day_move_time(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/move-time",
+            {
+                **move_payload,
+                "task_id": outsider_id,
+            },
+        )
+    )
+    assert outsider_move.status_code == 404
+    conflict_move = await crm.api_calendar_day_move_time(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/move-time",
+            {
+                **move_payload,
+                "target_time_from": "10:00",
+            },
+        )
+    )
+    assert conflict_move.status_code == 409
+    conflict_move_data = json.loads(conflict_move.body)
+    assert conflict_move_data["error"] == "time_conflict"
+    assert conflict_move_data["conflicts"][0]["task_id"] == overlap_id
+    assert conflict_move_data["suggestions"]
+    assert conflict_move_data["suggestions"][0]["label"] == (
+        "08:00–09:00"
+    )
+
+    original_send_message_to_chat = crm.send_message_to_chat
+    route_telegram_messages = []
+    crm.send_message_to_chat = (
+        lambda chat_id, text: route_telegram_messages.append(
+            (chat_id, text)
+        )
+    )
+
+    try:
+        moved_time = await crm.api_calendar_day_move_time(
+            make_json_request(
+                "owner2",
+                "/api/calendar/day/move-time",
+                move_payload,
+            )
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert moved_time["ok"] is True
+    assert moved_time["changed"] is True
+    assert moved_time["target_time_from"] == "11:00"
+    assert moved_time["target_time_to"] == "12:00"
+    assert route_telegram_messages == [
+        (
+            "chat-helper2",
+            (
+                f"Изменено расписание заявки #{without_time_id}\n"
+                "Клиент: Route without time\n"
+                f"Дата: {route_date}\n"
+                "Время: 11:00–12:00"
+            ),
+        )
+    ]
+    conn = connect()
+    c = conn.cursor()
+    moved_time_row = c.execute("""
+    SELECT time_from, time_to
+    FROM tasks
+    WHERE id=? AND company_id=2
+    """, (without_time_id,)).fetchone()
+    route_activity = c.execute("""
+    SELECT details
+    FROM task_activity
+    WHERE task_id=?
+      AND action='Время изменено на маршруте дня'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (without_time_id,)).fetchone()
+    route_notification = c.execute("""
+    SELECT message
+    FROM notifications
+    WHERE company_id=2
+      AND username='helper2'
+      AND title=?
+    ORDER BY id DESC
+    LIMIT 1
+    """, (
+        f"Изменено расписание заявки #{without_time_id}",
+    )).fetchone()
+    conn.close()
+    assert moved_time_row["time_from"] == "11:00"
+    assert moved_time_row["time_to"] == "12:00"
+    assert "11:00–12:00" in route_activity["details"]
+    assert route_notification["message"] == (
+        f"{route_date}, 11:00–12:00"
+    )
 
     invalid_time = await crm.update_task_date(
         make_form_request(
@@ -6107,6 +6285,10 @@ async def assert_daily_route_schedule():
     c.execute(
         f"DELETE FROM task_activity WHERE task_id IN ({placeholders})",
         task_ids,
+    )
+    c.execute(
+        "DELETE FROM notifications WHERE title=?",
+        (f"Изменено расписание заявки #{without_time_id}",),
     )
     c.execute(
         f"DELETE FROM tasks WHERE id IN ({placeholders})",

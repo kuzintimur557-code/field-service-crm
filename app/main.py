@@ -41,9 +41,16 @@ from app.services.schedule_conflicts import (
 from app.services.dispatch_board import build_dispatch_board
 from app.services.dispatch_planner import build_dispatch_plan
 from app.services.daily_schedule import (
+    SLOT_STEP,
+    WORKDAY_END,
+    WORKDAY_START,
     build_daily_schedule,
+    format_time_value,
     find_time_conflicts,
+    list_common_time_slots,
     normalize_time_window,
+    parse_time_value,
+    task_duration_minutes,
 )
 from app.services.workflow_graph import (
     get_company_workflow_graphs,
@@ -8666,6 +8673,404 @@ async def calendar_day_route_page(
             ),
         },
     )
+
+
+@app.post("/api/calendar/day/move-time")
+async def api_calendar_day_move_time(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {"ok": False, "error": "unauthorized"},
+            status_code=401,
+        )
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {"ok": False, "error": "feature_disabled"},
+            status_code=403,
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "invalid_json"},
+            status_code=400,
+        )
+
+    try:
+        task_id = int(payload.get("task_id") or 0)
+    except Exception:
+        task_id = 0
+
+    target_date = str(payload.get("target_date") or "").strip()[:10]
+    target_time_from = str(
+        payload.get("target_time_from") or ""
+    ).strip()[:5]
+    expected_date = str(
+        payload.get("expected_date") or ""
+    ).strip()[:10]
+    expected_time_from = str(
+        payload.get("expected_time_from") or ""
+    ).strip()[:5]
+    expected_time_to = str(
+        payload.get("expected_time_to") or ""
+    ).strip()[:5]
+
+    try:
+        parsed_target_date = datetime.strptime(
+            target_date,
+            "%Y-%m-%d",
+        ).date()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "invalid_date"},
+            status_code=400,
+        )
+
+    if parsed_target_date < datetime.now().date():
+        return JSONResponse(
+            {"ok": False, "error": "past_date"},
+            status_code=400,
+        )
+
+    target_start = parse_time_value(target_time_from)
+
+    if target_start is None or target_start % SLOT_STEP:
+        return JSONResponse(
+            {"ok": False, "error": "invalid_time"},
+            status_code=400,
+        )
+
+    conn = connect()
+    c = conn.cursor()
+    task = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE id=? AND company_id=?
+    """, (task_id, company_id)).fetchone()
+
+    if not task:
+        conn.close()
+        return JSONResponse(
+            {"ok": False, "error": "not_found"},
+            status_code=404,
+        )
+
+    if (
+        int(task["archived"] or 0) == 1
+        or task["status"] in ("Завершено", "Отменено")
+    ):
+        conn.close()
+        return JSONResponse(
+            {"ok": False, "error": "task_closed"},
+            status_code=409,
+        )
+
+    current_date = str(task["task_date"] or "")[:10]
+    current_time_from = str(task["time_from"] or "")[:5]
+    current_time_to = str(task["time_to"] or "")[:5]
+
+    if (
+        current_date != expected_date
+        or current_time_from != expected_time_from
+        or current_time_to != expected_time_to
+    ):
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "stale",
+                "current_date": current_date,
+                "current_time_from": current_time_from,
+                "current_time_to": current_time_to,
+            },
+            status_code=409,
+        )
+
+    duration_minutes = task_duration_minutes(task)
+    target_end = target_start + duration_minutes
+
+    if target_start < WORKDAY_START or target_end > WORKDAY_END:
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "outside_workday",
+                "workday_from": format_time_value(WORKDAY_START),
+                "workday_to": format_time_value(WORKDAY_END),
+            },
+            status_code=400,
+        )
+
+    target_time_from = format_time_value(target_start)
+    target_time_to = format_time_value(target_end)
+
+    if (
+        current_date == target_date
+        and current_time_from == target_time_from
+        and current_time_to == target_time_to
+    ):
+        conn.close()
+        return {
+            "ok": True,
+            "changed": False,
+            "task_id": task_id,
+            "target_date": target_date,
+            "target_time_from": target_time_from,
+            "target_time_to": target_time_to,
+        }
+
+    task_workers = get_task_worker_names(task)
+
+    if not task_workers:
+        conn.close()
+        return JSONResponse(
+            {"ok": False, "error": "unassigned"},
+            status_code=409,
+        )
+
+    placeholders = ",".join("?" for _ in task_workers)
+    worker_rows = c.execute(f"""
+    SELECT username, daily_capacity, telegram_chat_id
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+      AND username IN ({placeholders})
+    """, [company_id, *task_workers]).fetchall()
+    workers_by_name = {
+        row["username"]: row
+        for row in worker_rows
+    }
+
+    inactive_worker = next(
+        (
+            worker_name
+            for worker_name in task_workers
+            if worker_name not in workers_by_name
+        ),
+        "",
+    )
+
+    if inactive_worker:
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "inactive_worker",
+                "worker": inactive_worker,
+            },
+            status_code=409,
+        )
+
+    unavailable_dates, unavailable_reasons = get_worker_unavailability(
+        c,
+        company_id,
+        task_workers,
+        target_date,
+        target_date,
+    )
+    unavailable_worker = next(
+        (
+            worker_name
+            for worker_name in task_workers
+            if target_date in unavailable_dates.get(worker_name, set())
+        ),
+        "",
+    )
+
+    if unavailable_worker:
+        reason = unavailable_reasons.get(
+            (unavailable_worker, target_date),
+            "",
+        )
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "worker_unavailable",
+                "worker": unavailable_worker,
+                "reason": reason,
+            },
+            status_code=409,
+        )
+
+    if target_date != current_date:
+        for worker_name in task_workers:
+            active_count = c.execute(f"""
+            SELECT COUNT(*)
+            FROM tasks
+            WHERE company_id=?
+              AND id!=?
+              AND archived=0
+              AND status NOT IN ('Завершено', 'Отменено')
+              AND task_date LIKE ?
+              AND {worker_task_condition()}
+            """, [
+                company_id,
+                task_id,
+                f"{target_date}%",
+                *worker_task_params(worker_name),
+            ]).fetchone()[0]
+            daily_capacity = max(
+                1,
+                int(workers_by_name[worker_name]["daily_capacity"] or 3),
+            )
+
+            if active_count >= daily_capacity:
+                conn.close()
+                return JSONResponse(
+                    {
+                        "ok": False,
+                        "error": "capacity_reached",
+                        "worker": worker_name,
+                        "active_count": active_count,
+                        "daily_capacity": daily_capacity,
+                    },
+                    status_code=409,
+                )
+
+    day_tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND id!=?
+      AND archived=0
+      AND status NOT IN ('Завершено', 'Отменено')
+      AND task_date LIKE ?
+    ORDER BY time_from, id
+    """, (
+        company_id,
+        task_id,
+        f"{target_date}%",
+    )).fetchall()
+    conflicts = find_time_conflicts(
+        day_tasks,
+        task_workers,
+        target_time_from,
+        target_time_to,
+    )
+    assignments = [
+        {
+            "task_id": row["id"],
+            "date": str(row["task_date"] or "")[:10],
+            "workers": get_task_worker_names(row),
+            "time_from": str(row["time_from"] or "")[:5],
+            "time_to": str(row["time_to"] or "")[:5],
+        }
+        for row in day_tasks
+    ]
+    suggestions = list_common_time_slots(
+        assignments=assignments,
+        target_date=target_date,
+        target_workers=task_workers,
+        duration_minutes=duration_minutes,
+    )[:8]
+
+    if conflicts:
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "time_conflict",
+                "conflicts": conflicts,
+                "suggestions": suggestions,
+            },
+            status_code=409,
+        )
+
+    c.execute("""
+    UPDATE tasks
+    SET task_date=?, time_from=?, time_to=?
+    WHERE id=? AND company_id=?
+    """, (
+        target_date,
+        target_time_from,
+        target_time_to,
+        task_id,
+        company_id,
+    ))
+    details = (
+        f"Было: {current_date or 'Без даты'}, "
+        f"{current_time_from + '–' + current_time_to if current_time_from else 'Без времени'}. "
+        f"Стало: {target_date}, {target_time_from}–{target_time_to}"
+    )
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO task_activity (
+        task_id, username, role, action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        task_id,
+        username,
+        role,
+        "Время изменено на маршруте дня",
+        details,
+        created_at,
+    ))
+
+    for worker_name in task_workers:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message, link, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            f"Изменено расписание заявки #{task_id}",
+            f"{target_date}, {target_time_from}–{target_time_to}",
+            f"/task/{task_id}",
+            created_at,
+        ))
+
+    conn.commit()
+    chat_ids = [
+        str(row["telegram_chat_id"] or "").strip()
+        for row in worker_rows
+        if str(row["telegram_chat_id"] or "").strip()
+    ]
+    conn.close()
+
+    for chat_id in chat_ids:
+        try:
+            send_message_to_chat(
+                chat_id,
+                (
+                    f"Изменено расписание заявки #{task_id}\n"
+                    f"Клиент: {task['client']}\n"
+                    f"Дата: {target_date}\n"
+                    f"Время: {target_time_from}–{target_time_to}"
+                ),
+            )
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "changed": True,
+        "task_id": task_id,
+        "old_date": current_date,
+        "old_time_from": current_time_from,
+        "old_time_to": current_time_to,
+        "target_date": target_date,
+        "target_time_from": target_time_from,
+        "target_time_to": target_time_to,
+        "suggestions": suggestions,
+    }
 
 
 @app.get("/api/calendar/dispatch/plan")
