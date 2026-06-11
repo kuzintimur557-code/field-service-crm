@@ -44,6 +44,21 @@ h1{margin:0;font-size:30px}
 .readiness-issues{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
 .readiness-issue{display:inline-flex;gap:5px;align-items:center;padding:6px 8px;border:1px solid #fed7aa;border-radius:7px;background:#fff7ed;color:#9a3412;text-decoration:none;font-size:11px;font-weight:900}
 .readiness.critical .readiness-issue{border-color:#fecaca;background:#fef2f2;color:#991b1b}
+.plan-publication{display:flex;justify-content:space-between;gap:16px;align-items:center;margin:14px 0;padding:14px 16px;border:1px solid #d1d5db;border-left:4px solid #6b7280;background:white}
+.plan-publication.published{border-color:#bbf7d0;border-left-color:#16a34a}
+.plan-publication.changed{border-color:#fde68a;border-left-color:#d97706}
+.publication-main{display:flex;gap:11px;align-items:flex-start;min-width:0}
+.publication-mark{display:flex;width:36px;height:36px;flex:0 0 36px;align-items:center;justify-content:center;border-radius:50%;background:#e5e7eb;color:#374151;font-size:17px;font-weight:900}
+.plan-publication.published .publication-mark{background:#dcfce7;color:#166534}
+.plan-publication.changed .publication-mark{background:#fef3c7;color:#92400e}
+.publication-title{font-size:15px;font-weight:900}
+.publication-message{margin-top:3px;color:#6b7280;font-size:11px;font-weight:800}
+.publication-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:#4b5563;font-size:10px;font-weight:900}
+.publication-meta span{padding:4px 6px;border-radius:5px;background:#f3f4f6}
+.publication-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.publication-button{padding:10px 12px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.publication-button.secondary{background:#e5e7eb;color:#374151}
+.publication-button:disabled{cursor:not-allowed;opacity:.55}
 .auto-plan{margin:14px 0;padding:16px;border:1px solid #bfdbfe;border-left:4px solid #2563eb;background:white}
 .auto-plan-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
 .auto-plan-title{font-size:18px;font-weight:900}
@@ -143,6 +158,8 @@ h1{margin:0;font-size:30px}
     .summary{grid-template-columns:1fr 1fr}
     .readiness{grid-template-columns:1fr}
     .readiness-checks{grid-template-columns:1fr 1fr}
+    .plan-publication{align-items:stretch;flex-direction:column}
+    .publication-actions,.publication-button{width:100%}
     .auto-plan-actions,.auto-plan-apply{width:100%}
     .auto-plan-apply{justify-content:center}
     .auto-plan-row{grid-template-columns:28px minmax(0,1fr)}
@@ -244,6 +261,50 @@ h1{margin:0;font-size:30px}
             </div>
             {% endif %}
         </div>
+    </section>
+
+    <section
+        class="plan-publication {{ day_publication['tone'] }}"
+        id="day-publication"
+        data-date="{{ selected_date }}"
+    >
+        <div class="publication-main">
+            <div class="publication-mark">
+                {% if day_publication["state"] == "published" %}✓{% elif day_publication["state"] == "changed" %}!{% else %}·{% endif %}
+            </div>
+            <div>
+                <div class="publication-title">{{ day_publication["title"] }}</div>
+                <div class="publication-message">{{ day_publication["message"] }}</div>
+                <div class="publication-meta">
+                    <span>Заявок: {{ day_publication["task_count"] }}</span>
+                    <span>Исполнителей: {{ day_publication["worker_count"] }}</span>
+                    {% if day_publication["published_at"] %}
+                    <span>Версия: {{ day_publication["revision"] }}</span>
+                    <span>{{ day_publication["published_at"] }} · {{ day_publication["published_by"] }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if can_publish_day %}
+        <div class="publication-actions">
+            {% if day_publication["state"] != "published" %}
+            <button
+                class="publication-button"
+                id="publish-day-plan"
+                type="button"
+                {% if day_readiness["score"] != 100 or not day_publication["task_count"] %}disabled{% endif %}
+                title="{% if day_readiness['score'] != 100 %}Сначала доведите готовность дня до 100{% else %}Подтвердить план для исполнителей{% endif %}"
+            >
+                {% if day_publication["state"] == "changed" %}Обновить публикацию{% else %}Опубликовать план{% endif %}
+            </button>
+            {% endif %}
+            {% if day_publication["state"] in ("published", "changed") %}
+            <button class="publication-button secondary" id="unpublish-day-plan" type="button">
+                Снять публикацию
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
     </section>
 
     {% if role in ("boss", "manager") and day_conflict_repair["summary"]["conflict_tasks"] %}
@@ -596,6 +657,59 @@ h1{margin:0;font-size:30px}
         }, 4200);
     }
 
+    async function updateDayPublication(action) {
+        const section = document.getElementById("day-publication");
+        const publishButton = document.getElementById("publish-day-plan");
+        const unpublishButton = document.getElementById(
+            "unpublish-day-plan"
+        );
+        const activeButton = (
+            action === "publish" ? publishButton : unpublishButton
+        );
+
+        if (!section || !activeButton) {
+            return;
+        }
+
+        const originalText = activeButton.textContent;
+        activeButton.disabled = true;
+        activeButton.textContent = (
+            action === "publish" ? "Публикуем..." : "Снимаем..."
+        );
+
+        try {
+            const response = await fetch(
+                "/api/calendar/day/publication",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        date: section.dataset.date,
+                        action
+                    })
+                }
+            );
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                showToast(
+                    data.message || "Не удалось изменить публикацию.",
+                    true
+                );
+                return;
+            }
+
+            showToast(data.message);
+            window.setTimeout(() => window.location.reload(), 450);
+        } catch (error) {
+            showToast("Сервер временно недоступен.", true);
+        } finally {
+            activeButton.disabled = false;
+            activeButton.textContent = originalText;
+        }
+    }
+
     function errorMessage(data) {
         const messages = {
             invalid_date: "Указана некорректная дата.",
@@ -944,6 +1058,15 @@ h1{margin:0;font-size:30px}
             moveTaskTime(card, quickSelect.value);
         });
     });
+
+    document.getElementById("publish-day-plan")?.addEventListener(
+        "click",
+        () => updateDayPublication("publish")
+    );
+    document.getElementById("unpublish-day-plan")?.addEventListener(
+        "click",
+        () => updateDayPublication("unpublish")
+    );
 
     document.querySelectorAll(".timeline-slot.free.manageable").forEach(slot => {
         slot.addEventListener("dragover", event => {

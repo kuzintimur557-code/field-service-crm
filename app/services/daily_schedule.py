@@ -1219,7 +1219,7 @@ def build_day_readiness(
         status = "День свободен"
         tone = "ready"
         headline = "Активных заявок нет."
-    elif score >= 90:
+    elif score == 100:
         status = "Готово"
         tone = "ready"
         headline = "Расписание готово к работе."

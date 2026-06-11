@@ -40,6 +40,10 @@ from app.services.schedule_conflicts import (
 )
 from app.services.dispatch_board import build_dispatch_board
 from app.services.dispatch_planner import build_dispatch_plan
+from app.services.day_plan_publication import (
+    build_day_plan_snapshot,
+    build_day_publication_state,
+)
 from app.services.daily_schedule import (
     SLOT_STEP,
     WORKDAY_END,
@@ -8634,6 +8638,12 @@ async def calendar_day_route_page(
       AND task_date LIKE ?
     """
     params = [company_id, f"{selected_date}%"]
+    publication_tasks = c.execute(query + " ORDER BY id", params).fetchall()
+    publication = c.execute("""
+    SELECT *
+    FROM calendar_day_publications
+    WHERE company_id=? AND plan_date=?
+    """, (company_id, selected_date)).fetchone()
 
     if selected_worker:
         query += f" AND {worker_task_condition()}"
@@ -8649,7 +8659,7 @@ async def calendar_day_route_page(
     unavailable_dates, _ = get_worker_unavailability(
         c,
         company_id,
-        visible_worker_names,
+        worker_names,
         selected_date,
         selected_date,
     )
@@ -8718,14 +8728,18 @@ async def calendar_day_route_page(
         )
     day_readiness = build_day_readiness(
         tasks=tasks,
-        worker_names=visible_worker_names,
+        worker_names=worker_names,
         worker_capacities=worker_capacities,
         unavailable_worker_names={
             worker_name
-            for worker_name in visible_worker_names
+            for worker_name in worker_names
             if selected_date
             in unavailable_dates.get(worker_name, set())
         },
+    )
+    day_publication = build_day_publication_state(
+        publication,
+        publication_tasks,
     )
 
     if not can_auto_manage_day:
@@ -8753,6 +8767,8 @@ async def calendar_day_route_page(
             "selected_date": selected_date,
             "schedule": schedule,
             "day_readiness": day_readiness,
+            "day_publication": day_publication,
+            "can_publish_day": can_auto_manage_day,
             "day_auto_plan": day_auto_plan,
             "day_conflict_repair": day_conflict_repair,
             "previous_day_url": day_url(
@@ -8764,6 +8780,299 @@ async def calendar_day_route_page(
             ),
         },
     )
+
+
+@app.post("/api/calendar/day/publication")
+async def api_calendar_day_publication(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "message": "Требуется авторизация.",
+            },
+            status_code=401,
+        )
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Недостаточно прав.",
+            },
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "feature_disabled",
+                "message": "Модуль календаря отключён.",
+            },
+            status_code=403,
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_json",
+                "message": "Не удалось прочитать запрос.",
+            },
+            status_code=400,
+        )
+
+    selected_date = str(payload.get("date") or "").strip()[:10]
+    action = str(payload.get("action") or "publish").strip()
+
+    try:
+        selected_day = datetime.strptime(
+            selected_date,
+            "%Y-%m-%d",
+        ).date()
+    except ValueError:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_date",
+                "message": "Указана некорректная дата.",
+            },
+            status_code=400,
+        )
+
+    if selected_day < datetime.now().date():
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "past_date",
+                "message": "Нельзя изменять публикацию прошедшего дня.",
+            },
+            status_code=400,
+        )
+
+    if action not in ("publish", "unpublish"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_action",
+                "message": "Неизвестное действие.",
+            },
+            status_code=400,
+        )
+
+    conn = connect()
+    c = conn.cursor()
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status!='Отменено'
+      AND task_date LIKE ?
+    ORDER BY id
+    """, (company_id, f"{selected_date}%")).fetchall()
+    publication = c.execute("""
+    SELECT *
+    FROM calendar_day_publications
+    WHERE company_id=? AND plan_date=?
+    """, (company_id, selected_date)).fetchone()
+
+    if action == "unpublish":
+        if not publication:
+            conn.close()
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "not_published",
+                    "message": "План дня ещё не опубликован.",
+                },
+                status_code=404,
+            )
+
+        c.execute("""
+        DELETE FROM calendar_day_publications
+        WHERE company_id=? AND plan_date=?
+        """, (company_id, selected_date))
+        event_title = "План дня снят с публикации"
+        event_message = (
+            f"План на {selected_date} будет опубликован повторно "
+            "после уточнения."
+        )
+        response_message = "Публикация плана снята."
+        response_state = "draft"
+    else:
+        if not tasks:
+            conn.close()
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "empty_day",
+                    "message": "На выбранный день нет заявок.",
+                },
+                status_code=400,
+            )
+
+        worker_rows = c.execute("""
+        SELECT username, daily_capacity, telegram_chat_id
+        FROM users
+        WHERE company_id=?
+          AND role='worker'
+          AND COALESCE(is_active, 1)=1
+        ORDER BY username
+        """, (company_id,)).fetchall()
+        worker_names = [row["username"] for row in worker_rows]
+        worker_capacities = {
+            row["username"]: max(1, int(row["daily_capacity"] or 3))
+            for row in worker_rows
+        }
+        unavailable_dates, _ = get_worker_unavailability(
+            c,
+            company_id,
+            worker_names,
+            selected_date,
+            selected_date,
+        )
+        readiness = build_day_readiness(
+            tasks=tasks,
+            worker_names=worker_names,
+            worker_capacities=worker_capacities,
+            unavailable_worker_names={
+                worker_name
+                for worker_name in worker_names
+                if selected_date
+                in unavailable_dates.get(worker_name, set())
+            },
+        )
+
+        if readiness["score"] != 100:
+            conn.close()
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "day_not_ready",
+                    "message": (
+                        "Сначала устраните проблемы в расписании."
+                    ),
+                    "score": readiness["score"],
+                    "issues": readiness["issues"],
+                },
+                status_code=409,
+            )
+
+        snapshot = build_day_plan_snapshot(tasks)
+        now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+        c.execute("""
+        INSERT INTO calendar_day_publications (
+            company_id, plan_date, plan_hash, task_count,
+            worker_count, published_by, published_at, revision
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        ON CONFLICT(company_id, plan_date) DO UPDATE SET
+            plan_hash=excluded.plan_hash,
+            task_count=excluded.task_count,
+            worker_count=excluded.worker_count,
+            published_by=excluded.published_by,
+            published_at=excluded.published_at,
+            revision=calendar_day_publications.revision + 1
+        """, (
+            company_id,
+            selected_date,
+            snapshot["hash"],
+            snapshot["task_count"],
+            snapshot["worker_count"],
+            username,
+            now_value,
+        ))
+        is_update = publication is not None
+        event_title = (
+            "План дня обновлён"
+            if is_update
+            else "План дня опубликован"
+        )
+        event_message = (
+            f"Дата: {selected_date}. "
+            f"Заявок: {snapshot['task_count']}. "
+            "Откройте маршрут дня перед началом работы."
+        )
+        response_message = event_title + "."
+        response_state = "published"
+
+    assigned_workers = sorted({
+        worker_name
+        for task in tasks
+        for worker_name in get_task_worker_names(task)
+    })
+    active_worker_rows = c.execute("""
+    SELECT username, telegram_chat_id
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+    """, (company_id,)).fetchall()
+    active_workers = {
+        row["username"]: row
+        for row in active_worker_rows
+    }
+    now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+    telegram_messages = []
+
+    for worker_name in assigned_workers:
+        worker_row = active_workers.get(worker_name)
+
+        if not worker_row:
+            continue
+
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message, link, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            event_title,
+            event_message,
+            f"/calendar/day?date={selected_date}",
+            now_value,
+        ))
+        chat_id = str(worker_row["telegram_chat_id"] or "").strip()
+
+        if chat_id:
+            telegram_messages.append((
+                chat_id,
+                f"{event_title}\n{event_message}",
+            ))
+
+    conn.commit()
+    conn.close()
+
+    for chat_id, message in telegram_messages:
+        try:
+            send_message_to_chat(chat_id, message)
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "state": response_state,
+        "date": selected_date,
+        "message": response_message,
+        "notified_workers": len([
+            worker_name
+            for worker_name in assigned_workers
+            if worker_name in active_workers
+        ]),
+    }
 
 
 @app.post("/api/calendar/day/move-time")

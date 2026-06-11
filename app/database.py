@@ -232,6 +232,20 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS calendar_day_publications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        plan_date TEXT NOT NULL,
+        plan_hash TEXT NOT NULL,
+        task_count INTEGER DEFAULT 0,
+        worker_count INTEGER DEFAULT 0,
+        published_by TEXT,
+        published_at TEXT,
+        revision INTEGER DEFAULT 1
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS recurring_jobs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER,
@@ -784,6 +798,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_worker_unavailability_company_dates
     ON worker_unavailability(company_id, date_from, date_to)
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_day_publication_company_date
+    ON calendar_day_publications(company_id, plan_date)
     """)
 
     if os.getenv("ENV") != "production":

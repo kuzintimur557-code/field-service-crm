@@ -5976,6 +5976,10 @@ async def assert_daily_route_schedule():
     assert "ГОТОВНОСТЬ ДНЯ" in owner_html
     assert "Расписание нужно исправить до начала работ." in owner_html
     assert 'href="#conflict-repair"' in owner_html
+    assert "План не опубликован" in owner_html
+    assert 'id="publish-day-plan"' in owner_html
+    assert 'id="publish-day-plan"\n                type="button"\n                disabled' in owner_html
+    assert owner_page.context["day_publication"]["state"] == "draft"
     readiness = owner_page.context["day_readiness"]
     assert readiness["score"] == 35
     assert readiness["status"] == "Критично"
@@ -6062,6 +6066,36 @@ async def assert_daily_route_schedule():
     assert repair_item["old_time_label"] == "09:30–10:30"
     assert repair_item["target_time_label"] == "10:00–11:00"
 
+    anonymous_publication = await crm.api_calendar_day_publication(
+        make_json_request(
+            None,
+            "/api/calendar/day/publication",
+            {"date": route_date, "action": "publish"},
+        )
+    )
+    assert anonymous_publication.status_code == 401
+    worker_publication = await crm.api_calendar_day_publication(
+        make_json_request(
+            "worker2",
+            "/api/calendar/day/publication",
+            {"date": route_date, "action": "publish"},
+        )
+    )
+    assert worker_publication.status_code == 403
+    not_ready_publication = await crm.api_calendar_day_publication(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/publication",
+            {"date": route_date, "action": "publish"},
+        )
+    )
+    assert not_ready_publication.status_code == 409
+    not_ready_payload = json.loads(
+        not_ready_publication.body.decode("utf-8")
+    )
+    assert not_ready_payload["error"] == "day_not_ready"
+    assert not_ready_payload["score"] == 35
+
     filtered_page = await crm.calendar_day_route_page(
         make_asgi_request("owner2", "/calendar/day"),
         date=route_date,
@@ -6078,6 +6112,12 @@ async def assert_daily_route_schedule():
         issue["target"] == "#day-routes"
         for issue in filtered_page.context["day_readiness"]["issues"]
     )
+    assert (
+        filtered_page.context["day_readiness"]["issue_counts"][
+            "inactive_workers"
+        ]
+        == 0
+    )
 
     worker_page = await crm.calendar_day_route_page(
         make_asgi_request("worker2", "/calendar/day"),
@@ -6093,9 +6133,17 @@ async def assert_daily_route_schedule():
     assert "/api/calendar/day/move-time" not in worker_html
     assert "Автозаполнение дня" not in worker_html
     assert "Автоисправление пересечений" not in worker_html
+    assert "План не опубликован" in worker_html
+    assert 'id="publish-day-plan"' not in worker_html
     assert all(
         issue["target"] == "#day-routes"
         for issue in worker_page.context["day_readiness"]["issues"]
+    )
+    assert (
+        worker_page.context["day_readiness"]["issue_counts"][
+            "inactive_workers"
+        ]
+        == 0
     )
 
     outsider_page = await crm.calendar_day_route_page(
@@ -6547,6 +6595,120 @@ async def assert_daily_route_schedule():
     assert "Расписание готово к работе." in (
         ready_page.body.decode("utf-8")
     )
+    ready_html = ready_page.body.decode("utf-8")
+    assert 'id="publish-day-plan"' in ready_html
+    assert 'id="publish-day-plan"\n                type="button"\n                disabled' not in ready_html
+    expected_publication_workers = set(
+        ready_page.context["day_publication"]["workers"]
+    )
+
+    publication_result = await crm.api_calendar_day_publication(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/publication",
+            {"date": route_date, "action": "publish"},
+        )
+    )
+    assert publication_result["ok"] is True
+    assert publication_result["state"] == "published"
+    assert publication_result["notified_workers"] == len(
+        expected_publication_workers
+    )
+    conn = connect()
+    c = conn.cursor()
+    published_row = c.execute("""
+    SELECT *
+    FROM calendar_day_publications
+    WHERE company_id=2 AND plan_date=?
+    """, (route_date,)).fetchone()
+    publication_notifications = c.execute("""
+    SELECT username, title
+    FROM notifications
+    WHERE company_id=2 AND link=?
+    ORDER BY username
+    """, (f"/calendar/day?date={route_date}",)).fetchall()
+    assert published_row["revision"] == 1
+    assert published_row["task_count"] == 4
+    assert {
+        row["username"] for row in publication_notifications
+    } == expected_publication_workers
+    assert all(
+        row["title"] == "План дня опубликован"
+        for row in publication_notifications
+    )
+    outsider_unpublish = await crm.api_calendar_day_publication(
+        make_json_request(
+            "manager1",
+            "/api/calendar/day/publication",
+            {"date": route_date, "action": "unpublish"},
+        )
+    )
+    assert outsider_unpublish.status_code == 404
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM calendar_day_publications
+    WHERE company_id=2 AND plan_date=?
+    """, (route_date,)).fetchone()[0] == 1
+    c.execute("""
+    UPDATE tasks
+    SET time_from='19:00', time_to='20:00'
+    WHERE id=? AND company_id=2
+    """, (overlap_id,))
+    conn.commit()
+    conn.close()
+
+    changed_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    changed_html = changed_page.body.decode("utf-8")
+    assert changed_page.context["day_publication"]["state"] == "changed"
+    assert "После публикации есть изменения" in changed_html
+    assert "Обновить публикацию" in changed_html
+    assert "Снять публикацию" in changed_html
+
+    republish_result = await crm.api_calendar_day_publication(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/publication",
+            {"date": route_date, "action": "publish"},
+        )
+    )
+    assert republish_result["state"] == "published"
+    conn = connect()
+    c = conn.cursor()
+    republished_row = c.execute("""
+    SELECT revision
+    FROM calendar_day_publications
+    WHERE company_id=2 AND plan_date=?
+    """, (route_date,)).fetchone()
+    assert republished_row["revision"] == 2
+    conn.close()
+
+    published_worker_page = await crm.calendar_day_route_page(
+        make_asgi_request("worker2", "/calendar/day"),
+        date=route_date,
+    )
+    published_worker_html = published_worker_page.body.decode("utf-8")
+    assert "План опубликован" in published_worker_html
+    assert 'id="unpublish-day-plan"' not in published_worker_html
+
+    unpublish_result = await crm.api_calendar_day_publication(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/publication",
+            {"date": route_date, "action": "unpublish"},
+        )
+    )
+    assert unpublish_result["state"] == "draft"
+    conn = connect()
+    c = conn.cursor()
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM calendar_day_publications
+    WHERE company_id=2 AND plan_date=?
+    """, (route_date,)).fetchone()[0] == 0
+    conn.close()
 
     empty_readiness = build_day_readiness(
         tasks=[],
@@ -6556,7 +6718,17 @@ async def assert_daily_route_schedule():
     assert empty_readiness["score"] == 100
     assert empty_readiness["status"] == "День свободен"
 
+    conn = connect()
+    c = conn.cursor()
     placeholders = ",".join("?" for _ in task_ids)
+    c.execute(
+        "DELETE FROM calendar_day_publications WHERE plan_date=?",
+        (route_date,),
+    )
+    c.execute(
+        "DELETE FROM notifications WHERE link=?",
+        (f"/calendar/day?date={route_date}",),
+    )
     c.execute(
         f"DELETE FROM task_activity WHERE task_id IN ({placeholders})",
         task_ids,
