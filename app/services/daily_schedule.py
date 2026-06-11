@@ -1107,6 +1107,232 @@ def build_daily_conflict_repair_plan(
     }
 
 
+def build_day_readiness(
+    tasks,
+    worker_names=None,
+    worker_capacities=None,
+    unavailable_worker_names=None,
+):
+    active_tasks = [
+        task for task in tasks if _task_blocks_time(task)
+    ]
+    worker_names = set(worker_names or [])
+    unavailable_worker_names = set(unavailable_worker_names or [])
+    worker_capacities = {
+        worker_name: max(
+            1,
+            int((worker_capacities or {}).get(worker_name) or 3),
+        )
+        for worker_name in worker_names
+    }
+    unassigned_ids = set()
+    without_time_ids = set()
+    conflict_ids = set()
+    inactive_worker_task_ids = set()
+    unavailable_worker_task_ids = set()
+    worker_task_counts = {
+        worker_name: 0 for worker_name in worker_names
+    }
+
+    for task in active_tasks:
+        task_id = int(_value(task, "id", 0) or 0)
+        workers = task_workers(task)
+        start = parse_time_value(_value(task, "time_from"))
+        end = parse_time_value(_value(task, "time_to"))
+
+        if not workers:
+            unassigned_ids.add(task_id)
+
+        if start is None or end is None or start >= end:
+            without_time_ids.add(task_id)
+
+        if any(worker not in worker_names for worker in workers):
+            inactive_worker_task_ids.add(task_id)
+
+        if any(
+            worker in unavailable_worker_names for worker in workers
+        ):
+            unavailable_worker_task_ids.add(task_id)
+
+        for worker in set(workers).intersection(worker_names):
+            worker_task_counts[worker] += 1
+
+    for index, task in enumerate(active_tasks):
+        task_id = int(_value(task, "id", 0) or 0)
+        task_worker_names = set(task_workers(task))
+        start = parse_time_value(_value(task, "time_from"))
+        end = parse_time_value(_value(task, "time_to"))
+
+        if not task_worker_names or start is None or end is None:
+            continue
+
+        for other in active_tasks[index + 1:]:
+            other_workers = set(task_workers(other))
+
+            if not task_worker_names.intersection(other_workers):
+                continue
+
+            other_start = parse_time_value(
+                _value(other, "time_from")
+            )
+            other_end = parse_time_value(_value(other, "time_to"))
+
+            if other_start is None or other_end is None:
+                continue
+
+            if time_windows_overlap(
+                start,
+                end,
+                other_start,
+                other_end,
+            ):
+                conflict_ids.add(task_id)
+                conflict_ids.add(
+                    int(_value(other, "id", 0) or 0)
+                )
+
+    overloaded_workers = sorted(
+        worker_name
+        for worker_name, task_count in worker_task_counts.items()
+        if task_count > worker_capacities[worker_name]
+    )
+    issue_counts = {
+        "conflicts": len(conflict_ids),
+        "unassigned": len(unassigned_ids),
+        "without_time": len(without_time_ids),
+        "inactive_workers": len(inactive_worker_task_ids),
+        "unavailable_workers": len(unavailable_worker_task_ids),
+        "overloaded_workers": len(overloaded_workers),
+    }
+    score = max(
+        0,
+        100
+        - min(issue_counts["conflicts"] * 20, 40)
+        - min(issue_counts["unassigned"] * 15, 30)
+        - min(issue_counts["without_time"] * 10, 20)
+        - min(issue_counts["inactive_workers"] * 15, 30)
+        - min(issue_counts["unavailable_workers"] * 15, 30)
+        - min(issue_counts["overloaded_workers"] * 10, 20),
+    )
+
+    if not active_tasks:
+        status = "День свободен"
+        tone = "ready"
+        headline = "Активных заявок нет."
+    elif score >= 90:
+        status = "Готово"
+        tone = "ready"
+        headline = "Расписание готово к работе."
+    elif score >= 65:
+        status = "Требует внимания"
+        tone = "warning"
+        headline = "Перед началом дня проверьте замечания."
+    else:
+        status = "Критично"
+        tone = "critical"
+        headline = "Расписание нужно исправить до начала работ."
+
+    issues = []
+
+    def add_issue(code, count, title, detail, target):
+        if count:
+            issues.append({
+                "code": code,
+                "count": count,
+                "title": title,
+                "detail": detail,
+                "target": target,
+            })
+
+    add_issue(
+        "conflicts",
+        issue_counts["conflicts"],
+        "Пересечения по времени",
+        "Несколько заявок назначены одному исполнителю одновременно.",
+        "#conflict-repair",
+    )
+    add_issue(
+        "unassigned",
+        issue_counts["unassigned"],
+        "Нет исполнителя",
+        "Заявки не попадут в рабочий маршрут команды.",
+        "#auto-plan",
+    )
+    add_issue(
+        "without_time",
+        issue_counts["without_time"],
+        "Не указано время",
+        "Нельзя определить последовательность и загрузку.",
+        "#auto-plan",
+    )
+    add_issue(
+        "inactive_workers",
+        issue_counts["inactive_workers"],
+        "Назначен отключённый исполнитель",
+        "Нужно заменить исполнителя в заявке.",
+        "#day-routes",
+    )
+    add_issue(
+        "unavailable_workers",
+        issue_counts["unavailable_workers"],
+        "Исполнитель недоступен",
+        "У сотрудника отмечено отсутствие на выбранную дату.",
+        "#day-routes",
+    )
+    add_issue(
+        "overloaded_workers",
+        issue_counts["overloaded_workers"],
+        "Превышен дневной лимит",
+        "Перегружены: " + ", ".join(overloaded_workers) + ".",
+        "#day-routes",
+    )
+
+    checks = [
+        {
+            "label": "Исполнители назначены",
+            "ok": not issue_counts["unassigned"],
+            "count": issue_counts["unassigned"],
+        },
+        {
+            "label": "Время указано",
+            "ok": not issue_counts["without_time"],
+            "count": issue_counts["without_time"],
+        },
+        {
+            "label": "Нет пересечений",
+            "ok": not issue_counts["conflicts"],
+            "count": issue_counts["conflicts"],
+        },
+        {
+            "label": "Команда доступна",
+            "ok": not (
+                issue_counts["inactive_workers"]
+                or issue_counts["unavailable_workers"]
+            ),
+            "count": (
+                issue_counts["inactive_workers"]
+                + issue_counts["unavailable_workers"]
+            ),
+        },
+        {
+            "label": "Лимиты соблюдены",
+            "ok": not issue_counts["overloaded_workers"],
+            "count": issue_counts["overloaded_workers"],
+        },
+    ]
+
+    return {
+        "score": score,
+        "status": status,
+        "tone": tone,
+        "headline": headline,
+        "active_tasks": len(active_tasks),
+        "issues": issues,
+        "issue_counts": issue_counts,
+        "checks": checks,
+    }
+
+
 def build_daily_schedule(
     tasks,
     worker_names=None,

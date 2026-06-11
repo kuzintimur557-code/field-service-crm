@@ -21,7 +21,10 @@ os.environ["SECRET_KEY"] = "smoke-test-secret"
 
 from app import main as crm  # noqa: E402
 from app.database import connect  # noqa: E402
-from app.services.daily_schedule import find_common_time_slot  # noqa: E402
+from app.services.daily_schedule import (  # noqa: E402
+    build_day_readiness,
+    find_common_time_slot,
+)
 
 
 def make_request(username=None, cookies=None):
@@ -5970,6 +5973,20 @@ async def assert_daily_route_schedule():
     assert "Применить план (2)" in owner_html
     assert "Автоисправление пересечений" in owner_html
     assert "Исправить пересечения (1)" in owner_html
+    assert "ГОТОВНОСТЬ ДНЯ" in owner_html
+    assert "Расписание нужно исправить до начала работ." in owner_html
+    assert 'href="#conflict-repair"' in owner_html
+    readiness = owner_page.context["day_readiness"]
+    assert readiness["score"] == 35
+    assert readiness["status"] == "Критично"
+    assert readiness["issue_counts"] == {
+        "conflicts": 2,
+        "unassigned": 1,
+        "without_time": 1,
+        "inactive_workers": 0,
+        "unavailable_workers": 0,
+        "overloaded_workers": 0,
+    }
     assert owner_page.context["schedule"]["summary"] == {
         "workers": 2,
         "tasks": 4,
@@ -6057,6 +6074,10 @@ async def assert_daily_route_schedule():
     assert "Route unassigned" not in filtered_html
     assert "Автозаполнение дня" not in filtered_html
     assert "Автоисправление пересечений" not in filtered_html
+    assert all(
+        issue["target"] == "#day-routes"
+        for issue in filtered_page.context["day_readiness"]["issues"]
+    )
 
     worker_page = await crm.calendar_day_route_page(
         make_asgi_request("worker2", "/calendar/day"),
@@ -6072,6 +6093,10 @@ async def assert_daily_route_schedule():
     assert "/api/calendar/day/move-time" not in worker_html
     assert "Автозаполнение дня" not in worker_html
     assert "Автоисправление пересечений" not in worker_html
+    assert all(
+        issue["target"] == "#day-routes"
+        for issue in worker_page.context["day_readiness"]["issues"]
+    )
 
     outsider_page = await crm.calendar_day_route_page(
         make_asgi_request("outsider_worker", "/calendar/day"),
@@ -6511,6 +6536,25 @@ async def assert_daily_route_schedule():
         )
         for conflict in remaining_conflicts
     )
+    ready_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    ready_state = ready_page.context["day_readiness"]
+    assert ready_state["score"] == 100
+    assert ready_state["status"] == "Готово"
+    assert not ready_state["issues"]
+    assert "Расписание готово к работе." in (
+        ready_page.body.decode("utf-8")
+    )
+
+    empty_readiness = build_day_readiness(
+        tasks=[],
+        worker_names=["worker2"],
+        worker_capacities={"worker2": 3},
+    )
+    assert empty_readiness["score"] == 100
+    assert empty_readiness["status"] == "День свободен"
 
     placeholders = ",".join("?" for _ in task_ids)
     c.execute(

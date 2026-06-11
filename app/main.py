@@ -44,6 +44,7 @@ from app.services.daily_schedule import (
     SLOT_STEP,
     WORKDAY_END,
     WORKDAY_START,
+    build_day_readiness,
     build_daily_auto_plan,
     build_daily_conflict_repair_plan,
     build_daily_schedule,
@@ -8685,11 +8686,13 @@ async def calendar_day_route_page(
         },
     }
 
-    if (
+    can_auto_manage_day = (
         role in ("boss", "manager")
         and not selected_worker
         and selected_day >= datetime.now().date()
-    ):
+    )
+
+    if can_auto_manage_day:
         day_auto_plan = build_daily_auto_plan(
             tasks=tasks,
             worker_names=worker_names,
@@ -8713,6 +8716,22 @@ async def calendar_day_route_page(
             },
             target_date=selected_date,
         )
+    day_readiness = build_day_readiness(
+        tasks=tasks,
+        worker_names=visible_worker_names,
+        worker_capacities=worker_capacities,
+        unavailable_worker_names={
+            worker_name
+            for worker_name in visible_worker_names
+            if selected_date
+            in unavailable_dates.get(worker_name, set())
+        },
+    )
+
+    if not can_auto_manage_day:
+        for issue in day_readiness["issues"]:
+            if issue["target"] in ("#auto-plan", "#conflict-repair"):
+                issue["target"] = "#day-routes"
 
     def day_url(day_value):
         params = {"date": day_value.strftime("%Y-%m-%d")}
@@ -8733,6 +8752,7 @@ async def calendar_day_route_page(
             "selected_worker": selected_worker,
             "selected_date": selected_date,
             "schedule": schedule,
+            "day_readiness": day_readiness,
             "day_auto_plan": day_auto_plan,
             "day_conflict_repair": day_conflict_repair,
             "previous_day_url": day_url(

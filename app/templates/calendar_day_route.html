@@ -24,6 +24,26 @@ h1{margin:0;font-size:30px}
 .metric{padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:white}
 .metric span{display:block;color:#6b7280;font-size:11px;font-weight:900}
 .metric strong{display:block;margin-top:4px;font-size:22px}
+.readiness{display:grid;grid-template-columns:190px minmax(0,1fr);gap:18px;margin:14px 0;padding:16px;border:1px solid #d1fae5;border-left:4px solid #059669;background:white}
+.readiness.warning{border-color:#fde68a;border-left-color:#d97706}
+.readiness.critical{border-color:#fecaca;border-left-color:#dc2626}
+.readiness-score{display:flex;gap:13px;align-items:center}
+.readiness-number{display:flex;width:76px;height:76px;flex:0 0 76px;align-items:center;justify-content:center;border:7px solid #a7f3d0;border-radius:50%;color:#047857;font-size:25px;font-weight:900}
+.readiness.warning .readiness-number{border-color:#fde68a;color:#b45309}
+.readiness.critical .readiness-number{border-color:#fecaca;color:#b91c1c}
+.readiness-label{font-size:11px;color:#6b7280;font-weight:900}
+.readiness-status{margin-top:4px;font-size:17px;font-weight:900}
+.readiness-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.readiness-headline{font-size:15px;font-weight:900}
+.readiness-caption{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800}
+.readiness-checks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin-top:12px}
+.readiness-check{display:flex;gap:7px;align-items:center;padding:8px;border-radius:7px;background:#f3f4f6;color:#4b5563;font-size:11px;font-weight:900}
+.readiness-check.ok{background:#ecfdf5;color:#166534}
+.readiness-check-mark{display:flex;width:19px;height:19px;flex:0 0 19px;align-items:center;justify-content:center;border-radius:50%;background:#d1d5db;color:#374151;font-size:11px}
+.readiness-check.ok .readiness-check-mark{background:#16a34a;color:white}
+.readiness-issues{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.readiness-issue{display:inline-flex;gap:5px;align-items:center;padding:6px 8px;border:1px solid #fed7aa;border-radius:7px;background:#fff7ed;color:#9a3412;text-decoration:none;font-size:11px;font-weight:900}
+.readiness.critical .readiness-issue{border-color:#fecaca;background:#fef2f2;color:#991b1b}
 .auto-plan{margin:14px 0;padding:16px;border:1px solid #bfdbfe;border-left:4px solid #2563eb;background:white}
 .auto-plan-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
 .auto-plan-title{font-size:18px;font-weight:900}
@@ -121,6 +141,8 @@ h1{margin:0;font-size:30px}
     h1{font-size:26px}
     .actions,.actions a,.controls,.filter,.filter>div,.filter input,.filter select,.filter button,.day-nav,.day-nav a{width:100%}
     .summary{grid-template-columns:1fr 1fr}
+    .readiness{grid-template-columns:1fr}
+    .readiness-checks{grid-template-columns:1fr 1fr}
     .auto-plan-actions,.auto-plan-apply{width:100%}
     .auto-plan-apply{justify-content:center}
     .auto-plan-row{grid-template-columns:28px minmax(0,1fr)}
@@ -187,8 +209,45 @@ h1{margin:0;font-size:30px}
         <div class="metric"><span>Без исполнителя</span><strong>{{ schedule["summary"]["unassigned"] }}</strong></div>
     </section>
 
+    <section class="readiness {{ day_readiness['tone'] }}" id="day-readiness">
+        <div class="readiness-score">
+            <div class="readiness-number">{{ day_readiness["score"] }}</div>
+            <div>
+                <div class="readiness-label">ГОТОВНОСТЬ ДНЯ</div>
+                <div class="readiness-status">{{ day_readiness["status"] }}</div>
+            </div>
+        </div>
+        <div>
+            <div class="readiness-head">
+                <div>
+                    <div class="readiness-headline">{{ day_readiness["headline"] }}</div>
+                    <div class="readiness-caption">
+                        Проверено активных заявок: {{ day_readiness["active_tasks"] }}
+                    </div>
+                </div>
+            </div>
+            <div class="readiness-checks">
+                {% for check in day_readiness["checks"] %}
+                <div class="readiness-check {% if check['ok'] %}ok{% endif %}">
+                    <span class="readiness-check-mark">{% if check["ok"] %}✓{% else %}{{ check["count"] }}{% endif %}</span>
+                    <span>{{ check["label"] }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% if day_readiness["issues"] %}
+            <div class="readiness-issues">
+                {% for issue in day_readiness["issues"] %}
+                <a class="readiness-issue" href="{{ issue['target'] }}" title="{{ issue['detail'] }}">
+                    {{ issue["title"] }}: {{ issue["count"] }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
     {% if role in ("boss", "manager") and day_conflict_repair["summary"]["conflict_tasks"] %}
-    <section class="auto-plan conflict-repair day-conflict-repair">
+    <section class="auto-plan conflict-repair day-conflict-repair" id="conflict-repair">
         <div class="auto-plan-head">
             <div>
                 <div class="auto-plan-title">Автоисправление пересечений</div>
@@ -268,7 +327,7 @@ h1{margin:0;font-size:30px}
     {% endif %}
 
     {% if role in ("boss", "manager") and day_auto_plan["summary"]["eligible"] %}
-    <section class="auto-plan day-auto-plan">
+    <section class="auto-plan day-auto-plan" id="auto-plan">
         <div class="auto-plan-head">
             <div>
                 <div class="auto-plan-title">Автозаполнение дня</div>
@@ -342,6 +401,7 @@ h1{margin:0;font-size:30px}
     </section>
     {% endif %}
 
+    <div id="day-routes"></div>
     {% if schedule["summary"]["tasks"] %}
     {% for worker in schedule["workers"] %}
     {% if worker["items"] %}
