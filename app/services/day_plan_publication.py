@@ -1,7 +1,11 @@
 import hashlib
 import json
+from datetime import datetime, timedelta
 
 from app.services.daily_schedule import task_workers
+
+
+REMINDER_COOLDOWN_MINUTES = 30
 
 
 def _value(item, key, default=""):
@@ -45,15 +49,29 @@ def build_day_publication_state(
     publication,
     tasks,
     acknowledgements=None,
+    reminders=None,
+    active_worker_names=None,
     current_username="",
 ):
     snapshot = build_day_plan_snapshot(tasks)
+    active_worker_names = set(
+        snapshot["workers"]
+        if active_worker_names is None
+        else active_worker_names
+    )
     acknowledgement_rows = list(acknowledgements or [])
     acknowledgement_by_worker = {
         str(_value(row, "username") or ""): str(
             _value(row, "acknowledged_at") or ""
         )
         for row in acknowledgement_rows
+        if str(_value(row, "username") or "")
+    }
+    reminder_by_worker = {
+        str(_value(row, "username") or ""): str(
+            _value(row, "reminded_at") or ""
+        )
+        for row in list(reminders or [])
         if str(_value(row, "username") or "")
     }
 
@@ -75,6 +93,10 @@ def build_day_publication_state(
             ),
             "current_user_acknowledged": False,
             "current_user_acknowledged_at": "",
+            "remindable_count": 0,
+            "reminder_cooldown_count": 0,
+            "inactive_pending_count": 0,
+            "last_reminded_at": "",
         }
 
     published_hash = str(_value(publication, "plan_hash") or "")
@@ -91,21 +113,52 @@ def build_day_publication_state(
         title = "После публикации есть изменения"
         message = "Обновите публикацию, чтобы команда увидела актуальный план."
 
-    acknowledgement_items = [
-        {
+    cooldown_threshold = datetime.now() - timedelta(
+        minutes=REMINDER_COOLDOWN_MINUTES
+    )
+    acknowledgement_items = []
+
+    for worker_name in snapshot["workers"]:
+        worker_is_active = worker_name in active_worker_names
+        acknowledged = (
+            state == "published"
+            and worker_name in acknowledgement_by_worker
+        )
+        reminded_at = reminder_by_worker.get(worker_name, "")
+        reminder_on_cooldown = False
+
+        if state == "published" and not acknowledged and reminded_at:
+            try:
+                reminder_on_cooldown = (
+                    datetime.strptime(
+                        reminded_at,
+                        "%Y-%m-%d %H:%M",
+                    )
+                    > cooldown_threshold
+                )
+            except ValueError:
+                reminder_on_cooldown = False
+
+        acknowledgement_items.append({
             "username": worker_name,
-            "acknowledged": (
-                state == "published"
-                and worker_name in acknowledgement_by_worker
-            ),
+            "acknowledged": acknowledged,
             "acknowledged_at": (
                 acknowledgement_by_worker.get(worker_name, "")
                 if state == "published"
                 else ""
             ),
-        }
-        for worker_name in snapshot["workers"]
-    ]
+            "reminded_at": (
+                reminded_at if state == "published" else ""
+            ),
+            "reminder_on_cooldown": reminder_on_cooldown,
+            "active": worker_is_active,
+            "remindable": (
+                state == "published"
+                and not acknowledged
+                and worker_is_active
+                and not reminder_on_cooldown
+            ),
+        })
     acknowledged_count = sum(
         1 for item in acknowledgement_items
         if item["acknowledged"]
@@ -114,6 +167,27 @@ def build_day_publication_state(
         acknowledgement_by_worker.get(current_username, "")
         if state == "published"
         else ""
+    )
+    remindable_count = sum(
+        1 for item in acknowledgement_items if item["remindable"]
+    )
+    reminder_cooldown_count = sum(
+        1
+        for item in acknowledgement_items
+        if not item["acknowledged"] and item["reminder_on_cooldown"]
+    )
+    inactive_pending_count = sum(
+        1
+        for item in acknowledgement_items
+        if not item["acknowledged"] and not item["active"]
+    )
+    last_reminded_at = max(
+        (
+            item["reminded_at"]
+            for item in acknowledgement_items
+            if item["reminded_at"]
+        ),
+        default="",
     )
 
     return {
@@ -148,4 +222,9 @@ def build_day_publication_state(
         "current_user_acknowledged_at": (
             current_user_acknowledged_at
         ),
+        "remindable_count": remindable_count,
+        "reminder_cooldown_count": reminder_cooldown_count,
+        "inactive_pending_count": inactive_pending_count,
+        "last_reminded_at": last_reminded_at,
+        "reminder_cooldown_minutes": REMINDER_COOLDOWN_MINUTES,
     }

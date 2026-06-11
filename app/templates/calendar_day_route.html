@@ -62,6 +62,7 @@ h1{margin:0;font-size:30px}
 .publication-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .publication-button{padding:10px 12px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .publication-button.accept{background:#059669}
+.publication-button.remind{background:#d97706}
 .publication-button.secondary{background:#e5e7eb;color:#374151}
 .publication-button:disabled{cursor:not-allowed;opacity:.55}
 .auto-plan{margin:14px 0;padding:16px;border:1px solid #bfdbfe;border-left:4px solid #2563eb;background:white}
@@ -298,6 +299,8 @@ h1{margin:0;font-size:30px}
                         {% if item["acknowledged"] %}✓{% else %}·{% endif %}
                         {{ item["username"] }}
                         {% if item["acknowledged_at"] %}· {{ item["acknowledged_at"] }}{% endif %}
+                        {% if not item["active"] %}· отключён{% endif %}
+                        {% if not item["acknowledged"] and item["reminded_at"] %}· напомнили {{ item["reminded_at"] }}{% endif %}
                     </span>
                     {% endfor %}
                 </div>
@@ -325,6 +328,21 @@ h1{margin:0;font-size:30px}
             {% if day_publication["state"] in ("published", "changed") %}
             <button class="publication-button secondary" id="unpublish-day-plan" type="button">
                 Снять публикацию
+            </button>
+            {% endif %}
+            {% if day_publication["state"] == "published" and day_publication["pending_count"] %}
+            <button
+                class="publication-button remind"
+                id="remind-day-plan"
+                type="button"
+                {% if not day_publication["remindable_count"] %}disabled{% endif %}
+                title="Напомнить сотрудникам, которые ещё не приняли актуальную версию"
+            >
+                {% if day_publication["remindable_count"] %}
+                Напомнить ({{ day_publication["remindable_count"] }})
+                {% else %}
+                Напоминание отправлено
+                {% endif %}
             </button>
             {% endif %}
         </div>
@@ -741,6 +759,48 @@ h1{margin:0;font-size:30px}
         }
     }
 
+    async function remindPendingWorkers() {
+        const section = document.getElementById("day-publication");
+        const button = document.getElementById("remind-day-plan");
+
+        if (!section || !button) {
+            return;
+        }
+
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "Отправляем...";
+
+        try {
+            const response = await fetch(
+                "/api/calendar/day/acknowledgements/remind",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({date: section.dataset.date})
+                }
+            );
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                showToast(
+                    data.message || "Не удалось отправить напоминания.",
+                    true
+                );
+                return;
+            }
+
+            showToast(data.message);
+            window.setTimeout(() => window.location.reload(), 500);
+        } catch (error) {
+            showToast("Сервер временно недоступен.", true);
+        } finally {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+
     function errorMessage(data) {
         const messages = {
             invalid_date: "Указана некорректная дата.",
@@ -1097,6 +1157,10 @@ h1{margin:0;font-size:30px}
     document.getElementById("unpublish-day-plan")?.addEventListener(
         "click",
         () => updateDayPublication("unpublish")
+    );
+    document.getElementById("remind-day-plan")?.addEventListener(
+        "click",
+        remindPendingWorkers
     );
 
     document.querySelectorAll(".timeline-slot.free.manageable").forEach(slot => {

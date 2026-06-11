@@ -41,6 +41,7 @@ from app.services.schedule_conflicts import (
 from app.services.dispatch_board import build_dispatch_board
 from app.services.dispatch_planner import build_dispatch_plan
 from app.services.day_plan_publication import (
+    REMINDER_COOLDOWN_MINUTES,
     build_day_plan_snapshot,
     build_day_publication_state,
 )
@@ -8657,6 +8658,17 @@ async def calendar_day_route_page(
         selected_date,
         publication_revision,
     )).fetchall() if publication_revision else []
+    reminder_rows = c.execute("""
+    SELECT username, MAX(reminded_at) AS reminded_at
+    FROM calendar_day_ack_reminders
+    WHERE company_id=? AND plan_date=? AND revision=?
+    GROUP BY username
+    ORDER BY username
+    """, (
+        company_id,
+        selected_date,
+        publication_revision,
+    )).fetchall() if publication_revision else []
 
     if selected_worker:
         query += f" AND {worker_task_condition()}"
@@ -8754,6 +8766,8 @@ async def calendar_day_route_page(
         publication,
         publication_tasks,
         acknowledgements=acknowledgement_rows,
+        reminders=reminder_rows,
+        active_worker_names=worker_names,
         current_username=username,
     )
 
@@ -8916,6 +8930,14 @@ async def api_calendar_day_publication(request: Request):
 
         c.execute("""
         DELETE FROM calendar_day_publications
+        WHERE company_id=? AND plan_date=?
+        """, (company_id, selected_date))
+        c.execute("""
+        DELETE FROM calendar_day_acknowledgements
+        WHERE company_id=? AND plan_date=?
+        """, (company_id, selected_date))
+        c.execute("""
+        DELETE FROM calendar_day_ack_reminders
         WHERE company_id=? AND plan_date=?
         """, (company_id, selected_date))
         event_title = "План дня снят с публикации"
@@ -9143,13 +9165,26 @@ async def api_calendar_day_acknowledge(request: Request):
     selected_date = str(payload.get("date") or "").strip()[:10]
 
     try:
-        datetime.strptime(selected_date, "%Y-%m-%d")
+        selected_day = datetime.strptime(
+            selected_date,
+            "%Y-%m-%d",
+        ).date()
     except ValueError:
         return JSONResponse(
             {
                 "ok": False,
                 "error": "invalid_date",
                 "message": "Указана некорректная дата.",
+            },
+            status_code=400,
+        )
+
+    if selected_day < datetime.now().date():
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "past_date",
+                "message": "Нельзя подтверждать прошедший план.",
             },
             status_code=400,
         )
@@ -9250,7 +9285,11 @@ async def api_calendar_day_acknowledge(request: Request):
     WHERE company_id=?
       AND username=?
       AND link=?
-      AND title IN ('План дня опубликован', 'План дня обновлён')
+      AND title IN (
+          'План дня опубликован',
+          'План дня обновлён',
+          'Подтвердите план дня'
+      )
     """, (
         company_id,
         username,
@@ -9265,6 +9304,292 @@ async def api_calendar_day_acknowledge(request: Request):
         "revision": revision,
         "acknowledged_at": acknowledged_at,
         "message": "План дня принят.",
+    }
+
+
+@app.post("/api/calendar/day/acknowledgements/remind")
+async def api_calendar_day_acknowledgements_remind(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "message": "Требуется авторизация.",
+            },
+            status_code=401,
+        )
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Недостаточно прав.",
+            },
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "feature_disabled",
+                "message": "Модуль календаря отключён.",
+            },
+            status_code=403,
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_json",
+                "message": "Не удалось прочитать запрос.",
+            },
+            status_code=400,
+        )
+
+    selected_date = str(payload.get("date") or "").strip()[:10]
+
+    try:
+        selected_day = datetime.strptime(
+            selected_date,
+            "%Y-%m-%d",
+        ).date()
+    except ValueError:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_date",
+                "message": "Указана некорректная дата.",
+            },
+            status_code=400,
+        )
+
+    if selected_day < datetime.now().date():
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "past_date",
+                "message": "Нельзя напоминать по прошедшему плану.",
+            },
+            status_code=400,
+        )
+
+    conn = connect()
+    c = conn.cursor()
+    publication = c.execute("""
+    SELECT *
+    FROM calendar_day_publications
+    WHERE company_id=? AND plan_date=?
+    """, (company_id, selected_date)).fetchone()
+
+    if not publication:
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "not_published",
+                "message": "План дня ещё не опубликован.",
+            },
+            status_code=404,
+        )
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status!='Отменено'
+      AND task_date LIKE ?
+    ORDER BY id
+    """, (company_id, f"{selected_date}%")).fetchall()
+    snapshot = build_day_plan_snapshot(tasks)
+
+    if snapshot["hash"] != str(publication["plan_hash"] or ""):
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "plan_changed",
+                "message": (
+                    "План изменён. Сначала обновите публикацию."
+                ),
+            },
+            status_code=409,
+        )
+
+    revision = int(publication["revision"] or 1)
+    acknowledged_workers = {
+        row["username"]
+        for row in c.execute("""
+        SELECT username
+        FROM calendar_day_acknowledgements
+        WHERE company_id=? AND plan_date=? AND revision=?
+        """, (
+            company_id,
+            selected_date,
+            revision,
+        )).fetchall()
+    }
+    pending_workers = [
+        worker_name
+        for worker_name in snapshot["workers"]
+        if worker_name not in acknowledged_workers
+    ]
+
+    if not pending_workers:
+        conn.close()
+        return {
+            "ok": True,
+            "date": selected_date,
+            "revision": revision,
+            "sent": [],
+            "cooldown": [],
+            "inactive": [],
+            "message": "Все исполнители уже подтвердили план.",
+        }
+
+    placeholders = ",".join("?" for _ in pending_workers)
+    active_worker_rows = c.execute(f"""
+    SELECT username, telegram_chat_id
+    FROM users
+    WHERE company_id=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+      AND username IN ({placeholders})
+    """, [company_id, *pending_workers]).fetchall()
+    active_workers = {
+        row["username"]: row for row in active_worker_rows
+    }
+    now = datetime.now()
+    now_value = now.strftime("%Y-%m-%d %H:%M")
+    cooldown_threshold = now - timedelta(
+        minutes=REMINDER_COOLDOWN_MINUTES
+    )
+    sent_workers = []
+    cooldown_workers = []
+    inactive_workers = []
+    telegram_messages = []
+
+    for worker_name in pending_workers:
+        worker_row = active_workers.get(worker_name)
+
+        if not worker_row:
+            inactive_workers.append(worker_name)
+            continue
+
+        last_reminder = c.execute("""
+        SELECT reminded_at
+        FROM calendar_day_ack_reminders
+        WHERE company_id=?
+          AND plan_date=?
+          AND revision=?
+          AND username=?
+        ORDER BY id DESC
+        LIMIT 1
+        """, (
+            company_id,
+            selected_date,
+            revision,
+            worker_name,
+        )).fetchone()
+
+        if last_reminder and last_reminder["reminded_at"]:
+            try:
+                reminded_at = datetime.strptime(
+                    last_reminder["reminded_at"],
+                    "%Y-%m-%d %H:%M",
+                )
+            except ValueError:
+                reminded_at = None
+
+            if reminded_at and reminded_at > cooldown_threshold:
+                cooldown_workers.append(worker_name)
+                continue
+
+        c.execute("""
+        INSERT INTO calendar_day_ack_reminders (
+            company_id, plan_date, revision, username,
+            reminded_by, reminded_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            selected_date,
+            revision,
+            worker_name,
+            username,
+            now_value,
+        ))
+        notification_title = "Подтвердите план дня"
+        notification_message = (
+            f"План на {selected_date}, версия {revision}. "
+            "Откройте маршрут и нажмите «Принять план»."
+        )
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message, link, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            worker_name,
+            notification_title,
+            notification_message,
+            f"/calendar/day?date={selected_date}",
+            now_value,
+        ))
+        sent_workers.append(worker_name)
+        chat_id = str(worker_row["telegram_chat_id"] or "").strip()
+
+        if chat_id:
+            telegram_messages.append((
+                chat_id,
+                (
+                    f"{notification_title}\n"
+                    f"Дата: {selected_date}\n"
+                    f"Версия плана: {revision}\n"
+                    "Откройте маршрут дня и подтвердите получение."
+                ),
+            ))
+
+    conn.commit()
+    conn.close()
+
+    for chat_id, message in telegram_messages:
+        try:
+            send_message_to_chat(chat_id, message)
+        except Exception:
+            pass
+
+    if sent_workers:
+        message = f"Напоминания отправлены: {len(sent_workers)}."
+    elif cooldown_workers:
+        message = (
+            "Напоминания уже отправлялись недавно. "
+            f"Повтор доступен через {REMINDER_COOLDOWN_MINUTES} минут."
+        )
+    else:
+        message = "Нет активных исполнителей для напоминания."
+
+    return {
+        "ok": True,
+        "date": selected_date,
+        "revision": revision,
+        "sent": sent_workers,
+        "cooldown": cooldown_workers,
+        "inactive": inactive_workers,
+        "message": message,
+        "cooldown_minutes": REMINDER_COOLDOWN_MINUTES,
     }
 
 

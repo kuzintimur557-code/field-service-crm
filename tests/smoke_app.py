@@ -6121,6 +6121,36 @@ async def assert_daily_route_schedule():
         )
     )
     assert unpublished_acknowledgement.status_code == 404
+    anonymous_reminder = (
+        await crm.api_calendar_day_acknowledgements_remind(
+            make_json_request(
+                None,
+                "/api/calendar/day/acknowledgements/remind",
+                {"date": route_date},
+            )
+        )
+    )
+    assert anonymous_reminder.status_code == 401
+    worker_reminder = (
+        await crm.api_calendar_day_acknowledgements_remind(
+            make_json_request(
+                "worker2",
+                "/api/calendar/day/acknowledgements/remind",
+                {"date": route_date},
+            )
+        )
+    )
+    assert worker_reminder.status_code == 403
+    unpublished_reminder = (
+        await crm.api_calendar_day_acknowledgements_remind(
+            make_json_request(
+                "owner2",
+                "/api/calendar/day/acknowledgements/remind",
+                {"date": route_date},
+            )
+        )
+    )
+    assert unpublished_reminder.status_code == 404
 
     filtered_page = await crm.calendar_day_route_page(
         make_asgi_request("owner2", "/calendar/day"),
@@ -6655,6 +6685,91 @@ async def assert_daily_route_schedule():
         ]
         is False
     )
+    owner_pending_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    owner_pending_html = owner_pending_page.body.decode("utf-8")
+    assert 'id="remind-day-plan"' in owner_pending_html
+    assert "Напомнить (" in owner_pending_html
+    reminder_messages = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = (
+        lambda chat_id, text: reminder_messages.append((chat_id, text))
+    )
+
+    try:
+        reminder_result = (
+            await crm.api_calendar_day_acknowledgements_remind(
+                make_json_request(
+                    "owner2",
+                    "/api/calendar/day/acknowledgements/remind",
+                    {"date": route_date},
+                )
+            )
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert set(reminder_result["sent"]) == expected_publication_workers
+    assert not reminder_result["cooldown"]
+    repeated_reminder = (
+        await crm.api_calendar_day_acknowledgements_remind(
+            make_json_request(
+                "owner2",
+                "/api/calendar/day/acknowledgements/remind",
+                {"date": route_date},
+            )
+        )
+    )
+    assert not repeated_reminder["sent"]
+    assert set(
+        repeated_reminder["cooldown"]
+    ) == expected_publication_workers
+    expired_reminder_at = (
+        datetime.now() - timedelta(minutes=31)
+    ).strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE calendar_day_ack_reminders
+    SET reminded_at=?
+    WHERE company_id=2 AND plan_date=? AND revision=1
+    """, (expired_reminder_at, route_date))
+    conn.commit()
+    conn.close()
+    crm.send_message_to_chat = lambda chat_id, text: True
+
+    try:
+        renewed_reminder = (
+            await crm.api_calendar_day_acknowledgements_remind(
+                make_json_request(
+                    "owner2",
+                    "/api/calendar/day/acknowledgements/remind",
+                    {"date": route_date},
+                )
+            )
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert set(
+        renewed_reminder["sent"]
+    ) == expected_publication_workers
+    assert not renewed_reminder["cooldown"]
+    reminded_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    reminded_html = reminded_page.body.decode("utf-8")
+    assert "Напоминание отправлено" in reminded_html
+    assert "напомнили " in reminded_html
+    assert (
+        reminded_page.context["day_publication"][
+            "remindable_count"
+        ]
+        == 0
+    )
     acknowledgement_result = await crm.api_calendar_day_acknowledge(
         make_json_request(
             "worker2",
@@ -6674,7 +6789,9 @@ async def assert_daily_route_schedule():
     publication_notifications = c.execute("""
     SELECT username, title, is_read
     FROM notifications
-    WHERE company_id=2 AND link=?
+    WHERE company_id=2
+      AND link=?
+      AND title='План дня опубликован'
     ORDER BY username
     """, (f"/calendar/day?date={route_date}",)).fetchall()
     assert published_row["revision"] == 1
@@ -6701,6 +6818,27 @@ async def assert_daily_route_schedule():
         if row["username"] == "worker2"
     )
     assert worker_publication_notification["is_read"] == 1
+    worker_reminder_notification = c.execute("""
+    SELECT is_read
+    FROM notifications
+    WHERE company_id=2
+      AND username='worker2'
+      AND link=?
+      AND title='Подтвердите план дня'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (f"/calendar/day?date={route_date}",)).fetchone()
+    assert worker_reminder_notification["is_read"] == 1
+    reminder_history_count = c.execute("""
+    SELECT COUNT(*)
+    FROM calendar_day_ack_reminders
+    WHERE company_id=2
+      AND plan_date=?
+      AND revision=1
+    """, (route_date,)).fetchone()[0]
+    assert reminder_history_count == (
+        len(expected_publication_workers) * 2
+    )
     acknowledged_worker_page = await crm.calendar_day_route_page(
         make_asgi_request("worker2", "/calendar/day"),
         date=route_date,
@@ -6760,6 +6898,19 @@ async def assert_daily_route_schedule():
     assert json.loads(
         changed_acknowledgement.body.decode("utf-8")
     )["error"] == "plan_changed"
+    changed_reminder = (
+        await crm.api_calendar_day_acknowledgements_remind(
+            make_json_request(
+                "owner2",
+                "/api/calendar/day/acknowledgements/remind",
+                {"date": route_date},
+            )
+        )
+    )
+    assert changed_reminder.status_code == 409
+    assert json.loads(
+        changed_reminder.body.decode("utf-8")
+    )["error"] == "plan_changed"
 
     republish_result = await crm.api_calendar_day_publication(
         make_json_request(
@@ -6789,6 +6940,16 @@ async def assert_daily_route_schedule():
     assert "Приняли: 0/" in published_worker_html
     assert 'id="acknowledge-day-plan"' in published_worker_html
     assert "План принят вами" not in published_worker_html
+    republished_owner_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    assert (
+        republished_owner_page.context["day_publication"][
+            "remindable_count"
+        ]
+        == len(expected_publication_workers)
+    )
     second_acknowledgement = await crm.api_calendar_day_acknowledge(
         make_json_request(
             "worker2",
@@ -6827,6 +6988,16 @@ async def assert_daily_route_schedule():
     FROM calendar_day_publications
     WHERE company_id=2 AND plan_date=?
     """, (route_date,)).fetchone()[0] == 0
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM calendar_day_acknowledgements
+    WHERE company_id=2 AND plan_date=?
+    """, (route_date,)).fetchone()[0] == 0
+    assert c.execute("""
+    SELECT COUNT(*)
+    FROM calendar_day_ack_reminders
+    WHERE company_id=2 AND plan_date=?
+    """, (route_date,)).fetchone()[0] == 0
     conn.close()
 
     empty_readiness = build_day_readiness(
@@ -6846,6 +7017,10 @@ async def assert_daily_route_schedule():
     )
     c.execute(
         "DELETE FROM calendar_day_acknowledgements WHERE plan_date=?",
+        (route_date,),
+    )
+    c.execute(
+        "DELETE FROM calendar_day_ack_reminders WHERE plan_date=?",
         (route_date,),
     )
     c.execute(
