@@ -55,8 +55,13 @@ h1{margin:0;font-size:30px}
 .publication-message{margin-top:3px;color:#6b7280;font-size:11px;font-weight:800}
 .publication-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:#4b5563;font-size:10px;font-weight:900}
 .publication-meta span{padding:4px 6px;border-radius:5px;background:#f3f4f6}
+.publication-confirmations{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.confirmation-chip{display:inline-flex;gap:5px;align-items:center;padding:5px 7px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:900}
+.confirmation-chip.confirmed{background:#dcfce7;color:#166534}
+.worker-confirmation{margin-top:9px;color:#166534;font-size:11px;font-weight:900}
 .publication-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .publication-button{padding:10px 12px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.publication-button.accept{background:#059669}
 .publication-button.secondary{background:#e5e7eb;color:#374151}
 .publication-button:disabled{cursor:not-allowed;opacity:.55}
 .auto-plan{margin:14px 0;padding:16px;border:1px solid #bfdbfe;border-left:4px solid #2563eb;background:white}
@@ -282,7 +287,26 @@ h1{margin:0;font-size:30px}
                     <span>Версия: {{ day_publication["revision"] }}</span>
                     <span>{{ day_publication["published_at"] }} · {{ day_publication["published_by"] }}</span>
                     {% endif %}
+                    {% if day_publication["state"] == "published" %}
+                    <span>Приняли: {{ day_publication["acknowledged_count"] }}/{{ day_publication["worker_count"] }}</span>
+                    {% endif %}
                 </div>
+                {% if role in ("boss", "manager") and day_publication["state"] == "published" and day_publication["acknowledgements"] %}
+                <div class="publication-confirmations">
+                    {% for item in day_publication["acknowledgements"] %}
+                    <span class="confirmation-chip {% if item['acknowledged'] %}confirmed{% endif %}">
+                        {% if item["acknowledged"] %}✓{% else %}·{% endif %}
+                        {{ item["username"] }}
+                        {% if item["acknowledged_at"] %}· {{ item["acknowledged_at"] }}{% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if role == "worker" and day_publication["state"] == "published" and day_publication["current_user_acknowledged"] %}
+                <div class="worker-confirmation">
+                    ✓ План принят вами {{ day_publication["current_user_acknowledged_at"] }}
+                </div>
+                {% endif %}
             </div>
         </div>
         {% if can_publish_day %}
@@ -303,6 +327,13 @@ h1{margin:0;font-size:30px}
                 Снять публикацию
             </button>
             {% endif %}
+        </div>
+        {% endif %}
+        {% if role == "worker" and day_publication["state"] == "published" and day_publication["current_user_assigned"] and not day_publication["current_user_acknowledged"] %}
+        <div class="publication-actions">
+            <button class="publication-button accept" id="acknowledge-day-plan" type="button">
+                Принять план
+            </button>
         </div>
         {% endif %}
     </section>
@@ -1149,6 +1180,60 @@ h1{margin:0;font-size:30px}
         "click",
         applyConflictRepair
     );
+})();
+</script>
+{% endif %}
+{% if role == "worker" %}
+<script>
+(() => {
+    const button = document.getElementById("acknowledge-day-plan");
+    const section = document.getElementById("day-publication");
+    const toast = document.getElementById("schedule-toast");
+
+    if (!button || !section || !toast) {
+        return;
+    }
+
+    function showWorkerToast(message, isError = false) {
+        toast.textContent = message;
+        toast.classList.toggle("error", isError);
+        toast.hidden = false;
+    }
+
+    button.addEventListener("click", async () => {
+        button.disabled = true;
+        button.textContent = "Подтверждаем...";
+
+        try {
+            const response = await fetch(
+                "/api/calendar/day/acknowledge",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({date: section.dataset.date})
+                }
+            );
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                showWorkerToast(
+                    data.message || "Не удалось подтвердить план.",
+                    true
+                );
+                button.disabled = false;
+                button.textContent = "Принять план";
+                return;
+            }
+
+            showWorkerToast(data.message);
+            window.setTimeout(() => window.location.reload(), 450);
+        } catch (error) {
+            showWorkerToast("Сервер временно недоступен.", true);
+            button.disabled = false;
+            button.textContent = "Принять план";
+        }
+    });
 })();
 </script>
 {% endif %}

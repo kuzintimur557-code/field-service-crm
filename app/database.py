@@ -246,6 +246,17 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS calendar_day_acknowledgements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        plan_date TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        username TEXT NOT NULL,
+        acknowledged_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS recurring_jobs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER,
@@ -803,6 +814,18 @@ def init_db():
     c.execute("""
     CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_day_publication_company_date
     ON calendar_day_publications(company_id, plan_date)
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_day_ack_unique
+    ON calendar_day_acknowledgements(
+        company_id, plan_date, revision, username
+    )
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_calendar_day_ack_company_date
+    ON calendar_day_acknowledgements(company_id, plan_date, revision)
     """)
 
     if os.getenv("ENV") != "production":

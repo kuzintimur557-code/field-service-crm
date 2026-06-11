@@ -41,8 +41,21 @@ def build_day_plan_snapshot(tasks):
     }
 
 
-def build_day_publication_state(publication, tasks):
+def build_day_publication_state(
+    publication,
+    tasks,
+    acknowledgements=None,
+    current_username="",
+):
     snapshot = build_day_plan_snapshot(tasks)
+    acknowledgement_rows = list(acknowledgements or [])
+    acknowledgement_by_worker = {
+        str(_value(row, "username") or ""): str(
+            _value(row, "acknowledged_at") or ""
+        )
+        for row in acknowledgement_rows
+        if str(_value(row, "username") or "")
+    }
 
     if not publication:
         return {
@@ -54,6 +67,14 @@ def build_day_publication_state(publication, tasks):
             "published_by": "",
             "published_at": "",
             "revision": 0,
+            "acknowledged_count": 0,
+            "pending_count": snapshot["worker_count"],
+            "acknowledgements": [],
+            "current_user_assigned": (
+                current_username in snapshot["workers"]
+            ),
+            "current_user_acknowledged": False,
+            "current_user_acknowledged_at": "",
         }
 
     published_hash = str(_value(publication, "plan_hash") or "")
@@ -69,6 +90,31 @@ def build_day_publication_state(publication, tasks):
         tone = "changed"
         title = "После публикации есть изменения"
         message = "Обновите публикацию, чтобы команда увидела актуальный план."
+
+    acknowledgement_items = [
+        {
+            "username": worker_name,
+            "acknowledged": (
+                state == "published"
+                and worker_name in acknowledgement_by_worker
+            ),
+            "acknowledged_at": (
+                acknowledgement_by_worker.get(worker_name, "")
+                if state == "published"
+                else ""
+            ),
+        }
+        for worker_name in snapshot["workers"]
+    ]
+    acknowledged_count = sum(
+        1 for item in acknowledgement_items
+        if item["acknowledged"]
+    )
+    current_user_acknowledged_at = (
+        acknowledgement_by_worker.get(current_username, "")
+        if state == "published"
+        else ""
+    )
 
     return {
         **snapshot,
@@ -88,5 +134,18 @@ def build_day_publication_state(publication, tasks):
         ),
         "published_worker_count": int(
             _value(publication, "worker_count", 0) or 0
+        ),
+        "acknowledged_count": acknowledged_count,
+        "pending_count": max(
+            snapshot["worker_count"] - acknowledged_count,
+            0,
+        ),
+        "acknowledgements": acknowledgement_items,
+        "current_user_assigned": current_username in snapshot["workers"],
+        "current_user_acknowledged": bool(
+            current_user_acknowledged_at
+        ),
+        "current_user_acknowledged_at": (
+            current_user_acknowledged_at
         ),
     }

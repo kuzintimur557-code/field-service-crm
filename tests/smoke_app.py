@@ -6095,6 +6095,32 @@ async def assert_daily_route_schedule():
     )
     assert not_ready_payload["error"] == "day_not_ready"
     assert not_ready_payload["score"] == 35
+    anonymous_acknowledgement = await crm.api_calendar_day_acknowledge(
+        make_json_request(
+            None,
+            "/api/calendar/day/acknowledge",
+            {"date": route_date},
+        )
+    )
+    assert anonymous_acknowledgement.status_code == 401
+    owner_acknowledgement = await crm.api_calendar_day_acknowledge(
+        make_json_request(
+            "owner2",
+            "/api/calendar/day/acknowledge",
+            {"date": route_date},
+        )
+    )
+    assert owner_acknowledgement.status_code == 403
+    unpublished_acknowledgement = (
+        await crm.api_calendar_day_acknowledge(
+            make_json_request(
+                "worker2",
+                "/api/calendar/day/acknowledge",
+                {"date": route_date},
+            )
+        )
+    )
+    assert unpublished_acknowledgement.status_code == 404
 
     filtered_page = await crm.calendar_day_route_page(
         make_asgi_request("owner2", "/calendar/day"),
@@ -6614,6 +6640,30 @@ async def assert_daily_route_schedule():
     assert publication_result["notified_workers"] == len(
         expected_publication_workers
     )
+    first_published_worker_page = await crm.calendar_day_route_page(
+        make_asgi_request("worker2", "/calendar/day"),
+        date=route_date,
+    )
+    first_published_worker_html = (
+        first_published_worker_page.body.decode("utf-8")
+    )
+    assert "Приняли: 0/" in first_published_worker_html
+    assert 'id="acknowledge-day-plan"' in first_published_worker_html
+    assert (
+        first_published_worker_page.context["day_publication"][
+            "current_user_acknowledged"
+        ]
+        is False
+    )
+    acknowledgement_result = await crm.api_calendar_day_acknowledge(
+        make_json_request(
+            "worker2",
+            "/api/calendar/day/acknowledge",
+            {"date": route_date},
+        )
+    )
+    assert acknowledgement_result["ok"] is True
+    assert acknowledgement_result["revision"] == 1
     conn = connect()
     c = conn.cursor()
     published_row = c.execute("""
@@ -6622,7 +6672,7 @@ async def assert_daily_route_schedule():
     WHERE company_id=2 AND plan_date=?
     """, (route_date,)).fetchone()
     publication_notifications = c.execute("""
-    SELECT username, title
+    SELECT username, title, is_read
     FROM notifications
     WHERE company_id=2 AND link=?
     ORDER BY username
@@ -6636,6 +6686,39 @@ async def assert_daily_route_schedule():
         row["title"] == "План дня опубликован"
         for row in publication_notifications
     )
+    worker_acknowledgement = c.execute("""
+    SELECT *
+    FROM calendar_day_acknowledgements
+    WHERE company_id=2
+      AND plan_date=?
+      AND revision=1
+      AND username='worker2'
+    """, (route_date,)).fetchone()
+    assert worker_acknowledgement is not None
+    worker_publication_notification = next(
+        row
+        for row in publication_notifications
+        if row["username"] == "worker2"
+    )
+    assert worker_publication_notification["is_read"] == 1
+    acknowledged_worker_page = await crm.calendar_day_route_page(
+        make_asgi_request("worker2", "/calendar/day"),
+        date=route_date,
+    )
+    acknowledged_worker_html = (
+        acknowledged_worker_page.body.decode("utf-8")
+    )
+    assert "План принят вами" in acknowledged_worker_html
+    assert 'id="acknowledge-day-plan"' not in acknowledged_worker_html
+    acknowledged_owner_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    acknowledged_owner_html = (
+        acknowledged_owner_page.body.decode("utf-8")
+    )
+    assert "Приняли: 1/" in acknowledged_owner_html
+    assert "confirmation-chip confirmed" in acknowledged_owner_html
     outsider_unpublish = await crm.api_calendar_day_publication(
         make_json_request(
             "manager1",
@@ -6666,6 +6749,17 @@ async def assert_daily_route_schedule():
     assert "После публикации есть изменения" in changed_html
     assert "Обновить публикацию" in changed_html
     assert "Снять публикацию" in changed_html
+    changed_acknowledgement = await crm.api_calendar_day_acknowledge(
+        make_json_request(
+            "worker2",
+            "/api/calendar/day/acknowledge",
+            {"date": route_date},
+        )
+    )
+    assert changed_acknowledgement.status_code == 409
+    assert json.loads(
+        changed_acknowledgement.body.decode("utf-8")
+    )["error"] == "plan_changed"
 
     republish_result = await crm.api_calendar_day_publication(
         make_json_request(
@@ -6692,6 +6786,31 @@ async def assert_daily_route_schedule():
     published_worker_html = published_worker_page.body.decode("utf-8")
     assert "План опубликован" in published_worker_html
     assert 'id="unpublish-day-plan"' not in published_worker_html
+    assert "Приняли: 0/" in published_worker_html
+    assert 'id="acknowledge-day-plan"' in published_worker_html
+    assert "План принят вами" not in published_worker_html
+    second_acknowledgement = await crm.api_calendar_day_acknowledge(
+        make_json_request(
+            "worker2",
+            "/api/calendar/day/acknowledge",
+            {"date": route_date},
+        )
+    )
+    assert second_acknowledgement["revision"] == 2
+    conn = connect()
+    c = conn.cursor()
+    acknowledgement_revisions = c.execute("""
+    SELECT revision
+    FROM calendar_day_acknowledgements
+    WHERE company_id=2
+      AND plan_date=?
+      AND username='worker2'
+    ORDER BY revision
+    """, (route_date,)).fetchall()
+    assert [
+        row["revision"] for row in acknowledgement_revisions
+    ] == [1, 2]
+    conn.close()
 
     unpublish_result = await crm.api_calendar_day_publication(
         make_json_request(
@@ -6723,6 +6842,10 @@ async def assert_daily_route_schedule():
     placeholders = ",".join("?" for _ in task_ids)
     c.execute(
         "DELETE FROM calendar_day_publications WHERE plan_date=?",
+        (route_date,),
+    )
+    c.execute(
+        "DELETE FROM calendar_day_acknowledgements WHERE plan_date=?",
         (route_date,),
     )
     c.execute(

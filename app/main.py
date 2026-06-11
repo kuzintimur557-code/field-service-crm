@@ -8644,6 +8644,19 @@ async def calendar_day_route_page(
     FROM calendar_day_publications
     WHERE company_id=? AND plan_date=?
     """, (company_id, selected_date)).fetchone()
+    publication_revision = (
+        int(publication["revision"] or 0) if publication else 0
+    )
+    acknowledgement_rows = c.execute("""
+    SELECT username, acknowledged_at
+    FROM calendar_day_acknowledgements
+    WHERE company_id=? AND plan_date=? AND revision=?
+    ORDER BY username
+    """, (
+        company_id,
+        selected_date,
+        publication_revision,
+    )).fetchall() if publication_revision else []
 
     if selected_worker:
         query += f" AND {worker_task_condition()}"
@@ -8740,6 +8753,8 @@ async def calendar_day_route_page(
     day_publication = build_day_publication_state(
         publication,
         publication_tasks,
+        acknowledgements=acknowledgement_rows,
+        current_username=username,
     )
 
     if not can_auto_manage_day:
@@ -9072,6 +9087,184 @@ async def api_calendar_day_publication(request: Request):
             for worker_name in assigned_workers
             if worker_name in active_workers
         ]),
+    }
+
+
+@app.post("/api/calendar/day/acknowledge")
+async def api_calendar_day_acknowledge(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "message": "Требуется авторизация.",
+            },
+            status_code=401,
+        )
+
+    role = get_role(username)
+
+    if role != "worker":
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Подтверждение доступно исполнителям.",
+            },
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "feature_disabled",
+                "message": "Модуль календаря отключён.",
+            },
+            status_code=403,
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_json",
+                "message": "Не удалось прочитать запрос.",
+            },
+            status_code=400,
+        )
+
+    selected_date = str(payload.get("date") or "").strip()[:10]
+
+    try:
+        datetime.strptime(selected_date, "%Y-%m-%d")
+    except ValueError:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_date",
+                "message": "Указана некорректная дата.",
+            },
+            status_code=400,
+        )
+
+    conn = connect()
+    c = conn.cursor()
+    publication = c.execute("""
+    SELECT *
+    FROM calendar_day_publications
+    WHERE company_id=? AND plan_date=?
+    """, (company_id, selected_date)).fetchone()
+
+    if not publication:
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "not_published",
+                "message": "План дня ещё не опубликован.",
+            },
+            status_code=404,
+        )
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status!='Отменено'
+      AND task_date LIKE ?
+    ORDER BY id
+    """, (company_id, f"{selected_date}%")).fetchall()
+    snapshot = build_day_plan_snapshot(tasks)
+
+    if snapshot["hash"] != str(publication["plan_hash"] or ""):
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "plan_changed",
+                "message": (
+                    "План изменён. Дождитесь новой публикации."
+                ),
+            },
+            status_code=409,
+        )
+
+    if username not in snapshot["workers"]:
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "not_assigned",
+                "message": "На этот день у вас нет назначенных заявок.",
+            },
+            status_code=403,
+        )
+
+    active_worker = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=?
+      AND username=?
+      AND role='worker'
+      AND COALESCE(is_active, 1)=1
+    """, (company_id, username)).fetchone()
+
+    if not active_worker:
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "inactive_worker",
+                "message": "Учётная запись исполнителя отключена.",
+            },
+            status_code=403,
+        )
+
+    revision = int(publication["revision"] or 1)
+    acknowledged_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO calendar_day_acknowledgements (
+        company_id, plan_date, revision, username, acknowledged_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(company_id, plan_date, revision, username)
+    DO UPDATE SET acknowledged_at=excluded.acknowledged_at
+    """, (
+        company_id,
+        selected_date,
+        revision,
+        username,
+        acknowledged_at,
+    ))
+    c.execute("""
+    UPDATE notifications
+    SET is_read=1
+    WHERE company_id=?
+      AND username=?
+      AND link=?
+      AND title IN ('План дня опубликован', 'План дня обновлён')
+    """, (
+        company_id,
+        username,
+        f"/calendar/day?date={selected_date}",
+    ))
+    conn.commit()
+    conn.close()
+
+    return {
+        "ok": True,
+        "date": selected_date,
+        "revision": revision,
+        "acknowledged_at": acknowledged_at,
+        "message": "План дня принят.",
     }
 
 
