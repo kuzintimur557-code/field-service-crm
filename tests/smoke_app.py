@@ -5968,6 +5968,8 @@ async def assert_daily_route_schedule():
     assert "Назначить" in owner_html
     assert "Автозаполнение дня" in owner_html
     assert "Применить план (2)" in owner_html
+    assert "Автоисправление пересечений" in owner_html
+    assert "Исправить пересечения (1)" in owner_html
     assert owner_page.context["schedule"]["summary"] == {
         "workers": 2,
         "tasks": 4,
@@ -6030,6 +6032,18 @@ async def assert_daily_route_schedule():
     assert auto_plan_by_id[unassigned_id]["target_time_label"] == (
         "11:00–12:00"
     )
+    conflict_repair = owner_page.context["day_conflict_repair"]
+    assert conflict_repair["summary"] == {
+        "conflict_tasks": 1,
+        "planned": 1,
+        "unscheduled": 0,
+        "limited": 0,
+    }
+    repair_item = conflict_repair["items"][0]
+    assert repair_item["task_id"] == overlap_id
+    assert repair_item["conflict_task_ids"] == [morning_id]
+    assert repair_item["old_time_label"] == "09:30–10:30"
+    assert repair_item["target_time_label"] == "10:00–11:00"
 
     filtered_page = await crm.calendar_day_route_page(
         make_asgi_request("owner2", "/calendar/day"),
@@ -6042,6 +6056,7 @@ async def assert_daily_route_schedule():
     assert "Route morning" not in filtered_html
     assert "Route unassigned" not in filtered_html
     assert "Автозаполнение дня" not in filtered_html
+    assert "Автоисправление пересечений" not in filtered_html
 
     worker_page = await crm.calendar_day_route_page(
         make_asgi_request("worker2", "/calendar/day"),
@@ -6056,6 +6071,7 @@ async def assert_daily_route_schedule():
     assert f'data-task-id="{morning_id}"' not in worker_html
     assert "/api/calendar/day/move-time" not in worker_html
     assert "Автозаполнение дня" not in worker_html
+    assert "Автоисправление пересечений" not in worker_html
 
     outsider_page = await crm.calendar_day_route_page(
         make_asgi_request("outsider_worker", "/calendar/day"),
@@ -6453,6 +6469,48 @@ async def assert_daily_route_schedule():
     """, (without_time_id, unassigned_id)).fetchall()
     assert all(row["workers"] for row in bulk_rows)
     assert all(row["time_from"] and row["time_to"] for row in bulk_rows)
+    conn.close()
+
+    repair_page = await crm.calendar_day_route_page(
+        make_asgi_request("owner2", "/calendar/day"),
+        date=route_date,
+    )
+    repair_plan = repair_page.context["day_conflict_repair"]
+    assert repair_plan["summary"]["planned"] == 1
+    repair_result = await crm.api_calendar_dispatch_plan_apply(
+        make_json_request(
+            "owner2",
+            "/api/calendar/dispatch/plan/apply",
+            {"items": repair_plan["items"]},
+        )
+    )
+    assert repair_result["summary"] == {
+        "requested": 1,
+        "applied": 1,
+        "skipped": 0,
+    }
+    conn = connect()
+    c = conn.cursor()
+    repaired_overlap = c.execute("""
+    SELECT time_from, time_to
+    FROM tasks
+    WHERE id=? AND company_id=2
+    """, (overlap_id,)).fetchone()
+    assert repaired_overlap["time_from"] == "10:00"
+    assert repaired_overlap["time_to"] == "11:00"
+    remaining_conflicts, _ = crm.get_company_schedule_conflicts(
+        2,
+        route_date,
+        route_date,
+    )
+    assert not any(
+        conflict["task_id"] in (morning_id, overlap_id)
+        and any(
+            issue["type"] == "time_overlap"
+            for issue in conflict["issues"]
+        )
+        for conflict in remaining_conflicts
+    )
 
     placeholders = ",".join("?" for _ in task_ids)
     c.execute(

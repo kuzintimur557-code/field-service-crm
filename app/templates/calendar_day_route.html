@@ -44,6 +44,14 @@ h1{margin:0;font-size:30px}
 .auto-plan-problems{margin-top:10px;color:#92400e;font-size:12px;font-weight:800}
 .auto-plan-problems summary{cursor:pointer}
 .auto-plan-problems ul{margin:8px 0 0;padding-left:20px}
+.conflict-repair{border-color:#fecaca;border-left-color:#dc2626}
+.conflict-repair .auto-plan-summary span{background:#fef2f2;color:#991b1b}
+.conflict-repair .auto-plan-apply{background:#dc2626}
+.conflict-repair .auto-plan-reason{color:#991b1b}
+.conflict-time-change{display:block;margin-bottom:3px}
+.conflict-time-old{color:#991b1b;text-decoration:line-through}
+.conflict-time-arrow{padding:0 5px;color:#6b7280}
+.conflict-time-new{color:#166534}
 .worker-section{margin-top:14px;border-top:4px solid #111827;background:white}
 .worker-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid #e5e7eb}
 .worker-name{font-size:18px;font-weight:900}
@@ -179,8 +187,88 @@ h1{margin:0;font-size:30px}
         <div class="metric"><span>Без исполнителя</span><strong>{{ schedule["summary"]["unassigned"] }}</strong></div>
     </section>
 
+    {% if role in ("boss", "manager") and day_conflict_repair["summary"]["conflict_tasks"] %}
+    <section class="auto-plan conflict-repair day-conflict-repair">
+        <div class="auto-plan-head">
+            <div>
+                <div class="auto-plan-title">Автоисправление пересечений</div>
+                <div class="auto-plan-subtitle">
+                    Сохраняет приоритетную заявку и переносит вторую в ближайшее общее окно.
+                </div>
+            </div>
+            {% if day_conflict_repair["items"] %}
+            <div class="auto-plan-actions">
+                <label class="auto-plan-toggle">
+                    <input id="conflict-repair-select-all" type="checkbox" checked>
+                    Выбрать все
+                </label>
+                <button class="auto-plan-apply" id="conflict-repair-apply" type="button">
+                    Исправить пересечения ({{ day_conflict_repair["items"]|length }})
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        <div class="auto-plan-summary">
+            <span>Требуют переноса: {{ day_conflict_repair["summary"]["conflict_tasks"] }}</span>
+            <span>Готово к исправлению: {{ day_conflict_repair["summary"]["planned"] }}</span>
+            {% if day_conflict_repair["summary"]["unscheduled"] %}
+            <span>Без решения: {{ day_conflict_repair["summary"]["unscheduled"] }}</span>
+            {% endif %}
+            {% if day_conflict_repair["summary"]["limited"] %}
+            <span>За пределами текущего плана: {{ day_conflict_repair["summary"]["limited"] }}</span>
+            {% endif %}
+        </div>
+        {% if day_conflict_repair["items"] %}
+        <div class="auto-plan-list">
+            {% for item in day_conflict_repair["items"] %}
+            <article
+                class="auto-plan-row conflict-repair-row"
+                data-task-id="{{ item['task_id'] }}"
+                data-current-date="{{ item['current_date'] }}"
+                data-expected-workers="{{ item['expected_workers'] }}"
+                data-expected-time-from="{{ item['expected_time_from'] }}"
+                data-expected-time-to="{{ item['expected_time_to'] }}"
+                data-target-date="{{ item['target_date'] }}"
+                data-target-workers="{{ item['target_workers_csv'] }}"
+                data-target-time-from="{{ item['target_time_from'] }}"
+                data-target-time-to="{{ item['target_time_to'] }}"
+            >
+                <input class="auto-plan-check conflict-repair-check" type="checkbox" checked aria-label="Исправить пересечение заявки #{{ item['task_id'] }}">
+                <div>
+                    <a class="auto-plan-task" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+                    <div class="auto-plan-meta">
+                        <span>{{ item["priority"] }}</span>
+                        <span>Конфликт: {{ item["conflict_label"] }}</span>
+                    </div>
+                </div>
+                <div class="auto-plan-target">
+                    <span class="conflict-time-change">
+                        <span class="conflict-time-old">{{ item["old_time_label"] }}</span>
+                        <span class="conflict-time-arrow">→</span>
+                        <span class="conflict-time-new">{{ item["target_time_label"] }}</span>
+                    </span>
+                    {{ item["target_workers"]|join(", ") }}
+                    <div class="auto-plan-reason">{{ item["reason"] }} · оценка {{ item["score"] }}</div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if day_conflict_repair["unscheduled"] %}
+        <details class="auto-plan-problems">
+            <summary>Почему часть пересечений нельзя исправить автоматически</summary>
+            <ul>
+                {% for item in day_conflict_repair["unscheduled"] %}
+                <li>#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}: {{ item["reason"] }}</li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+    </section>
+    {% endif %}
+
     {% if role in ("boss", "manager") and day_auto_plan["summary"]["eligible"] %}
-    <section class="auto-plan">
+    <section class="auto-plan day-auto-plan">
         <div class="auto-plan-head">
             <div>
                 <div class="auto-plan-title">Автозаполнение дня</div>
@@ -594,22 +682,35 @@ h1{margin:0;font-size:30px}
         }
     }
 
+    function planItemFromRow(row) {
+        return {
+            task_id: Number(row.dataset.taskId),
+            current_date: row.dataset.currentDate,
+            expected_workers: row.dataset.expectedWorkers,
+            expected_time_from: row.dataset.expectedTimeFrom,
+            expected_time_to: row.dataset.expectedTimeTo,
+            target_date: row.dataset.targetDate,
+            target_workers: String(
+                row.dataset.targetWorkers || ""
+            ).split(",").filter(Boolean),
+            target_time_from: row.dataset.targetTimeFrom,
+            target_time_to: row.dataset.targetTimeTo
+        };
+    }
+
+    function selectedPlanItems(sectionSelector, checkboxSelector) {
+        return [...document.querySelectorAll(
+            `${sectionSelector} .auto-plan-row`
+        )]
+            .filter(row => row.querySelector(checkboxSelector)?.checked)
+            .map(planItemFromRow);
+    }
+
     function selectedAutoPlanItems() {
-        return [...document.querySelectorAll(".auto-plan-row")]
-            .filter(row => row.querySelector(".auto-plan-check")?.checked)
-            .map(row => ({
-                task_id: Number(row.dataset.taskId),
-                current_date: row.dataset.currentDate,
-                expected_workers: row.dataset.expectedWorkers,
-                expected_time_from: row.dataset.expectedTimeFrom,
-                expected_time_to: row.dataset.expectedTimeTo,
-                target_date: row.dataset.targetDate,
-                target_workers: String(
-                    row.dataset.targetWorkers || ""
-                ).split(",").filter(Boolean),
-                target_time_from: row.dataset.targetTimeFrom,
-                target_time_to: row.dataset.targetTimeTo
-            }));
+        return selectedPlanItems(
+            ".day-auto-plan",
+            ".auto-plan-check"
+        );
     }
 
     function updateAutoPlanButton() {
@@ -680,6 +781,85 @@ h1{margin:0;font-size:30px}
         }
     }
 
+    function selectedConflictRepairItems() {
+        return selectedPlanItems(
+            ".day-conflict-repair",
+            ".conflict-repair-check"
+        );
+    }
+
+    function updateConflictRepairButton() {
+        const button = document.getElementById(
+            "conflict-repair-apply"
+        );
+
+        if (!button) {
+            return;
+        }
+
+        const count = selectedConflictRepairItems().length;
+        button.textContent = `Исправить пересечения (${count})`;
+        button.disabled = count === 0;
+    }
+
+    async function applyConflictRepair() {
+        const button = document.getElementById(
+            "conflict-repair-apply"
+        );
+        const items = selectedConflictRepairItems();
+
+        if (!items.length) {
+            showToast("Выберите хотя бы одно пересечение.", true);
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = "Исправляем...";
+
+        try {
+            const response = await fetch(
+                "/api/calendar/dispatch/plan/apply",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({items})
+                }
+            );
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                showToast(
+                    data.message || "Не удалось исправить пересечения.",
+                    true
+                );
+                return;
+            }
+
+            const applied = data.summary?.applied || 0;
+            const skipped = data.summary?.skipped || 0;
+            let message = `Исправлено пересечений: ${applied}.`;
+
+            if (skipped) {
+                message += ` Пропущено: ${skipped}.`;
+
+                if (data.skipped?.[0]?.reason) {
+                    message += ` ${data.skipped[0].reason}`;
+                }
+            }
+
+            showToast(message, applied === 0);
+
+            if (applied) {
+                window.setTimeout(() => window.location.reload(), 700);
+            }
+        } catch (error) {
+            showToast("Сервер временно недоступен.", true);
+        } finally {
+            updateConflictRepairButton();
+        }
+    }
+
     document.querySelectorAll('.route-item[draggable="true"]').forEach(card => {
         card.addEventListener("dragstart", event => {
             draggedCard = card;
@@ -737,7 +917,9 @@ h1{margin:0;font-size:30px}
         "auto-plan-select-all"
     );
     const autoPlanChecks = [
-        ...document.querySelectorAll(".auto-plan-check")
+        ...document.querySelectorAll(
+            ".day-auto-plan .auto-plan-check"
+        )
     ];
 
     autoPlanSelectAll?.addEventListener("change", () => {
@@ -757,6 +939,32 @@ h1{margin:0;font-size:30px}
     document.getElementById("auto-plan-apply")?.addEventListener(
         "click",
         applyAutoPlan
+    );
+
+    const conflictRepairSelectAll = document.getElementById(
+        "conflict-repair-select-all"
+    );
+    const conflictRepairChecks = [
+        ...document.querySelectorAll(".conflict-repair-check")
+    ];
+
+    conflictRepairSelectAll?.addEventListener("change", () => {
+        conflictRepairChecks.forEach(input => {
+            input.checked = conflictRepairSelectAll.checked;
+        });
+        updateConflictRepairButton();
+    });
+    conflictRepairChecks.forEach(input => {
+        input.addEventListener("change", () => {
+            conflictRepairSelectAll.checked = (
+                conflictRepairChecks.every(item => item.checked)
+            );
+            updateConflictRepairButton();
+        });
+    });
+    document.getElementById("conflict-repair-apply")?.addEventListener(
+        "click",
+        applyConflictRepair
     );
 })();
 </script>

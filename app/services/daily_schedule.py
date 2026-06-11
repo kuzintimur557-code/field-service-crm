@@ -886,6 +886,227 @@ def build_daily_auto_plan(
     }
 
 
+def build_daily_conflict_repair_plan(
+    tasks,
+    worker_names,
+    unavailable_worker_names=None,
+    target_date="",
+    limit=50,
+):
+    tasks = [
+        task
+        for task in tasks
+        if (
+            _task_blocks_time(task)
+            and task_workers(task)
+            and parse_time_value(_value(task, "time_from")) is not None
+            and parse_time_value(_value(task, "time_to")) is not None
+        )
+    ]
+    worker_names = set(worker_names or [])
+    unavailable_worker_names = set(unavailable_worker_names or [])
+    target_date = str(target_date or "")[:10]
+    ordered_tasks = sorted(tasks, key=lambda task: (
+        _priority_rank(task),
+        parse_time_value(_value(task, "time_from")) or WORKDAY_END,
+        int(_value(task, "id", 0) or 0),
+    ))
+    fixed_tasks = []
+    moving_tasks = []
+    conflict_ids_by_task = {}
+
+    for task in ordered_tasks:
+        task_id = int(_value(task, "id", 0) or 0)
+        start = parse_time_value(_value(task, "time_from"))
+        end = parse_time_value(_value(task, "time_to"))
+        workers = set(task_workers(task))
+        conflicts = []
+
+        for fixed_task in fixed_tasks:
+            fixed_workers = set(task_workers(fixed_task))
+
+            if not workers.intersection(fixed_workers):
+                continue
+
+            fixed_start = parse_time_value(
+                _value(fixed_task, "time_from")
+            )
+            fixed_end = parse_time_value(_value(fixed_task, "time_to"))
+
+            if time_windows_overlap(
+                start,
+                end,
+                fixed_start,
+                fixed_end,
+            ):
+                conflicts.append(
+                    int(_value(fixed_task, "id", 0) or 0)
+                )
+
+        if conflicts:
+            moving_tasks.append(task)
+            conflict_ids_by_task[task_id] = sorted(set(conflicts))
+        else:
+            fixed_tasks.append(task)
+
+    if not moving_tasks:
+        return {
+            "items": [],
+            "unscheduled": [],
+            "summary": {
+                "conflict_tasks": 0,
+                "planned": 0,
+                "unscheduled": 0,
+                "limited": 0,
+            },
+        }
+
+    assignments = [
+        {
+            "task_id": int(_value(task, "id", 0) or 0),
+            "date": str(_value(task, "task_date") or "")[:10],
+            "workers": task_workers(task),
+            "time_from": str(_value(task, "time_from") or "")[:5],
+            "time_to": str(_value(task, "time_to") or "")[:5],
+        }
+        for task in fixed_tasks
+    ]
+    plan_limit = max(1, min(int(limit or 50), 50))
+    plan_items = []
+    unscheduled = []
+
+    for task in moving_tasks[:plan_limit]:
+        task_id = int(_value(task, "id", 0) or 0)
+        current_workers = task_workers(task)
+        current_time_from = str(_value(task, "time_from") or "")[:5]
+        current_time_to = str(_value(task, "time_to") or "")[:5]
+        original_start = (
+            parse_time_value(current_time_from) or WORKDAY_START
+        )
+        inactive_workers = [
+            worker_name
+            for worker_name in current_workers
+            if worker_name not in worker_names
+        ]
+
+        if inactive_workers:
+            unscheduled.append({
+                "task_id": task_id,
+                "client": str(_value(task, "client") or ""),
+                "reason": (
+                    "Исполнитель отключён: "
+                    + ", ".join(inactive_workers)
+                ),
+            })
+            continue
+
+        blocked_workers = [
+            worker_name
+            for worker_name in current_workers
+            if worker_name in unavailable_worker_names
+        ]
+
+        if blocked_workers:
+            unscheduled.append({
+                "task_id": task_id,
+                "client": str(_value(task, "client") or ""),
+                "reason": (
+                    "Исполнитель недоступен: "
+                    + ", ".join(blocked_workers)
+                ),
+            })
+            continue
+
+        available_slots = list_common_time_slots(
+            assignments=assignments,
+            target_date=target_date,
+            target_workers=current_workers,
+            duration_minutes=task_duration_minutes(task),
+            exclude_task_id=task_id,
+        )
+
+        if not available_slots:
+            unscheduled.append({
+                "task_id": task_id,
+                "client": str(_value(task, "client") or ""),
+                "reason": "В рабочем дне нет общего свободного окна.",
+            })
+            continue
+
+        available_slots.sort(key=lambda slot: (
+            abs(
+                (
+                    parse_time_value(slot["time_from"])
+                    or WORKDAY_START
+                ) - original_start
+            ),
+            0
+            if (
+                parse_time_value(slot["time_from"])
+                or WORKDAY_START
+            ) >= original_start
+            else 1,
+            slot["time_from"],
+        ))
+        target_slot = available_slots[0]
+        target_start = (
+            parse_time_value(target_slot["time_from"])
+            or WORKDAY_START
+        )
+        shift_minutes = abs(target_start - original_start)
+        conflict_ids = conflict_ids_by_task.get(task_id, [])
+        assignments.append({
+            "task_id": task_id,
+            "date": target_date,
+            "workers": current_workers,
+            "time_from": target_slot["time_from"],
+            "time_to": target_slot["time_to"],
+        })
+        plan_items.append({
+            "task_id": task_id,
+            "client": str(_value(task, "client") or ""),
+            "priority": str(
+                _value(task, "priority") or "Обычный"
+            ),
+            "current_date": target_date,
+            "expected_workers": ",".join(current_workers),
+            "expected_time_from": current_time_from,
+            "expected_time_to": current_time_to,
+            "target_date": target_date,
+            "target_workers": current_workers,
+            "target_workers_csv": ",".join(current_workers),
+            "target_time_from": target_slot["time_from"],
+            "target_time_to": target_slot["time_to"],
+            "target_time_label": (
+                f"{target_slot['time_from']}–"
+                f"{target_slot['time_to']}"
+            ),
+            "old_time_label": (
+                f"{current_time_from}–{current_time_to}"
+            ),
+            "conflict_task_ids": conflict_ids,
+            "conflict_label": ", ".join(
+                f"#{conflict_id}" for conflict_id in conflict_ids
+            ),
+            "change_label": "Устранить пересечение",
+            "reason": (
+                f"Перенос на {shift_minutes} мин. от исходного времени"
+            ),
+            "score": max(0, 100 - shift_minutes // SLOT_STEP * 5),
+        })
+
+    return {
+        "items": plan_items,
+        "unscheduled": unscheduled,
+        "summary": {
+            "conflict_tasks": len(moving_tasks),
+            "planned": len(plan_items),
+            "unscheduled": len(unscheduled),
+            "limited": max(len(moving_tasks) - plan_limit, 0),
+        },
+    }
+
+
 def build_daily_schedule(
     tasks,
     worker_names=None,
