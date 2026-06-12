@@ -3719,6 +3719,101 @@ def update_last_seen(username):
     conn.close()
 
 
+def format_calendar_incident_age(age_minutes):
+    if age_minutes is None:
+        return "неизвестно"
+
+    age_minutes = max(0, int(age_minutes))
+
+    if age_minutes < 60:
+        return f"{age_minutes} мин"
+
+    hours, minutes = divmod(age_minutes, 60)
+
+    if hours < 24:
+        return (
+            f"{hours} ч {minutes} мин"
+            if minutes
+            else f"{hours} ч"
+        )
+
+    days, remaining_hours = divmod(hours, 24)
+    return (
+        f"{days} д {remaining_hours} ч"
+        if remaining_hours
+        else f"{days} д"
+    )
+
+
+def get_calendar_incident_priority(
+    status_code,
+    active_incident,
+    is_acknowledged,
+    incident_age_minutes,
+):
+    has_incident = bool(active_incident)
+    response_overdue = bool(
+        has_incident
+        and not is_acknowledged
+        and incident_age_minutes is not None
+        and incident_age_minutes >= 30
+    )
+
+    if (
+        has_incident
+        and not is_acknowledged
+        and (
+            status_code in {"error", "stuck"}
+            or response_overdue
+        )
+    ):
+        return {
+            "code": "critical",
+            "label": "Критический",
+            "rank": 0,
+            "response_overdue": response_overdue,
+        }
+
+    if has_incident and not is_acknowledged:
+        return {
+            "code": "high",
+            "label": "Высокий",
+            "rank": 1,
+            "response_overdue": response_overdue,
+        }
+
+    if has_incident and is_acknowledged:
+        return {
+            "code": "medium",
+            "label": "В работе",
+            "rank": 2,
+            "response_overdue": False,
+        }
+
+    if status_code in {"error", "stuck"}:
+        return {
+            "code": "high",
+            "label": "Высокий",
+            "rank": 1,
+            "response_overdue": False,
+        }
+
+    if status_code == "stale":
+        return {
+            "code": "medium",
+            "label": "Проверить",
+            "rank": 2,
+            "response_overdue": False,
+        }
+
+    return {
+        "code": "normal",
+        "label": "Штатный",
+        "rank": 3,
+        "response_overdue": False,
+    }
+
+
 def get_platform_calendar_health(
     now_dt=None,
     status_filter="all",
@@ -3734,6 +3829,8 @@ def get_platform_calendar_health(
             "healthy",
             "waiting",
             "disabled",
+            "unacknowledged",
+            "critical",
         }
         else "all"
     )
@@ -3903,6 +4000,44 @@ def get_platform_calendar_health(
         item["is_acknowledged"] = bool(
             item["incident_acknowledged_at"]
         )
+        incident_started_value = str(
+            item["incident_started_at"] or ""
+        )
+
+        try:
+            incident_started_at = datetime.strptime(
+                incident_started_value,
+                "%Y-%m-%d %H:%M",
+            )
+            incident_age_minutes = max(
+                0,
+                int(
+                    (now_dt - incident_started_at).total_seconds()
+                    // 60
+                ),
+            )
+        except ValueError:
+            incident_age_minutes = None
+
+        priority = get_calendar_incident_priority(
+            status_code,
+            active_incident,
+            item["is_acknowledged"],
+            incident_age_minutes,
+        )
+        item["incident_age_minutes"] = incident_age_minutes
+        item["incident_age_label"] = (
+            format_calendar_incident_age(incident_age_minutes)
+            if active_incident
+            else ""
+        )
+        item["priority_code"] = priority["code"]
+        item["priority_label"] = priority["label"]
+        item["priority_rank"] = priority["rank"]
+        item["response_overdue"] = priority["response_overdue"]
+        item["requires_response"] = bool(
+            active_incident and not item["is_acknowledged"]
+        )
         item["detail_url"] = (
             f"/platform/calendar-health/{item['company_id']}"
         )
@@ -3926,6 +4061,14 @@ def get_platform_calendar_health(
         ),
         "acknowledged": sum(
             1 for item in items if item["is_acknowledged"]
+        ),
+        "unacknowledged": sum(
+            1 for item in items if item["requires_response"]
+        ),
+        "critical": sum(
+            1
+            for item in items
+            if item["priority_code"] == "critical"
         ),
     }
 
@@ -3951,12 +4094,23 @@ def get_platform_calendar_health(
             for item in items
             if item["status_code"] == "disabled"
         ]
+    elif status_filter == "unacknowledged":
+        filtered_items = [
+            item for item in items if item["requires_response"]
+        ]
+    elif status_filter == "critical":
+        filtered_items = [
+            item
+            for item in items
+            if item["priority_code"] == "critical"
+        ]
     else:
         filtered_items = items
 
     filtered_items.sort(
         key=lambda item: (
-            0 if item["is_problem"] else 1,
+            item["priority_rank"],
+            -int(item["incident_age_minutes"] or 0),
             0 if item["automation_enabled"] else 1,
             item["company_name"].lower(),
         )

@@ -7219,6 +7219,26 @@ async def assert_platform_calendar_health():
     conn.close()
 
     try:
+        assert crm.format_calendar_incident_age(None) == "неизвестно"
+        assert crm.format_calendar_incident_age(29) == "29 мин"
+        assert crm.format_calendar_incident_age(90) == "1 ч 30 мин"
+        assert crm.format_calendar_incident_age(1500) == "1 д 1 ч"
+        immediate_error_priority = (
+            crm.get_calendar_incident_priority(
+                "error",
+                "error",
+                False,
+                5,
+            )
+        )
+        assert immediate_error_priority["code"] == "critical"
+        acknowledged_priority = crm.get_calendar_incident_priority(
+            "stale",
+            "stale",
+            True,
+            180,
+        )
+        assert acknowledged_priority["code"] == "medium"
         health = crm.get_platform_calendar_health(
             now_dt=now_dt,
             status_filter="problem",
@@ -7236,13 +7256,46 @@ async def assert_platform_calendar_health():
         assert company["automation_enabled"] is True
         assert company["is_problem"] is True
         assert company["is_acknowledged"] is False
+        assert company["requires_response"] is True
+        assert company["priority_code"] == "critical"
+        assert company["priority_label"] == "Критический"
+        assert company["response_overdue"] is True
+        assert company["incident_age_minutes"] == 120
+        assert company["incident_age_label"] == "2 ч"
         assert company["last_activity_at"] == incident_value
         assert company["detail_url"] == (
             f"/platform/calendar-health/{company_id}"
         )
         assert health["summary"]["problems"] >= 1
+        assert health["summary"]["critical"] >= 1
+        assert health["summary"]["unacknowledged"] >= 1
         assert all(item["is_problem"] for item in health["items"])
 
+        critical_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            status_filter="critical",
+        )
+        assert critical_health["status_filter"] == "critical"
+        assert any(
+            item["company_id"] == company_id
+            for item in critical_health["items"]
+        )
+        assert all(
+            item["priority_code"] == "critical"
+            for item in critical_health["items"]
+        )
+        unacknowledged_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            status_filter="unacknowledged",
+        )
+        assert any(
+            item["company_id"] == company_id
+            for item in unacknowledged_health["items"]
+        )
+        assert all(
+            item["requires_response"]
+            for item in unacknowledged_health["items"]
+        )
         normalized = crm.get_platform_calendar_health(
             now_dt=now_dt,
             status_filter="unknown",
@@ -7277,6 +7330,12 @@ async def assert_platform_calendar_health():
         )
         html = page.body.decode("utf-8")
         assert "Здоровье календарных автоматизаций" in html
+        assert "Рабочая очередь компаний" in html
+        assert "Критические" in html
+        assert "Не приняты" in html
+        assert "Критический" in html
+        assert "Реакция просрочена" in html
+        assert "Возраст: 2 ч" in html
         assert company_name in html
         assert "Планировщик не запускался более шести часов." in html
         assert f"/platform/calendar-health/{company_id}" in html
@@ -7429,6 +7488,19 @@ async def assert_platform_calendar_health():
             f"/platform/calendar-health/{company_id}/acknowledge"
             not in acknowledged_html
         )
+        acknowledged_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            status_filter="problem",
+        )
+        acknowledged_company = next(
+            item
+            for item in acknowledged_health["items"]
+            if item["company_id"] == company_id
+        )
+        assert acknowledged_company["priority_code"] == "medium"
+        assert acknowledged_company["priority_label"] == "В работе"
+        assert acknowledged_company["requires_response"] is False
+        assert acknowledged_company["response_overdue"] is False
         anonymous_recovery = (
             await crm.platform_calendar_incident_recover(
                 make_public_asgi_request(

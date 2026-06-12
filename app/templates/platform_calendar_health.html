@@ -14,7 +14,7 @@ body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
 .header h1{margin:0;font-size:30px}
 .subtitle{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800}
 .back{display:inline-flex;padding:10px 12px;border-radius:7px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
-.stats{display:grid;grid-template-columns:repeat(6,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;margin-bottom:14px}
 .stat{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
 .stat-label{color:#6b7280;font-size:11px;font-weight:900}
 .stat-value{margin-top:5px;font-size:24px;font-weight:900}
@@ -22,11 +22,13 @@ body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
 .filter{padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;background:white;color:#374151;text-decoration:none;font-size:11px;font-weight:900}
 .filter.active{border-color:#2563eb;background:#2563eb;color:white}
 .table-wrap{overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;background:white}
-table{width:100%;min-width:1100px;border-collapse:collapse}
+table{width:100%;min-width:1220px;border-collapse:collapse}
 th,td{padding:11px 12px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}
 th{background:#f9fafb;color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
 td{font-size:11px;font-weight:800}
 tr:last-child td{border-bottom:0}
+tr.priority-critical td:first-child{box-shadow:inset 4px 0 #dc2626}
+tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
 .company-name{font-size:13px;font-weight:900}
 .muted{margin-top:3px;color:#6b7280;font-size:10px}
 .status{display:inline-flex;padding:5px 7px;border-radius:6px;background:#e5e7eb;color:#374151;font-size:10px;font-weight:900;white-space:nowrap}
@@ -35,8 +37,14 @@ tr:last-child td{border-bottom:0}
 .status.waiting{background:#fef3c7;color:#92400e}
 .status.disabled{background:#e5e7eb;color:#4b5563}
 .status.error,.status.stuck,.status.stale{background:#fee2e2;color:#991b1b}
+.priority{display:inline-flex;padding:5px 7px;border-radius:6px;background:#e5e7eb;color:#374151;font-size:10px;font-weight:900;white-space:nowrap}
+.priority.critical{background:#991b1b;color:white}
+.priority.high{background:#fef3c7;color:#92400e}
+.priority.medium{background:#dbeafe;color:#1e40af}
+.priority.normal{background:#d1fae5;color:#065f46}
 .incident{max-width:320px;color:#991b1b;line-height:1.35}
 .ack{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:900}
+.overdue{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#991b1b;color:white;font-size:9px;font-weight:900}
 .empty{padding:32px;color:#6b7280;text-align:center;font-weight:900}
 @media(max-width:900px){
     .container{padding:16px}
@@ -60,7 +68,7 @@ tr:last-child td{border-bottom:0}
         <div>
             <h1>Здоровье календарных автоматизаций</h1>
             <div class="subtitle">
-                Состояние компаний на {{ health["generated_at"] }}.
+                Рабочая очередь компаний на {{ health["generated_at"] }}.
                 Просрочка: {{ health["stale_after_hours"] }} ч.
             </div>
         </div>
@@ -73,8 +81,12 @@ tr:last-child td{border-bottom:0}
             <div class="stat-value">{{ summary["total_companies"] }}</div>
         </div>
         <div class="stat">
-            <div class="stat-label">Автоматизация включена</div>
-            <div class="stat-value">{{ summary["enabled"] }}</div>
+            <div class="stat-label">Критические</div>
+            <div class="stat-value">{{ summary["critical"] }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Не приняты</div>
+            <div class="stat-value">{{ summary["unacknowledged"] }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">Работают</div>
@@ -92,10 +104,16 @@ tr:last-child td{border-bottom:0}
             <div class="stat-label">Выключены</div>
             <div class="stat-value">{{ summary["disabled"] }}</div>
         </div>
+        <div class="stat">
+            <div class="stat-label">Автоматизация включена</div>
+            <div class="stat-value">{{ summary["enabled"] }}</div>
+        </div>
     </section>
 
     <nav class="filters" aria-label="Фильтры состояния">
         <a class="filter {% if selected_status == 'all' %}active{% endif %}" href="/platform/calendar-health">Все</a>
+        <a class="filter {% if selected_status == 'critical' %}active{% endif %}" href="/platform/calendar-health?status=critical">Критические · {{ summary["critical"] }}</a>
+        <a class="filter {% if selected_status == 'unacknowledged' %}active{% endif %}" href="/platform/calendar-health?status=unacknowledged">Не приняты · {{ summary["unacknowledged"] }}</a>
         <a class="filter {% if selected_status == 'problem' %}active{% endif %}" href="/platform/calendar-health?status=problem">Проблемы · {{ summary["problems"] }}</a>
         <a class="filter {% if selected_status == 'healthy' %}active{% endif %}" href="/platform/calendar-health?status=healthy">Работают · {{ summary["healthy"] }}</a>
         <a class="filter {% if selected_status == 'waiting' %}active{% endif %}" href="/platform/calendar-health?status=waiting">Ожидают · {{ summary["waiting"] }}</a>
@@ -108,6 +126,7 @@ tr:last-child td{border-bottom:0}
             <thead>
                 <tr>
                     <th>Компания</th>
+                    <th>Приоритет</th>
                     <th>Состояние</th>
                     <th>Политика</th>
                     <th>Последний запуск</th>
@@ -118,13 +137,21 @@ tr:last-child td{border-bottom:0}
             </thead>
             <tbody>
                 {% for company in companies %}
-                <tr>
+                <tr class="priority-{{ company['priority_code'] }}">
                     <td data-label="Компания">
                         <div class="company-name">{{ company["company_name"] }}</div>
                         <div class="muted">
                             #{{ company["company_id"] }}
                             · владелец {{ company["owner_username"] }}
                         </div>
+                    </td>
+                    <td data-label="Приоритет">
+                        <span class="priority {{ company['priority_code'] }}">
+                            {{ company["priority_label"] }}
+                        </span>
+                        {% if company["response_overdue"] %}
+                        <div class="overdue">Реакция просрочена</div>
+                        {% endif %}
                     </td>
                     <td data-label="Состояние">
                         <span class="status {{ company['status_code'] }}">
@@ -174,6 +201,9 @@ tr:last-child td{border-bottom:0}
                             <strong>{{ company["incident_label"] }}</strong>
                             <div class="muted">
                                 {{ company["incident_message"] or "Требуется проверка." }}
+                            </div>
+                            <div class="muted">
+                                Возраст: {{ company["incident_age_label"] }}
                             </div>
                         </div>
                         {% else %}
