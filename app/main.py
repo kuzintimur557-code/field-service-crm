@@ -8577,8 +8577,35 @@ async def calendar_dispatch_page(
     FROM calendar_plan_scheduler_status
     WHERE company_id=?
     """, (company_id,)).fetchone()
+    scheduler_run_rows = c.execute("""
+    SELECT *
+    FROM calendar_plan_scheduler_runs
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 8
+    """, (company_id,)).fetchall()
+    scheduler_run_summary_row = c.execute("""
+    SELECT
+        COUNT(*) AS total_runs,
+        SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) AS done_runs,
+        SUM(CASE WHEN status='skipped' THEN 1 ELSE 0 END) AS skipped_runs,
+        SUM(
+            CASE WHEN status IN ('error', 'locked')
+                 THEN 1 ELSE 0 END
+        ) AS problem_runs,
+        SUM(changed_days) AS changed_days,
+        SUM(notifications_sent) AS notifications_sent
+    FROM (
+        SELECT *
+        FROM calendar_plan_scheduler_runs
+        WHERE company_id=?
+        ORDER BY id DESC
+        LIMIT 30
+    )
+    """, (company_id,)).fetchone()
     conn.close()
     week_plan_runs = []
+    calendar_scheduler_runs = []
 
     for row in week_plan_run_rows:
         item = dict(row)
@@ -8597,6 +8624,42 @@ async def calendar_dispatch_page(
             )
         )
         week_plan_runs.append(item)
+
+    scheduler_status_labels = {
+        "done": ("Выполнено", "done"),
+        "skipped": ("Пропущено", "skipped"),
+        "locked": ("Занято", "locked"),
+        "error": ("Ошибка", "error"),
+        "running": ("Выполняется", "running"),
+    }
+
+    for row in scheduler_run_rows:
+        item = dict(row)
+        item["source_label"] = (
+            "Вручную"
+            if item["source"] == "manual_run"
+            else "По расписанию"
+        )
+        (
+            item["status_label"],
+            item["status_tone"],
+        ) = scheduler_status_labels.get(
+            item["status"],
+            ("Неизвестно", "skipped"),
+        )
+        calendar_scheduler_runs.append(item)
+
+    calendar_scheduler_run_summary = {
+        key: int(scheduler_run_summary_row[key] or 0)
+        for key in (
+            "total_runs",
+            "done_runs",
+            "skipped_runs",
+            "problem_runs",
+            "changed_days",
+            "notifications_sent",
+        )
+    }
 
     automation_enabled = bool(
         calendar_settings["calendar_auto_publish"]
@@ -8844,6 +8907,10 @@ async def calendar_dispatch_page(
             "planning_queue_count": planning_queue_count,
             "week_publication": week_publication,
             "week_plan_runs": week_plan_runs,
+            "calendar_scheduler_runs": calendar_scheduler_runs,
+            "calendar_scheduler_run_summary": (
+                calendar_scheduler_run_summary
+            ),
             "calendar_auto_publish": bool(
                 calendar_settings["calendar_auto_publish"]
             ),
@@ -9741,6 +9808,89 @@ def calendar_automation_time_allowed(
     )
 
 
+def create_calendar_scheduler_run(
+    company_id,
+    source,
+    actor_username,
+    range_start,
+    range_end,
+    started_at,
+):
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO calendar_plan_scheduler_runs (
+        company_id, source, actor_username,
+        range_start, range_end, status, started_at
+    )
+    VALUES (?, ?, ?, ?, ?, 'running', ?)
+    """, (
+        company_id,
+        source,
+        actor_username,
+        range_start,
+        range_end,
+        started_at,
+    ))
+    run_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return run_id
+
+
+def trim_calendar_scheduler_runs(company_id, keep=100):
+    keep = max(10, min(int(keep or 100), 500))
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    DELETE FROM calendar_plan_scheduler_runs
+    WHERE company_id=?
+      AND id NOT IN (
+          SELECT id
+          FROM calendar_plan_scheduler_runs
+          WHERE company_id=?
+          ORDER BY id DESC
+          LIMIT ?
+      )
+    """, (company_id, company_id, keep))
+    conn.commit()
+    conn.close()
+
+
+def finish_calendar_scheduler_run(
+    run_id,
+    company_id,
+    status,
+    reason,
+    result,
+):
+    completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE calendar_plan_scheduler_runs
+    SET status=?,
+        reason=?,
+        changed_days=?,
+        notifications_sent=?,
+        completed_at=?,
+        result_json=?
+    WHERE id=? AND company_id=?
+    """, (
+        status,
+        str(reason or "")[:500],
+        int(result.get("changed_days") or 0),
+        int(result.get("notifications_sent") or 0),
+        completed_at,
+        json.dumps(result, ensure_ascii=False),
+        run_id,
+        company_id,
+    ))
+    conn.commit()
+    conn.close()
+    trim_calendar_scheduler_runs(company_id)
+
+
 async def run_calendar_plan_scheduler(
     company_id,
     now_dt=None,
@@ -9833,6 +9983,16 @@ async def run_calendar_plan_scheduler(
     result["range_start"] = range_start.strftime("%Y-%m-%d")
     result["range_end"] = range_end.strftime("%Y-%m-%d")
     result["enabled"] = True
+    started_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    scheduler_run_id = create_calendar_scheduler_run(
+        company_id,
+        source,
+        actor["username"],
+        result["range_start"],
+        result["range_end"],
+        started_at,
+    )
+    result["scheduler_run_id"] = scheduler_run_id
 
     if (
         source == "scheduler"
@@ -9876,9 +10036,15 @@ async def run_calendar_plan_scheduler(
         ))
         conn.commit()
         conn.close()
+        finish_calendar_scheduler_run(
+            scheduler_run_id,
+            company_id,
+            "skipped",
+            "Вне рабочего окна",
+            result,
+        )
         return result
 
-    started_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     stale_before = (
         datetime.now() - timedelta(minutes=30)
     ).strftime("%Y-%m-%d %H:%M")
@@ -9925,6 +10091,13 @@ async def run_calendar_plan_scheduler(
 
     if not acquired:
         result["error"] = "scheduler_already_running"
+        finish_calendar_scheduler_run(
+            scheduler_run_id,
+            company_id,
+            "locked",
+            "Другой запуск уже выполняется",
+            result,
+        )
         return result
 
     try:
@@ -10043,6 +10216,13 @@ async def run_calendar_plan_scheduler(
     ))
     conn.commit()
     conn.close()
+    finish_calendar_scheduler_run(
+        scheduler_run_id,
+        company_id,
+        "error" if result["error"] else "done",
+        result["error"],
+        result,
+    )
 
     return result
 

@@ -307,6 +307,24 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS calendar_plan_scheduler_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        source TEXT NOT NULL DEFAULT 'scheduler',
+        actor_username TEXT,
+        range_start TEXT,
+        range_end TEXT,
+        status TEXT NOT NULL DEFAULT 'running',
+        reason TEXT,
+        changed_days INTEGER DEFAULT 0,
+        notifications_sent INTEGER DEFAULT 0,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        result_json TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS recurring_jobs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER,
@@ -908,6 +926,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_calendar_plan_runs_company_week
     ON calendar_plan_operation_runs(company_id, week_start, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_calendar_scheduler_runs_company_started
+    ON calendar_plan_scheduler_runs(company_id, started_at, id)
     """)
 
     if os.getenv("ENV") != "production":

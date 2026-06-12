@@ -5209,6 +5209,10 @@ async def assert_dispatch_board():
     DELETE FROM calendar_plan_scheduler_status
     WHERE company_id=2
     """)
+    c.execute("""
+    DELETE FROM calendar_plan_scheduler_runs
+    WHERE company_id=2
+    """)
     conn.commit()
     conn.close()
     publication_tasks = []
@@ -5440,6 +5444,10 @@ async def assert_dispatch_board():
     assert 'id="calendar-auto-window-start"' in page_html
     assert 'id="calendar-auto-window-end"' in page_html
     assert page.context["calendar_scheduler_status"]["tone"] == "disabled"
+    assert page.context["calendar_scheduler_runs"] == []
+    assert page.context["calendar_scheduler_run_summary"][
+        "total_runs"
+    ] == 0
     assert "Автоматизация выключена" in page_html
     backlog_column = page.context["board_columns"][0]
     assert backlog_column["is_backlog"] is True
@@ -5929,6 +5937,16 @@ async def assert_dispatch_board():
     assert scheduler_page.context["week_plan_runs"][0][
         "source_label"
     ] == "Запуск владельцем"
+    assert len(scheduler_page.context["calendar_scheduler_runs"]) == 2
+    assert scheduler_page.context["calendar_scheduler_runs"][0][
+        "source_label"
+    ] == "Вручную"
+    assert scheduler_page.context["calendar_scheduler_run_summary"][
+        "done_runs"
+    ] == 2
+    assert "Журнал автоматизации" in (
+        scheduler_page.body.decode("utf-8")
+    )
     assert "Автоматизация работает" in (
         scheduler_page.body.decode("utf-8")
     )
@@ -6011,6 +6029,15 @@ async def assert_dispatch_board():
     assert waiting_page.context["calendar_scheduler_status"][
         "tone"
     ] == "waiting"
+    assert waiting_page.context["calendar_scheduler_runs"][0][
+        "status"
+    ] == "skipped"
+    assert waiting_page.context["calendar_scheduler_runs"][0][
+        "reason"
+    ] == "Вне рабочего окна"
+    assert waiting_page.context["calendar_scheduler_run_summary"][
+        "skipped_runs"
+    ] == 1
     assert "Ожидает рабочего окна" in (
         waiting_page.body.decode("utf-8")
     )
@@ -6094,6 +6121,12 @@ async def assert_dispatch_board():
     FROM calendar_plan_scheduler_status
     WHERE company_id=2
     """).fetchone()
+    scheduler_runs = c.execute("""
+    SELECT status, source, reason
+    FROM calendar_plan_scheduler_runs
+    WHERE company_id=2
+    ORDER BY id
+    """).fetchall()
     conn.close()
     assert sum(
         1 for row in operation_runs if row["source"] == "manual"
@@ -6110,6 +6143,59 @@ async def assert_dispatch_board():
     assert scheduler_status["last_notifications_sent"] == 0
     assert scheduler_status["last_source"] == "scheduler"
     assert scheduler_status["last_triggered_by"] == "owner2"
+    assert len(scheduler_runs) == 7
+    assert sum(
+        1 for row in scheduler_runs if row["status"] == "done"
+    ) == 5
+    assert sum(
+        1 for row in scheduler_runs if row["status"] == "locked"
+    ) == 1
+    assert sum(
+        1 for row in scheduler_runs if row["status"] == "skipped"
+    ) == 1
+    assert sum(
+        1 for row in scheduler_runs
+        if row["source"] == "manual_run"
+    ) == 2
+    assert any(
+        row["reason"] == "Другой запуск уже выполняется"
+        for row in scheduler_runs
+    )
+
+    conn = connect()
+    c = conn.cursor()
+
+    for index in range(105):
+        c.execute("""
+        INSERT INTO calendar_plan_scheduler_runs (
+            company_id, source, actor_username,
+            range_start, range_end, status,
+            changed_days, notifications_sent,
+            started_at, completed_at
+        )
+        VALUES (
+            2, 'scheduler', 'owner2',
+            ?, ?, 'done', 0, 0, ?, ?
+        )
+        """, (
+            original_date,
+            capacity_date,
+            f"2026-01-01 00:{index % 60:02d}",
+            f"2026-01-01 00:{index % 60:02d}",
+        ))
+
+    conn.commit()
+    conn.close()
+    crm.trim_calendar_scheduler_runs(2, keep=100)
+    conn = connect()
+    c = conn.cursor()
+    retained_scheduler_runs = c.execute("""
+    SELECT COUNT(*)
+    FROM calendar_plan_scheduler_runs
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+    assert retained_scheduler_runs == 100
 
     anonymous = await crm.api_calendar_dispatch_move(
         make_json_request(
@@ -6318,6 +6404,10 @@ async def assert_dispatch_board():
     """)
     c.execute("""
     DELETE FROM calendar_plan_scheduler_status
+    WHERE company_id=2
+    """)
+    c.execute("""
+    DELETE FROM calendar_plan_scheduler_runs
     WHERE company_id=2
     """)
     if original_scheduler_status:

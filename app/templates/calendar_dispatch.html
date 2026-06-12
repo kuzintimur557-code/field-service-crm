@@ -69,6 +69,18 @@ h1{margin:0;font-size:32px}
 .week-settings-save{padding:9px 11px;border:0;border-radius:7px;background:#111827;color:white;font-size:11px;font-weight:900;cursor:pointer}
 .week-settings-run{padding:9px 11px;border:1px solid #047857;border-radius:7px;background:#ecfdf5;color:#047857;font-size:11px;font-weight:900;cursor:pointer}
 .week-settings-save:disabled,.week-settings-run:disabled{cursor:not-allowed;opacity:.6}
+.automation-journal{margin-top:12px;padding-top:10px;border-top:1px solid #d1d5db}
+.automation-journal summary{cursor:pointer;color:#374151;font-size:12px;font-weight:900}
+.automation-journal-stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.automation-journal-stat{padding:5px 7px;border-radius:6px;background:#f3f4f6;color:#4b5563;font-size:10px;font-weight:900}
+.automation-journal-list{display:grid;gap:6px;margin-top:8px}
+.automation-journal-row{display:grid;grid-template-columns:92px 105px 110px minmax(150px,1fr) 75px 95px;gap:8px;align-items:center;padding:8px 9px;border:1px solid #e5e7eb;border-radius:7px;background:white;font-size:10px;font-weight:800}
+.automation-run-status{display:inline-flex;justify-content:center;padding:4px 6px;border-radius:6px;background:#e5e7eb;color:#4b5563;font-size:9px;font-weight:900}
+.automation-run-status.done{background:#d1fae5;color:#065f46}
+.automation-run-status.skipped{background:#fef3c7;color:#92400e}
+.automation-run-status.locked,.automation-run-status.error{background:#fee2e2;color:#991b1b}
+.automation-run-status.running{background:#dbeafe;color:#1e40af}
+.automation-journal-muted{color:#6b7280}
 .week-history{margin-top:10px}
 .week-history summary{cursor:pointer;color:#374151;font-size:12px;font-weight:900}
 .week-history-list{display:grid;gap:6px;margin-top:8px}
@@ -161,6 +173,8 @@ h1{margin:0;font-size:32px}
     .week-automation-controls,.week-toggle,.week-policy,.week-settings-run,.week-settings-save{width:100%}
     .week-policy{grid-template-columns:1fr 1fr}
     .week-policy label:first-child{grid-column:1/-1}
+    .automation-journal-row{grid-template-columns:1fr 1fr}
+    .automation-journal-row .automation-journal-range{grid-column:1/-1}
     .week-history-row{grid-template-columns:1fr 1fr}
     .week-history-row strong{grid-column:1/-1}
     .header-actions,.header-actions .button,.toolbar,.filters,.filters>div,.filters select,.filters button,.filters a,.week-nav,.week-nav a,.week-jump,.week-jump input,.week-jump button{width:100%}
@@ -353,6 +367,54 @@ h1{margin:0;font-size:32px}
             </div>
             {% endif %}
         </div>
+        {% if calendar_scheduler_runs %}
+        <details class="automation-journal">
+            <summary>
+                Журнал автоматизации ·
+                {{ calendar_scheduler_run_summary["total_runs"] }}
+            </summary>
+            <div class="automation-journal-stats">
+                <span class="automation-journal-stat">
+                    Выполнено: {{ calendar_scheduler_run_summary["done_runs"] }}
+                </span>
+                <span class="automation-journal-stat">
+                    Пропущено: {{ calendar_scheduler_run_summary["skipped_runs"] }}
+                </span>
+                <span class="automation-journal-stat">
+                    Проблемы: {{ calendar_scheduler_run_summary["problem_runs"] }}
+                </span>
+                <span class="automation-journal-stat">
+                    Изменено дней: {{ calendar_scheduler_run_summary["changed_days"] }}
+                </span>
+                <span class="automation-journal-stat">
+                    Уведомлений: {{ calendar_scheduler_run_summary["notifications_sent"] }}
+                </span>
+            </div>
+            <div class="automation-journal-list">
+                {% for run in calendar_scheduler_runs %}
+                <div class="automation-journal-row">
+                    <span class="automation-run-status {{ run['status_tone'] }}">
+                        {{ run["status_label"] }}
+                    </span>
+                    <strong>{{ run["source_label"] }}</strong>
+                    <span class="automation-journal-muted">
+                        {{ run["started_at"] }}
+                    </span>
+                    <span class="automation-journal-range">
+                        {{ run["range_start"] or "—" }}
+                        —
+                        {{ run["range_end"] or "—" }}
+                        {% if run["reason"] %}
+                        · {{ run["reason"] }}
+                        {% endif %}
+                    </span>
+                    <span>Дней: {{ run["changed_days"] }}</span>
+                    <span>Уведомлений: {{ run["notifications_sent"] }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
         {% if week_plan_runs %}
         <details class="week-history">
             <summary>История операций недели · {{ week_plan_runs|length }}</summary>
