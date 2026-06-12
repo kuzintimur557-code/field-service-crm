@@ -5183,6 +5183,19 @@ async def assert_dispatch_board():
     original_auto_remind = int(
         original_calendar_settings["calendar_auto_remind"] or 0
     )
+    conn = connect()
+    c = conn.cursor()
+    original_scheduler_status = c.execute("""
+    SELECT *
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=2
+    """).fetchone()
+    c.execute("""
+    DELETE FROM calendar_plan_scheduler_status
+    WHERE company_id=2
+    """)
+    conn.commit()
+    conn.close()
     publication_tasks = []
 
     for offset in range(4):
@@ -5403,6 +5416,8 @@ async def assert_dispatch_board():
     assert 'id="save-calendar-automation"' in page_html
     assert page.context["calendar_auto_publish"] is False
     assert page.context["calendar_auto_remind"] is False
+    assert page.context["calendar_scheduler_status"]["tone"] == "disabled"
+    assert "Автоматизация выключена" in page_html
     backlog_column = page.context["board_columns"][0]
     assert backlog_column["is_backlog"] is True
     assert any(
@@ -5619,9 +5634,27 @@ async def assert_dispatch_board():
     published_week_html = published_week_page.body.decode("utf-8")
     assert "История операций недели" in published_week_html
     assert "Публикация готовых планов" in published_week_html
+    assert "Ожидает первого запуска" in published_week_html
     assert "/api/calendar/dispatch/automation-settings" in (
         published_week_html
     )
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE calendar_day_ack_reminders
+    SET reminded_at=?
+    WHERE company_id=2
+      AND plan_date=?
+      AND revision=1
+      AND username='helper2'
+    """, (
+        (datetime.now() - timedelta(
+            minutes=crm.REMINDER_COOLDOWN_MINUTES + 1
+        )).strftime("%Y-%m-%d %H:%M"),
+        capacity_date,
+    ))
+    conn.commit()
+    conn.close()
     scheduler_now = datetime(
         board_start.year,
         board_start.month,
@@ -5629,17 +5662,101 @@ async def assert_dispatch_board():
         12,
         0,
     )
-    scheduler_result = await crm.run_calendar_plan_scheduler(
-        2,
-        now_dt=scheduler_now,
+    scheduler_messages = []
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message_to_chat = (
+        lambda chat_id, text: scheduler_messages.append(
+            (chat_id, text)
+        )
     )
+
+    try:
+        scheduler_result = await crm.run_calendar_plan_scheduler(
+            2,
+            now_dt=scheduler_now,
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
     assert scheduler_result["enabled"] is True
     assert scheduler_result["publish"]["source"] == "scheduler"
     assert scheduler_result["remind"]["source"] == "scheduler"
-    assert scheduler_result["changed_days"] == 0
-    assert scheduler_result["notifications_sent"] == 0
+    assert scheduler_result["changed_days"] == 1
+    assert scheduler_result["notifications_sent"] == 1
+    assert scheduler_result["remind"]["summary"][
+        "automatic_skips"
+    ] == 0
+    assert len(scheduler_messages) == 1
+
+    conn = connect()
+    c = conn.cursor()
+    scheduler_reminder = c.execute("""
+    SELECT source
+    FROM calendar_day_ack_reminders
+    WHERE company_id=2
+      AND plan_date=?
+      AND revision=1
+      AND username='helper2'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (capacity_date,)).fetchone()
+    c.execute("""
+    UPDATE calendar_day_ack_reminders
+    SET reminded_at=?
+    WHERE company_id=2
+      AND plan_date=?
+      AND revision=1
+      AND username='helper2'
+    """, (
+        (datetime.now() - timedelta(
+            minutes=crm.REMINDER_COOLDOWN_MINUTES + 1
+        )).strftime("%Y-%m-%d %H:%M"),
+        capacity_date,
+    ))
+    conn.commit()
+    conn.close()
+    assert scheduler_reminder["source"] == "scheduler"
+
+    repeated_scheduler = await crm.run_calendar_plan_scheduler(
+        2,
+        now_dt=scheduler_now,
+    )
+    assert repeated_scheduler["changed_days"] == 0
+    assert repeated_scheduler["notifications_sent"] == 0
+    assert repeated_scheduler["remind"]["summary"][
+        "automatic_skips"
+    ] == 1
+    assert repeated_scheduler["publish"]["operation_run_id"] == 0
+    assert repeated_scheduler["remind"]["operation_run_id"] == 0
+
+    scheduler_page = await crm.calendar_dispatch_page(
+        make_asgi_request("owner2", "/calendar/dispatch"),
+        week_start=original_date,
+    )
+    assert scheduler_page.context["calendar_scheduler_status"][
+        "tone"
+    ] == "healthy"
+    assert "Автоматизация работает" in (
+        scheduler_page.body.decode("utf-8")
+    )
     old_cron_secret = os.environ.get("AUTOMATION_CRON_SECRET")
     os.environ["AUTOMATION_CRON_SECRET"] = "calendar-cron-secret"
+
+    async def fake_calendar_scheduler_for_all_companies(now_dt=None):
+        return {
+            "companies": 1,
+            "changed_days": 0,
+            "notifications_sent": 0,
+            "errors": 0,
+            "results": [],
+        }
+
+    original_scheduler_for_all = (
+        crm.run_calendar_plan_scheduler_for_all_companies
+    )
+    crm.run_calendar_plan_scheduler_for_all_companies = (
+        fake_calendar_scheduler_for_all_companies
+    )
 
     try:
         forbidden_calendar_cron = (
@@ -5662,6 +5779,9 @@ async def assert_dispatch_board():
             )
         )
     finally:
+        crm.run_calendar_plan_scheduler_for_all_companies = (
+            original_scheduler_for_all
+        )
         if old_cron_secret is None:
             os.environ.pop("AUTOMATION_CRON_SECRET", None)
         else:
@@ -5678,13 +5798,22 @@ async def assert_dispatch_board():
       AND week_start=?
     ORDER BY id
     """, (original_date,)).fetchall()
+    scheduler_status = c.execute("""
+    SELECT *
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=2
+    """).fetchone()
     conn.close()
     assert sum(
         1 for row in operation_runs if row["source"] == "manual"
     ) == 3
     assert sum(
         1 for row in operation_runs if row["source"] == "scheduler"
-    ) == 2
+    ) == 1
+    assert scheduler_status["last_status"] == "done"
+    assert scheduler_status["last_error"] == ""
+    assert scheduler_status["last_changed_days"] == 0
+    assert scheduler_status["last_notifications_sent"] == 0
 
     anonymous = await crm.api_calendar_dispatch_move(
         make_json_request(
@@ -5891,6 +6020,28 @@ async def assert_dispatch_board():
     DELETE FROM calendar_plan_operation_runs
     WHERE company_id IN (1, 2)
     """)
+    c.execute("""
+    DELETE FROM calendar_plan_scheduler_status
+    WHERE company_id=2
+    """)
+    if original_scheduler_status:
+        c.execute("""
+        INSERT INTO calendar_plan_scheduler_status (
+            company_id, last_started_at, last_completed_at,
+            last_status, last_error, last_changed_days,
+            last_notifications_sent, last_result_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            original_scheduler_status["company_id"],
+            original_scheduler_status["last_started_at"],
+            original_scheduler_status["last_completed_at"],
+            original_scheduler_status["last_status"],
+            original_scheduler_status["last_error"],
+            original_scheduler_status["last_changed_days"],
+            original_scheduler_status["last_notifications_sent"],
+            original_scheduler_status["last_result_json"],
+        ))
     c.execute("""
     UPDATE company_settings
     SET calendar_auto_publish=?,

@@ -266,7 +266,8 @@ def init_db():
         revision INTEGER NOT NULL,
         username TEXT NOT NULL,
         reminded_by TEXT,
-        reminded_at TEXT
+        reminded_at TEXT,
+        source TEXT DEFAULT 'manual'
     )
     """)
 
@@ -284,6 +285,19 @@ def init_db():
         skipped_days INTEGER DEFAULT 0,
         result_json TEXT,
         created_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS calendar_plan_scheduler_status (
+        company_id INTEGER PRIMARY KEY,
+        last_started_at TEXT,
+        last_completed_at TEXT,
+        last_status TEXT DEFAULT 'waiting',
+        last_error TEXT,
+        last_changed_days INTEGER DEFAULT 0,
+        last_notifications_sent INTEGER DEFAULT 0,
+        last_result_json TEXT
     )
     """)
 
@@ -633,6 +647,7 @@ def init_db():
     add_column_if_missing(c, "company_settings", "ai_calls_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calendar_auto_publish", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calendar_auto_remind", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "calendar_day_ack_reminders", "source", "TEXT DEFAULT 'manual'")
 
     add_column_if_missing(c, "company_features", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_features", "feature_key", "TEXT")
@@ -866,6 +881,14 @@ def init_db():
     ON calendar_day_ack_reminders(
         company_id, plan_date, revision, username, reminded_at
     )
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_day_ack_scheduler_unique
+    ON calendar_day_ack_reminders(
+        company_id, plan_date, revision, username
+    )
+    WHERE source='scheduler'
     """)
 
     c.execute("""

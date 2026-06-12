@@ -8572,6 +8572,11 @@ async def calendar_dispatch_page(
         company_id,
         selected_week_start,
     )).fetchall()
+    scheduler_status_row = c.execute("""
+    SELECT *
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
     conn.close()
     week_plan_runs = []
 
@@ -8588,6 +8593,110 @@ async def calendar_dispatch_page(
             else "Вручную"
         )
         week_plan_runs.append(item)
+
+    automation_enabled = bool(
+        calendar_settings["calendar_auto_publish"]
+        or calendar_settings["calendar_auto_remind"]
+    )
+
+    if not automation_enabled:
+        calendar_scheduler_status = {
+            "tone": "disabled",
+            "title": "Автоматизация выключена",
+            "message": "Включите нужные действия и сохраните настройки.",
+            "last_completed_at": "",
+        }
+    elif not scheduler_status_row:
+        calendar_scheduler_status = {
+            "tone": "waiting",
+            "title": "Ожидает первого запуска",
+            "message": "Cron ещё не запускал автоматизацию календаря.",
+            "last_completed_at": "",
+        }
+    else:
+        last_completed_at = str(
+            scheduler_status_row["last_completed_at"] or ""
+        )
+        last_status = str(
+            scheduler_status_row["last_status"] or "waiting"
+        )
+
+        if last_status == "error":
+            calendar_scheduler_status = {
+                "tone": "error",
+                "title": "Ошибка автоматизации",
+                "message": str(
+                    scheduler_status_row["last_error"]
+                    or "Последний запуск завершился с ошибкой."
+                ),
+                "last_completed_at": last_completed_at,
+            }
+        elif last_status == "running":
+            last_started_at = str(
+                scheduler_status_row["last_started_at"] or ""
+            )
+
+            try:
+                started_at = datetime.strptime(
+                    last_started_at,
+                    "%Y-%m-%d %H:%M",
+                )
+                is_stuck = (
+                    datetime.now() - started_at
+                    > timedelta(minutes=30)
+                )
+            except ValueError:
+                is_stuck = True
+
+            calendar_scheduler_status = {
+                "tone": "error" if is_stuck else "waiting",
+                "title": (
+                    "Запуск не завершён"
+                    if is_stuck
+                    else "Автоматизация выполняется"
+                ),
+                "message": (
+                    "Проверьте cron и журнал приложения: "
+                    "последний запуск не завершился."
+                    if is_stuck
+                    else f"Запуск начат: {last_started_at}."
+                ),
+                "last_completed_at": last_started_at,
+            }
+        else:
+            try:
+                completed_at = datetime.strptime(
+                    last_completed_at,
+                    "%Y-%m-%d %H:%M",
+                )
+                is_stale = (
+                    datetime.now() - completed_at
+                    > timedelta(hours=6)
+                )
+            except ValueError:
+                is_stale = True
+
+            calendar_scheduler_status = {
+                "tone": "stale" if is_stale else "healthy",
+                "title": (
+                    "Давно не запускалась"
+                    if is_stale
+                    else "Автоматизация работает"
+                ),
+                "message": (
+                    "Проверьте расписание cron и секрет запуска."
+                    if is_stale
+                    else (
+                        "Последний запуск: "
+                        f"{last_completed_at}. "
+                        "Изменено дней: "
+                        f"{scheduler_status_row['last_changed_days']}. "
+                        "Уведомлений: "
+                        f"{scheduler_status_row['last_notifications_sent']}."
+                    )
+                ),
+                "last_completed_at": last_completed_at,
+            }
     week_publication = build_week_publication_summary(
         week_start=board_week_start,
         tasks=week_publication_tasks,
@@ -8708,6 +8817,7 @@ async def calendar_dispatch_page(
             "calendar_auto_remind": bool(
                 calendar_settings["calendar_auto_remind"]
             ),
+            "calendar_scheduler_status": calendar_scheduler_status,
             "previous_week_url": dispatch_week_url(
                 board_week_start - timedelta(days=7)
             ),
@@ -8862,6 +8972,13 @@ async def api_calendar_dispatch_week_plans(request: Request):
     )
     now = datetime.now()
     now_value = now.strftime("%Y-%m-%d %H:%M")
+    source = str(
+        request.scope.get("state", {}).get(
+            "calendar_plan_source",
+            "manual",
+        )
+    )
+    source = "scheduler" if source == "scheduler" else "manual"
     telegram_messages = []
     items = []
 
@@ -9058,6 +9175,24 @@ async def api_calendar_dispatch_week_plans(request: Request):
             ): row["reminded_at"]
             for row in reminder_rows
         }
+        scheduler_reminded_workers = {
+            (
+                row["plan_date"],
+                int(row["revision"] or 0),
+                row["username"],
+            )
+            for row in c.execute("""
+            SELECT DISTINCT plan_date, revision, username
+            FROM calendar_day_ack_reminders
+            WHERE company_id=?
+              AND plan_date BETWEEN ? AND ?
+              AND source='scheduler'
+            """, (
+                company_id,
+                week_start_value,
+                week_end_value,
+            )).fetchall()
+        }
         cooldown_threshold = now - timedelta(
             minutes=REMINDER_COOLDOWN_MINUTES
         )
@@ -9065,6 +9200,7 @@ async def api_calendar_dispatch_week_plans(request: Request):
         sent_reminders = 0
         cooldown_workers = 0
         inactive_workers = 0
+        automatic_skips = 0
 
         for offset in range(7):
             selected_date = (
@@ -9124,12 +9260,26 @@ async def api_calendar_dispatch_week_plans(request: Request):
             day_sent = 0
             day_cooldown = 0
             day_inactive = 0
+            day_automatic_skips = 0
 
             for worker_name in pending_workers:
                 worker_row = active_workers.get(worker_name)
 
                 if not worker_row:
                     day_inactive += 1
+                    continue
+
+                reminder_key = (
+                    selected_date,
+                    revision,
+                    worker_name,
+                )
+
+                if (
+                    source == "scheduler"
+                    and reminder_key in scheduler_reminded_workers
+                ):
+                    day_automatic_skips += 1
                     continue
 
                 reminded_at_value = reminder_by_plan_worker.get((
@@ -9153,11 +9303,11 @@ async def api_calendar_dispatch_week_plans(request: Request):
                     continue
 
                 c.execute("""
-                INSERT INTO calendar_day_ack_reminders (
+                INSERT OR IGNORE INTO calendar_day_ack_reminders (
                     company_id, plan_date, revision, username,
-                    reminded_by, reminded_at
+                    reminded_by, reminded_at, source
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     company_id,
                     selected_date,
@@ -9165,7 +9315,13 @@ async def api_calendar_dispatch_week_plans(request: Request):
                     worker_name,
                     username,
                     now_value,
+                    source,
                 ))
+
+                if source == "scheduler" and c.rowcount == 0:
+                    day_automatic_skips += 1
+                    continue
+
                 notification_title = "Подтвердите план дня"
                 notification_message = (
                     f"План на {selected_date}, версия {revision}. "
@@ -9207,6 +9363,7 @@ async def api_calendar_dispatch_week_plans(request: Request):
             sent_reminders += day_sent
             cooldown_workers += day_cooldown
             inactive_workers += day_inactive
+            automatic_skips += day_automatic_skips
             items.append({
                 "date": selected_date,
                 "status": "reminded" if day_sent else "skipped",
@@ -9218,6 +9375,7 @@ async def api_calendar_dispatch_week_plans(request: Request):
                 "sent": day_sent,
                 "cooldown": day_cooldown,
                 "inactive": day_inactive,
+                "automatic_skips": day_automatic_skips,
             })
 
         summary = {
@@ -9225,6 +9383,7 @@ async def api_calendar_dispatch_week_plans(request: Request):
             "sent_reminders": sent_reminders,
             "cooldown_workers": cooldown_workers,
             "inactive_workers": inactive_workers,
+            "automatic_skips": automatic_skips,
             "skipped_days": sum(
                 1 for item in items if item["status"] == "skipped"
             ),
@@ -9234,13 +9393,6 @@ async def api_calendar_dispatch_week_plans(request: Request):
             f"Дней затронуто: {affected_days}."
         )
 
-    source = str(
-        request.scope.get("state", {}).get(
-            "calendar_plan_source",
-            "manual",
-        )
-    )
-    source = "scheduler" if source == "scheduler" else "manual"
     changed_days = (
         summary["published_days"] + summary["updated_days"]
         if action == "publish_ready"
@@ -9251,34 +9403,37 @@ async def api_calendar_dispatch_week_plans(request: Request):
         if action == "publish_ready"
         else summary["sent_reminders"]
     )
-    c.execute("""
-    INSERT INTO calendar_plan_operation_runs (
-        company_id, week_start, week_end, action, source,
-        actor_username, changed_days, notifications_sent,
-        skipped_days, result_json, created_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        week_start_value,
-        week_end_value,
-        action,
-        source,
-        username,
-        changed_days,
-        notifications_sent,
-        summary["skipped_days"],
-        json.dumps(
-            {
-                "summary": summary,
-                "items": items,
-                "message": message,
-            },
-            ensure_ascii=False,
-        ),
-        now_value,
-    ))
-    operation_run_id = c.lastrowid
+    operation_run_id = 0
+
+    if source == "manual" or changed_days or notifications_sent:
+        c.execute("""
+        INSERT INTO calendar_plan_operation_runs (
+            company_id, week_start, week_end, action, source,
+            actor_username, changed_days, notifications_sent,
+            skipped_days, result_json, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            week_start_value,
+            week_end_value,
+            action,
+            source,
+            username,
+            changed_days,
+            notifications_sent,
+            summary["skipped_days"],
+            json.dumps(
+                {
+                    "summary": summary,
+                    "items": items,
+                    "message": message,
+                },
+                ensure_ascii=False,
+            ),
+            now_value,
+        ))
+        operation_run_id = c.lastrowid
     conn.commit()
     conn.close()
 
@@ -9448,52 +9603,97 @@ async def run_calendar_plan_scheduler(company_id, now_dt=None):
         return result
 
     now_dt = now_dt or datetime.now()
+    started_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     week_start = (
         now_dt.date() - timedelta(days=now_dt.date().weekday())
     ).strftime("%Y-%m-%d")
     result["enabled"] = True
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO calendar_plan_scheduler_status (
+        company_id, last_started_at, last_status,
+        last_error, last_changed_days, last_notifications_sent
+    )
+    VALUES (?, ?, 'running', '', 0, 0)
+    ON CONFLICT(company_id) DO UPDATE SET
+        last_started_at=excluded.last_started_at,
+        last_status='running',
+        last_error=''
+    """, (company_id, started_at))
+    conn.commit()
+    conn.close()
 
-    for action, result_key, enabled in (
-        ("publish_ready", "publish", auto_publish),
-        ("remind_pending", "remind", auto_remind),
-    ):
-        if not enabled:
-            continue
+    try:
+        for action, result_key, enabled in (
+            ("publish_ready", "publish", auto_publish),
+            ("remind_pending", "remind", auto_remind),
+        ):
+            if not enabled:
+                continue
 
-        response = await api_calendar_dispatch_week_plans(
-            make_internal_calendar_plan_request(
-                actor["username"],
-                {
-                    "action": action,
-                    "week_start": week_start,
-                },
+            response = await api_calendar_dispatch_week_plans(
+                make_internal_calendar_plan_request(
+                    actor["username"],
+                    {
+                        "action": action,
+                        "week_start": week_start,
+                    },
+                )
             )
-        )
 
-        if isinstance(response, JSONResponse):
-            response_data = json.loads(response.body.decode("utf-8"))
-        else:
-            response_data = response
+            if isinstance(response, JSONResponse):
+                response_data = json.loads(
+                    response.body.decode("utf-8")
+                )
+            else:
+                response_data = response
 
-        result[result_key] = response_data
+            result[result_key] = response_data
 
-        if not response_data.get("ok"):
-            result["error"] = response_data.get(
-                "error",
-                "operation_failed",
+            if not response_data.get("ok"):
+                result["error"] = response_data.get(
+                    "error",
+                    "operation_failed",
+                )
+                continue
+
+            action_summary = response_data["summary"]
+            result["changed_days"] += (
+                action_summary.get("published_days", 0)
+                + action_summary.get("updated_days", 0)
+                + action_summary.get("affected_days", 0)
             )
-            continue
+            result["notifications_sent"] += (
+                action_summary.get("notified_workers", 0)
+                + action_summary.get("sent_reminders", 0)
+            )
+    except Exception as exc:
+        result["error"] = str(exc)[:500]
 
-        action_summary = response_data["summary"]
-        result["changed_days"] += (
-            action_summary.get("published_days", 0)
-            + action_summary.get("updated_days", 0)
-            + action_summary.get("affected_days", 0)
-        )
-        result["notifications_sent"] += (
-            action_summary.get("notified_workers", 0)
-            + action_summary.get("sent_reminders", 0)
-        )
+    completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET last_completed_at=?,
+        last_status=?,
+        last_error=?,
+        last_changed_days=?,
+        last_notifications_sent=?,
+        last_result_json=?
+    WHERE company_id=?
+    """, (
+        completed_at,
+        "error" if result["error"] else "done",
+        result["error"],
+        result["changed_days"],
+        result["notifications_sent"],
+        json.dumps(result, ensure_ascii=False),
+        company_id,
+    ))
+    conn.commit()
+    conn.close()
 
     return result
 
@@ -10508,9 +10708,9 @@ async def api_calendar_day_acknowledgements_remind(request: Request):
         c.execute("""
         INSERT INTO calendar_day_ack_reminders (
             company_id, plan_date, revision, username,
-            reminded_by, reminded_at
+            reminded_by, reminded_at, source
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, 'manual')
         """, (
             company_id,
             selected_date,
