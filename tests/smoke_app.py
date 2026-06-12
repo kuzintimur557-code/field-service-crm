@@ -7761,8 +7761,89 @@ async def assert_platform_calendar_health():
             "Восстановление завершилось с ошибкой."
             in failed_page.body.decode("utf-8")
         )
+        escalation_now = datetime.now() + timedelta(minutes=45)
+        escalation_watchdog = crm.monitor_calendar_plan_schedulers(
+            now_dt=escalation_now,
+            company_id=company_id,
+            escalation_after_minutes=30,
+        )
+        escalation = escalation_watchdog["escalation"]
+        assert escalation_watchdog["escalated"] == 1
+        assert (
+            escalation_watchdog["escalation_notifications_sent"]
+            == 1
+        )
+        assert escalation["checked"] == 1
+        assert escalation["escalated"] == 1
+        assert escalation["notifications_sent"] == 1
+        assert escalation["items"][0]["company_id"] == company_id
+        assert escalation["items"][0]["age_minutes"] == 45
+        repeated_watchdog = (
+            crm.monitor_calendar_plan_schedulers(
+                now_dt=escalation_now + timedelta(minutes=10),
+                company_id=company_id,
+                escalation_after_minutes=30,
+            )
+        )
+        repeated_escalation = repeated_watchdog["escalation"]
+        assert repeated_watchdog["escalated"] == 0
+        assert repeated_escalation["escalated"] == 0
+        assert repeated_escalation["notifications_sent"] == 0
+        conn = connect()
+        c = conn.cursor()
+        escalation_events = c.execute("""
+        SELECT event_type, actor_username
+        FROM calendar_scheduler_incident_events
+        WHERE company_id=? AND event_type='escalated'
+        """, (company_id,)).fetchall()
+        platform_notifications = c.execute("""
+        SELECT company_id, username, title, link
+        FROM notifications
+        WHERE username='super'
+          AND link=?
+        """, (
+            f"/platform/calendar-health/{company_id}",
+        )).fetchall()
+        conn.close()
+        assert [
+            (row["event_type"], row["actor_username"])
+            for row in escalation_events
+        ] == [("escalated", "watchdog")]
+        assert len(platform_notifications) == 1
+        assert platform_notifications[0]["company_id"] == 1
+        assert platform_notifications[0]["title"] == (
+            "Критический инцидент календаря"
+        )
+        escalated_health = crm.get_platform_calendar_health(
+            now_dt=escalation_now,
+            status_filter="problem",
+        )
+        escalated_company = next(
+            item
+            for item in escalated_health["items"]
+            if item["company_id"] == company_id
+        )
+        assert escalated_company["is_escalated"] is True
+        assert escalated_health["summary"]["escalated"] >= 1
+        escalated_page = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "super",
+                "/platform/calendar-health",
+            ),
+            status="problem",
+        )
+        assert "Передано платформе" in (
+            escalated_page.body.decode("utf-8")
+        )
+        escalated_detail = crm.get_platform_calendar_company_detail(
+            company_id,
+        )
+        assert escalated_detail["incidents"][0][
+            "event_type_label"
+        ] == "Передан платформе"
         analytics = crm.get_platform_calendar_incident_analytics(
             days=30,
+            now_dt=escalation_now,
         )
         analytics_company = next(
             item
@@ -7775,9 +7856,11 @@ async def assert_platform_calendar_health():
         assert analytics["summary"]["active"] >= 1
         assert analytics["summary"]["recovery_attempts"] >= 2
         assert analytics["summary"]["recovery_failures"] >= 1
+        assert analytics["summary"]["escalations"] >= 1
         assert analytics_company["incidents"] == 2
         assert analytics_company["recovered"] == 1
         assert analytics_company["active"] == 1
+        assert analytics_company["escalations"] == 1
         assert analytics_company["detail_url"] == (
             f"/platform/calendar-health/{company_id}"
         )
@@ -7788,10 +7871,11 @@ async def assert_platform_calendar_health():
         assert analytics["daily"]
         assert analytics["recent_sessions"][0][
             "status_label"
-        ] == "Ожидает реакции"
+        ] == "Передан платформе"
         normalized_analytics = (
             crm.get_platform_calendar_incident_analytics(
                 days=11,
+                now_dt=escalation_now,
             )
         )
         assert normalized_analytics["days"] == 30

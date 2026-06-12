@@ -47,6 +47,7 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
 .incident{max-width:320px;color:#991b1b;line-height:1.35}
 .ack{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:900}
 .overdue{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#991b1b;color:white;font-size:9px;font-weight:900}
+.escalated{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#111827;color:white;font-size:9px;font-weight:900}
 .empty{padding:32px;color:#6b7280;text-align:center;font-weight:900}
 @media(max-width:900px){
     .container{padding:16px}
@@ -112,8 +113,8 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
             <div class="stat-value">{{ summary["disabled"] }}</div>
         </div>
         <div class="stat">
-            <div class="stat-label">Автоматизация включена</div>
-            <div class="stat-value">{{ summary["enabled"] }}</div>
+            <div class="stat-label">Передано платформе</div>
+            <div class="stat-value">{{ summary["escalated"] }}</div>
         </div>
     </section>
 
@@ -158,6 +159,9 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                         </span>
                         {% if company["response_overdue"] %}
                         <div class="overdue">Реакция просрочена</div>
+                        {% endif %}
+                        {% if company["is_escalated"] %}
+                        <div class="escalated">Передано платформе</div>
                         {% endif %}
                     </td>
                     <td data-label="Состояние">

@@ -3865,6 +3865,9 @@ def build_calendar_incident_sessions(events, now_dt=None):
                 "recovered_by": "",
                 "recovery_attempts": 0,
                 "recovery_failures": 0,
+                "escalations": 0,
+                "escalated_at": None,
+                "escalated_at_value": "",
             }
             sessions.append(session)
             active_by_company[company_id] = session
@@ -3890,6 +3893,12 @@ def build_calendar_incident_sessions(events, now_dt=None):
             session["recovery_attempts"] += 1
         elif event_type == "recovery_failed":
             session["recovery_failures"] += 1
+        elif event_type == "escalated":
+            session["escalations"] += 1
+            session["escalated_at"] = event_at
+            session["escalated_at_value"] = str(
+                raw_event.get("created_at") or ""
+            )
         elif event_type == "recovered":
             session["recovered_at"] = event_at
             session["recovered_at_value"] = str(
@@ -3971,7 +3980,11 @@ def build_calendar_incident_sessions(events, now_dt=None):
             else (
                 "Принят в работу"
                 if acknowledged_at
-                else "Ожидает реакции"
+                else (
+                    "Передан платформе"
+                    if session["escalations"]
+                    else "Ожидает реакции"
+                )
             )
         )
         session["status_tone"] = (
@@ -4080,11 +4093,13 @@ def get_platform_calendar_incident_analytics(
                 "active": 0,
                 "response_minutes": [],
                 "recovery_minutes": [],
+                "escalations": 0,
             },
         )
         company["incidents"] += 1
         company["recovered"] += int(session["is_recovered"])
         company["active"] += int(session["is_active"])
+        company["escalations"] += int(session["escalations"] or 0)
 
         if session["response_minutes"] is not None:
             company["response_minutes"].append(
@@ -4222,6 +4237,9 @@ def get_platform_calendar_incident_analytics(
         "recovery_failures": sum(
             item["recovery_failures"] for item in sessions
         ),
+        "escalations": sum(
+            item["escalations"] for item in sessions
+        ),
     }
 
     return {
@@ -4291,6 +4309,16 @@ def get_platform_calendar_health(
         scheduler.incident_message,
         scheduler.incident_acknowledged_at,
         scheduler.incident_acknowledged_by,
+        EXISTS(
+            SELECT 1
+            FROM calendar_scheduler_incident_events AS escalation
+            WHERE escalation.company_id=settings.company_id
+              AND escalation.event_type='escalated'
+              AND escalation.created_at>=COALESCE(
+                  scheduler.incident_started_at,
+                  ''
+              )
+        ) AS incident_escalated,
         latest_run.started_at AS last_scheduler_run_at,
         latest_run.completed_at AS last_scheduler_completed_at,
         latest_run.status AS last_scheduler_run_status,
@@ -4461,6 +4489,9 @@ def get_platform_calendar_health(
         item["requires_response"] = bool(
             active_incident and not item["is_acknowledged"]
         )
+        item["is_escalated"] = bool(
+            active_incident and item["incident_escalated"]
+        )
         item["detail_url"] = (
             f"/platform/calendar-health/{item['company_id']}"
         )
@@ -4492,6 +4523,9 @@ def get_platform_calendar_health(
             1
             for item in items
             if item["priority_code"] == "critical"
+        ),
+        "escalated": sum(
+            1 for item in items if item["is_escalated"]
         ),
     }
 
@@ -4610,6 +4644,7 @@ def get_platform_calendar_company_detail(
     incident_event_labels = {
         "opened": ("Открыт", "error"),
         "acknowledged": ("Принят в работу", "waiting"),
+        "escalated": ("Передан платформе", "error"),
         "recovery_started": ("Запущено восстановление", "running"),
         "recovery_failed": ("Восстановление не выполнено", "error"),
         "recovered": ("Восстановлен", "healthy"),
@@ -11603,6 +11638,160 @@ def log_calendar_scheduler_recovery_attempt(
     return True
 
 
+def escalate_calendar_scheduler_incidents(
+    now_dt=None,
+    after_minutes=30,
+    company_id=None,
+):
+    now_dt = now_dt or datetime.now()
+    after_minutes = max(5, int(after_minutes or 30))
+    cutoff = now_dt - timedelta(minutes=after_minutes)
+    now_value = now_dt.strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    conn.execute("BEGIN IMMEDIATE")
+    c = conn.cursor()
+    incidents = c.execute("""
+    SELECT
+        scheduler.company_id,
+        scheduler.active_incident,
+        scheduler.incident_started_at,
+        scheduler.incident_message,
+        COALESCE(
+            companies.name,
+            settings.company_name,
+            'Компания #' || scheduler.company_id
+        ) AS company_name
+    FROM calendar_plan_scheduler_status AS scheduler
+    LEFT JOIN companies
+      ON companies.id=scheduler.company_id
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=scheduler.company_id
+    WHERE COALESCE(scheduler.active_incident, '')!=''
+      AND scheduler.incident_acknowledged_at IS NULL
+      AND (? IS NULL OR scheduler.company_id=?)
+    ORDER BY scheduler.incident_started_at, scheduler.company_id
+    """, (
+        company_id,
+        company_id,
+    )).fetchall()
+    recipients = c.execute("""
+    SELECT username, company_id, telegram_chat_id
+    FROM users
+    WHERE role='superadmin'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY id
+    """).fetchall()
+    escalated_items = []
+    telegram_messages = []
+
+    for incident in incidents:
+        incident_started_at = parse_calendar_incident_datetime(
+            incident["incident_started_at"],
+        )
+
+        if not incident_started_at or incident_started_at > cutoff:
+            continue
+
+        already_escalated = c.execute("""
+        SELECT 1
+        FROM calendar_scheduler_incident_events
+        WHERE company_id=?
+          AND event_type='escalated'
+          AND created_at>=?
+        LIMIT 1
+        """, (
+            incident["company_id"],
+            incident["incident_started_at"],
+        )).fetchone()
+
+        if already_escalated:
+            continue
+
+        age_minutes = max(
+            0,
+            int(
+                (now_dt - incident_started_at).total_seconds()
+                // 60
+            ),
+        )
+        age_label = format_calendar_incident_age(age_minutes)
+        company_name = str(incident["company_name"] or "")
+        title = "Критический инцидент календаря"
+        message = (
+            f"{company_name}: инцидент не принят {age_label}. "
+            f"{incident['incident_message'] or 'Требуется проверка.'}"
+        )
+        log_calendar_scheduler_incident_event(
+            c,
+            incident["company_id"],
+            incident["active_incident"],
+            "escalated",
+            message,
+            actor_username="watchdog",
+            created_at=now_value,
+        )
+
+        for recipient in recipients:
+            recipient_company_id = int(
+                recipient["company_id"] or 1
+            )
+            c.execute("""
+            INSERT INTO notifications (
+                company_id, username, title, message,
+                link, is_read, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, 0, ?)
+            """, (
+                recipient_company_id,
+                recipient["username"],
+                title,
+                message,
+                (
+                    "/platform/calendar-health/"
+                    f"{incident['company_id']}"
+                ),
+                now_value,
+            ))
+            chat_id = str(
+                recipient["telegram_chat_id"] or ""
+            ).strip()
+
+            if chat_id:
+                telegram_messages.append((
+                    chat_id,
+                    f"{title}\n{message}",
+                ))
+
+        escalated_items.append({
+            "company_id": incident["company_id"],
+            "company_name": company_name,
+            "incident_type": incident["active_incident"],
+            "incident_started_at": incident["incident_started_at"],
+            "age_minutes": age_minutes,
+            "age_label": age_label,
+            "recipients": len(recipients),
+        })
+
+    conn.commit()
+    conn.close()
+
+    for chat_id, message in telegram_messages:
+        try:
+            send_message_to_chat(chat_id, message)
+        except Exception:
+            pass
+
+    return {
+        "checked": len(incidents),
+        "escalated": len(escalated_items),
+        "notifications_sent": (
+            len(escalated_items) * len(recipients)
+        ),
+        "after_minutes": after_minutes,
+        "items": escalated_items,
+    }
+
+
 async def run_calendar_plan_scheduler(
     company_id,
     now_dt=None,
@@ -11991,6 +12180,7 @@ def monitor_calendar_plan_schedulers(
     now_dt=None,
     stale_after_hours=6,
     company_id=None,
+    escalation_after_minutes=30,
 ):
     now_dt = now_dt or datetime.now()
     stale_after_hours = max(1, int(stale_after_hours or 6))
@@ -12069,6 +12259,12 @@ def monitor_calendar_plan_schedulers(
             "alerted": alerted,
         })
 
+    escalation = escalate_calendar_scheduler_incidents(
+        now_dt=now_dt,
+        after_minutes=escalation_after_minutes,
+        company_id=company_id,
+    )
+
     return {
         "companies": len(items),
         "healthy": sum(
@@ -12081,6 +12277,11 @@ def monitor_calendar_plan_schedulers(
             1 for item in items if item["status"] == "stale"
         ),
         "alerts_sent": alerts_sent,
+        "escalation": escalation,
+        "escalated": escalation["escalated"],
+        "escalation_notifications_sent": (
+            escalation["notifications_sent"]
+        ),
         "stale_after_hours": stale_after_hours,
         "items": items,
     }
