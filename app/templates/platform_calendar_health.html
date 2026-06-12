@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Здоровье календарных автоматизаций</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
+.container{max-width:1400px;margin:auto;padding:24px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+.header h1{margin:0;font-size:30px}
+.subtitle{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800}
+.back{display:inline-flex;padding:10px 12px;border-radius:7px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
+.stats{display:grid;grid-template-columns:repeat(6,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+.stat{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.stat-label{color:#6b7280;font-size:11px;font-weight:900}
+.stat-value{margin-top:5px;font-size:24px;font-weight:900}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.filter{padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;background:white;color:#374151;text-decoration:none;font-size:11px;font-weight:900}
+.filter.active{border-color:#2563eb;background:#2563eb;color:white}
+.table-wrap{overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;background:white}
+table{width:100%;min-width:1100px;border-collapse:collapse}
+th,td{padding:11px 12px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}
+th{background:#f9fafb;color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+td{font-size:11px;font-weight:800}
+tr:last-child td{border-bottom:0}
+.company-name{font-size:13px;font-weight:900}
+.muted{margin-top:3px;color:#6b7280;font-size:10px}
+.status{display:inline-flex;padding:5px 7px;border-radius:6px;background:#e5e7eb;color:#374151;font-size:10px;font-weight:900;white-space:nowrap}
+.status.healthy{background:#d1fae5;color:#065f46}
+.status.running{background:#dbeafe;color:#1e40af}
+.status.waiting{background:#fef3c7;color:#92400e}
+.status.disabled{background:#e5e7eb;color:#4b5563}
+.status.error,.status.stuck,.status.stale{background:#fee2e2;color:#991b1b}
+.incident{max-width:320px;color:#991b1b;line-height:1.35}
+.ack{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:900}
+.empty{padding:32px;color:#6b7280;text-align:center;font-weight:900}
+@media(max-width:900px){
+    .container{padding:16px}
+    .header{flex-direction:column}
+    .header h1{font-size:25px}
+    .back{width:100%;justify-content:center}
+    .stats{grid-template-columns:1fr 1fr}
+    .table-wrap{overflow:visible;border:0;background:transparent}
+    table,tbody{display:block;min-width:0}
+    thead{display:none}
+    tr{display:grid;gap:8px;margin-bottom:10px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+    td{display:block;padding:0;border:0}
+    td::before{display:block;margin-bottom:3px;color:#6b7280;font-size:9px;font-weight:900;content:attr(data-label);text-transform:uppercase}
+    .incident{max-width:none}
+}
+</style>
+</head>
+<body>
+<main class="container">
+    <header class="header">
+        <div>
+            <h1>Здоровье календарных автоматизаций</h1>
+            <div class="subtitle">
+                Состояние компаний на {{ health["generated_at"] }}.
+                Просрочка: {{ health["stale_after_hours"] }} ч.
+            </div>
+        </div>
+        <a class="back" href="/platform">Панель платформы</a>
+    </header>
+
+    <section class="stats">
+        <div class="stat">
+            <div class="stat-label">Компаний</div>
+            <div class="stat-value">{{ summary["total_companies"] }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Автоматизация включена</div>
+            <div class="stat-value">{{ summary["enabled"] }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Работают</div>
+            <div class="stat-value">{{ summary["healthy"] }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Проблемы</div>
+            <div class="stat-value">{{ summary["problems"] }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Ожидают запуска</div>
+            <div class="stat-value">{{ summary["waiting"] }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Выключены</div>
+            <div class="stat-value">{{ summary["disabled"] }}</div>
+        </div>
+    </section>
+
+    <nav class="filters" aria-label="Фильтры состояния">
+        <a class="filter {% if selected_status == 'all' %}active{% endif %}" href="/platform/calendar-health">Все</a>
+        <a class="filter {% if selected_status == 'problem' %}active{% endif %}" href="/platform/calendar-health?status=problem">Проблемы · {{ summary["problems"] }}</a>
+        <a class="filter {% if selected_status == 'healthy' %}active{% endif %}" href="/platform/calendar-health?status=healthy">Работают · {{ summary["healthy"] }}</a>
+        <a class="filter {% if selected_status == 'waiting' %}active{% endif %}" href="/platform/calendar-health?status=waiting">Ожидают · {{ summary["waiting"] }}</a>
+        <a class="filter {% if selected_status == 'disabled' %}active{% endif %}" href="/platform/calendar-health?status=disabled">Выключены · {{ summary["disabled"] }}</a>
+    </nav>
+
+    {% if companies %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Компания</th>
+                    <th>Состояние</th>
+                    <th>Политика</th>
+                    <th>Последний запуск</th>
+                    <th>Результат</th>
+                    <th>Инцидент</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for company in companies %}
+                <tr>
+                    <td data-label="Компания">
+                        <div class="company-name">{{ company["company_name"] }}</div>
+                        <div class="muted">
+                            #{{ company["company_id"] }}
+                            · владелец {{ company["owner_username"] }}
+                        </div>
+                    </td>
+                    <td data-label="Состояние">
+                        <span class="status {{ company['status_code'] }}">
+                            {{ company["status_label"] }}
+                        </span>
+                        {% if company["is_acknowledged"] %}
+                        <div class="ack">
+                            Принял {{ company["incident_acknowledged_by"] }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td data-label="Политика">
+                        {% if company["automation_enabled"] %}
+                        <div>
+                            Публикация:
+                            {% if company["calendar_auto_publish"] %}да{% else %}нет{% endif %}
+                            · напоминания:
+                            {% if company["calendar_auto_remind"] %}да{% else %}нет{% endif %}
+                        </div>
+                        <div class="muted">
+                            {{ company["calendar_auto_days_ahead"] or 0 }} дн.
+                            · {{ company["calendar_auto_window_start"] or "00:00" }}
+                            –{{ company["calendar_auto_window_end"] or "23:59" }}
+                        </div>
+                        {% else %}
+                        <span class="muted">Действия выключены</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Последний запуск">
+                        {{ company["last_activity_at"] or "Не запускался" }}
+                    </td>
+                    <td data-label="Результат">
+                        {% if company["last_scheduler_run_status"] %}
+                        <div>
+                            {{ company["last_scheduler_run_status_label"] }}
+                        </div>
+                        <div class="muted">
+                            {{ company["last_scheduler_run_reason"] or "Без ошибок" }}
+                        </div>
+                        {% else %}
+                        <span class="muted">Нет данных</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Инцидент">
+                        {% if company["active_incident"] %}
+                        <div class="incident">
+                            <strong>{{ company["incident_label"] }}</strong>
+                            <div class="muted">
+                                {{ company["incident_message"] or "Требуется проверка." }}
+                            </div>
+                        </div>
+                        {% else %}
+                        <span class="muted">Нет активного инцидента</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty">По выбранному фильтру компаний нет.</div>
+    {% endif %}
+</main>
+</body>
+</html>

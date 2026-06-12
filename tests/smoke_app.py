@@ -7081,6 +7081,193 @@ async def assert_dispatch_planner():
     conn.close()
 
 
+async def assert_platform_calendar_health():
+    company_id = 901
+    company_name = "Smoke Calendar Health"
+    owner_username = "smoke_health_owner"
+    now_dt = datetime.now()
+    old_value = (
+        now_dt - timedelta(hours=8)
+    ).strftime("%Y-%m-%d %H:%M")
+    incident_value = (
+        now_dt - timedelta(hours=2)
+    ).strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO companies (
+        id, name, owner_username, created_at
+    )
+    VALUES (?, ?, ?, ?)
+    """, (
+        company_id,
+        company_name,
+        owner_username,
+        old_value,
+    ))
+    c.execute("""
+    INSERT INTO users (
+        username, password, role, company_id,
+        is_active, last_seen
+    )
+    VALUES (?, 'x', 'boss', ?, 1, ?)
+    """, (
+        owner_username,
+        company_id,
+        old_value,
+    ))
+    c.execute("""
+    INSERT INTO company_settings (
+        company_id, company_name,
+        calendar_auto_publish, calendar_auto_remind,
+        calendar_auto_days_ahead,
+        calendar_auto_window_start,
+        calendar_auto_window_end,
+        updated_at
+    )
+    VALUES (?, ?, 1, 1, 5, '08:00', '20:00', ?)
+    """, (
+        company_id,
+        company_name,
+        old_value,
+    ))
+    c.execute("""
+    INSERT INTO calendar_plan_scheduler_runs (
+        company_id, source, actor_username,
+        range_start, range_end, status, reason,
+        changed_days, notifications_sent,
+        started_at, completed_at
+    )
+    VALUES (
+        ?, 'scheduler', ?, '2026-06-01', '2026-06-05',
+        'done', '', 2, 3, ?, ?
+    )
+    """, (
+        company_id,
+        owner_username,
+        old_value,
+        old_value,
+    ))
+    c.execute("""
+    INSERT INTO calendar_plan_scheduler_status (
+        company_id, last_started_at, last_completed_at,
+        last_status, last_error, last_changed_days,
+        last_notifications_sent, last_source,
+        last_triggered_by, active_incident,
+        incident_started_at, incident_message,
+        last_alerted_at, incident_acknowledged_at,
+        incident_acknowledged_by
+    )
+    VALUES (
+        ?, ?, ?, 'done', '', 2, 3, 'scheduler',
+        ?, 'stale', ?, ?, ?, ?, 'super'
+    )
+    """, (
+        company_id,
+        old_value,
+        old_value,
+        owner_username,
+        incident_value,
+        "Планировщик не запускался более шести часов.",
+        incident_value,
+        incident_value,
+    ))
+    conn.commit()
+    conn.close()
+
+    try:
+        health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            status_filter="problem",
+        )
+        company = next(
+            item
+            for item in health["items"]
+            if item["company_id"] == company_id
+        )
+        assert company["company_name"] == company_name
+        assert company["owner_username"] == owner_username
+        assert company["status_code"] == "stale"
+        assert company["status_label"] == "Давно не запускалась"
+        assert company["last_scheduler_run_status_label"] == "Выполнено"
+        assert company["automation_enabled"] is True
+        assert company["is_problem"] is True
+        assert company["is_acknowledged"] is True
+        assert company["last_activity_at"] == old_value
+        assert health["summary"]["problems"] >= 1
+        assert health["summary"]["acknowledged"] >= 1
+        assert all(item["is_problem"] for item in health["items"])
+
+        normalized = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            status_filter="unknown",
+        )
+        assert normalized["status_filter"] == "all"
+
+        anonymous = await crm.platform_calendar_health_page(
+            make_public_asgi_request("/platform/calendar-health"),
+        )
+        assert anonymous.status_code == 302
+        assert anonymous.headers["location"] == "/login"
+        boss = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "owner2",
+                "/platform/calendar-health",
+            ),
+        )
+        assert boss.status_code == 302
+        assert boss.headers["location"] == "/"
+        page = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "super",
+                "/platform/calendar-health",
+            ),
+            status="problem",
+        )
+        assert page.status_code == 200
+        assert page.context["selected_status"] == "problem"
+        assert any(
+            item["company_id"] == company_id
+            for item in page.context["companies"]
+        )
+        html = page.body.decode("utf-8")
+        assert "Здоровье календарных автоматизаций" in html
+        assert company_name in html
+        assert "Принял super" in html
+        assert "Планировщик не запускался более шести часов." in html
+        platform_page = await crm.platform_dashboard(
+            make_asgi_request("super", "/platform"),
+        )
+        assert "/platform/calendar-health" in (
+            platform_page.body.decode("utf-8")
+        )
+    finally:
+        conn = connect()
+        c = conn.cursor()
+        c.execute(
+            "DELETE FROM calendar_plan_scheduler_status WHERE company_id=?",
+            (company_id,),
+        )
+        c.execute(
+            "DELETE FROM calendar_plan_scheduler_runs WHERE company_id=?",
+            (company_id,),
+        )
+        c.execute(
+            "DELETE FROM company_settings WHERE company_id=?",
+            (company_id,),
+        )
+        c.execute(
+            "DELETE FROM users WHERE company_id=?",
+            (company_id,),
+        )
+        c.execute(
+            "DELETE FROM companies WHERE id=?",
+            (company_id,),
+        )
+        conn.commit()
+        conn.close()
+
+
 async def assert_daily_route_schedule():
     route_date = (
         datetime.now().date() + timedelta(days=42)
@@ -11753,6 +11940,7 @@ def main():
         asyncio.run(assert_schedule_conflicts())
         asyncio.run(assert_dispatch_board())
         asyncio.run(assert_dispatch_planner())
+        asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())

@@ -3719,6 +3719,255 @@ def update_last_seen(username):
     conn.close()
 
 
+def get_platform_calendar_health(
+    now_dt=None,
+    status_filter="all",
+    stale_after_hours=6,
+):
+    now_dt = now_dt or datetime.now()
+    stale_after_hours = max(1, int(stale_after_hours or 6))
+    status_filter = (
+        status_filter
+        if status_filter in {
+            "all",
+            "problem",
+            "healthy",
+            "waiting",
+            "disabled",
+        }
+        else "all"
+    )
+    conn = connect()
+    c = conn.cursor()
+    rows = c.execute("""
+    SELECT
+        settings.company_id,
+        settings.company_name,
+        settings.calendar_auto_publish,
+        settings.calendar_auto_remind,
+        settings.calendar_auto_days_ahead,
+        settings.calendar_auto_window_start,
+        settings.calendar_auto_window_end,
+        settings.updated_at AS settings_updated_at,
+        companies.name AS registered_name,
+        companies.owner_username AS registered_owner,
+        (
+            SELECT users.username
+            FROM users
+            WHERE users.company_id=settings.company_id
+              AND users.role='boss'
+              AND COALESCE(users.is_active, 1)=1
+            ORDER BY users.id
+            LIMIT 1
+        ) AS active_owner,
+        scheduler.last_started_at,
+        scheduler.last_completed_at,
+        scheduler.last_status,
+        scheduler.last_error,
+        scheduler.last_changed_days,
+        scheduler.last_notifications_sent,
+        scheduler.active_incident,
+        scheduler.incident_started_at,
+        scheduler.incident_message,
+        scheduler.incident_acknowledged_at,
+        scheduler.incident_acknowledged_by,
+        latest_run.started_at AS last_scheduler_run_at,
+        latest_run.completed_at AS last_scheduler_completed_at,
+        latest_run.status AS last_scheduler_run_status,
+        latest_run.reason AS last_scheduler_run_reason
+    FROM company_settings AS settings
+    LEFT JOIN companies
+      ON companies.id=settings.company_id
+    LEFT JOIN calendar_plan_scheduler_status AS scheduler
+      ON scheduler.company_id=settings.company_id
+    LEFT JOIN calendar_plan_scheduler_runs AS latest_run
+      ON latest_run.id=(
+          SELECT run.id
+          FROM calendar_plan_scheduler_runs AS run
+          WHERE run.company_id=settings.company_id
+            AND run.source='scheduler'
+          ORDER BY run.id DESC
+          LIMIT 1
+      )
+    ORDER BY settings.company_id
+    """).fetchall()
+    conn.close()
+    items = []
+    incident_labels = {
+        "error": "Ошибка запуска",
+        "stuck": "Зависший запуск",
+        "stale": "Планировщик не запускался",
+    }
+    status_labels = {
+        "disabled": "Выключена",
+        "waiting": "Ожидает запуска",
+        "healthy": "Работает",
+        "running": "Выполняется",
+        "stale": "Давно не запускалась",
+        "stuck": "Запуск завис",
+        "error": "Ошибка",
+    }
+    run_status_labels = {
+        "done": "Выполнено",
+        "skipped": "Пропущено",
+        "locked": "Занято другим запуском",
+        "error": "Ошибка",
+        "running": "Выполняется",
+    }
+
+    for row in rows:
+        item = dict(row)
+        item["company_name"] = str(
+            item["registered_name"]
+            or item["company_name"]
+            or f"Компания #{item['company_id']}"
+        )
+        item["owner_username"] = str(
+            item["registered_owner"]
+            or item["active_owner"]
+            or "не назначен"
+        )
+        item["automation_enabled"] = bool(
+            item["calendar_auto_publish"]
+            or item["calendar_auto_remind"]
+        )
+        active_incident = str(item["active_incident"] or "")
+        latest_value = str(
+            item["last_scheduler_run_at"]
+            or item["settings_updated_at"]
+            or ""
+        )
+
+        try:
+            latest_at = datetime.strptime(
+                latest_value,
+                "%Y-%m-%d %H:%M",
+            )
+        except ValueError:
+            latest_at = None
+
+        if not item["automation_enabled"]:
+            status_code = "disabled"
+        elif active_incident:
+            status_code = active_incident
+        elif not item["last_scheduler_run_at"]:
+            status_code = (
+                "stale"
+                if latest_at
+                and now_dt - latest_at
+                > timedelta(hours=stale_after_hours)
+                else "waiting"
+            )
+        elif item["last_scheduler_run_status"] == "error":
+            status_code = "error"
+        elif item["last_scheduler_run_status"] == "running":
+            status_code = (
+                "stuck"
+                if latest_at
+                and now_dt - latest_at > timedelta(minutes=30)
+                else "running"
+            )
+        elif (
+            latest_at
+            and now_dt - latest_at
+            > timedelta(hours=stale_after_hours)
+        ):
+            status_code = "stale"
+        else:
+            status_code = "healthy"
+
+        item["status_code"] = status_code
+        item["status_label"] = status_labels[status_code]
+        item["last_scheduler_run_status_label"] = (
+            run_status_labels.get(
+                str(item["last_scheduler_run_status"] or ""),
+                "Неизвестно",
+            )
+            if item["last_scheduler_run_status"]
+            else ""
+        )
+        item["incident_label"] = incident_labels.get(
+            active_incident,
+            "",
+        )
+        item["last_activity_at"] = str(
+            item["last_scheduler_completed_at"]
+            or item["last_scheduler_run_at"]
+            or ""
+        )
+        item["is_problem"] = status_code in {
+            "error",
+            "stuck",
+            "stale",
+        }
+        item["is_acknowledged"] = bool(
+            item["incident_acknowledged_at"]
+        )
+        items.append(item)
+
+    summary = {
+        "total_companies": len(items),
+        "enabled": sum(
+            1 for item in items if item["automation_enabled"]
+        ),
+        "healthy": sum(
+            1 for item in items
+            if item["status_code"] in {"healthy", "running"}
+        ),
+        "problems": sum(1 for item in items if item["is_problem"]),
+        "waiting": sum(
+            1 for item in items if item["status_code"] == "waiting"
+        ),
+        "disabled": sum(
+            1 for item in items if item["status_code"] == "disabled"
+        ),
+        "acknowledged": sum(
+            1 for item in items if item["is_acknowledged"]
+        ),
+    }
+
+    if status_filter == "problem":
+        filtered_items = [
+            item for item in items if item["is_problem"]
+        ]
+    elif status_filter == "healthy":
+        filtered_items = [
+            item
+            for item in items
+            if item["status_code"] in {"healthy", "running"}
+        ]
+    elif status_filter == "waiting":
+        filtered_items = [
+            item
+            for item in items
+            if item["status_code"] == "waiting"
+        ]
+    elif status_filter == "disabled":
+        filtered_items = [
+            item
+            for item in items
+            if item["status_code"] == "disabled"
+        ]
+    else:
+        filtered_items = items
+
+    filtered_items.sort(
+        key=lambda item: (
+            0 if item["is_problem"] else 1,
+            0 if item["automation_enabled"] else 1,
+            item["company_name"].lower(),
+        )
+    )
+
+    return {
+        "summary": summary,
+        "items": filtered_items,
+        "status_filter": status_filter,
+        "stale_after_hours": stale_after_hours,
+        "generated_at": now_dt.strftime("%Y-%m-%d %H:%M"),
+    }
+
+
 @app.post("/platform/companies")
 async def create_platform_company(request: Request):
 
@@ -3896,6 +4145,40 @@ async def platform_dashboard(request: Request):
             "clients_count": clients_count,
             "companies": companies
         }
+    )
+
+
+@app.get("/platform/calendar-health", response_class=HTMLResponse)
+async def platform_calendar_health_page(
+    request: Request,
+    status: str = "all",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    health = get_platform_calendar_health(
+        status_filter=status,
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_calendar_health.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "health": health,
+            "summary": health["summary"],
+            "companies": health["items"],
+            "selected_status": health["status_filter"],
+        },
     )
 
 
