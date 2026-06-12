@@ -3903,6 +3903,9 @@ def get_platform_calendar_health(
         item["is_acknowledged"] = bool(
             item["incident_acknowledged_at"]
         )
+        item["detail_url"] = (
+            f"/platform/calendar-health/{item['company_id']}"
+        )
         items.append(item)
 
     summary = {
@@ -3964,6 +3967,150 @@ def get_platform_calendar_health(
         "items": filtered_items,
         "status_filter": status_filter,
         "stale_after_hours": stale_after_hours,
+        "generated_at": now_dt.strftime("%Y-%m-%d %H:%M"),
+    }
+
+
+def get_platform_calendar_company_detail(
+    company_id,
+    now_dt=None,
+):
+    now_dt = now_dt or datetime.now()
+    health = get_platform_calendar_health(now_dt=now_dt)
+    company = next(
+        (
+            item
+            for item in health["items"]
+            if int(item["company_id"]) == int(company_id)
+        ),
+        None,
+    )
+
+    if not company:
+        return None
+
+    conn = connect()
+    c = conn.cursor()
+    run_rows = c.execute("""
+    SELECT *
+    FROM calendar_plan_scheduler_runs
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 30
+    """, (company_id,)).fetchall()
+    incident_rows = c.execute("""
+    SELECT *
+    FROM calendar_scheduler_incident_events
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 30
+    """, (company_id,)).fetchall()
+    operation_rows = c.execute("""
+    SELECT *
+    FROM calendar_plan_operation_runs
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 20
+    """, (company_id,)).fetchall()
+    conn.close()
+    run_labels = {
+        "done": ("Выполнено", "healthy"),
+        "skipped": ("Пропущено", "waiting"),
+        "locked": ("Занято", "error"),
+        "error": ("Ошибка", "error"),
+        "running": ("Выполняется", "running"),
+    }
+    source_labels = {
+        "scheduler": "По расписанию",
+        "manual_run": "Вручную владельцем",
+        "manual": "Ручная операция",
+    }
+    incident_type_labels = {
+        "error": "Ошибка запуска",
+        "stuck": "Зависший запуск",
+        "stale": "Планировщик не запускался",
+    }
+    incident_event_labels = {
+        "opened": ("Открыт", "error"),
+        "acknowledged": ("Принят в работу", "waiting"),
+        "recovered": ("Восстановлен", "healthy"),
+    }
+    operation_labels = {
+        "publish_ready": "Публикация готовых планов",
+        "remind_pending": "Напоминания исполнителям",
+    }
+    runs = []
+    incidents = []
+    operations = []
+
+    for row in run_rows:
+        item = dict(row)
+        (
+            item["status_label"],
+            item["status_tone"],
+        ) = run_labels.get(
+            item["status"],
+            ("Неизвестно", "waiting"),
+        )
+        item["source_label"] = source_labels.get(
+            item["source"],
+            "Система",
+        )
+        runs.append(item)
+
+    for row in incident_rows:
+        item = dict(row)
+        item["incident_type_label"] = incident_type_labels.get(
+            item["incident_type"],
+            "Инцидент",
+        )
+        (
+            item["event_type_label"],
+            item["event_tone"],
+        ) = incident_event_labels.get(
+            item["event_type"],
+            ("Событие", "waiting"),
+        )
+        incidents.append(item)
+
+    for row in operation_rows:
+        item = dict(row)
+        item["action_label"] = operation_labels.get(
+            item["action"],
+            "Операция планов",
+        )
+        item["source_label"] = source_labels.get(
+            item["source"],
+            "Система",
+        )
+        operations.append(item)
+
+    summary = {
+        "runs": len(runs),
+        "successful": sum(
+            1 for item in runs if item["status"] == "done"
+        ),
+        "problems": sum(
+            1
+            for item in runs
+            if item["status"] in {"error", "locked"}
+        ),
+        "changed_days": sum(
+            int(item["changed_days"] or 0) for item in runs
+        ),
+        "notifications": sum(
+            int(item["notifications_sent"] or 0) for item in runs
+        ),
+        "incident_events": len(incidents),
+        "operations": len(operations),
+    }
+
+    return {
+        "company": company,
+        "summary": summary,
+        "runs": runs,
+        "incidents": incidents,
+        "operations": operations,
         "generated_at": now_dt.strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -4178,6 +4325,49 @@ async def platform_calendar_health_page(
             "summary": health["summary"],
             "companies": health["items"],
             "selected_status": health["status_filter"],
+        },
+    )
+
+
+@app.get(
+    "/platform/calendar-health/{company_id}",
+    response_class=HTMLResponse,
+)
+async def platform_calendar_company_health_page(
+    request: Request,
+    company_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    detail = get_platform_calendar_company_detail(company_id)
+
+    if not detail:
+        return RedirectResponse(
+            "/platform/calendar-health?error=company_not_found",
+            status_code=302,
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_calendar_company_health.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "detail": detail,
+            "company": detail["company"],
+            "summary": detail["summary"],
+            "runs": detail["runs"],
+            "incidents": detail["incidents"],
+            "operations": detail["operations"],
         },
     )
 

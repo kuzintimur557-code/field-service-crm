@@ -7149,6 +7149,62 @@ async def assert_platform_calendar_health():
         old_value,
     ))
     c.execute("""
+    INSERT INTO calendar_plan_scheduler_runs (
+        company_id, source, actor_username,
+        range_start, range_end, status, reason,
+        changed_days, notifications_sent,
+        started_at, completed_at
+    )
+    VALUES (
+        ?, 'scheduler', ?, '2026-06-06', '2026-06-10',
+        'error', 'Smoke scheduler failure', 0, 1, ?, ?
+    )
+    """, (
+        company_id,
+        owner_username,
+        incident_value,
+        incident_value,
+    ))
+    c.execute("""
+    INSERT INTO calendar_scheduler_incident_events (
+        company_id, incident_type, event_type,
+        actor_username, message, created_at
+    )
+    VALUES (?, 'stale', 'opened', '', ?, ?)
+    """, (
+        company_id,
+        "Планировщик не запускался более шести часов.",
+        incident_value,
+    ))
+    c.execute("""
+    INSERT INTO calendar_scheduler_incident_events (
+        company_id, incident_type, event_type,
+        actor_username, message, created_at
+    )
+    VALUES (?, 'stale', 'acknowledged', 'super', ?, ?)
+    """, (
+        company_id,
+        "Инцидент принят платформой.",
+        incident_value,
+    ))
+    c.execute("""
+    INSERT INTO calendar_plan_operation_runs (
+        company_id, week_start, week_end,
+        action, source, actor_username,
+        changed_days, notifications_sent,
+        skipped_days, result_json, created_at
+    )
+    VALUES (
+        ?, '2026-06-01', '2026-06-07',
+        'publish_ready', 'scheduler', ?,
+        2, 3, 1, '{}', ?
+    )
+    """, (
+        company_id,
+        owner_username,
+        old_value,
+    ))
+    c.execute("""
     INSERT INTO calendar_plan_scheduler_status (
         company_id, last_started_at, last_completed_at,
         last_status, last_error, last_changed_days,
@@ -7189,11 +7245,14 @@ async def assert_platform_calendar_health():
         assert company["owner_username"] == owner_username
         assert company["status_code"] == "stale"
         assert company["status_label"] == "Давно не запускалась"
-        assert company["last_scheduler_run_status_label"] == "Выполнено"
+        assert company["last_scheduler_run_status_label"] == "Ошибка"
         assert company["automation_enabled"] is True
         assert company["is_problem"] is True
         assert company["is_acknowledged"] is True
-        assert company["last_activity_at"] == old_value
+        assert company["last_activity_at"] == incident_value
+        assert company["detail_url"] == (
+            f"/platform/calendar-health/{company_id}"
+        )
         assert health["summary"]["problems"] >= 1
         assert health["summary"]["acknowledged"] >= 1
         assert all(item["is_problem"] for item in health["items"])
@@ -7235,6 +7294,83 @@ async def assert_platform_calendar_health():
         assert company_name in html
         assert "Принял super" in html
         assert "Планировщик не запускался более шести часов." in html
+        assert f"/platform/calendar-health/{company_id}" in html
+        detail = crm.get_platform_calendar_company_detail(
+            company_id,
+            now_dt=now_dt,
+        )
+        assert detail["company"]["company_name"] == company_name
+        assert detail["summary"] == {
+            "runs": 2,
+            "successful": 1,
+            "problems": 1,
+            "changed_days": 2,
+            "notifications": 4,
+            "incident_events": 2,
+            "operations": 1,
+        }
+        assert detail["runs"][0]["status_label"] == "Ошибка"
+        assert detail["runs"][0]["reason"] == "Smoke scheduler failure"
+        assert detail["incidents"][0]["event_type_label"] == (
+            "Принят в работу"
+        )
+        assert detail["operations"][0]["action_label"] == (
+            "Публикация готовых планов"
+        )
+        assert crm.get_platform_calendar_company_detail(
+            999999,
+            now_dt=now_dt,
+        ) is None
+        anonymous_detail = (
+            await crm.platform_calendar_company_health_page(
+                make_public_asgi_request(
+                    f"/platform/calendar-health/{company_id}"
+                ),
+                company_id,
+            )
+        )
+        assert anonymous_detail.status_code == 302
+        assert anonymous_detail.headers["location"] == "/login"
+        boss_detail = (
+            await crm.platform_calendar_company_health_page(
+                make_asgi_request(
+                    "owner2",
+                    f"/platform/calendar-health/{company_id}",
+                ),
+                company_id,
+            )
+        )
+        assert boss_detail.status_code == 302
+        assert boss_detail.headers["location"] == "/"
+        detail_page = (
+            await crm.platform_calendar_company_health_page(
+                make_asgi_request(
+                    "super",
+                    f"/platform/calendar-health/{company_id}",
+                ),
+                company_id,
+            )
+        )
+        assert detail_page.status_code == 200
+        detail_html = detail_page.body.decode("utf-8")
+        assert "Последние запуски" in detail_html
+        assert "История инцидентов" in detail_html
+        assert "Операции с планами" in detail_html
+        assert "Smoke scheduler failure" in detail_html
+        assert "Публикация готовых планов" in detail_html
+        missing_detail = (
+            await crm.platform_calendar_company_health_page(
+                make_asgi_request(
+                    "super",
+                    "/platform/calendar-health/999999",
+                ),
+                999999,
+            )
+        )
+        assert missing_detail.status_code == 302
+        assert missing_detail.headers["location"] == (
+            "/platform/calendar-health?error=company_not_found"
+        )
         platform_page = await crm.platform_dashboard(
             make_asgi_request("super", "/platform"),
         )
@@ -7250,6 +7386,14 @@ async def assert_platform_calendar_health():
         )
         c.execute(
             "DELETE FROM calendar_plan_scheduler_runs WHERE company_id=?",
+            (company_id,),
+        )
+        c.execute(
+            "DELETE FROM calendar_scheduler_incident_events WHERE company_id=?",
+            (company_id,),
+        )
+        c.execute(
+            "DELETE FROM calendar_plan_operation_runs WHERE company_id=?",
             (company_id,),
         )
         c.execute(
