@@ -69,6 +69,21 @@ h1{margin:0;font-size:32px}
 .week-settings-save{padding:9px 11px;border:0;border-radius:7px;background:#111827;color:white;font-size:11px;font-weight:900;cursor:pointer}
 .week-settings-run{padding:9px 11px;border:1px solid #047857;border-radius:7px;background:#ecfdf5;color:#047857;font-size:11px;font-weight:900;cursor:pointer}
 .week-settings-save:disabled,.week-settings-run:disabled{cursor:not-allowed;opacity:.6}
+.scheduler-incident{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;margin-top:12px;padding:12px;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:8px;background:#fff7f7}
+.scheduler-incident-title{font-size:13px;font-weight:900;color:#991b1b}
+.scheduler-incident-message{margin-top:4px;color:#7f1d1d;font-size:11px;font-weight:800}
+.scheduler-incident-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:#6b7280;font-size:10px;font-weight:900}
+.scheduler-incident-action{padding:9px 11px;border:0;border-radius:7px;background:#991b1b;color:white;font-size:11px;font-weight:900;cursor:pointer}
+.scheduler-incident-action:disabled{cursor:not-allowed;opacity:.6}
+.scheduler-incident-accepted{padding:7px 9px;border-radius:6px;background:#fee2e2;color:#991b1b;font-size:10px;font-weight:900}
+.incident-history{margin-top:10px}
+.incident-history summary{cursor:pointer;color:#374151;font-size:12px;font-weight:900}
+.incident-history-list{display:grid;gap:6px;margin-top:8px}
+.incident-history-row{display:grid;grid-template-columns:105px 130px 120px minmax(180px,1fr);gap:8px;align-items:center;padding:8px 9px;border:1px solid #e5e7eb;border-radius:7px;background:white;font-size:10px;font-weight:800}
+.incident-event{display:inline-flex;justify-content:center;padding:4px 6px;border-radius:6px;background:#f3f4f6;color:#374151;font-size:9px;font-weight:900}
+.incident-event.opened{background:#fee2e2;color:#991b1b}
+.incident-event.acknowledged{background:#fef3c7;color:#92400e}
+.incident-event.recovered{background:#d1fae5;color:#065f46}
 .automation-journal{margin-top:12px;padding-top:10px;border-top:1px solid #d1d5db}
 .automation-journal summary{cursor:pointer;color:#374151;font-size:12px;font-weight:900}
 .automation-journal-stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -173,6 +188,10 @@ h1{margin:0;font-size:32px}
     .week-automation-controls,.week-toggle,.week-policy,.week-settings-run,.week-settings-save{width:100%}
     .week-policy{grid-template-columns:1fr 1fr}
     .week-policy label:first-child{grid-column:1/-1}
+    .scheduler-incident{grid-template-columns:1fr}
+    .scheduler-incident-action{width:100%}
+    .incident-history-row{grid-template-columns:1fr 1fr}
+    .incident-history-row span:last-child{grid-column:1/-1}
     .automation-journal-row{grid-template-columns:1fr 1fr}
     .automation-journal-row .automation-journal-range{grid-column:1/-1}
     .week-history-row{grid-template-columns:1fr 1fr}
@@ -367,6 +386,65 @@ h1{margin:0;font-size:32px}
             </div>
             {% endif %}
         </div>
+        {% if calendar_scheduler_incident["active"] %}
+        <section class="scheduler-incident" aria-live="polite">
+            <div>
+                <div class="scheduler-incident-title">
+                    {{ calendar_scheduler_incident["type_label"] }}
+                </div>
+                <div class="scheduler-incident-message">
+                    {{ calendar_scheduler_incident["message"] }}
+                </div>
+                <div class="scheduler-incident-meta">
+                    <span>
+                        Открыт: {{ calendar_scheduler_incident["started_at"] or "—" }}
+                    </span>
+                    {% if calendar_scheduler_incident["acknowledged_at"] %}
+                    <span>
+                        Принял: {{ calendar_scheduler_incident["acknowledged_by"] }}
+                        · {{ calendar_scheduler_incident["acknowledged_at"] }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if calendar_scheduler_incident["acknowledged_at"] %}
+            <div class="scheduler-incident-accepted">Принят в работу</div>
+            {% elif role == "boss" %}
+            <button
+                class="scheduler-incident-action"
+                id="acknowledge-calendar-incident"
+                type="button"
+            >
+                Принять в работу
+            </button>
+            {% endif %}
+        </section>
+        {% endif %}
+        {% if calendar_scheduler_incident_events %}
+        <details class="incident-history">
+            <summary>
+                История инцидентов ·
+                {{ calendar_scheduler_incident_events|length }}
+            </summary>
+            <div class="incident-history-list">
+                {% for event in calendar_scheduler_incident_events %}
+                <div class="incident-history-row">
+                    <span class="incident-event {{ event['event_type'] }}">
+                        {{ event["event_type_label"] }}
+                    </span>
+                    <strong>{{ event["incident_type_label"] }}</strong>
+                    <span>{{ event["created_at"] }}</span>
+                    <span>
+                        {{ event["actor_username"] or "система" }}
+                        {% if event["message"] %}
+                        · {{ event["message"] }}
+                        {% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
         {% if calendar_scheduler_runs %}
         <details class="automation-journal">
             <summary>
@@ -621,6 +699,9 @@ h1{margin:0;font-size:32px}
     const runCalendarAutomation = document.getElementById(
         "run-calendar-automation"
     );
+    const acknowledgeCalendarIncident = document.getElementById(
+        "acknowledge-calendar-incident"
+    );
     let plannerItems = [];
     let draggedCard = null;
 
@@ -792,6 +873,36 @@ h1{margin:0;font-size:32px}
             );
             runCalendarAutomation.disabled = false;
             saveCalendarAutomation.disabled = false;
+        }
+    }
+
+    async function acknowledgeCalendarSchedulerIncident() {
+        acknowledgeCalendarIncident.disabled = true;
+
+        try {
+            const response = await fetch(
+                "/api/calendar/dispatch/incident/acknowledge",
+                {
+                    method: "POST",
+                    credentials: "same-origin"
+                }
+            );
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                throw new Error(
+                    data.message || "Не удалось принять инцидент."
+                );
+            }
+
+            showToast(data.message);
+            window.setTimeout(() => window.location.reload(), 700);
+        } catch (error) {
+            showToast(
+                error.message || "Не удалось принять инцидент.",
+                true
+            );
+            acknowledgeCalendarIncident.disabled = false;
         }
     }
 
@@ -1049,6 +1160,10 @@ h1{margin:0;font-size:32px}
     runCalendarAutomation?.addEventListener(
         "click",
         runCalendarAutomationNow
+    );
+    acknowledgeCalendarIncident?.addEventListener(
+        "click",
+        acknowledgeCalendarSchedulerIncident
     );
 })();
 </script>

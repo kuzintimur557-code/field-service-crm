@@ -8603,9 +8603,17 @@ async def calendar_dispatch_page(
         LIMIT 30
     )
     """, (company_id,)).fetchone()
+    scheduler_incident_rows = c.execute("""
+    SELECT *
+    FROM calendar_scheduler_incident_events
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 8
+    """, (company_id,)).fetchall()
     conn.close()
     week_plan_runs = []
     calendar_scheduler_runs = []
+    calendar_scheduler_incident_events = []
 
     for row in week_plan_run_rows:
         item = dict(row)
@@ -8660,11 +8668,44 @@ async def calendar_dispatch_page(
             "notifications_sent",
         )
     }
+    incident_type_labels = {
+        "error": "Ошибка запуска",
+        "stuck": "Зависший запуск",
+        "stale": "Cron не запускался",
+    }
+    incident_event_labels = {
+        "opened": "Открыт",
+        "acknowledged": "Принят в работу",
+        "recovered": "Восстановлен",
+    }
+
+    for row in scheduler_incident_rows:
+        item = dict(row)
+        item["incident_type_label"] = incident_type_labels.get(
+            item["incident_type"],
+            "Инцидент",
+        )
+        item["event_type_label"] = incident_event_labels.get(
+            item["event_type"],
+            "Событие",
+        )
+        calendar_scheduler_incident_events.append(item)
 
     automation_enabled = bool(
         calendar_settings["calendar_auto_publish"]
         or calendar_settings["calendar_auto_remind"]
     )
+
+    calendar_scheduler_incident = {
+        "active": False,
+        "type": "",
+        "type_label": "",
+        "message": "",
+        "started_at": "",
+        "alerted_at": "",
+        "acknowledged_at": "",
+        "acknowledged_by": "",
+    }
 
     if not automation_enabled:
         calendar_scheduler_status = {
@@ -8793,6 +8834,47 @@ async def calendar_dispatch_page(
                 ),
                 "last_completed_at": last_completed_at,
             }
+
+        active_incident = str(
+            scheduler_status_row["active_incident"] or ""
+        )
+
+        if active_incident:
+            calendar_scheduler_incident = {
+                "active": True,
+                "type": active_incident,
+                "type_label": incident_type_labels.get(
+                    active_incident,
+                    "Инцидент",
+                ),
+                "message": str(
+                    scheduler_status_row["incident_message"] or ""
+                ),
+                "started_at": str(
+                    scheduler_status_row["incident_started_at"] or ""
+                ),
+                "alerted_at": str(
+                    scheduler_status_row["last_alerted_at"] or ""
+                ),
+                "acknowledged_at": str(
+                    scheduler_status_row[
+                        "incident_acknowledged_at"
+                    ] or ""
+                ),
+                "acknowledged_by": str(
+                    scheduler_status_row[
+                        "incident_acknowledged_by"
+                    ] or ""
+                ),
+            }
+            calendar_scheduler_status = {
+                "tone": "error",
+                "title": calendar_scheduler_incident["type_label"],
+                "message": calendar_scheduler_incident["message"],
+                "last_completed_at": (
+                    calendar_scheduler_incident["started_at"]
+                ),
+            }
     week_publication = build_week_publication_summary(
         week_start=board_week_start,
         tasks=week_publication_tasks,
@@ -8910,6 +8992,12 @@ async def calendar_dispatch_page(
             "calendar_scheduler_runs": calendar_scheduler_runs,
             "calendar_scheduler_run_summary": (
                 calendar_scheduler_run_summary
+            ),
+            "calendar_scheduler_incident": (
+                calendar_scheduler_incident
+            ),
+            "calendar_scheduler_incident_events": (
+                calendar_scheduler_incident_events
             ),
             "calendar_auto_publish": bool(
                 calendar_settings["calendar_auto_publish"]
@@ -9891,21 +9979,63 @@ def finish_calendar_scheduler_run(
     trim_calendar_scheduler_runs(company_id)
 
 
+def log_calendar_scheduler_incident_event(
+    cursor,
+    company_id,
+    incident_type,
+    event_type,
+    message,
+    actor_username="",
+    created_at="",
+):
+    cursor.execute("""
+    INSERT INTO calendar_scheduler_incident_events (
+        company_id, incident_type, event_type,
+        actor_username, message, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        incident_type,
+        event_type,
+        actor_username,
+        str(message or "")[:500],
+        created_at or datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    cursor.execute("""
+    DELETE FROM calendar_scheduler_incident_events
+    WHERE company_id=?
+      AND id NOT IN (
+          SELECT id
+          FROM calendar_scheduler_incident_events
+          WHERE company_id=?
+          ORDER BY id DESC
+          LIMIT 200
+      )
+    """, (
+        company_id,
+        company_id,
+    ))
+
+
 def open_calendar_scheduler_incident(
     company_id,
     incident_type,
     message,
 ):
     incident_type = (
-        incident_type if incident_type in {"error", "stuck"} else "error"
+        incident_type
+        if incident_type in {"error", "stuck", "stale"}
+        else "error"
     )
     message = str(message or "")[:500]
     now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
-    title = (
-        "Планировщик календаря не отвечает"
-        if incident_type == "stuck"
-        else "Ошибка автоматизации календаря"
-    )
+    titles = {
+        "error": "Ошибка автоматизации календаря",
+        "stuck": "Планировщик календаря не отвечает",
+        "stale": "Планировщик календаря давно не запускался",
+    }
+    title = titles[incident_type]
     conn = connect()
     c = conn.cursor()
     status_row = c.execute("""
@@ -9921,17 +10051,16 @@ def open_calendar_scheduler_incident(
     active_incident = str(status_row["active_incident"] or "")
 
     if active_incident:
-        c.execute("""
-        UPDATE calendar_plan_scheduler_status
-        SET active_incident=?,
-            incident_message=?
-        WHERE company_id=?
-        """, (
-            incident_type,
-            message,
-            company_id,
-        ))
-        conn.commit()
+        if active_incident == incident_type:
+            c.execute("""
+            UPDATE calendar_plan_scheduler_status
+            SET incident_message=?
+            WHERE company_id=?
+            """, (
+                message,
+                company_id,
+            ))
+            conn.commit()
         conn.close()
         return 0
 
@@ -9964,7 +10093,9 @@ def open_calendar_scheduler_incident(
     SET active_incident=?,
         incident_started_at=?,
         incident_message=?,
-        last_alerted_at=?
+        last_alerted_at=?,
+        incident_acknowledged_at=NULL,
+        incident_acknowledged_by=NULL
     WHERE company_id=?
     """, (
         incident_type,
@@ -9973,6 +10104,14 @@ def open_calendar_scheduler_incident(
         now_value,
         company_id,
     ))
+    log_calendar_scheduler_incident_event(
+        c,
+        company_id,
+        incident_type,
+        "opened",
+        message,
+        created_at=now_value,
+    )
     conn.commit()
     conn.close()
 
@@ -9992,17 +10131,29 @@ def open_calendar_scheduler_incident(
     return len(recipients)
 
 
-def close_calendar_scheduler_incident(company_id):
+def close_calendar_scheduler_incident(
+    company_id,
+    allowed_types=None,
+):
     now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
     conn = connect()
     c = conn.cursor()
     status_row = c.execute("""
-    SELECT active_incident, incident_started_at
+    SELECT
+        active_incident,
+        incident_started_at,
+        incident_acknowledged_by
     FROM calendar_plan_scheduler_status
     WHERE company_id=?
     """, (company_id,)).fetchone()
 
     if not status_row or not str(status_row["active_incident"] or ""):
+        conn.close()
+        return 0
+
+    incident_type = str(status_row["active_incident"] or "")
+
+    if allowed_types and incident_type not in set(allowed_types):
         conn.close()
         return 0
 
@@ -10043,12 +10194,22 @@ def close_calendar_scheduler_incident(company_id):
     SET active_incident='',
         incident_started_at=NULL,
         incident_message=NULL,
-        last_recovered_at=?
+        last_recovered_at=?,
+        incident_acknowledged_at=NULL,
+        incident_acknowledged_by=NULL
     WHERE company_id=?
     """, (
         now_value,
         company_id,
     ))
+    log_calendar_scheduler_incident_event(
+        c,
+        company_id,
+        incident_type,
+        "recovered",
+        message,
+        created_at=now_value,
+    )
     conn.commit()
     conn.close()
 
@@ -10172,6 +10333,14 @@ async def run_calendar_plan_scheduler(
         started_at,
     )
     result["scheduler_run_id"] = scheduler_run_id
+
+    if source == "scheduler":
+        result["recovery_alerts_sent"] += (
+            close_calendar_scheduler_incident(
+                company_id,
+                allowed_types={"stale"},
+            )
+        )
 
     if (
         source == "scheduler"
@@ -10405,8 +10574,8 @@ async def run_calendar_plan_scheduler(
                 ),
             )
         )
-    elif not result["error"]:
-        result["recovery_alerts_sent"] = (
+    elif not result["error"] and source == "scheduler":
+        result["recovery_alerts_sent"] += (
             close_calendar_scheduler_incident(company_id)
         )
 
@@ -10442,6 +10611,105 @@ async def run_calendar_plan_scheduler(
     )
 
     return result
+
+
+def monitor_calendar_plan_schedulers(
+    now_dt=None,
+    stale_after_hours=6,
+    company_id=None,
+):
+    now_dt = now_dt or datetime.now()
+    stale_after_hours = max(1, int(stale_after_hours or 6))
+    cutoff = now_dt - timedelta(hours=stale_after_hours)
+    conn = connect()
+    c = conn.cursor()
+    companies = c.execute("""
+    SELECT
+        settings.company_id,
+        settings.updated_at,
+        MAX(runs.started_at) AS last_scheduler_run
+    FROM company_settings AS settings
+    LEFT JOIN calendar_plan_scheduler_runs AS runs
+      ON runs.company_id=settings.company_id
+     AND runs.source='scheduler'
+    WHERE (
+        COALESCE(settings.calendar_auto_publish, 0)=1
+        OR COALESCE(settings.calendar_auto_remind, 0)=1
+    )
+      AND (? IS NULL OR settings.company_id=?)
+    GROUP BY settings.company_id, settings.updated_at
+    ORDER BY settings.company_id
+    """, (
+        company_id,
+        company_id,
+    )).fetchall()
+    conn.close()
+    items = []
+    alerts_sent = 0
+
+    for company in companies:
+        baseline_value = str(
+            company["last_scheduler_run"]
+            or company["updated_at"]
+            or ""
+        )
+
+        try:
+            baseline_at = datetime.strptime(
+                baseline_value,
+                "%Y-%m-%d %H:%M",
+            )
+        except ValueError:
+            items.append({
+                "company_id": company["company_id"],
+                "status": "waiting",
+                "last_scheduler_run": baseline_value,
+                "alerted": 0,
+            })
+            continue
+
+        if baseline_at > cutoff:
+            items.append({
+                "company_id": company["company_id"],
+                "status": "healthy",
+                "last_scheduler_run": baseline_value,
+                "alerted": 0,
+            })
+            continue
+
+        message = (
+            "Запуск автоматизации календаря по расписанию "
+            f"не фиксировался более {stale_after_hours} ч. "
+            f"Последняя активность: {baseline_value}."
+        )
+        alerted = open_calendar_scheduler_incident(
+            company["company_id"],
+            "stale",
+            message,
+        )
+        alerts_sent += alerted
+        items.append({
+            "company_id": company["company_id"],
+            "status": "stale",
+            "last_scheduler_run": baseline_value,
+            "alerted": alerted,
+        })
+
+    return {
+        "companies": len(items),
+        "healthy": sum(
+            1 for item in items if item["status"] == "healthy"
+        ),
+        "waiting": sum(
+            1 for item in items if item["status"] == "waiting"
+        ),
+        "stale": sum(
+            1 for item in items if item["status"] == "stale"
+        ),
+        "alerts_sent": alerts_sent,
+        "stale_after_hours": stale_after_hours,
+        "items": items,
+    }
 
 
 @app.post("/api/calendar/dispatch/automation-run")
@@ -10528,6 +10796,119 @@ async def api_calendar_dispatch_automation_run(request: Request):
     }
 
 
+@app.post("/api/calendar/dispatch/incident/acknowledge")
+async def api_calendar_dispatch_incident_acknowledge(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "message": "Требуется авторизация.",
+            },
+            status_code=401,
+        )
+
+    if get_role(username) != "boss":
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Подтвердить инцидент может владелец.",
+            },
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "feature_disabled",
+                "message": "Модуль календаря отключён.",
+            },
+            status_code=403,
+        )
+
+    now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    incident = c.execute("""
+    SELECT
+        active_incident,
+        incident_message,
+        incident_acknowledged_at
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+
+    if not incident or not str(incident["active_incident"] or ""):
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "incident_not_found",
+                "message": "Активный инцидент не найден.",
+            },
+            status_code=409,
+        )
+
+    if incident["incident_acknowledged_at"]:
+        conn.close()
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "already_acknowledged",
+                "message": "Инцидент уже принят в работу.",
+            },
+            status_code=409,
+        )
+
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET incident_acknowledged_at=?,
+        incident_acknowledged_by=?
+    WHERE company_id=?
+      AND active_incident!=''
+      AND incident_acknowledged_at IS NULL
+    """, (
+        now_value,
+        username,
+        company_id,
+    ))
+    log_calendar_scheduler_incident_event(
+        c,
+        company_id,
+        incident["active_incident"],
+        "acknowledged",
+        incident["incident_message"],
+        actor_username=username,
+        created_at=now_value,
+    )
+    c.execute("""
+    UPDATE notifications
+    SET is_read=1
+    WHERE company_id=?
+      AND username=?
+      AND link='/calendar/dispatch'
+      AND is_read=0
+    """, (
+        company_id,
+        username,
+    ))
+    conn.commit()
+    conn.close()
+
+    return {
+        "ok": True,
+        "message": "Инцидент принят в работу.",
+        "acknowledged_at": now_value,
+        "acknowledged_by": username,
+    }
+
+
 async def run_calendar_plan_scheduler_for_all_companies(now_dt=None):
     conn = connect()
     c = conn.cursor()
@@ -10590,6 +10971,37 @@ async def run_calendar_plan_scheduler_cron(request: Request):
     return {
         "ok": True,
         "summary": await run_calendar_plan_scheduler_for_all_companies(),
+    }
+
+
+@app.post("/automation/cron/calendar-plans/watchdog")
+async def run_calendar_plan_scheduler_watchdog(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "AUTOMATION_CRON_SECRET is not configured",
+            },
+            status_code=503,
+        )
+
+    token = (
+        request.headers.get("x-automation-secret")
+        or request.query_params.get("token")
+        or ""
+    ).strip()
+
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    return {
+        "ok": True,
+        "summary": monitor_calendar_plan_schedulers(),
     }
 
 

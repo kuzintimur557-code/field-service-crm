@@ -5213,6 +5213,10 @@ async def assert_dispatch_board():
     DELETE FROM calendar_plan_scheduler_runs
     WHERE company_id=2
     """)
+    c.execute("""
+    DELETE FROM calendar_scheduler_incident_events
+    WHERE company_id=2
+    """)
     conn.commit()
     conn.close()
     publication_tasks = []
@@ -5448,6 +5452,10 @@ async def assert_dispatch_board():
     assert page.context["calendar_scheduler_run_summary"][
         "total_runs"
     ] == 0
+    assert page.context["calendar_scheduler_incident"][
+        "active"
+    ] is False
+    assert page.context["calendar_scheduler_incident_events"] == []
     assert "Автоматизация выключена" in page_html
     backlog_column = page.context["board_columns"][0]
     assert backlog_column["is_backlog"] is True
@@ -5566,6 +5574,26 @@ async def assert_dispatch_board():
         )
     )
     assert manager_automation_run.status_code == 403
+    anonymous_incident_ack = (
+        await crm.api_calendar_dispatch_incident_acknowledge(
+            make_json_request(
+                None,
+                "/api/calendar/dispatch/incident/acknowledge",
+                {},
+            )
+        )
+    )
+    assert anonymous_incident_ack.status_code == 401
+    manager_incident_ack = (
+        await crm.api_calendar_dispatch_incident_acknowledge(
+            make_json_request(
+                "manager1",
+                "/api/calendar/dispatch/incident/acknowledge",
+                {},
+            )
+        )
+    )
+    assert manager_incident_ack.status_code == 403
     disabled_automation_run = (
         await crm.api_calendar_dispatch_automation_run(
             make_json_request(
@@ -6059,6 +6087,91 @@ async def assert_dispatch_board():
     )
     assert final_scheduler["error"] == ""
     assert final_scheduler["skipped"] is False
+    stale_run_at = (
+        datetime.now() - timedelta(hours=7)
+    ).strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE calendar_plan_scheduler_runs
+    SET started_at=?,
+        completed_at=?
+    WHERE company_id=2
+      AND source='scheduler'
+    """, (
+        stale_run_at,
+        stale_run_at,
+    ))
+    conn.commit()
+    conn.close()
+    stale_watchdog = crm.monitor_calendar_plan_schedulers(
+        now_dt=datetime.now(),
+        company_id=2,
+    )
+    company_watchdog = next(
+        item
+        for item in stale_watchdog["items"]
+        if item["company_id"] == 2
+    )
+    assert company_watchdog["status"] == "stale"
+    assert company_watchdog["alerted"] == 1
+    repeated_watchdog = crm.monitor_calendar_plan_schedulers(
+        now_dt=datetime.now(),
+        company_id=2,
+    )
+    repeated_company_watchdog = next(
+        item
+        for item in repeated_watchdog["items"]
+        if item["company_id"] == 2
+    )
+    assert repeated_company_watchdog["status"] == "stale"
+    assert repeated_company_watchdog["alerted"] == 0
+    stale_page = await crm.calendar_dispatch_page(
+        make_asgi_request("owner2", "/calendar/dispatch"),
+        week_start=original_date,
+    )
+    stale_page_html = stale_page.body.decode("utf-8")
+    assert stale_page.context["calendar_scheduler_incident"][
+        "type"
+    ] == "stale"
+    assert 'id="acknowledge-calendar-incident"' in stale_page_html
+    assert "Cron не запускался" in stale_page_html
+    acknowledged_incident = (
+        await crm.api_calendar_dispatch_incident_acknowledge(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/incident/acknowledge",
+                {},
+            )
+        )
+    )
+    assert acknowledged_incident["ok"] is True
+    repeated_acknowledgement = (
+        await crm.api_calendar_dispatch_incident_acknowledge(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/incident/acknowledge",
+                {},
+            )
+        )
+    )
+    assert repeated_acknowledgement.status_code == 409
+    assert json.loads(repeated_acknowledgement.body)[
+        "error"
+    ] == "already_acknowledged"
+    acknowledged_page = await crm.calendar_dispatch_page(
+        make_asgi_request("owner2", "/calendar/dispatch"),
+        week_start=original_date,
+    )
+    assert "Принят в работу" in (
+        acknowledged_page.body.decode("utf-8")
+    )
+    stale_recovery = await crm.run_calendar_plan_scheduler(
+        2,
+        now_dt=scheduler_now,
+    )
+    assert stale_recovery["error"] == ""
+    assert stale_recovery["recovery_alerts_sent"] == 1
 
     original_week_plan_api = crm.api_calendar_dispatch_week_plans
 
@@ -6106,8 +6219,22 @@ async def assert_dispatch_board():
     original_scheduler_for_all = (
         crm.run_calendar_plan_scheduler_for_all_companies
     )
+    original_calendar_watchdog = (
+        crm.monitor_calendar_plan_schedulers
+    )
     crm.run_calendar_plan_scheduler_for_all_companies = (
         fake_calendar_scheduler_for_all_companies
+    )
+    crm.monitor_calendar_plan_schedulers = (
+        lambda: {
+            "companies": 1,
+            "healthy": 1,
+            "waiting": 0,
+            "stale": 0,
+            "alerts_sent": 0,
+            "stale_after_hours": 6,
+            "items": [],
+        }
     )
 
     try:
@@ -6130,9 +6257,33 @@ async def assert_dispatch_board():
                 ],
             )
         )
+        forbidden_calendar_watchdog = (
+            await crm.run_calendar_plan_scheduler_watchdog(
+                make_public_asgi_request(
+                    "/automation/cron/calendar-plans/watchdog"
+                )
+            )
+        )
+        assert forbidden_calendar_watchdog.status_code == 403
+        calendar_watchdog = (
+            await crm.run_calendar_plan_scheduler_watchdog(
+                make_public_asgi_request(
+                    "/automation/cron/calendar-plans/watchdog",
+                    headers=[
+                        (
+                            b"x-automation-secret",
+                            b"calendar-cron-secret",
+                        ),
+                    ],
+                )
+            )
+        )
     finally:
         crm.run_calendar_plan_scheduler_for_all_companies = (
             original_scheduler_for_all
+        )
+        crm.monitor_calendar_plan_schedulers = (
+            original_calendar_watchdog
         )
         if old_cron_secret is None:
             os.environ.pop("AUTOMATION_CRON_SECRET", None)
@@ -6141,6 +6292,8 @@ async def assert_dispatch_board():
 
     assert calendar_cron["ok"] is True
     assert calendar_cron["summary"]["companies"] >= 1
+    assert calendar_watchdog["ok"] is True
+    assert calendar_watchdog["summary"]["healthy"] == 1
     conn = connect()
     c = conn.cursor()
     operation_runs = c.execute("""
@@ -6169,9 +6322,16 @@ async def assert_dispatch_board():
       AND link='/calendar/dispatch'
       AND title IN (
           'Планировщик календаря не отвечает',
+          'Планировщик календаря давно не запускался',
           'Ошибка автоматизации календаря',
           'Автоматизация календаря восстановлена'
       )
+    ORDER BY id
+    """).fetchall()
+    incident_events = c.execute("""
+    SELECT incident_type, event_type, actor_username
+    FROM calendar_scheduler_incident_events
+    WHERE company_id=2
     ORDER BY id
     """).fetchall()
     conn.close()
@@ -6193,10 +6353,10 @@ async def assert_dispatch_board():
     assert scheduler_status["active_incident"] == ""
     assert scheduler_status["last_alerted_at"]
     assert scheduler_status["last_recovered_at"]
-    assert len(scheduler_runs) == 10
+    assert len(scheduler_runs) == 11
     assert sum(
         1 for row in scheduler_runs if row["status"] == "done"
-    ) == 6
+    ) == 7
     assert sum(
         1 for row in scheduler_runs if row["status"] == "error"
     ) == 2
@@ -6219,9 +6379,24 @@ async def assert_dispatch_board():
     ] == [
         "Планировщик календаря не отвечает",
         "Автоматизация календаря восстановлена",
+        "Планировщик календаря давно не запускался",
+        "Автоматизация календаря восстановлена",
         "Ошибка автоматизации календаря",
         "Автоматизация календаря восстановлена",
     ]
+    assert [
+        (row["incident_type"], row["event_type"])
+        for row in incident_events
+    ] == [
+        ("stuck", "opened"),
+        ("stuck", "recovered"),
+        ("stale", "opened"),
+        ("stale", "acknowledged"),
+        ("stale", "recovered"),
+        ("error", "opened"),
+        ("error", "recovered"),
+    ]
+    assert incident_events[3]["actor_username"] == "owner2"
 
     conn = connect()
     c = conn.cursor()
@@ -6462,6 +6637,7 @@ async def assert_dispatch_board():
               link='/calendar/dispatch'
               AND title IN (
                   'Планировщик календаря не отвечает',
+                  'Планировщик календаря давно не запускался',
                   'Ошибка автоматизации календаря',
                   'Автоматизация календаря восстановлена'
               )
@@ -6483,6 +6659,10 @@ async def assert_dispatch_board():
     DELETE FROM calendar_plan_scheduler_runs
     WHERE company_id=2
     """)
+    c.execute("""
+    DELETE FROM calendar_scheduler_incident_events
+    WHERE company_id=2
+    """)
     if original_scheduler_status:
         c.execute("""
         INSERT INTO calendar_plan_scheduler_status (
@@ -6492,9 +6672,14 @@ async def assert_dispatch_board():
             last_triggered_by, last_result_json,
             active_incident, incident_started_at,
             incident_message, last_alerted_at,
-            last_recovered_at
+            last_recovered_at,
+            incident_acknowledged_at,
+            incident_acknowledged_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?
+        )
         """, (
             original_scheduler_status["company_id"],
             original_scheduler_status["last_started_at"],
@@ -6511,6 +6696,8 @@ async def assert_dispatch_board():
             original_scheduler_status["incident_message"],
             original_scheduler_status["last_alerted_at"],
             original_scheduler_status["last_recovered_at"],
+            original_scheduler_status["incident_acknowledged_at"],
+            original_scheduler_status["incident_acknowledged_by"],
         ))
     c.execute("""
     UPDATE company_settings

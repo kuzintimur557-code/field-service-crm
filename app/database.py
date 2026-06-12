@@ -307,7 +307,9 @@ def init_db():
         incident_started_at TEXT,
         incident_message TEXT,
         last_alerted_at TEXT,
-        last_recovered_at TEXT
+        last_recovered_at TEXT,
+        incident_acknowledged_at TEXT,
+        incident_acknowledged_by TEXT
     )
     """)
 
@@ -326,6 +328,18 @@ def init_db():
         started_at TEXT NOT NULL,
         completed_at TEXT,
         result_json TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS calendar_scheduler_incident_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        incident_type TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        actor_username TEXT,
+        message TEXT,
+        created_at TEXT NOT NULL
     )
     """)
 
@@ -686,6 +700,8 @@ def init_db():
     add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_message", "TEXT")
     add_column_if_missing(c, "calendar_plan_scheduler_status", "last_alerted_at", "TEXT")
     add_column_if_missing(c, "calendar_plan_scheduler_status", "last_recovered_at", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_acknowledged_at", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_acknowledged_by", "TEXT")
 
     add_column_if_missing(c, "company_features", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_features", "feature_key", "TEXT")
@@ -941,6 +957,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_calendar_scheduler_runs_company_started
     ON calendar_plan_scheduler_runs(company_id, started_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_calendar_incidents_company_created
+    ON calendar_scheduler_incident_events(company_id, created_at, id)
     """)
 
     if os.getenv("ENV") != "production":
