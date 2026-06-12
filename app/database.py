@@ -67,6 +67,8 @@ def init_db():
         one_c_enabled INTEGER DEFAULT 0,
         calls_enabled INTEGER DEFAULT 0,
         ai_calls_enabled INTEGER DEFAULT 0,
+        calendar_auto_publish INTEGER DEFAULT 0,
+        calendar_auto_remind INTEGER DEFAULT 0,
         updated_at TEXT
     )
     """)
@@ -265,6 +267,23 @@ def init_db():
         username TEXT NOT NULL,
         reminded_by TEXT,
         reminded_at TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS calendar_plan_operation_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        week_start TEXT NOT NULL,
+        week_end TEXT NOT NULL,
+        action TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'manual',
+        actor_username TEXT,
+        changed_days INTEGER DEFAULT 0,
+        notifications_sent INTEGER DEFAULT 0,
+        skipped_days INTEGER DEFAULT 0,
+        result_json TEXT,
+        created_at TEXT NOT NULL
     )
     """)
 
@@ -612,6 +631,8 @@ def init_db():
     add_column_if_missing(c, "company_settings", "one_c_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calls_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "ai_calls_enabled", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "company_settings", "calendar_auto_publish", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "company_settings", "calendar_auto_remind", "INTEGER DEFAULT 0")
 
     add_column_if_missing(c, "company_features", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_features", "feature_key", "TEXT")
@@ -845,6 +866,11 @@ def init_db():
     ON calendar_day_ack_reminders(
         company_id, plan_date, revision, username, reminded_at
     )
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_calendar_plan_runs_company_week
+    ON calendar_plan_operation_runs(company_id, week_start, created_at)
     """)
 
     if os.getenv("ENV") != "production":

@@ -5176,6 +5176,13 @@ async def assert_dispatch_board():
         board_start + timedelta(days=2)
     ).strftime("%Y-%m-%d")
     success_date = (board_start + timedelta(days=3)).strftime("%Y-%m-%d")
+    original_calendar_settings = crm.get_company_settings(2)
+    original_auto_publish = int(
+        original_calendar_settings["calendar_auto_publish"] or 0
+    )
+    original_auto_remind = int(
+        original_calendar_settings["calendar_auto_remind"] or 0
+    )
     publication_tasks = []
 
     for offset in range(4):
@@ -5392,6 +5399,10 @@ async def assert_dispatch_board():
     assert 'id="publish-week-plans"' in page_html
     assert 'id="remind-week-plans"' in page_html
     assert "/api/calendar/dispatch/week-plans" in page_html
+    assert "Автоматизация планов" in page_html
+    assert 'id="save-calendar-automation"' in page_html
+    assert page.context["calendar_auto_publish"] is False
+    assert page.context["calendar_auto_remind"] is False
     backlog_column = page.context["board_columns"][0]
     assert backlog_column["is_backlog"] is True
     assert any(
@@ -5463,6 +5474,50 @@ async def assert_dispatch_board():
         )
     )
     assert invalid_week_date.status_code == 400
+    anonymous_automation_settings = (
+        await crm.api_calendar_dispatch_automation_settings(
+            make_json_request(
+                None,
+                "/api/calendar/dispatch/automation-settings",
+                {
+                    "auto_publish": True,
+                    "auto_remind": True,
+                },
+            )
+        )
+    )
+    assert anonymous_automation_settings.status_code == 401
+    manager_automation_settings = (
+        await crm.api_calendar_dispatch_automation_settings(
+            make_json_request(
+                "manager1",
+                "/api/calendar/dispatch/automation-settings",
+                {
+                    "auto_publish": True,
+                    "auto_remind": True,
+                },
+            )
+        )
+    )
+    assert manager_automation_settings.status_code == 403
+    saved_automation_settings = (
+        await crm.api_calendar_dispatch_automation_settings(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/automation-settings",
+                {
+                    "auto_publish": True,
+                    "auto_remind": True,
+                },
+            )
+        )
+    )
+    assert saved_automation_settings == {
+        "ok": True,
+        "auto_publish": True,
+        "auto_remind": True,
+        "message": "Настройки автоматизации сохранены.",
+    }
     outsider_week_action = (
         await crm.api_calendar_dispatch_week_plans(
             make_json_request(
@@ -5556,6 +5611,80 @@ async def assert_dispatch_board():
     assert published_week_summary["published_days"] == 2
     assert published_week_summary["pending_acknowledgements"] == 1
     assert published_week_summary["remindable_workers"] == 0
+    assert len(published_week_page.context["week_plan_runs"]) == 3
+    assert all(
+        item["source"] == "manual"
+        for item in published_week_page.context["week_plan_runs"]
+    )
+    published_week_html = published_week_page.body.decode("utf-8")
+    assert "История операций недели" in published_week_html
+    assert "Публикация готовых планов" in published_week_html
+    assert "/api/calendar/dispatch/automation-settings" in (
+        published_week_html
+    )
+    scheduler_now = datetime(
+        board_start.year,
+        board_start.month,
+        board_start.day,
+        12,
+        0,
+    )
+    scheduler_result = await crm.run_calendar_plan_scheduler(
+        2,
+        now_dt=scheduler_now,
+    )
+    assert scheduler_result["enabled"] is True
+    assert scheduler_result["publish"]["source"] == "scheduler"
+    assert scheduler_result["remind"]["source"] == "scheduler"
+    assert scheduler_result["changed_days"] == 0
+    assert scheduler_result["notifications_sent"] == 0
+    old_cron_secret = os.environ.get("AUTOMATION_CRON_SECRET")
+    os.environ["AUTOMATION_CRON_SECRET"] = "calendar-cron-secret"
+
+    try:
+        forbidden_calendar_cron = (
+            await crm.run_calendar_plan_scheduler_cron(
+                make_public_asgi_request(
+                    "/automation/cron/calendar-plans"
+                )
+            )
+        )
+        assert forbidden_calendar_cron.status_code == 403
+        calendar_cron = await crm.run_calendar_plan_scheduler_cron(
+            make_public_asgi_request(
+                "/automation/cron/calendar-plans",
+                headers=[
+                    (
+                        b"x-automation-secret",
+                        b"calendar-cron-secret",
+                    ),
+                ],
+            )
+        )
+    finally:
+        if old_cron_secret is None:
+            os.environ.pop("AUTOMATION_CRON_SECRET", None)
+        else:
+            os.environ["AUTOMATION_CRON_SECRET"] = old_cron_secret
+
+    assert calendar_cron["ok"] is True
+    assert calendar_cron["summary"]["companies"] >= 1
+    conn = connect()
+    c = conn.cursor()
+    operation_runs = c.execute("""
+    SELECT source, action
+    FROM calendar_plan_operation_runs
+    WHERE company_id=2
+      AND week_start=?
+    ORDER BY id
+    """, (original_date,)).fetchall()
+    conn.close()
+    assert sum(
+        1 for row in operation_runs if row["source"] == "manual"
+    ) == 3
+    assert sum(
+        1 for row in operation_runs if row["source"] == "scheduler"
+    ) == 2
 
     anonymous = await crm.api_calendar_dispatch_move(
         make_json_request(
@@ -5757,6 +5886,19 @@ async def assert_dispatch_board():
     """, (
         f"/calendar/day?date={original_date}",
         f"/calendar/day?date={capacity_date}",
+    ))
+    c.execute("""
+    DELETE FROM calendar_plan_operation_runs
+    WHERE company_id IN (1, 2)
+    """)
+    c.execute("""
+    UPDATE company_settings
+    SET calendar_auto_publish=?,
+        calendar_auto_remind=?
+    WHERE company_id=2
+    """, (
+        original_auto_publish,
+        original_auto_remind,
     ))
     c.execute(
         "DELETE FROM worker_unavailability WHERE id=?",

@@ -52,6 +52,20 @@ h1{margin:0;font-size:32px}
 .week-plan-day.changed .week-plan-status{background:#fee2e2;color:#991b1b}
 .week-plan-meta{display:grid;gap:3px;margin-top:9px;color:#4b5563;font-size:11px;font-weight:800}
 .week-plan-action{margin-top:auto;padding-top:10px;color:#1d4ed8;font-size:11px;font-weight:900}
+.week-automation{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid #d1d5db}
+.week-automation-title{font-size:13px;font-weight:900}
+.week-automation-status{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800}
+.week-automation-controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.week-toggle{display:inline-flex;gap:7px;align-items:center;padding:8px 9px;border:1px solid #d1d5db;border-radius:7px;background:white;color:#374151;font-size:11px;font-weight:900}
+.week-toggle input{width:17px;height:17px;accent-color:#2563eb}
+.week-settings-save{padding:9px 11px;border:0;border-radius:7px;background:#111827;color:white;font-size:11px;font-weight:900;cursor:pointer}
+.week-settings-save:disabled{cursor:wait;opacity:.6}
+.week-history{margin-top:10px}
+.week-history summary{cursor:pointer;color:#374151;font-size:12px;font-weight:900}
+.week-history-list{display:grid;gap:6px;margin-top:8px}
+.week-history-row{display:grid;grid-template-columns:145px minmax(170px,1fr) 100px repeat(3,90px);gap:9px;align-items:center;padding:8px 9px;border:1px solid #e5e7eb;border-radius:7px;background:white;font-size:10px;font-weight:800}
+.week-history-row strong{font-size:11px}
+.week-history-muted{color:#6b7280}
 .toolbar{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
 .filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
 .filters label{display:block;margin-bottom:5px;color:#6b7280;font-size:12px;font-weight:900}
@@ -134,6 +148,10 @@ h1{margin:0;font-size:32px}
     .week-plans-actions,.week-plan-button{width:100%}
     .week-plans-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(220px,72vw);overflow-x:auto;padding-bottom:5px;scroll-snap-type:x proximity}
     .week-plan-day{scroll-snap-align:start}
+    .week-automation{align-items:stretch;flex-direction:column}
+    .week-automation-controls,.week-toggle,.week-settings-save{width:100%}
+    .week-history-row{grid-template-columns:1fr 1fr}
+    .week-history-row strong{grid-column:1/-1}
     .header-actions,.header-actions .button,.toolbar,.filters,.filters>div,.filters select,.filters button,.filters a,.week-nav,.week-nav a,.week-jump,.week-jump input,.week-jump button{width:100%}
     .board-scroll{overflow:visible}
     .board{grid-template-columns:1fr;min-width:0}
@@ -255,6 +273,47 @@ h1{margin:0;font-size:32px}
             </a>
             {% endfor %}
         </div>
+        <div class="week-automation">
+            <div>
+                <div class="week-automation-title">Автоматизация планов</div>
+                <div class="week-automation-status">
+                    Автопубликация: {% if calendar_auto_publish %}включена{% else %}выключена{% endif %}
+                    · автонапоминания: {% if calendar_auto_remind %}включены{% else %}выключены{% endif %}
+                </div>
+            </div>
+            {% if role == "boss" %}
+            <div class="week-automation-controls">
+                <label class="week-toggle">
+                    <input id="calendar-auto-publish" type="checkbox" {% if calendar_auto_publish %}checked{% endif %}>
+                    Автопубликация
+                </label>
+                <label class="week-toggle">
+                    <input id="calendar-auto-remind" type="checkbox" {% if calendar_auto_remind %}checked{% endif %}>
+                    Автонапоминания
+                </label>
+                <button class="week-settings-save" id="save-calendar-automation" type="button">
+                    Сохранить
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        {% if week_plan_runs %}
+        <details class="week-history">
+            <summary>История операций недели · {{ week_plan_runs|length }}</summary>
+            <div class="week-history-list">
+                {% for run in week_plan_runs %}
+                <div class="week-history-row">
+                    <strong>{{ run["action_label"] }}</strong>
+                    <span>{{ run["source_label"] }} · {{ run["actor_username"] or "система" }}</span>
+                    <span class="week-history-muted">{{ run["created_at"] }}</span>
+                    <span>Дней: {{ run["changed_days"] }}</span>
+                    <span>Уведомлений: {{ run["notifications_sent"] }}</span>
+                    <span>Пропущено: {{ run["skipped_days"] }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
     </section>
 
     <section class="toolbar">
@@ -438,6 +497,9 @@ h1{margin:0;font-size:32px}
     const plannerSelected = document.getElementById("planner-selected");
     const publishWeekPlans = document.getElementById("publish-week-plans");
     const remindWeekPlans = document.getElementById("remind-week-plans");
+    const saveCalendarAutomation = document.getElementById(
+        "save-calendar-automation"
+    );
     let plannerItems = [];
     let draggedCard = null;
 
@@ -523,6 +585,45 @@ h1{margin:0;font-size:32px}
                 {{ 0 if week_publication["summary"]["remindable_workers"] else 1 }}
                 === 1
             );
+        }
+    }
+
+    async function saveCalendarAutomationSettings() {
+        saveCalendarAutomation.disabled = true;
+
+        try {
+            const response = await fetch(
+                "/api/calendar/dispatch/automation-settings",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        auto_publish: document.getElementById(
+                            "calendar-auto-publish"
+                        ).checked,
+                        auto_remind: document.getElementById(
+                            "calendar-auto-remind"
+                        ).checked
+                    })
+                }
+            );
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                throw new Error(
+                    data.message || "Не удалось сохранить настройки."
+                );
+            }
+
+            showToast(data.message);
+            window.setTimeout(() => window.location.reload(), 700);
+        } catch (error) {
+            showToast(
+                error.message || "Не удалось сохранить настройки.",
+                true
+            );
+            saveCalendarAutomation.disabled = false;
         }
     }
 
@@ -773,6 +874,10 @@ h1{margin:0;font-size:32px}
     remindWeekPlans.addEventListener("click", () => {
         runWeekPlanAction("remind_pending");
     });
+    saveCalendarAutomation?.addEventListener(
+        "click",
+        saveCalendarAutomationSettings
+    );
 })();
 </script>
 </body>

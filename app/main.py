@@ -8373,6 +8373,7 @@ async def calendar_dispatch_page(
     if disabled_response:
         return disabled_response
 
+    calendar_settings = get_company_settings(company_id)
     try:
         week_anchor = datetime.strptime(
             str(week_start or datetime.now().strftime("%Y-%m-%d")),
@@ -8560,7 +8561,33 @@ async def calendar_dispatch_page(
         selected_week_start,
         selected_week_end,
     )).fetchall()
+    week_plan_run_rows = c.execute("""
+    SELECT *
+    FROM calendar_plan_operation_runs
+    WHERE company_id=?
+      AND week_start=?
+    ORDER BY id DESC
+    LIMIT 8
+    """, (
+        company_id,
+        selected_week_start,
+    )).fetchall()
     conn.close()
+    week_plan_runs = []
+
+    for row in week_plan_run_rows:
+        item = dict(row)
+        item["action_label"] = (
+            "Публикация готовых планов"
+            if item["action"] == "publish_ready"
+            else "Напоминания команде"
+        )
+        item["source_label"] = (
+            "Автоматически"
+            if item["source"] == "scheduler"
+            else "Вручную"
+        )
+        week_plan_runs.append(item)
     week_publication = build_week_publication_summary(
         week_start=board_week_start,
         tasks=week_publication_tasks,
@@ -8674,6 +8701,13 @@ async def calendar_dispatch_page(
             "selected_week_end": selected_week_end,
             "planning_queue_count": planning_queue_count,
             "week_publication": week_publication,
+            "week_plan_runs": week_plan_runs,
+            "calendar_auto_publish": bool(
+                calendar_settings["calendar_auto_publish"]
+            ),
+            "calendar_auto_remind": bool(
+                calendar_settings["calendar_auto_remind"]
+            ),
             "previous_week_url": dispatch_week_url(
                 board_week_start - timedelta(days=7)
             ),
@@ -9200,6 +9234,51 @@ async def api_calendar_dispatch_week_plans(request: Request):
             f"Дней затронуто: {affected_days}."
         )
 
+    source = str(
+        request.scope.get("state", {}).get(
+            "calendar_plan_source",
+            "manual",
+        )
+    )
+    source = "scheduler" if source == "scheduler" else "manual"
+    changed_days = (
+        summary["published_days"] + summary["updated_days"]
+        if action == "publish_ready"
+        else summary["affected_days"]
+    )
+    notifications_sent = (
+        summary["notified_workers"]
+        if action == "publish_ready"
+        else summary["sent_reminders"]
+    )
+    c.execute("""
+    INSERT INTO calendar_plan_operation_runs (
+        company_id, week_start, week_end, action, source,
+        actor_username, changed_days, notifications_sent,
+        skipped_days, result_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        week_start_value,
+        week_end_value,
+        action,
+        source,
+        username,
+        changed_days,
+        notifications_sent,
+        summary["skipped_days"],
+        json.dumps(
+            {
+                "summary": summary,
+                "items": items,
+                "message": message,
+            },
+            ensure_ascii=False,
+        ),
+        now_value,
+    ))
+    operation_run_id = c.lastrowid
     conn.commit()
     conn.close()
 
@@ -9217,6 +9296,270 @@ async def api_calendar_dispatch_week_plans(request: Request):
         "summary": summary,
         "items": items,
         "message": message,
+        "source": source,
+        "operation_run_id": operation_run_id,
+    }
+
+
+@app.post("/api/calendar/dispatch/automation-settings")
+async def api_calendar_dispatch_automation_settings(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "message": "Требуется авторизация.",
+            },
+            status_code=401,
+        )
+
+    if get_role(username) != "boss":
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Настройки автоматизации доступны владельцу.",
+            },
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "feature_disabled",
+                "message": "Модуль календаря отключён.",
+            },
+            status_code=403,
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_json",
+                "message": "Не удалось прочитать запрос.",
+            },
+            status_code=400,
+        )
+
+    auto_publish = 1 if payload.get("auto_publish") else 0
+    auto_remind = 1 if payload.get("auto_remind") else 0
+    get_company_settings(company_id)
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_settings
+    SET calendar_auto_publish=?,
+        calendar_auto_remind=?,
+        updated_at=?
+    WHERE company_id=?
+    """, (
+        auto_publish,
+        auto_remind,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        company_id,
+    ))
+    conn.commit()
+    conn.close()
+
+    return {
+        "ok": True,
+        "auto_publish": bool(auto_publish),
+        "auto_remind": bool(auto_remind),
+        "message": "Настройки автоматизации сохранены.",
+    }
+
+
+def make_internal_calendar_plan_request(username, payload):
+    body = json.dumps(payload).encode("utf-8")
+    cookie = (
+        f"{SESSION_COOKIE_NAME}={sign_session_value(username)}"
+    )
+
+    async def receive():
+        return {
+            "type": "http.request",
+            "body": body,
+            "more_body": False,
+        }
+
+    return Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/api/calendar/dispatch/week-plans",
+        "headers": [
+            (b"cookie", cookie.encode("utf-8")),
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(body)).encode("utf-8")),
+        ],
+        "query_string": b"",
+        "scheme": "http",
+        "client": ("127.0.0.1", 0),
+        "server": ("internal", 80),
+        "state": {"calendar_plan_source": "scheduler"},
+    }, receive)
+
+
+async def run_calendar_plan_scheduler(company_id, now_dt=None):
+    result = {
+        "company_id": company_id,
+        "enabled": False,
+        "publish": None,
+        "remind": None,
+        "changed_days": 0,
+        "notifications_sent": 0,
+        "error": "",
+    }
+
+    if not has_feature(company_id, "calendar"):
+        result["error"] = "calendar_disabled"
+        return result
+
+    settings = get_company_settings(company_id)
+    auto_publish = bool(settings["calendar_auto_publish"])
+    auto_remind = bool(settings["calendar_auto_remind"])
+
+    if not auto_publish and not auto_remind:
+        result["error"] = "automation_disabled"
+        return result
+
+    conn = connect()
+    c = conn.cursor()
+    actor = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=?
+      AND role IN ('boss', 'manager')
+      AND COALESCE(is_active, 1)=1
+    ORDER BY CASE role WHEN 'boss' THEN 0 ELSE 1 END, id
+    LIMIT 1
+    """, (company_id,)).fetchone()
+    conn.close()
+
+    if not actor:
+        result["error"] = "actor_not_found"
+        return result
+
+    now_dt = now_dt or datetime.now()
+    week_start = (
+        now_dt.date() - timedelta(days=now_dt.date().weekday())
+    ).strftime("%Y-%m-%d")
+    result["enabled"] = True
+
+    for action, result_key, enabled in (
+        ("publish_ready", "publish", auto_publish),
+        ("remind_pending", "remind", auto_remind),
+    ):
+        if not enabled:
+            continue
+
+        response = await api_calendar_dispatch_week_plans(
+            make_internal_calendar_plan_request(
+                actor["username"],
+                {
+                    "action": action,
+                    "week_start": week_start,
+                },
+            )
+        )
+
+        if isinstance(response, JSONResponse):
+            response_data = json.loads(response.body.decode("utf-8"))
+        else:
+            response_data = response
+
+        result[result_key] = response_data
+
+        if not response_data.get("ok"):
+            result["error"] = response_data.get(
+                "error",
+                "operation_failed",
+            )
+            continue
+
+        action_summary = response_data["summary"]
+        result["changed_days"] += (
+            action_summary.get("published_days", 0)
+            + action_summary.get("updated_days", 0)
+            + action_summary.get("affected_days", 0)
+        )
+        result["notifications_sent"] += (
+            action_summary.get("notified_workers", 0)
+            + action_summary.get("sent_reminders", 0)
+        )
+
+    return result
+
+
+async def run_calendar_plan_scheduler_for_all_companies(now_dt=None):
+    conn = connect()
+    c = conn.cursor()
+    companies = c.execute("""
+    SELECT DISTINCT company_settings.company_id
+    FROM company_settings
+    WHERE COALESCE(company_settings.calendar_auto_publish, 0)=1
+       OR COALESCE(company_settings.calendar_auto_remind, 0)=1
+    ORDER BY company_settings.company_id
+    """).fetchall()
+    conn.close()
+    results = []
+
+    for company in companies:
+        results.append(
+            await run_calendar_plan_scheduler(
+                company["company_id"],
+                now_dt=now_dt,
+            )
+        )
+
+    return {
+        "companies": len(results),
+        "changed_days": sum(
+            item["changed_days"] for item in results
+        ),
+        "notifications_sent": sum(
+            item["notifications_sent"] for item in results
+        ),
+        "errors": sum(1 for item in results if item["error"]),
+        "results": results,
+    }
+
+
+@app.post("/automation/cron/calendar-plans")
+async def run_calendar_plan_scheduler_cron(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "AUTOMATION_CRON_SECRET is not configured",
+            },
+            status_code=503,
+        )
+
+    token = (
+        request.headers.get("x-automation-secret")
+        or request.query_params.get("token")
+        or ""
+    ).strip()
+
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    return {
+        "ok": True,
+        "summary": await run_calendar_plan_scheduler_for_all_companies(),
     }
 
 
