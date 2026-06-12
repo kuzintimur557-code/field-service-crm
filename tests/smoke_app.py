@@ -7219,6 +7219,70 @@ async def assert_platform_calendar_health():
     conn.close()
 
     try:
+        sample_sessions = crm.build_calendar_incident_sessions(
+            [
+                {
+                    "id": 1,
+                    "company_id": 77,
+                    "company_name": "Тестовая компания",
+                    "incident_type": "error",
+                    "event_type": "opened",
+                    "actor_username": "",
+                    "message": "Ошибка",
+                    "created_at": "2026-06-10 10:00",
+                },
+                {
+                    "id": 2,
+                    "company_id": 77,
+                    "company_name": "Тестовая компания",
+                    "incident_type": "error",
+                    "event_type": "acknowledged",
+                    "actor_username": "super",
+                    "message": "Ошибка",
+                    "created_at": "2026-06-10 10:20",
+                },
+                {
+                    "id": 3,
+                    "company_id": 77,
+                    "company_name": "Тестовая компания",
+                    "incident_type": "error",
+                    "event_type": "recovery_started",
+                    "actor_username": "super",
+                    "message": "Проверка",
+                    "created_at": "2026-06-10 10:25",
+                },
+                {
+                    "id": 4,
+                    "company_id": 77,
+                    "company_name": "Тестовая компания",
+                    "incident_type": "error",
+                    "event_type": "recovered",
+                    "actor_username": "super",
+                    "message": "Готово",
+                    "created_at": "2026-06-10 11:00",
+                },
+                {
+                    "id": 5,
+                    "company_id": 77,
+                    "company_name": "Тестовая компания",
+                    "incident_type": "stale",
+                    "event_type": "opened",
+                    "actor_username": "",
+                    "message": "Нет запуска",
+                    "created_at": "2026-06-10 12:00",
+                },
+            ],
+            now_dt=datetime(2026, 6, 10, 13, 0),
+        )
+        assert len(sample_sessions) == 2
+        assert sample_sessions[0]["response_minutes"] == 20
+        assert sample_sessions[0]["recovery_minutes"] == 60
+        assert sample_sessions[0]["response_sla_met"] is True
+        assert sample_sessions[0]["recovery_attempts"] == 1
+        assert sample_sessions[0]["status_label"] == "Восстановлен"
+        assert sample_sessions[1]["is_active"] is True
+        assert sample_sessions[1]["age_minutes"] == 60
+        assert sample_sessions[1]["status_label"] == "Ожидает реакции"
         assert crm.format_calendar_incident_age(None) == "неизвестно"
         assert crm.format_calendar_incident_age(29) == "29 мин"
         assert crm.format_calendar_incident_age(90) == "1 ч 30 мин"
@@ -7336,6 +7400,7 @@ async def assert_platform_calendar_health():
         assert "Критический" in html
         assert "Реакция просрочена" in html
         assert "Возраст: 2 ч" in html
+        assert "/platform/calendar-health/analytics" in html
         assert company_name in html
         assert "Планировщик не запускался более шести часов." in html
         assert f"/platform/calendar-health/{company_id}" in html
@@ -7696,6 +7761,77 @@ async def assert_platform_calendar_health():
             "Восстановление завершилось с ошибкой."
             in failed_page.body.decode("utf-8")
         )
+        analytics = crm.get_platform_calendar_incident_analytics(
+            days=30,
+        )
+        analytics_company = next(
+            item
+            for item in analytics["companies"]
+            if item["company_id"] == company_id
+        )
+        assert analytics["days"] == 30
+        assert analytics["summary"]["incidents"] >= 2
+        assert analytics["summary"]["recovered"] >= 1
+        assert analytics["summary"]["active"] >= 1
+        assert analytics["summary"]["recovery_attempts"] >= 2
+        assert analytics["summary"]["recovery_failures"] >= 1
+        assert analytics_company["incidents"] == 2
+        assert analytics_company["recovered"] == 1
+        assert analytics_company["active"] == 1
+        assert analytics_company["detail_url"] == (
+            f"/platform/calendar-health/{company_id}"
+        )
+        assert any(
+            item["type"] == "error"
+            for item in analytics["types"]
+        )
+        assert analytics["daily"]
+        assert analytics["recent_sessions"][0][
+            "status_label"
+        ] == "Ожидает реакции"
+        normalized_analytics = (
+            crm.get_platform_calendar_incident_analytics(
+                days=11,
+            )
+        )
+        assert normalized_analytics["days"] == 30
+        anonymous_analytics = (
+            await crm.platform_calendar_incident_analytics_page(
+                make_public_asgi_request(
+                    "/platform/calendar-health/analytics"
+                ),
+            )
+        )
+        assert anonymous_analytics.status_code == 302
+        assert anonymous_analytics.headers["location"] == "/login"
+        boss_analytics = (
+            await crm.platform_calendar_incident_analytics_page(
+                make_asgi_request(
+                    "owner2",
+                    "/platform/calendar-health/analytics",
+                ),
+            )
+        )
+        assert boss_analytics.status_code == 302
+        assert boss_analytics.headers["location"] == "/"
+        analytics_page = (
+            await crm.platform_calendar_incident_analytics_page(
+                make_asgi_request(
+                    "super",
+                    "/platform/calendar-health/analytics",
+                ),
+                days=30,
+            )
+        )
+        assert analytics_page.status_code == 200
+        assert analytics_page.context["selected_days"] == 30
+        analytics_html = analytics_page.body.decode("utf-8")
+        assert "Аналитика календарных инцидентов" in analytics_html
+        assert "Реакция до 30 минут" in analytics_html
+        assert "Среднее восстановление" in analytics_html
+        assert "Последние инциденты" in analytics_html
+        assert "Динамика" in analytics_html
+        assert company_name in analytics_html
         missing_detail = (
             await crm.platform_calendar_company_health_page(
                 make_asgi_request(

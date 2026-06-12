@@ -3814,6 +3814,429 @@ def get_calendar_incident_priority(
     }
 
 
+def parse_calendar_incident_datetime(value):
+    try:
+        return datetime.strptime(
+            str(value or ""),
+            "%Y-%m-%d %H:%M",
+        )
+    except ValueError:
+        return None
+
+
+def build_calendar_incident_sessions(events, now_dt=None):
+    now_dt = now_dt or datetime.now()
+    sessions = []
+    active_by_company = {}
+
+    for raw_event in sorted(
+        (dict(event) for event in events),
+        key=lambda event: (
+            str(event.get("created_at") or ""),
+            int(event.get("id") or 0),
+        ),
+    ):
+        company_id = int(raw_event.get("company_id") or 0)
+        event_type = str(raw_event.get("event_type") or "")
+        event_at = parse_calendar_incident_datetime(
+            raw_event.get("created_at"),
+        )
+
+        if event_type == "opened":
+            session = {
+                "company_id": company_id,
+                "company_name": str(
+                    raw_event.get("company_name")
+                    or f"Компания #{company_id}"
+                ),
+                "incident_type": str(
+                    raw_event.get("incident_type") or "error"
+                ),
+                "message": str(raw_event.get("message") or ""),
+                "opened_at": event_at,
+                "opened_at_value": str(
+                    raw_event.get("created_at") or ""
+                ),
+                "acknowledged_at": None,
+                "acknowledged_at_value": "",
+                "acknowledged_by": "",
+                "recovered_at": None,
+                "recovered_at_value": "",
+                "recovered_by": "",
+                "recovery_attempts": 0,
+                "recovery_failures": 0,
+            }
+            sessions.append(session)
+            active_by_company[company_id] = session
+            continue
+
+        session = active_by_company.get(company_id)
+
+        if not session:
+            continue
+
+        if (
+            event_type == "acknowledged"
+            and not session["acknowledged_at"]
+        ):
+            session["acknowledged_at"] = event_at
+            session["acknowledged_at_value"] = str(
+                raw_event.get("created_at") or ""
+            )
+            session["acknowledged_by"] = str(
+                raw_event.get("actor_username") or ""
+            )
+        elif event_type == "recovery_started":
+            session["recovery_attempts"] += 1
+        elif event_type == "recovery_failed":
+            session["recovery_failures"] += 1
+        elif event_type == "recovered":
+            session["recovered_at"] = event_at
+            session["recovered_at_value"] = str(
+                raw_event.get("created_at") or ""
+            )
+            session["recovered_by"] = str(
+                raw_event.get("actor_username") or ""
+            )
+            active_by_company.pop(company_id, None)
+
+    incident_type_labels = {
+        "error": "Ошибка запуска",
+        "stuck": "Зависший запуск",
+        "stale": "Планировщик не запускался",
+    }
+
+    for session in sessions:
+        opened_at = session["opened_at"]
+        acknowledged_at = session["acknowledged_at"]
+        recovered_at = session["recovered_at"]
+        response_minutes = None
+        recovery_minutes = None
+
+        if opened_at and acknowledged_at:
+            response_minutes = max(
+                0,
+                int(
+                    (acknowledged_at - opened_at).total_seconds()
+                    // 60
+                ),
+            )
+
+        if opened_at and recovered_at:
+            recovery_minutes = max(
+                0,
+                int(
+                    (recovered_at - opened_at).total_seconds()
+                    // 60
+                ),
+            )
+
+        session["response_minutes"] = response_minutes
+        session["response_label"] = (
+            format_calendar_incident_age(response_minutes)
+            if response_minutes is not None
+            else "Не принят"
+        )
+        session["recovery_minutes"] = recovery_minutes
+        session["recovery_label"] = (
+            format_calendar_incident_age(recovery_minutes)
+            if recovery_minutes is not None
+            else "Не восстановлен"
+        )
+        session["age_minutes"] = (
+            max(
+                0,
+                int((now_dt - opened_at).total_seconds() // 60),
+            )
+            if opened_at
+            else None
+        )
+        session["age_label"] = format_calendar_incident_age(
+            session["age_minutes"],
+        )
+        session["is_recovered"] = bool(recovered_at)
+        session["is_active"] = not session["is_recovered"]
+        session["response_sla_met"] = bool(
+            response_minutes is not None and response_minutes <= 30
+        )
+        session["incident_type_label"] = (
+            incident_type_labels.get(
+                session["incident_type"],
+                "Инцидент",
+            )
+        )
+        session["status_label"] = (
+            "Восстановлен"
+            if session["is_recovered"]
+            else (
+                "Принят в работу"
+                if acknowledged_at
+                else "Ожидает реакции"
+            )
+        )
+        session["status_tone"] = (
+            "healthy"
+            if session["is_recovered"]
+            else ("waiting" if acknowledged_at else "error")
+        )
+
+    return sessions
+
+
+def get_platform_calendar_incident_analytics(
+    days=30,
+    now_dt=None,
+):
+    now_dt = now_dt or datetime.now()
+    selected_days = days if days in {7, 30, 90} else 30
+    date_from = (
+        now_dt.date() - timedelta(days=selected_days - 1)
+    ).strftime("%Y-%m-%d")
+    conn = connect()
+    c = conn.cursor()
+    event_rows = c.execute("""
+    SELECT
+        events.*,
+        COALESCE(
+            companies.name,
+            settings.company_name,
+            'Компания #' || events.company_id
+        ) AS company_name
+    FROM calendar_scheduler_incident_events AS events
+    LEFT JOIN companies
+      ON companies.id=events.company_id
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=events.company_id
+    WHERE events.created_at>=?
+    ORDER BY events.created_at, events.id
+    """, (f"{date_from} 00:00",)).fetchall()
+    conn.close()
+    sessions = build_calendar_incident_sessions(
+        event_rows,
+        now_dt=now_dt,
+    )
+    recovered = [
+        item for item in sessions if item["is_recovered"]
+    ]
+    active = [
+        item for item in sessions if item["is_active"]
+    ]
+    responded = [
+        item
+        for item in sessions
+        if item["response_minutes"] is not None
+    ]
+    response_eligible = [
+        item
+        for item in sessions
+        if (
+            item["response_minutes"] is not None
+            or item["is_recovered"]
+            or int(item["age_minutes"] or 0) >= 30
+        )
+    ]
+    response_sla_met = sum(
+        1 for item in response_eligible if item["response_sla_met"]
+    )
+    response_sla_percent = round(
+        response_sla_met * 100 / len(response_eligible),
+    ) if response_eligible else 100
+    recovery_rate = round(
+        len(recovered) * 100 / len(sessions),
+    ) if sessions else 100
+    average_response_minutes = round(
+        sum(item["response_minutes"] for item in responded)
+        / len(responded),
+    ) if responded else 0
+    average_recovery_minutes = round(
+        sum(item["recovery_minutes"] for item in recovered)
+        / len(recovered),
+    ) if recovered else 0
+    company_map = {}
+    type_map = {
+        incident_type: {
+            "type": incident_type,
+            "label": label,
+            "incidents": 0,
+            "recovered": 0,
+            "active": 0,
+        }
+        for incident_type, label in (
+            ("error", "Ошибки запуска"),
+            ("stuck", "Зависшие запуски"),
+            ("stale", "Пропуски расписания"),
+        )
+    }
+    daily_map = {}
+
+    for session in sessions:
+        company = company_map.setdefault(
+            session["company_id"],
+            {
+                "company_id": session["company_id"],
+                "company_name": session["company_name"],
+                "incidents": 0,
+                "recovered": 0,
+                "active": 0,
+                "response_minutes": [],
+                "recovery_minutes": [],
+            },
+        )
+        company["incidents"] += 1
+        company["recovered"] += int(session["is_recovered"])
+        company["active"] += int(session["is_active"])
+
+        if session["response_minutes"] is not None:
+            company["response_minutes"].append(
+                session["response_minutes"],
+            )
+
+        if session["recovery_minutes"] is not None:
+            company["recovery_minutes"].append(
+                session["recovery_minutes"],
+            )
+
+        incident_type = type_map.setdefault(
+            session["incident_type"],
+            {
+                "type": session["incident_type"],
+                "label": session["incident_type_label"],
+                "incidents": 0,
+                "recovered": 0,
+                "active": 0,
+            },
+        )
+        incident_type["incidents"] += 1
+        incident_type["recovered"] += int(session["is_recovered"])
+        incident_type["active"] += int(session["is_active"])
+        opened_date = (
+            session["opened_at"].strftime("%Y-%m-%d")
+            if session["opened_at"]
+            else ""
+        )
+
+        if opened_date:
+            day = daily_map.setdefault(
+                opened_date,
+                {
+                    "date": opened_date,
+                    "incidents": 0,
+                    "recovered": 0,
+                    "active": 0,
+                },
+            )
+            day["incidents"] += 1
+            day["recovered"] += int(session["is_recovered"])
+            day["active"] += int(session["is_active"])
+
+    companies = []
+
+    for company in company_map.values():
+        response_values = company.pop("response_minutes")
+        recovery_values = company.pop("recovery_minutes")
+        company["average_response_minutes"] = (
+            round(sum(response_values) / len(response_values))
+            if response_values
+            else 0
+        )
+        company["average_response_label"] = (
+            format_calendar_incident_age(
+                company["average_response_minutes"],
+            )
+            if response_values
+            else "Нет данных"
+        )
+        company["average_recovery_minutes"] = (
+            round(sum(recovery_values) / len(recovery_values))
+            if recovery_values
+            else 0
+        )
+        company["average_recovery_label"] = (
+            format_calendar_incident_age(
+                company["average_recovery_minutes"],
+            )
+            if recovery_values
+            else "Нет данных"
+        )
+        company["detail_url"] = (
+            f"/platform/calendar-health/{company['company_id']}"
+        )
+        companies.append(company)
+
+    companies.sort(
+        key=lambda item: (
+            -item["active"],
+            -item["incidents"],
+            item["company_name"].lower(),
+        )
+    )
+    type_rows = [
+        item
+        for item in type_map.values()
+        if item["incidents"]
+    ]
+    type_rows.sort(
+        key=lambda item: (-item["incidents"], item["label"])
+    )
+    daily = sorted(
+        daily_map.values(),
+        key=lambda item: item["date"],
+        reverse=True,
+    )
+    max_daily_incidents = max(
+        (item["incidents"] for item in daily),
+        default=1,
+    )
+
+    for day in daily:
+        day["bar_percent"] = max(
+            8,
+            round(day["incidents"] * 100 / max_daily_incidents),
+        )
+
+    sessions.sort(
+        key=lambda item: item["opened_at_value"],
+        reverse=True,
+    )
+    summary = {
+        "incidents": len(sessions),
+        "recovered": len(recovered),
+        "active": len(active),
+        "recovery_rate": recovery_rate,
+        "response_sla_percent": response_sla_percent,
+        "average_response_minutes": average_response_minutes,
+        "average_response_label": (
+            format_calendar_incident_age(average_response_minutes)
+            if responded
+            else "Нет данных"
+        ),
+        "average_recovery_minutes": average_recovery_minutes,
+        "average_recovery_label": (
+            format_calendar_incident_age(average_recovery_minutes)
+            if recovered
+            else "Нет данных"
+        ),
+        "recovery_attempts": sum(
+            item["recovery_attempts"] for item in sessions
+        ),
+        "recovery_failures": sum(
+            item["recovery_failures"] for item in sessions
+        ),
+    }
+
+    return {
+        "days": selected_days,
+        "date_from": date_from,
+        "date_to": now_dt.strftime("%Y-%m-%d"),
+        "generated_at": now_dt.strftime("%Y-%m-%d %H:%M"),
+        "summary": summary,
+        "companies": companies,
+        "types": type_rows,
+        "daily": daily,
+        "recent_sessions": sessions[:20],
+    }
+
+
 def get_platform_calendar_health(
     now_dt=None,
     status_filter="all",
@@ -4481,6 +4904,44 @@ async def platform_calendar_health_page(
             "summary": health["summary"],
             "companies": health["items"],
             "selected_status": health["status_filter"],
+        },
+    )
+
+
+@app.get(
+    "/platform/calendar-health/analytics",
+    response_class=HTMLResponse,
+)
+async def platform_calendar_incident_analytics_page(
+    request: Request,
+    days: int = 30,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    analytics = get_platform_calendar_incident_analytics(
+        days=days,
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_calendar_incident_analytics.html",
+        {
+            "request": request,
+            "username": username,
+            "role": "superadmin",
+            "analytics": analytics,
+            "summary": analytics["summary"],
+            "companies": analytics["companies"],
+            "types": analytics["types"],
+            "daily": analytics["daily"],
+            "recent_sessions": analytics["recent_sessions"],
+            "selected_days": analytics["days"],
         },
     )
 

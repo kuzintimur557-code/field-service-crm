@@ -964,6 +964,11 @@ def init_db():
     ON calendar_scheduler_incident_events(company_id, created_at, id)
     """)
 
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_calendar_incidents_created
+    ON calendar_scheduler_incident_events(created_at, id)
+    """)
+
     if os.getenv("ENV") != "production":
         c.execute("""
         INSERT OR IGNORE INTO users (username, password, role, last_seen)

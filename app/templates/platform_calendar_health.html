@@ -13,7 +13,9 @@ body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
 .header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
 .header h1{margin:0;font-size:30px}
 .subtitle{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}
 .back{display:inline-flex;padding:10px 12px;border-radius:7px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
+.back.secondary{border:1px solid #d1d5db;background:white;color:#374151}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;margin-bottom:14px}
 .stat{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
 .stat-label{color:#6b7280;font-size:11px;font-weight:900}
@@ -50,7 +52,7 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
     .container{padding:16px}
     .header{flex-direction:column}
     .header h1{font-size:25px}
-    .back{width:100%;justify-content:center}
+    .header-actions,.back{width:100%;justify-content:center}
     .stats{grid-template-columns:1fr 1fr}
     .table-wrap{overflow:visible;border:0;background:transparent}
     table,tbody{display:block;min-width:0}
@@ -72,7 +74,12 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                 Просрочка: {{ health["stale_after_hours"] }} ч.
             </div>
         </div>
-        <a class="back" href="/platform">Панель платформы</a>
+        <div class="header-actions">
+            <a class="back secondary" href="/platform/calendar-health/analytics">
+                Аналитика инцидентов
+            </a>
+            <a class="back" href="/platform">Панель платформы</a>
+        </div>
     </header>
 
     <section class="stats">

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Аналитика календарных инцидентов</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
+.container{max-width:1400px;margin:auto;padding:24px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+h1{margin:0;font-size:30px}
+.subtitle{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.button{display:inline-flex;align-items:center;justify-content:center;padding:10px 12px;border:1px solid #d1d5db;border-radius:7px;background:white;color:#374151;text-decoration:none;font-size:12px;font-weight:900}
+.button.primary{border-color:#111827;background:#111827;color:white}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.filter{padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;background:white;color:#374151;text-decoration:none;font-size:11px;font-weight:900}
+.filter.active{border-color:#2563eb;background:#2563eb;color:white}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px}
+.metric{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.metric-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.metric-value{margin-top:5px;font-size:24px;font-weight:900}
+.metric-meta{margin-top:4px;color:#6b7280;font-size:10px;font-weight:800}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:14px;margin-top:16px}
+.section{min-width:0}
+.section-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:8px}
+.section h2{margin:0;font-size:17px}
+.note{color:#6b7280;font-size:10px;font-weight:900}
+.panel{border:1px solid #e5e7eb;border-radius:8px;background:white}
+.table-wrap{overflow-x:auto}
+table{width:100%;min-width:760px;border-collapse:collapse}
+th,td{padding:10px 11px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}
+th{background:#f9fafb;color:#6b7280;font-size:9px;font-weight:900;text-transform:uppercase}
+td{font-size:10px;font-weight:800}
+tr:last-child td{border-bottom:0}
+.company-link{color:#111827;font-weight:900;text-decoration:none}
+.pill{display:inline-flex;padding:4px 6px;border-radius:6px;background:#e5e7eb;color:#374151;font-size:9px;font-weight:900}
+.pill.healthy{background:#d1fae5;color:#065f46}
+.pill.waiting{background:#fef3c7;color:#92400e}
+.pill.error{background:#fee2e2;color:#991b1b}
+.type-list{display:grid;gap:8px;padding:12px}
+.type-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px;border:1px solid #e5e7eb;border-radius:7px}
+.type-title{font-size:11px;font-weight:900}
+.type-meta{margin-top:4px;color:#6b7280;font-size:10px;font-weight:800}
+.type-value{font-size:19px;font-weight:900}
+.trend-list{display:grid;gap:9px;padding:12px}
+.trend-row{display:grid;grid-template-columns:82px minmax(0,1fr) 32px;gap:9px;align-items:center;font-size:10px;font-weight:900}
+.trend-track{height:8px;border-radius:4px;background:#e5e7eb;overflow:hidden}
+.trend-bar{height:100%;border-radius:4px;background:#2563eb}
+.empty{padding:25px;color:#6b7280;text-align:center;font-size:11px;font-weight:900}
+@media(max-width:900px){
+    .container{padding:16px}
+    .header{flex-direction:column}
+    h1{font-size:25px}
+    .actions,.button{width:100%}
+    .metrics{grid-template-columns:1fr 1fr}
+    .grid{grid-template-columns:1fr}
+    .table-wrap{overflow:visible}
+    table,tbody{display:block;min-width:0}
+    thead{display:none}
+    tr{display:grid;gap:7px;margin:0 0 9px;padding:11px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+    td{display:block;padding:0;border:0}
+    td::before{display:block;margin-bottom:3px;color:#6b7280;font-size:9px;font-weight:900;content:attr(data-label);text-transform:uppercase}
+    .panel.table-panel{border:0;background:transparent}
+}
+</style>
+</head>
+<body>
+<main class="container">
+    <header class="header">
+        <div>
+            <h1>Аналитика календарных инцидентов</h1>
+            <div class="subtitle">
+                Период {{ analytics["date_from"] }} – {{ analytics["date_to"] }}
+                · обновлено {{ analytics["generated_at"] }}
+            </div>
+        </div>
+        <div class="actions">
+            <a class="button" href="/platform/calendar-health">Рабочая очередь</a>
+            <a class="button primary" href="/platform">Панель платформы</a>
+        </div>
+    </header>
+
+    <nav class="filters" aria-label="Период аналитики">
+        {% for days in (7, 30, 90) %}
+        <a
+            class="filter {% if selected_days == days %}active{% endif %}"
+            href="/platform/calendar-health/analytics?days={{ days }}"
+        >
+            {{ days }} дней
+        </a>
+        {% endfor %}
+    </nav>
+
+    <section class="metrics">
+        <div class="metric">
+            <div class="metric-label">Инцидентов</div>
+            <div class="metric-value">{{ summary["incidents"] }}</div>
+            <div class="metric-meta">Активных: {{ summary["active"] }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Закрыто</div>
+            <div class="metric-value">{{ summary["recovery_rate"] }}%</div>
+            <div class="metric-meta">{{ summary["recovered"] }} восстановлено</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Реакция до 30 минут</div>
+            <div class="metric-value">{{ summary["response_sla_percent"] }}%</div>
+            <div class="metric-meta">Среднее: {{ summary["average_response_label"] }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Среднее восстановление</div>
+            <div class="metric-value">{{ summary["average_recovery_label"] }}</div>
+            <div class="metric-meta">
+                Попыток: {{ summary["recovery_attempts"] }}
+                · ошибок: {{ summary["recovery_failures"] }}
+            </div>
+        </div>
+    </section>
+
+    <div class="grid">
+        <section class="section">
+            <div class="section-head">
+                <h2>Компании</h2>
+                <div class="note">Сначала компании с активными проблемами</div>
+            </div>
+            {% if companies %}
+            <div class="panel table-panel table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Компания</th>
+                            <th>Инциденты</th>
+                            <th>Активные</th>
+                            <th>Средняя реакция</th>
+                            <th>Среднее восстановление</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for company in companies %}
+                        <tr>
+                            <td data-label="Компания">
+                                <a class="company-link" href="{{ company['detail_url'] }}">
+                                    {{ company["company_name"] }}
+                                </a>
+                            </td>
+                            <td data-label="Инциденты">{{ company["incidents"] }}</td>
+                            <td data-label="Активные">{{ company["active"] }}</td>
+                            <td data-label="Средняя реакция">{{ company["average_response_label"] }}</td>
+                            <td data-label="Среднее восстановление">{{ company["average_recovery_label"] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="panel empty">За период инцидентов не было.</div>
+            {% endif %}
+        </section>
+
+        <section class="section">
+            <div class="section-head">
+                <h2>Причины</h2>
+                <div class="note">Распределение по типам</div>
+            </div>
+            <div class="panel type-list">
+                {% for type in types %}
+                <div class="type-row">
+                    <div>
+                        <div class="type-title">{{ type["label"] }}</div>
+                        <div class="type-meta">
+                            Закрыто: {{ type["recovered"] }}
+                            · активно: {{ type["active"] }}
+                        </div>
+                    </div>
+                    <div class="type-value">{{ type["incidents"] }}</div>
+                </div>
+                {% else %}
+                <div class="empty">Нет данных.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+
+    <div class="grid">
+        <section class="section">
+            <div class="section-head">
+                <h2>Последние инциденты</h2>
+                <div class="note">До 20 циклов</div>
+            </div>
+            {% if recent_sessions %}
+            <div class="panel table-panel table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Компания</th>
+                            <th>Тип</th>
+                            <th>Открыт</th>
+                            <th>Реакция</th>
+                            <th>Восстановление</th>
+                            <th>Состояние</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for incident in recent_sessions %}
+                        <tr>
+                            <td data-label="Компания">{{ incident["company_name"] }}</td>
+                            <td data-label="Тип">{{ incident["incident_type_label"] }}</td>
+                            <td data-label="Открыт">{{ incident["opened_at_value"] }}</td>
+                            <td data-label="Реакция">{{ incident["response_label"] }}</td>
+                            <td data-label="Восстановление">{{ incident["recovery_label"] }}</td>
+                            <td data-label="Состояние">
+                                <span class="pill {{ incident['status_tone'] }}">
+                                    {{ incident["status_label"] }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="panel empty">История пока пуста.</div>
+            {% endif %}
+        </section>
+
+        <section class="section">
+            <div class="section-head">
+                <h2>Динамика</h2>
+                <div class="note">Инциденты по дням</div>
+            </div>
+            <div class="panel trend-list">
+                {% for day in daily %}
+                <div class="trend-row">
+                    <span>{{ day["date"] }}</span>
+                    <div class="trend-track">
+                        <div class="trend-bar" style="width:{{ day['bar_percent'] }}%"></div>
+                    </div>
+                    <strong>{{ day["incidents"] }}</strong>
+                </div>
+                {% else %}
+                <div class="empty">Нет данных.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</main>
+</body>
+</html>
