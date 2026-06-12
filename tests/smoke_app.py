@@ -6001,6 +6001,8 @@ async def assert_dispatch_board():
     assert recovered_scheduler["error"] == ""
     assert recovered_scheduler["changed_days"] == 0
     assert recovered_scheduler["notifications_sent"] == 0
+    assert recovered_scheduler["incident_alerts_sent"] == 1
+    assert recovered_scheduler["recovery_alerts_sent"] == 1
     conn = connect()
     c = conn.cursor()
     c.execute("""
@@ -6057,6 +6059,38 @@ async def assert_dispatch_board():
     )
     assert final_scheduler["error"] == ""
     assert final_scheduler["skipped"] is False
+
+    original_week_plan_api = crm.api_calendar_dispatch_week_plans
+
+    async def failing_week_plan_api(request):
+        raise RuntimeError("calendar smoke failure")
+
+    crm.api_calendar_dispatch_week_plans = failing_week_plan_api
+
+    try:
+        failed_scheduler = await crm.run_calendar_plan_scheduler(
+            2,
+            now_dt=scheduler_now,
+        )
+        repeated_failed_scheduler = (
+            await crm.run_calendar_plan_scheduler(
+                2,
+                now_dt=scheduler_now,
+            )
+        )
+    finally:
+        crm.api_calendar_dispatch_week_plans = original_week_plan_api
+
+    assert failed_scheduler["error"] == "calendar smoke failure"
+    assert failed_scheduler["incident_alerts_sent"] == 1
+    assert repeated_failed_scheduler["error"] == "calendar smoke failure"
+    assert repeated_failed_scheduler["incident_alerts_sent"] == 0
+    scheduler_recovery = await crm.run_calendar_plan_scheduler(
+        2,
+        now_dt=scheduler_now,
+    )
+    assert scheduler_recovery["error"] == ""
+    assert scheduler_recovery["recovery_alerts_sent"] == 1
     old_cron_secret = os.environ.get("AUTOMATION_CRON_SECRET")
     os.environ["AUTOMATION_CRON_SECRET"] = "calendar-cron-secret"
 
@@ -6127,6 +6161,19 @@ async def assert_dispatch_board():
     WHERE company_id=2
     ORDER BY id
     """).fetchall()
+    scheduler_alerts = c.execute("""
+    SELECT title
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND link='/calendar/dispatch'
+      AND title IN (
+          'Планировщик календаря не отвечает',
+          'Ошибка автоматизации календаря',
+          'Автоматизация календаря восстановлена'
+      )
+    ORDER BY id
+    """).fetchall()
     conn.close()
     assert sum(
         1 for row in operation_runs if row["source"] == "manual"
@@ -6143,10 +6190,16 @@ async def assert_dispatch_board():
     assert scheduler_status["last_notifications_sent"] == 0
     assert scheduler_status["last_source"] == "scheduler"
     assert scheduler_status["last_triggered_by"] == "owner2"
-    assert len(scheduler_runs) == 7
+    assert scheduler_status["active_incident"] == ""
+    assert scheduler_status["last_alerted_at"]
+    assert scheduler_status["last_recovered_at"]
+    assert len(scheduler_runs) == 10
     assert sum(
         1 for row in scheduler_runs if row["status"] == "done"
-    ) == 5
+    ) == 6
+    assert sum(
+        1 for row in scheduler_runs if row["status"] == "error"
+    ) == 2
     assert sum(
         1 for row in scheduler_runs if row["status"] == "locked"
     ) == 1
@@ -6161,6 +6214,14 @@ async def assert_dispatch_board():
         row["reason"] == "Другой запуск уже выполняется"
         for row in scheduler_runs
     )
+    assert [
+        row["title"] for row in scheduler_alerts
+    ] == [
+        "Планировщик календаря не отвечает",
+        "Автоматизация календаря восстановлена",
+        "Ошибка автоматизации календаря",
+        "Автоматизация календаря восстановлена",
+    ]
 
     conn = connect()
     c = conn.cursor()
@@ -6388,11 +6449,23 @@ async def assert_dispatch_board():
     c.execute("""
     DELETE FROM notifications
     WHERE company_id=2
-      AND link IN (?, ?)
-      AND title IN (
-          'План дня опубликован',
-          'План дня обновлён',
-          'Подтвердите план дня'
+      AND (
+          (
+              link IN (?, ?)
+              AND title IN (
+                  'План дня опубликован',
+                  'План дня обновлён',
+                  'Подтвердите план дня'
+              )
+          )
+          OR (
+              link='/calendar/dispatch'
+              AND title IN (
+                  'Планировщик календаря не отвечает',
+                  'Ошибка автоматизации календаря',
+                  'Автоматизация календаря восстановлена'
+              )
+          )
       )
     """, (
         f"/calendar/day?date={original_date}",
@@ -6416,9 +6489,12 @@ async def assert_dispatch_board():
             company_id, last_started_at, last_completed_at,
             last_status, last_error, last_changed_days,
             last_notifications_sent, last_source,
-            last_triggered_by, last_result_json
+            last_triggered_by, last_result_json,
+            active_incident, incident_started_at,
+            incident_message, last_alerted_at,
+            last_recovered_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             original_scheduler_status["company_id"],
             original_scheduler_status["last_started_at"],
@@ -6430,6 +6506,11 @@ async def assert_dispatch_board():
             original_scheduler_status["last_source"],
             original_scheduler_status["last_triggered_by"],
             original_scheduler_status["last_result_json"],
+            original_scheduler_status["active_incident"],
+            original_scheduler_status["incident_started_at"],
+            original_scheduler_status["incident_message"],
+            original_scheduler_status["last_alerted_at"],
+            original_scheduler_status["last_recovered_at"],
         ))
     c.execute("""
     UPDATE company_settings

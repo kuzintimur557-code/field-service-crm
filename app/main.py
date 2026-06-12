@@ -9891,6 +9891,183 @@ def finish_calendar_scheduler_run(
     trim_calendar_scheduler_runs(company_id)
 
 
+def open_calendar_scheduler_incident(
+    company_id,
+    incident_type,
+    message,
+):
+    incident_type = (
+        incident_type if incident_type in {"error", "stuck"} else "error"
+    )
+    message = str(message or "")[:500]
+    now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+    title = (
+        "Планировщик календаря не отвечает"
+        if incident_type == "stuck"
+        else "Ошибка автоматизации календаря"
+    )
+    conn = connect()
+    c = conn.cursor()
+    status_row = c.execute("""
+    SELECT active_incident
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+
+    if not status_row:
+        conn.close()
+        return 0
+
+    active_incident = str(status_row["active_incident"] or "")
+
+    if active_incident:
+        c.execute("""
+        UPDATE calendar_plan_scheduler_status
+        SET active_incident=?,
+            incident_message=?
+        WHERE company_id=?
+        """, (
+            incident_type,
+            message,
+            company_id,
+        ))
+        conn.commit()
+        conn.close()
+        return 0
+
+    recipients = c.execute("""
+    SELECT username, telegram_chat_id
+    FROM users
+    WHERE company_id=?
+      AND role='boss'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY id
+    """, (company_id,)).fetchall()
+
+    for recipient in recipients:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message,
+            link, is_read, created_at
+        )
+        VALUES (?, ?, ?, ?, '/calendar/dispatch', 0, ?)
+        """, (
+            company_id,
+            recipient["username"],
+            title,
+            message,
+            now_value,
+        ))
+
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET active_incident=?,
+        incident_started_at=?,
+        incident_message=?,
+        last_alerted_at=?
+    WHERE company_id=?
+    """, (
+        incident_type,
+        now_value,
+        message,
+        now_value,
+        company_id,
+    ))
+    conn.commit()
+    conn.close()
+
+    telegram_text = f"{title}\n{message}"
+
+    for recipient in recipients:
+        chat_id = str(recipient["telegram_chat_id"] or "").strip()
+
+        if not chat_id:
+            continue
+
+        try:
+            send_message_to_chat(chat_id, telegram_text)
+        except Exception:
+            pass
+
+    return len(recipients)
+
+
+def close_calendar_scheduler_incident(company_id):
+    now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    status_row = c.execute("""
+    SELECT active_incident, incident_started_at
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+
+    if not status_row or not str(status_row["active_incident"] or ""):
+        conn.close()
+        return 0
+
+    incident_started_at = str(
+        status_row["incident_started_at"] or "неизвестно"
+    )
+    title = "Автоматизация календаря восстановлена"
+    message = (
+        "Планировщик снова работает штатно. "
+        f"Инцидент начался: {incident_started_at}."
+    )
+    recipients = c.execute("""
+    SELECT username, telegram_chat_id
+    FROM users
+    WHERE company_id=?
+      AND role='boss'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY id
+    """, (company_id,)).fetchall()
+
+    for recipient in recipients:
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message,
+            link, is_read, created_at
+        )
+        VALUES (?, ?, ?, ?, '/calendar/dispatch', 0, ?)
+        """, (
+            company_id,
+            recipient["username"],
+            title,
+            message,
+            now_value,
+        ))
+
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET active_incident='',
+        incident_started_at=NULL,
+        incident_message=NULL,
+        last_recovered_at=?
+    WHERE company_id=?
+    """, (
+        now_value,
+        company_id,
+    ))
+    conn.commit()
+    conn.close()
+
+    telegram_text = f"{title}\n{message}"
+
+    for recipient in recipients:
+        chat_id = str(recipient["telegram_chat_id"] or "").strip()
+
+        if not chat_id:
+            continue
+
+        try:
+            send_message_to_chat(chat_id, telegram_text)
+        except Exception:
+            pass
+
+    return len(recipients)
+
+
 async def run_calendar_plan_scheduler(
     company_id,
     now_dt=None,
@@ -9911,6 +10088,8 @@ async def run_calendar_plan_scheduler(
         "range_start": "",
         "range_end": "",
         "error": "",
+        "incident_alerts_sent": 0,
+        "recovery_alerts_sent": 0,
     }
 
     if not has_feature(company_id, "calendar"):
@@ -10060,6 +10239,16 @@ async def run_calendar_plan_scheduler(
 
     conn = connect()
     c = conn.cursor()
+    previous_status = c.execute("""
+    SELECT last_status, last_started_at
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+    stale_running = bool(
+        previous_status
+        and previous_status["last_status"] == "running"
+        and str(previous_status["last_started_at"] or "") <= stale_before
+    )
     c.execute("""
     INSERT INTO calendar_plan_scheduler_status (
         company_id, last_started_at, last_status,
@@ -10099,6 +10288,18 @@ async def run_calendar_plan_scheduler(
             result,
         )
         return result
+
+    if stale_running and source == "scheduler":
+        result["incident_alerts_sent"] = (
+            open_calendar_scheduler_incident(
+                company_id,
+                "stuck",
+                (
+                    "Предыдущий запуск не завершился за 30 минут. "
+                    "Система начала автоматическое восстановление."
+                ),
+            )
+        )
 
     try:
         for action, result_key, enabled in (
@@ -10192,6 +10393,22 @@ async def run_calendar_plan_scheduler(
             )
     except Exception as exc:
         result["error"] = str(exc)[:500]
+
+    if result["error"] and source == "scheduler":
+        result["incident_alerts_sent"] = (
+            open_calendar_scheduler_incident(
+                company_id,
+                "error",
+                (
+                    "Автоматический запуск завершился с ошибкой: "
+                    f"{result['error']}"
+                ),
+            )
+        )
+    elif not result["error"]:
+        result["recovery_alerts_sent"] = (
+            close_calendar_scheduler_incident(company_id)
+        )
 
     completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     conn = connect()

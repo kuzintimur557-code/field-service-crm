@@ -302,7 +302,12 @@ def init_db():
         last_notifications_sent INTEGER DEFAULT 0,
         last_source TEXT DEFAULT 'scheduler',
         last_triggered_by TEXT,
-        last_result_json TEXT
+        last_result_json TEXT,
+        active_incident TEXT DEFAULT '',
+        incident_started_at TEXT,
+        incident_message TEXT,
+        last_alerted_at TEXT,
+        last_recovered_at TEXT
     )
     """)
 
@@ -676,6 +681,11 @@ def init_db():
     add_column_if_missing(c, "calendar_day_ack_reminders", "source", "TEXT DEFAULT 'manual'")
     add_column_if_missing(c, "calendar_plan_scheduler_status", "last_source", "TEXT DEFAULT 'scheduler'")
     add_column_if_missing(c, "calendar_plan_scheduler_status", "last_triggered_by", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "active_incident", "TEXT DEFAULT ''")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_started_at", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_message", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "last_alerted_at", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "last_recovered_at", "TEXT")
 
     add_column_if_missing(c, "company_features", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_features", "feature_key", "TEXT")
