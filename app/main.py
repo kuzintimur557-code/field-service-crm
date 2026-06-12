@@ -8588,9 +8588,13 @@ async def calendar_dispatch_page(
             else "Напоминания команде"
         )
         item["source_label"] = (
-            "Автоматически"
+            "По расписанию"
             if item["source"] == "scheduler"
-            else "Вручную"
+            else (
+                "Запуск владельцем"
+                if item["source"] == "manual_run"
+                else "Вручную"
+            )
         )
         week_plan_runs.append(item)
 
@@ -8620,6 +8624,21 @@ async def calendar_dispatch_page(
         last_status = str(
             scheduler_status_row["last_status"] or "waiting"
         )
+        last_source = str(
+            scheduler_status_row["last_source"] or "scheduler"
+        )
+        source_label = (
+            "вручную"
+            if last_source == "manual_run"
+            else "по расписанию"
+        )
+        triggered_by = str(
+            scheduler_status_row["last_triggered_by"] or ""
+        )
+        trigger_details = source_label
+
+        if triggered_by:
+            trigger_details += f", {triggered_by}"
 
         if last_status == "error":
             calendar_scheduler_status = {
@@ -8659,7 +8678,10 @@ async def calendar_dispatch_page(
                     "Проверьте cron и журнал приложения: "
                     "последний запуск не завершился."
                     if is_stuck
-                    else f"Запуск начат: {last_started_at}."
+                    else (
+                        f"Запуск начат: {last_started_at} "
+                        f"({trigger_details})."
+                    )
                 ),
                 "last_completed_at": last_started_at,
             }
@@ -8692,7 +8714,8 @@ async def calendar_dispatch_page(
                         "Изменено дней: "
                         f"{scheduler_status_row['last_changed_days']}. "
                         "Уведомлений: "
-                        f"{scheduler_status_row['last_notifications_sent']}."
+                        f"{scheduler_status_row['last_notifications_sent']}. "
+                        f"Источник: {trigger_details}."
                     )
                 ),
                 "last_completed_at": last_completed_at,
@@ -8978,7 +9001,9 @@ async def api_calendar_dispatch_week_plans(request: Request):
             "manual",
         )
     )
-    source = "scheduler" if source == "scheduler" else "manual"
+    if source not in ("scheduler", "manual_run"):
+        source = "manual"
+    is_automatic_source = source in ("scheduler", "manual_run")
     telegram_messages = []
     items = []
 
@@ -9186,7 +9211,7 @@ async def api_calendar_dispatch_week_plans(request: Request):
             FROM calendar_day_ack_reminders
             WHERE company_id=?
               AND plan_date BETWEEN ? AND ?
-              AND source='scheduler'
+              AND source IN ('scheduler', 'manual_run')
             """, (
                 company_id,
                 week_start_value,
@@ -9276,7 +9301,7 @@ async def api_calendar_dispatch_week_plans(request: Request):
                 )
 
                 if (
-                    source == "scheduler"
+                    is_automatic_source
                     and reminder_key in scheduler_reminded_workers
                 ):
                     day_automatic_skips += 1
@@ -9318,7 +9343,7 @@ async def api_calendar_dispatch_week_plans(request: Request):
                     source,
                 ))
 
-                if source == "scheduler" and c.rowcount == 0:
+                if is_automatic_source and c.rowcount == 0:
                     day_automatic_skips += 1
                     continue
 
@@ -9532,7 +9557,11 @@ async def api_calendar_dispatch_automation_settings(request: Request):
     }
 
 
-def make_internal_calendar_plan_request(username, payload):
+def make_internal_calendar_plan_request(
+    username,
+    payload,
+    source="scheduler",
+):
     body = json.dumps(payload).encode("utf-8")
     cookie = (
         f"{SESSION_COOKIE_NAME}={sign_session_value(username)}"
@@ -9558,14 +9587,21 @@ def make_internal_calendar_plan_request(username, payload):
         "scheme": "http",
         "client": ("127.0.0.1", 0),
         "server": ("internal", 80),
-        "state": {"calendar_plan_source": "scheduler"},
+        "state": {"calendar_plan_source": source},
     }, receive)
 
 
-async def run_calendar_plan_scheduler(company_id, now_dt=None):
+async def run_calendar_plan_scheduler(
+    company_id,
+    now_dt=None,
+    actor_username="",
+    source="scheduler",
+):
+    source = "manual_run" if source == "manual_run" else "scheduler"
     result = {
         "company_id": company_id,
         "enabled": False,
+        "source": source,
         "publish": None,
         "remind": None,
         "changed_days": 0,
@@ -9587,15 +9623,28 @@ async def run_calendar_plan_scheduler(company_id, now_dt=None):
 
     conn = connect()
     c = conn.cursor()
-    actor = c.execute("""
-    SELECT username
-    FROM users
-    WHERE company_id=?
-      AND role IN ('boss', 'manager')
-      AND COALESCE(is_active, 1)=1
-    ORDER BY CASE role WHEN 'boss' THEN 0 ELSE 1 END, id
-    LIMIT 1
-    """, (company_id,)).fetchone()
+
+    if actor_username:
+        actor = c.execute("""
+        SELECT username
+        FROM users
+        WHERE company_id=?
+          AND username=?
+          AND role IN ('boss', 'manager')
+          AND COALESCE(is_active, 1)=1
+        LIMIT 1
+        """, (company_id, actor_username)).fetchone()
+    else:
+        actor = c.execute("""
+        SELECT username
+        FROM users
+        WHERE company_id=?
+          AND role IN ('boss', 'manager')
+          AND COALESCE(is_active, 1)=1
+        ORDER BY CASE role WHEN 'boss' THEN 0 ELSE 1 END, id
+        LIMIT 1
+        """, (company_id,)).fetchone()
+
     conn.close()
 
     if not actor:
@@ -9604,6 +9653,9 @@ async def run_calendar_plan_scheduler(company_id, now_dt=None):
 
     now_dt = now_dt or datetime.now()
     started_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    stale_before = (
+        datetime.now() - timedelta(minutes=30)
+    ).strftime("%Y-%m-%d %H:%M")
     week_start = (
         now_dt.date() - timedelta(days=now_dt.date().weekday())
     ).strftime("%Y-%m-%d")
@@ -9613,16 +9665,35 @@ async def run_calendar_plan_scheduler(company_id, now_dt=None):
     c.execute("""
     INSERT INTO calendar_plan_scheduler_status (
         company_id, last_started_at, last_status,
-        last_error, last_changed_days, last_notifications_sent
+        last_error, last_changed_days, last_notifications_sent,
+        last_source, last_triggered_by
     )
-    VALUES (?, ?, 'running', '', 0, 0)
+    VALUES (?, ?, 'running', '', 0, 0, ?, ?)
     ON CONFLICT(company_id) DO UPDATE SET
         last_started_at=excluded.last_started_at,
         last_status='running',
-        last_error=''
-    """, (company_id, started_at))
+        last_error='',
+        last_source=excluded.last_source,
+        last_triggered_by=excluded.last_triggered_by
+    WHERE calendar_plan_scheduler_status.last_status!='running'
+       OR COALESCE(
+            calendar_plan_scheduler_status.last_started_at,
+            ''
+       )<=?
+    """, (
+        company_id,
+        started_at,
+        source,
+        actor["username"],
+        stale_before,
+    ))
+    acquired = c.rowcount > 0
     conn.commit()
     conn.close()
+
+    if not acquired:
+        result["error"] = "scheduler_already_running"
+        return result
 
     try:
         for action, result_key, enabled in (
@@ -9639,6 +9710,7 @@ async def run_calendar_plan_scheduler(company_id, now_dt=None):
                         "action": action,
                         "week_start": week_start,
                     },
+                    source=source,
                 )
             )
 
@@ -9696,6 +9768,90 @@ async def run_calendar_plan_scheduler(company_id, now_dt=None):
     conn.close()
 
     return result
+
+
+@app.post("/api/calendar/dispatch/automation-run")
+async def api_calendar_dispatch_automation_run(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "message": "Требуется авторизация.",
+            },
+            status_code=401,
+        )
+
+    if get_role(username) != "boss":
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Ручной запуск доступен владельцу.",
+            },
+            status_code=403,
+        )
+
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "calendar"):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "feature_disabled",
+                "message": "Модуль календаря отключён.",
+            },
+            status_code=403,
+        )
+
+    result = await run_calendar_plan_scheduler(
+        company_id,
+        actor_username=username,
+        source="manual_run",
+    )
+
+    if result["error"]:
+        error_messages = {
+            "automation_disabled": (
+                "Сначала включите автопубликацию "
+                "или автонапоминания."
+            ),
+            "actor_not_found": "Не найден активный владелец компании.",
+            "scheduler_already_running": (
+                "Автоматизация уже выполняется. "
+                "Дождитесь завершения текущего запуска."
+            ),
+        }
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": result["error"],
+                "message": error_messages.get(
+                    result["error"],
+                    "Автоматизация завершилась с ошибкой.",
+                ),
+                "result": result,
+            },
+            status_code=409,
+        )
+
+    changed_days = int(result["changed_days"] or 0)
+    notifications_sent = int(result["notifications_sent"] or 0)
+    message = (
+        "Автоматизация выполнена. "
+        f"Изменено дней: {changed_days}. "
+        f"Уведомлений: {notifications_sent}."
+        if changed_days or notifications_sent
+        else "Проверка завершена: новых действий нет."
+    )
+
+    return {
+        "ok": True,
+        "message": message,
+        "result": result,
+    }
 
 
 async def run_calendar_plan_scheduler_for_all_companies(now_dt=None):

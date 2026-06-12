@@ -297,6 +297,8 @@ def init_db():
         last_error TEXT,
         last_changed_days INTEGER DEFAULT 0,
         last_notifications_sent INTEGER DEFAULT 0,
+        last_source TEXT DEFAULT 'scheduler',
+        last_triggered_by TEXT,
         last_result_json TEXT
     )
     """)
@@ -648,6 +650,8 @@ def init_db():
     add_column_if_missing(c, "company_settings", "calendar_auto_publish", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calendar_auto_remind", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "calendar_day_ack_reminders", "source", "TEXT DEFAULT 'manual'")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "last_source", "TEXT DEFAULT 'scheduler'")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "last_triggered_by", "TEXT")
 
     add_column_if_missing(c, "company_features", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_features", "feature_key", "TEXT")
@@ -889,6 +893,14 @@ def init_db():
         company_id, plan_date, revision, username
     )
     WHERE source='scheduler'
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_day_ack_automation_unique
+    ON calendar_day_ack_reminders(
+        company_id, plan_date, revision, username
+    )
+    WHERE source IN ('scheduler', 'manual_run')
     """)
 
     c.execute("""

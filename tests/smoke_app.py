@@ -5414,6 +5414,8 @@ async def assert_dispatch_board():
     assert "/api/calendar/dispatch/week-plans" in page_html
     assert "Автоматизация планов" in page_html
     assert 'id="save-calendar-automation"' in page_html
+    assert 'id="run-calendar-automation"' in page_html
+    assert "/api/calendar/dispatch/automation-run" in page_html
     assert page.context["calendar_auto_publish"] is False
     assert page.context["calendar_auto_remind"] is False
     assert page.context["calendar_scheduler_status"]["tone"] == "disabled"
@@ -5515,6 +5517,39 @@ async def assert_dispatch_board():
         )
     )
     assert manager_automation_settings.status_code == 403
+    anonymous_automation_run = (
+        await crm.api_calendar_dispatch_automation_run(
+            make_json_request(
+                None,
+                "/api/calendar/dispatch/automation-run",
+                {},
+            )
+        )
+    )
+    assert anonymous_automation_run.status_code == 401
+    manager_automation_run = (
+        await crm.api_calendar_dispatch_automation_run(
+            make_json_request(
+                "manager1",
+                "/api/calendar/dispatch/automation-run",
+                {},
+            )
+        )
+    )
+    assert manager_automation_run.status_code == 403
+    disabled_automation_run = (
+        await crm.api_calendar_dispatch_automation_run(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/automation-run",
+                {},
+            )
+        )
+    )
+    assert disabled_automation_run.status_code == 409
+    assert json.loads(disabled_automation_run.body)[
+        "error"
+    ] == "automation_disabled"
     saved_automation_settings = (
         await crm.api_calendar_dispatch_automation_settings(
             make_json_request(
@@ -5532,6 +5567,56 @@ async def assert_dispatch_board():
         "auto_publish": True,
         "auto_remind": True,
         "message": "Настройки автоматизации сохранены.",
+    }
+    original_calendar_scheduler = crm.run_calendar_plan_scheduler
+    manual_run_arguments = {}
+
+    async def fake_manual_calendar_scheduler(
+        company_id,
+        now_dt=None,
+        actor_username="",
+        source="scheduler",
+    ):
+        manual_run_arguments.update({
+            "company_id": company_id,
+            "actor_username": actor_username,
+            "source": source,
+        })
+        return {
+            "company_id": company_id,
+            "enabled": True,
+            "source": source,
+            "publish": None,
+            "remind": None,
+            "changed_days": 2,
+            "notifications_sent": 3,
+            "error": "",
+        }
+
+    crm.run_calendar_plan_scheduler = fake_manual_calendar_scheduler
+
+    try:
+        manual_automation_run = (
+            await crm.api_calendar_dispatch_automation_run(
+                make_json_request(
+                    "owner2",
+                    "/api/calendar/dispatch/automation-run",
+                    {},
+                )
+            )
+        )
+    finally:
+        crm.run_calendar_plan_scheduler = original_calendar_scheduler
+
+    assert manual_automation_run["ok"] is True
+    assert manual_automation_run["message"] == (
+        "Автоматизация выполнена. "
+        "Изменено дней: 2. Уведомлений: 3."
+    )
+    assert manual_run_arguments == {
+        "company_id": 2,
+        "actor_username": "owner2",
+        "source": "manual_run",
     }
     outsider_week_action = (
         await crm.api_calendar_dispatch_week_plans(
@@ -5674,13 +5759,16 @@ async def assert_dispatch_board():
         scheduler_result = await crm.run_calendar_plan_scheduler(
             2,
             now_dt=scheduler_now,
+            actor_username="owner2",
+            source="manual_run",
         )
     finally:
         crm.send_message_to_chat = original_send_message_to_chat
 
     assert scheduler_result["enabled"] is True
-    assert scheduler_result["publish"]["source"] == "scheduler"
-    assert scheduler_result["remind"]["source"] == "scheduler"
+    assert scheduler_result["source"] == "manual_run"
+    assert scheduler_result["publish"]["source"] == "manual_run"
+    assert scheduler_result["remind"]["source"] == "manual_run"
     assert scheduler_result["changed_days"] == 1
     assert scheduler_result["notifications_sent"] == 1
     assert scheduler_result["remind"]["summary"][
@@ -5715,7 +5803,24 @@ async def assert_dispatch_board():
     ))
     conn.commit()
     conn.close()
-    assert scheduler_reminder["source"] == "scheduler"
+    assert scheduler_reminder["source"] == "manual_run"
+
+    scheduler_page = await crm.calendar_dispatch_page(
+        make_asgi_request("owner2", "/calendar/dispatch"),
+        week_start=original_date,
+    )
+    assert scheduler_page.context["calendar_scheduler_status"][
+        "tone"
+    ] == "healthy"
+    assert "вручную, owner2" in scheduler_page.context[
+        "calendar_scheduler_status"
+    ]["message"]
+    assert scheduler_page.context["week_plan_runs"][0][
+        "source_label"
+    ] == "Запуск владельцем"
+    assert "Автоматизация работает" in (
+        scheduler_page.body.decode("utf-8")
+    )
 
     repeated_scheduler = await crm.run_calendar_plan_scheduler(
         2,
@@ -5729,16 +5834,44 @@ async def assert_dispatch_board():
     assert repeated_scheduler["publish"]["operation_run_id"] == 0
     assert repeated_scheduler["remind"]["operation_run_id"] == 0
 
-    scheduler_page = await crm.calendar_dispatch_page(
-        make_asgi_request("owner2", "/calendar/dispatch"),
-        week_start=original_date,
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET last_status='running',
+        last_started_at=?
+    WHERE company_id=2
+    """, (datetime.now().strftime("%Y-%m-%d %H:%M"),))
+    conn.commit()
+    conn.close()
+    locked_scheduler = await crm.run_calendar_plan_scheduler(
+        2,
+        now_dt=scheduler_now,
     )
-    assert scheduler_page.context["calendar_scheduler_status"][
-        "tone"
-    ] == "healthy"
-    assert "Автоматизация работает" in (
-        scheduler_page.body.decode("utf-8")
+    assert locked_scheduler["error"] == "scheduler_already_running"
+    assert locked_scheduler["publish"] is None
+    assert locked_scheduler["remind"] is None
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET last_started_at=?
+    WHERE company_id=2
+    """, (
+        (datetime.now() - timedelta(minutes=31)).strftime(
+            "%Y-%m-%d %H:%M"
+        ),
+    ))
+    conn.commit()
+    conn.close()
+    recovered_scheduler = await crm.run_calendar_plan_scheduler(
+        2,
+        now_dt=scheduler_now,
     )
+    assert recovered_scheduler["error"] == ""
+    assert recovered_scheduler["changed_days"] == 0
+    assert recovered_scheduler["notifications_sent"] == 0
     old_cron_secret = os.environ.get("AUTOMATION_CRON_SECRET")
     os.environ["AUTOMATION_CRON_SECRET"] = "calendar-cron-secret"
 
@@ -5809,11 +5942,16 @@ async def assert_dispatch_board():
     ) == 3
     assert sum(
         1 for row in operation_runs if row["source"] == "scheduler"
+    ) == 0
+    assert sum(
+        1 for row in operation_runs if row["source"] == "manual_run"
     ) == 1
     assert scheduler_status["last_status"] == "done"
     assert scheduler_status["last_error"] == ""
     assert scheduler_status["last_changed_days"] == 0
     assert scheduler_status["last_notifications_sent"] == 0
+    assert scheduler_status["last_source"] == "scheduler"
+    assert scheduler_status["last_triggered_by"] == "owner2"
 
     anonymous = await crm.api_calendar_dispatch_move(
         make_json_request(
@@ -6029,9 +6167,10 @@ async def assert_dispatch_board():
         INSERT INTO calendar_plan_scheduler_status (
             company_id, last_started_at, last_completed_at,
             last_status, last_error, last_changed_days,
-            last_notifications_sent, last_result_json
+            last_notifications_sent, last_source,
+            last_triggered_by, last_result_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             original_scheduler_status["company_id"],
             original_scheduler_status["last_started_at"],
@@ -6040,6 +6179,8 @@ async def assert_dispatch_board():
             original_scheduler_status["last_error"],
             original_scheduler_status["last_changed_days"],
             original_scheduler_status["last_notifications_sent"],
+            original_scheduler_status["last_source"],
+            original_scheduler_status["last_triggered_by"],
             original_scheduler_status["last_result_json"],
         ))
     c.execute("""
