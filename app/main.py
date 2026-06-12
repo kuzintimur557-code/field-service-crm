@@ -44,6 +44,7 @@ from app.services.day_plan_publication import (
     REMINDER_COOLDOWN_MINUTES,
     build_day_plan_snapshot,
     build_day_publication_state,
+    build_week_publication_summary,
 )
 from app.services.daily_schedule import (
     SLOT_STEP,
@@ -8493,7 +8494,81 @@ async def calendar_dispatch_page(
           )
       )
     """, (company_id,)).fetchone()[0]
+    week_publication_tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND archived=0
+      AND status!='Отменено'
+      AND substr(task_date, 1, 10) BETWEEN ? AND ?
+    ORDER BY task_date, id
+    """, (
+        company_id,
+        selected_week_start,
+        selected_week_end,
+    )).fetchall()
+    publication_rows = c.execute("""
+    SELECT *
+    FROM calendar_day_publications
+    WHERE company_id=?
+      AND plan_date BETWEEN ? AND ?
+    ORDER BY plan_date
+    """, (
+        company_id,
+        selected_week_start,
+        selected_week_end,
+    )).fetchall()
+    acknowledgement_rows = c.execute("""
+    SELECT
+        acknowledgement.plan_date,
+        acknowledgement.revision,
+        acknowledgement.username,
+        acknowledgement.acknowledged_at
+    FROM calendar_day_acknowledgements AS acknowledgement
+    JOIN calendar_day_publications AS publication
+      ON publication.company_id=acknowledgement.company_id
+     AND publication.plan_date=acknowledgement.plan_date
+     AND publication.revision=acknowledgement.revision
+    WHERE acknowledgement.company_id=?
+      AND acknowledgement.plan_date BETWEEN ? AND ?
+    ORDER BY acknowledgement.plan_date, acknowledgement.username
+    """, (
+        company_id,
+        selected_week_start,
+        selected_week_end,
+    )).fetchall()
+    reminder_rows = c.execute("""
+    SELECT
+        reminder.plan_date,
+        reminder.revision,
+        reminder.username,
+        MAX(reminder.reminded_at) AS reminded_at
+    FROM calendar_day_ack_reminders AS reminder
+    JOIN calendar_day_publications AS publication
+      ON publication.company_id=reminder.company_id
+     AND publication.plan_date=reminder.plan_date
+     AND publication.revision=reminder.revision
+    WHERE reminder.company_id=?
+      AND reminder.plan_date BETWEEN ? AND ?
+    GROUP BY
+        reminder.plan_date,
+        reminder.revision,
+        reminder.username
+    ORDER BY reminder.plan_date, reminder.username
+    """, (
+        company_id,
+        selected_week_start,
+        selected_week_end,
+    )).fetchall()
     conn.close()
+    week_publication = build_week_publication_summary(
+        week_start=board_week_start,
+        tasks=week_publication_tasks,
+        publications=publication_rows,
+        acknowledgements=acknowledgement_rows,
+        reminders=reminder_rows,
+        active_worker_names=worker_names,
+    )
     board_columns = build_dispatch_board(
         tasks=display_tasks,
         week_start=board_week_start,
@@ -8560,6 +8635,7 @@ async def calendar_dispatch_page(
             "selected_week_start": selected_week_start,
             "selected_week_end": selected_week_end,
             "planning_queue_count": planning_queue_count,
+            "week_publication": week_publication,
             "previous_week_url": dispatch_week_url(
                 board_week_start - timedelta(days=7)
             ),

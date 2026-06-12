@@ -228,3 +228,132 @@ def build_day_publication_state(
         "last_reminded_at": last_reminded_at,
         "reminder_cooldown_minutes": REMINDER_COOLDOWN_MINUTES,
     }
+
+
+def build_week_publication_summary(
+    week_start,
+    tasks,
+    publications=None,
+    acknowledgements=None,
+    reminders=None,
+    active_worker_names=None,
+):
+    publication_by_date = {
+        str(_value(row, "plan_date") or "")[:10]: row
+        for row in list(publications or [])
+    }
+    tasks_by_date = {}
+
+    for task in tasks:
+        task_date = str(_value(task, "task_date") or "")[:10]
+
+        if task_date:
+            tasks_by_date.setdefault(task_date, []).append(task)
+
+    acknowledgements_by_plan = {}
+
+    for row in list(acknowledgements or []):
+        key = (
+            str(_value(row, "plan_date") or "")[:10],
+            int(_value(row, "revision", 0) or 0),
+        )
+        acknowledgements_by_plan.setdefault(key, []).append(row)
+
+    reminders_by_plan = {}
+
+    for row in list(reminders or []):
+        key = (
+            str(_value(row, "plan_date") or "")[:10],
+            int(_value(row, "revision", 0) or 0),
+        )
+        reminders_by_plan.setdefault(key, []).append(row)
+
+    day_names = (
+        "Понедельник",
+        "Вторник",
+        "Среда",
+        "Четверг",
+        "Пятница",
+        "Суббота",
+        "Воскресенье",
+    )
+    days = []
+
+    for offset, day_name in enumerate(day_names):
+        day_value = week_start + timedelta(days=offset)
+        plan_date = day_value.strftime("%Y-%m-%d")
+        publication = publication_by_date.get(plan_date)
+        revision = int(_value(publication, "revision", 0) or 0)
+        state = build_day_publication_state(
+            publication,
+            tasks_by_date.get(plan_date, []),
+            acknowledgements=acknowledgements_by_plan.get(
+                (plan_date, revision),
+                [],
+            ),
+            reminders=reminders_by_plan.get(
+                (plan_date, revision),
+                [],
+            ),
+            active_worker_names=active_worker_names,
+        )
+
+        if not state["task_count"] and not publication:
+            display_state = "empty"
+            status_label = "Нет заявок"
+        elif state["state"] == "changed":
+            display_state = "changed"
+            status_label = "План изменён"
+        elif state["state"] == "draft":
+            display_state = "draft"
+            status_label = "Черновик"
+        elif state["worker_count"] and not state["pending_count"]:
+            display_state = "accepted"
+            status_label = "План принят"
+        elif state["pending_count"]:
+            display_state = "waiting"
+            status_label = "Ожидает принятия"
+        else:
+            display_state = "published"
+            status_label = "Опубликован"
+
+        days.append({
+            **state,
+            "date": plan_date,
+            "date_label": day_value.strftime("%d.%m"),
+            "day_label": day_name,
+            "display_state": display_state,
+            "status_label": status_label,
+            "url": f"/calendar/day?date={plan_date}",
+        })
+
+    active_days = [day for day in days if day["task_count"]]
+    published_days = [
+        day for day in active_days
+        if day["state"] == "published"
+    ]
+
+    return {
+        "days": days,
+        "summary": {
+            "active_days": len(active_days),
+            "draft_days": sum(
+                1 for day in active_days if day["state"] == "draft"
+            ),
+            "published_days": len(published_days),
+            "changed_days": sum(
+                1 for day in active_days if day["state"] == "changed"
+            ),
+            "accepted_days": sum(
+                1
+                for day in published_days
+                if day["worker_count"] and not day["pending_count"]
+            ),
+            "pending_acknowledgements": sum(
+                day["pending_count"] for day in published_days
+            ),
+            "remindable_workers": sum(
+                day["remindable_count"] for day in published_days
+            ),
+        },
+    }

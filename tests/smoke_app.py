@@ -5176,6 +5176,68 @@ async def assert_dispatch_board():
         board_start + timedelta(days=2)
     ).strftime("%Y-%m-%d")
     success_date = (board_start + timedelta(days=3)).strftime("%Y-%m-%d")
+    publication_tasks = []
+
+    for offset in range(4):
+        publication_tasks.append({
+            "id": 9000 + offset,
+            "task_date": (
+                board_start + timedelta(days=offset)
+            ).strftime("%Y-%m-%d"),
+            "worker": "helper2",
+            "workers": "helper2",
+            "time_from": f"{9 + offset:02d}:00",
+            "time_to": f"{10 + offset:02d}:00",
+        })
+
+    waiting_snapshot = crm.build_day_plan_snapshot(
+        [publication_tasks[1]]
+    )
+    accepted_snapshot = crm.build_day_plan_snapshot(
+        [publication_tasks[2]]
+    )
+    weekly_publication = crm.build_week_publication_summary(
+        week_start=board_start,
+        tasks=publication_tasks,
+        publications=[
+            {
+                "plan_date": publication_tasks[1]["task_date"],
+                "plan_hash": waiting_snapshot["hash"],
+                "revision": 1,
+            },
+            {
+                "plan_date": publication_tasks[2]["task_date"],
+                "plan_hash": accepted_snapshot["hash"],
+                "revision": 2,
+            },
+            {
+                "plan_date": publication_tasks[3]["task_date"],
+                "plan_hash": "stale-plan",
+                "revision": 1,
+            },
+        ],
+        acknowledgements=[{
+            "plan_date": publication_tasks[2]["task_date"],
+            "revision": 2,
+            "username": "helper2",
+            "acknowledged_at": "2026-06-12 09:00",
+        }],
+        active_worker_names=["helper2"],
+    )
+    assert [
+        day["display_state"]
+        for day in weekly_publication["days"][:4]
+    ] == ["draft", "waiting", "accepted", "changed"]
+    assert weekly_publication["summary"] == {
+        "active_days": 4,
+        "draft_days": 1,
+        "published_days": 2,
+        "changed_days": 1,
+        "accepted_days": 1,
+        "pending_acknowledgements": 1,
+        "remindable_workers": 1,
+    }
+
     conn = connect()
     c = conn.cursor()
     helper = c.execute("""
@@ -5246,6 +5308,39 @@ async def assert_dispatch_board():
         datetime.now().strftime("%Y-%m-%d %H:%M"),
     ))
     outsider_id = c.lastrowid
+    publication_tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=2
+      AND archived=0
+      AND status!='Отменено'
+      AND task_date LIKE ?
+    ORDER BY id
+    """, (f"{original_date}%",)).fetchall()
+    publication_snapshot = crm.build_day_plan_snapshot(publication_tasks)
+    published_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO calendar_day_publications (
+        company_id, plan_date, plan_hash, task_count, worker_count,
+        published_by, published_at, revision
+    )
+    VALUES (2, ?, ?, ?, ?, 'owner2', ?, 1)
+    """, (
+        original_date,
+        publication_snapshot["hash"],
+        publication_snapshot["task_count"],
+        publication_snapshot["worker_count"],
+        published_at,
+    ))
+
+    for worker_name in publication_snapshot["workers"]:
+        c.execute("""
+        INSERT INTO calendar_day_acknowledgements (
+            company_id, plan_date, revision, username, acknowledged_at
+        )
+        VALUES (2, ?, 1, ?, ?)
+        """, (original_date, worker_name, published_at))
+
     conn.commit()
     conn.close()
 
@@ -5269,6 +5364,26 @@ async def assert_dispatch_board():
     assert len(page.context["board_columns"]) == 8
     assert page.context["summary"]["tasks"] == 3
     assert page.context["summary"]["backlog"] == 1
+    assert "Планы команды на неделю" in page_html
+    assert "План принят" in page_html
+    assert page.context["week_publication"]["summary"][
+        "published_days"
+    ] == 1
+    assert page.context["week_publication"]["summary"][
+        "accepted_days"
+    ] == 1
+    publication_day = next(
+        day
+        for day in page.context["week_publication"]["days"]
+        if day["date"] == original_date
+    )
+    assert publication_day["display_state"] == "accepted"
+    assert publication_day["acknowledged_count"] == (
+        publication_day["worker_count"]
+    )
+    assert publication_day["url"] == (
+        f"/calendar/day?date={original_date}"
+    )
     backlog_column = page.context["board_columns"][0]
     assert backlog_column["is_backlog"] is True
     assert any(
@@ -5464,6 +5579,18 @@ async def assert_dispatch_board():
         f"DELETE FROM tasks WHERE id IN ({placeholders})",
         task_ids,
     )
+    c.execute("""
+    DELETE FROM calendar_day_publications
+    WHERE company_id=2 AND plan_date=?
+    """, (original_date,))
+    c.execute("""
+    DELETE FROM calendar_day_acknowledgements
+    WHERE company_id=2 AND plan_date=?
+    """, (original_date,))
+    c.execute("""
+    DELETE FROM calendar_day_ack_reminders
+    WHERE company_id=2 AND plan_date=?
+    """, (original_date,))
     c.execute(
         "DELETE FROM worker_unavailability WHERE id=?",
         (absence_id,),
