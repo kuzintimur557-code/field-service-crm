@@ -63,6 +63,9 @@ h1{margin:0;font-size:32px}
 .week-automation-controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .week-toggle{display:inline-flex;gap:7px;align-items:center;padding:8px 9px;border:1px solid #d1d5db;border-radius:7px;background:white;color:#374151;font-size:11px;font-weight:900}
 .week-toggle input{width:17px;height:17px;accent-color:#2563eb}
+.week-policy{display:grid;grid-template-columns:100px 88px 88px;gap:7px;align-items:end;width:100%}
+.week-policy label{display:grid;gap:4px;color:#6b7280;font-size:9px;font-weight:900}
+.week-policy input{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:7px;background:white;color:#111827;font-size:11px;font-weight:900}
 .week-settings-save{padding:9px 11px;border:0;border-radius:7px;background:#111827;color:white;font-size:11px;font-weight:900;cursor:pointer}
 .week-settings-run{padding:9px 11px;border:1px solid #047857;border-radius:7px;background:#ecfdf5;color:#047857;font-size:11px;font-weight:900;cursor:pointer}
 .week-settings-save:disabled,.week-settings-run:disabled{cursor:not-allowed;opacity:.6}
@@ -155,7 +158,9 @@ h1{margin:0;font-size:32px}
     .week-plans-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(220px,72vw);overflow-x:auto;padding-bottom:5px;scroll-snap-type:x proximity}
     .week-plan-day{scroll-snap-align:start}
     .week-automation{align-items:stretch;flex-direction:column}
-    .week-automation-controls,.week-toggle,.week-settings-run,.week-settings-save{width:100%}
+    .week-automation-controls,.week-toggle,.week-policy,.week-settings-run,.week-settings-save{width:100%}
+    .week-policy{grid-template-columns:1fr 1fr}
+    .week-policy label:first-child{grid-column:1/-1}
     .week-history-row{grid-template-columns:1fr 1fr}
     .week-history-row strong{grid-column:1/-1}
     .header-actions,.header-actions .button,.toolbar,.filters,.filters>div,.filters select,.filters button,.filters a,.week-nav,.week-nav a,.week-jump,.week-jump input,.week-jump button{width:100%}
@@ -285,6 +290,8 @@ h1{margin:0;font-size:32px}
                 <div class="week-automation-status">
                     Автопубликация: {% if calendar_auto_publish %}включена{% else %}выключена{% endif %}
                     · автонапоминания: {% if calendar_auto_remind %}включены{% else %}выключены{% endif %}
+                    · горизонт: {{ calendar_auto_days_ahead }} дн.
+                    · окно: {{ calendar_auto_window_start }}–{{ calendar_auto_window_end }}
                 </div>
                 <div class="scheduler-health {{ calendar_scheduler_status['tone'] }}" title="{{ calendar_scheduler_status['message'] }}">
                     {{ calendar_scheduler_status["title"] }}
@@ -303,6 +310,34 @@ h1{margin:0;font-size:32px}
                     <input id="calendar-auto-remind" type="checkbox" {% if calendar_auto_remind %}checked{% endif %}>
                     Автонапоминания
                 </label>
+                <div class="week-policy">
+                    <label>
+                        Дней вперёд
+                        <input
+                            id="calendar-auto-days-ahead"
+                            type="number"
+                            min="0"
+                            max="14"
+                            value="{{ calendar_auto_days_ahead }}"
+                        >
+                    </label>
+                    <label>
+                        Начало
+                        <input
+                            id="calendar-auto-window-start"
+                            type="time"
+                            value="{{ calendar_auto_window_start }}"
+                        >
+                    </label>
+                    <label>
+                        Окончание
+                        <input
+                            id="calendar-auto-window-end"
+                            type="time"
+                            value="{{ calendar_auto_window_end }}"
+                        >
+                    </label>
+                </div>
                 <button
                     class="week-settings-run"
                     id="run-calendar-automation"
@@ -628,7 +663,16 @@ h1{margin:0;font-size:32px}
                         ).checked,
                         auto_remind: document.getElementById(
                             "calendar-auto-remind"
-                        ).checked
+                        ).checked,
+                        days_ahead: Number(document.getElementById(
+                            "calendar-auto-days-ahead"
+                        ).value),
+                        window_start: document.getElementById(
+                            "calendar-auto-window-start"
+                        ).value,
+                        window_end: document.getElementById(
+                            "calendar-auto-window-end"
+                        ).value
                     })
                 }
             );

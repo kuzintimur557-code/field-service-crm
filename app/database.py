@@ -69,6 +69,9 @@ def init_db():
         ai_calls_enabled INTEGER DEFAULT 0,
         calendar_auto_publish INTEGER DEFAULT 0,
         calendar_auto_remind INTEGER DEFAULT 0,
+        calendar_auto_days_ahead INTEGER DEFAULT 7,
+        calendar_auto_window_start TEXT DEFAULT '00:00',
+        calendar_auto_window_end TEXT DEFAULT '23:59',
         updated_at TEXT
     )
     """)
@@ -649,6 +652,9 @@ def init_db():
     add_column_if_missing(c, "company_settings", "ai_calls_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calendar_auto_publish", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calendar_auto_remind", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "company_settings", "calendar_auto_days_ahead", "INTEGER DEFAULT 7")
+    add_column_if_missing(c, "company_settings", "calendar_auto_window_start", "TEXT DEFAULT '00:00'")
+    add_column_if_missing(c, "company_settings", "calendar_auto_window_end", "TEXT DEFAULT '23:59'")
     add_column_if_missing(c, "calendar_day_ack_reminders", "source", "TEXT DEFAULT 'manual'")
     add_column_if_missing(c, "calendar_plan_scheduler_status", "last_source", "TEXT DEFAULT 'scheduler'")
     add_column_if_missing(c, "calendar_plan_scheduler_status", "last_triggered_by", "TEXT")
@@ -888,11 +894,7 @@ def init_db():
     """)
 
     c.execute("""
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_day_ack_scheduler_unique
-    ON calendar_day_ack_reminders(
-        company_id, plan_date, revision, username
-    )
-    WHERE source='scheduler'
+    DROP INDEX IF EXISTS idx_calendar_day_ack_scheduler_unique
     """)
 
     c.execute("""

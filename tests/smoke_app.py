@@ -5183,6 +5183,21 @@ async def assert_dispatch_board():
     original_auto_remind = int(
         original_calendar_settings["calendar_auto_remind"] or 0
     )
+    original_auto_days_ahead = int(
+        original_calendar_settings["calendar_auto_days_ahead"]
+        if original_calendar_settings[
+            "calendar_auto_days_ahead"
+        ] is not None
+        else 7
+    )
+    original_auto_window_start = str(
+        original_calendar_settings["calendar_auto_window_start"]
+        or "00:00"
+    )
+    original_auto_window_end = str(
+        original_calendar_settings["calendar_auto_window_end"]
+        or "23:59"
+    )
     conn = connect()
     c = conn.cursor()
     original_scheduler_status = c.execute("""
@@ -5418,6 +5433,12 @@ async def assert_dispatch_board():
     assert "/api/calendar/dispatch/automation-run" in page_html
     assert page.context["calendar_auto_publish"] is False
     assert page.context["calendar_auto_remind"] is False
+    assert page.context["calendar_auto_days_ahead"] == (
+        original_auto_days_ahead
+    )
+    assert 'id="calendar-auto-days-ahead"' in page_html
+    assert 'id="calendar-auto-window-start"' in page_html
+    assert 'id="calendar-auto-window-end"' in page_html
     assert page.context["calendar_scheduler_status"]["tone"] == "disabled"
     assert "Автоматизация выключена" in page_html
     backlog_column = page.context["board_columns"][0]
@@ -5550,6 +5571,44 @@ async def assert_dispatch_board():
     assert json.loads(disabled_automation_run.body)[
         "error"
     ] == "automation_disabled"
+    invalid_days_settings = (
+        await crm.api_calendar_dispatch_automation_settings(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/automation-settings",
+                {
+                    "auto_publish": True,
+                    "auto_remind": True,
+                    "days_ahead": 15,
+                    "window_start": "08:00",
+                    "window_end": "20:00",
+                },
+            )
+        )
+    )
+    assert invalid_days_settings.status_code == 400
+    assert json.loads(invalid_days_settings.body)[
+        "error"
+    ] == "invalid_days_ahead"
+    invalid_window_settings = (
+        await crm.api_calendar_dispatch_automation_settings(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/automation-settings",
+                {
+                    "auto_publish": True,
+                    "auto_remind": True,
+                    "days_ahead": 1,
+                    "window_start": "25:00",
+                    "window_end": "20:00",
+                },
+            )
+        )
+    )
+    assert invalid_window_settings.status_code == 400
+    assert json.loads(invalid_window_settings.body)[
+        "error"
+    ] == "invalid_time_window"
     saved_automation_settings = (
         await crm.api_calendar_dispatch_automation_settings(
             make_json_request(
@@ -5558,6 +5617,9 @@ async def assert_dispatch_board():
                 {
                     "auto_publish": True,
                     "auto_remind": True,
+                    "days_ahead": 1,
+                    "window_start": "00:00",
+                    "window_end": "23:59",
                 },
             )
         )
@@ -5566,8 +5628,21 @@ async def assert_dispatch_board():
         "ok": True,
         "auto_publish": True,
         "auto_remind": True,
+        "days_ahead": 1,
+        "window_start": "00:00",
+        "window_end": "23:59",
         "message": "Настройки автоматизации сохранены.",
     }
+    assert crm.calendar_automation_time_allowed(
+        datetime(2026, 6, 12, 23, 30),
+        "22:00",
+        "06:00",
+    ) is True
+    assert crm.calendar_automation_time_allowed(
+        datetime(2026, 6, 12, 12, 0),
+        "22:00",
+        "06:00",
+    ) is False
     original_calendar_scheduler = crm.run_calendar_plan_scheduler
     manual_run_arguments = {}
 
@@ -5755,6 +5830,39 @@ async def assert_dispatch_board():
         )
     )
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_settings
+    SET calendar_auto_days_ahead=0
+    WHERE company_id=2
+    """)
+    conn.commit()
+    conn.close()
+    horizon_today_result = await crm.run_calendar_plan_scheduler(
+        2,
+        now_dt=scheduler_now,
+        actor_username="owner2",
+        source="manual_run",
+    )
+    assert horizon_today_result["policy"]["days_ahead"] == 0
+    assert horizon_today_result["changed_days"] == 0
+    assert horizon_today_result["notifications_sent"] == 0
+    assert any(
+        item["date"] == capacity_date
+        and item["reason"] == "Вне горизонта автоматизации"
+        for item in horizon_today_result["remind"]["items"]
+    )
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_settings
+    SET calendar_auto_days_ahead=1
+    WHERE company_id=2
+    """)
+    conn.commit()
+    conn.close()
+
     try:
         scheduler_result = await crm.run_calendar_plan_scheduler(
             2,
@@ -5767,6 +5875,9 @@ async def assert_dispatch_board():
 
     assert scheduler_result["enabled"] is True
     assert scheduler_result["source"] == "manual_run"
+    assert scheduler_result["range_start"] == original_date
+    assert scheduler_result["range_end"] == capacity_date
+    assert len(scheduler_result["publish"]["weeks"]) == 1
     assert scheduler_result["publish"]["source"] == "manual_run"
     assert scheduler_result["remind"]["source"] == "manual_run"
     assert scheduler_result["changed_days"] == 1
@@ -5872,6 +5983,53 @@ async def assert_dispatch_board():
     assert recovered_scheduler["error"] == ""
     assert recovered_scheduler["changed_days"] == 0
     assert recovered_scheduler["notifications_sent"] == 0
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_settings
+    SET calendar_auto_window_start='13:00',
+        calendar_auto_window_end='14:00'
+    WHERE company_id=2
+    """)
+    conn.commit()
+    conn.close()
+    outside_window_scheduler = (
+        await crm.run_calendar_plan_scheduler(
+            2,
+            now_dt=scheduler_now,
+        )
+    )
+    assert outside_window_scheduler["error"] == ""
+    assert outside_window_scheduler["skipped"] is True
+    assert outside_window_scheduler[
+        "skip_reason"
+    ] == "outside_time_window"
+    waiting_page = await crm.calendar_dispatch_page(
+        make_asgi_request("owner2", "/calendar/dispatch"),
+        week_start=original_date,
+    )
+    assert waiting_page.context["calendar_scheduler_status"][
+        "tone"
+    ] == "waiting"
+    assert "Ожидает рабочего окна" in (
+        waiting_page.body.decode("utf-8")
+    )
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_settings
+    SET calendar_auto_window_start='00:00',
+        calendar_auto_window_end='23:59'
+    WHERE company_id=2
+    """)
+    conn.commit()
+    conn.close()
+    final_scheduler = await crm.run_calendar_plan_scheduler(
+        2,
+        now_dt=scheduler_now,
+    )
+    assert final_scheduler["error"] == ""
+    assert final_scheduler["skipped"] is False
     old_cron_secret = os.environ.get("AUTOMATION_CRON_SECRET")
     os.environ["AUTOMATION_CRON_SECRET"] = "calendar-cron-secret"
 
@@ -6186,11 +6344,17 @@ async def assert_dispatch_board():
     c.execute("""
     UPDATE company_settings
     SET calendar_auto_publish=?,
-        calendar_auto_remind=?
+        calendar_auto_remind=?,
+        calendar_auto_days_ahead=?,
+        calendar_auto_window_start=?,
+        calendar_auto_window_end=?
     WHERE company_id=2
     """, (
         original_auto_publish,
         original_auto_remind,
+        original_auto_days_ahead,
+        original_auto_window_start,
+        original_auto_window_end,
     ))
     c.execute(
         "DELETE FROM worker_unavailability WHERE id=?",

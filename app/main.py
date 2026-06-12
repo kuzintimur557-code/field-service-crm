@@ -8650,6 +8650,16 @@ async def calendar_dispatch_page(
                 ),
                 "last_completed_at": last_completed_at,
             }
+        elif last_status == "waiting":
+            calendar_scheduler_status = {
+                "tone": "waiting",
+                "title": "Ожидает рабочего окна",
+                "message": (
+                    "Последняя проверка выполнена вне настроенного "
+                    "времени автоматизации."
+                ),
+                "last_completed_at": last_completed_at,
+            }
         elif last_status == "running":
             last_started_at = str(
                 scheduler_status_row["last_started_at"] or ""
@@ -8840,6 +8850,29 @@ async def calendar_dispatch_page(
             "calendar_auto_remind": bool(
                 calendar_settings["calendar_auto_remind"]
             ),
+            "calendar_auto_days_ahead": max(
+                0,
+                min(
+                    14,
+                    int(
+                        calendar_settings[
+                            "calendar_auto_days_ahead"
+                        ]
+                        if calendar_settings[
+                            "calendar_auto_days_ahead"
+                        ] is not None
+                        else 7
+                    ),
+                ),
+            ),
+            "calendar_auto_window_start": str(
+                calendar_settings["calendar_auto_window_start"]
+                or "00:00"
+            ),
+            "calendar_auto_window_end": str(
+                calendar_settings["calendar_auto_window_end"]
+                or "23:59"
+            ),
             "calendar_scheduler_status": calendar_scheduler_status,
             "previous_week_url": dispatch_week_url(
                 board_week_start - timedelta(days=7)
@@ -9004,6 +9037,24 @@ async def api_calendar_dispatch_week_plans(request: Request):
     if source not in ("scheduler", "manual_run"):
         source = "manual"
     is_automatic_source = source in ("scheduler", "manual_run")
+    automatic_date_from = ""
+    automatic_date_to = ""
+
+    if is_automatic_source:
+        automatic_date_from = str(
+            payload.get("date_from") or ""
+        )[:10]
+        automatic_date_to = str(
+            payload.get("date_to") or ""
+        )[:10]
+
+        try:
+            datetime.strptime(automatic_date_from, "%Y-%m-%d")
+            datetime.strptime(automatic_date_to, "%Y-%m-%d")
+        except ValueError:
+            automatic_date_from = week_start_value
+            automatic_date_to = week_end_value
+
     telegram_messages = []
     items = []
 
@@ -9018,6 +9069,21 @@ async def api_calendar_dispatch_week_plans(request: Request):
             ).strftime("%Y-%m-%d")
             tasks = tasks_by_date.get(selected_date, [])
             publication = publication_by_date.get(selected_date)
+
+            if (
+                is_automatic_source
+                and not (
+                    automatic_date_from
+                    <= selected_date
+                    <= automatic_date_to
+                )
+            ):
+                items.append({
+                    "date": selected_date,
+                    "status": "skipped",
+                    "reason": "Вне горизонта автоматизации",
+                })
+                continue
 
             if selected_date < today_value:
                 items.append({
@@ -9232,6 +9298,21 @@ async def api_calendar_dispatch_week_plans(request: Request):
                 week_start + timedelta(days=offset)
             ).strftime("%Y-%m-%d")
             publication = publication_by_date.get(selected_date)
+
+            if (
+                is_automatic_source
+                and not (
+                    automatic_date_from
+                    <= selected_date
+                    <= automatic_date_to
+                )
+            ):
+                items.append({
+                    "date": selected_date,
+                    "status": "skipped",
+                    "reason": "Вне горизонта автоматизации",
+                })
+                continue
 
             if selected_date < today_value:
                 items.append({
@@ -9531,6 +9612,50 @@ async def api_calendar_dispatch_automation_settings(request: Request):
 
     auto_publish = 1 if payload.get("auto_publish") else 0
     auto_remind = 1 if payload.get("auto_remind") else 0
+
+    try:
+        auto_days_ahead = int(
+            payload.get("days_ahead", 7)
+        )
+    except (TypeError, ValueError):
+        auto_days_ahead = -1
+
+    if auto_days_ahead < 0 or auto_days_ahead > 14:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_days_ahead",
+                "message": (
+                    "Горизонт автоматизации должен быть "
+                    "от 0 до 14 дней."
+                ),
+            },
+            status_code=400,
+        )
+
+    auto_window_start = str(
+        payload.get("window_start") or "00:00"
+    ).strip()
+    auto_window_end = str(
+        payload.get("window_end") or "23:59"
+    ).strip()
+
+    for value in (auto_window_start, auto_window_end):
+        try:
+            datetime.strptime(value, "%H:%M")
+        except ValueError:
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "invalid_time_window",
+                    "message": (
+                        "Время автоматизации должно быть "
+                        "в формате ЧЧ:ММ."
+                    ),
+                },
+                status_code=400,
+            )
+
     get_company_settings(company_id)
     conn = connect()
     c = conn.cursor()
@@ -9538,11 +9663,17 @@ async def api_calendar_dispatch_automation_settings(request: Request):
     UPDATE company_settings
     SET calendar_auto_publish=?,
         calendar_auto_remind=?,
+        calendar_auto_days_ahead=?,
+        calendar_auto_window_start=?,
+        calendar_auto_window_end=?,
         updated_at=?
     WHERE company_id=?
     """, (
         auto_publish,
         auto_remind,
+        auto_days_ahead,
+        auto_window_start,
+        auto_window_end,
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         company_id,
     ))
@@ -9553,6 +9684,9 @@ async def api_calendar_dispatch_automation_settings(request: Request):
         "ok": True,
         "auto_publish": bool(auto_publish),
         "auto_remind": bool(auto_remind),
+        "days_ahead": auto_days_ahead,
+        "window_start": auto_window_start,
+        "window_end": auto_window_end,
         "message": "Настройки автоматизации сохранены.",
     }
 
@@ -9591,6 +9725,22 @@ def make_internal_calendar_plan_request(
     }, receive)
 
 
+def calendar_automation_time_allowed(
+    current_time,
+    window_start,
+    window_end,
+):
+    current_value = current_time.strftime("%H:%M")
+
+    if window_start <= window_end:
+        return window_start <= current_value <= window_end
+
+    return (
+        current_value >= window_start
+        or current_value <= window_end
+    )
+
+
 async def run_calendar_plan_scheduler(
     company_id,
     now_dt=None,
@@ -9606,6 +9756,10 @@ async def run_calendar_plan_scheduler(
         "remind": None,
         "changed_days": 0,
         "notifications_sent": 0,
+        "skipped": False,
+        "skip_reason": "",
+        "range_start": "",
+        "range_end": "",
         "error": "",
     }
 
@@ -9616,6 +9770,28 @@ async def run_calendar_plan_scheduler(
     settings = get_company_settings(company_id)
     auto_publish = bool(settings["calendar_auto_publish"])
     auto_remind = bool(settings["calendar_auto_remind"])
+    auto_days_ahead = max(
+        0,
+        min(
+            14,
+            int(
+                settings["calendar_auto_days_ahead"]
+                if settings["calendar_auto_days_ahead"] is not None
+                else 7
+            ),
+        ),
+    )
+    auto_window_start = str(
+        settings["calendar_auto_window_start"] or "00:00"
+    )
+    auto_window_end = str(
+        settings["calendar_auto_window_end"] or "23:59"
+    )
+    result["policy"] = {
+        "days_ahead": auto_days_ahead,
+        "window_start": auto_window_start,
+        "window_end": auto_window_end,
+    }
 
     if not auto_publish and not auto_remind:
         result["error"] = "automation_disabled"
@@ -9652,14 +9828,70 @@ async def run_calendar_plan_scheduler(
         return result
 
     now_dt = now_dt or datetime.now()
+    range_start = now_dt.date()
+    range_end = range_start + timedelta(days=auto_days_ahead)
+    result["range_start"] = range_start.strftime("%Y-%m-%d")
+    result["range_end"] = range_end.strftime("%Y-%m-%d")
+    result["enabled"] = True
+
+    if (
+        source == "scheduler"
+        and not calendar_automation_time_allowed(
+            now_dt,
+            auto_window_start,
+            auto_window_end,
+        )
+    ):
+        result["skipped"] = True
+        result["skip_reason"] = "outside_time_window"
+        completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        INSERT INTO calendar_plan_scheduler_status (
+            company_id, last_started_at, last_completed_at,
+            last_status, last_error, last_changed_days,
+            last_notifications_sent, last_source,
+            last_triggered_by, last_result_json
+        )
+        VALUES (?, ?, ?, 'waiting', '', 0, 0, ?, ?, ?)
+        ON CONFLICT(company_id) DO UPDATE SET
+            last_started_at=excluded.last_started_at,
+            last_completed_at=excluded.last_completed_at,
+            last_status='waiting',
+            last_error='',
+            last_changed_days=0,
+            last_notifications_sent=0,
+            last_source=excluded.last_source,
+            last_triggered_by=excluded.last_triggered_by,
+            last_result_json=excluded.last_result_json
+        WHERE calendar_plan_scheduler_status.last_status!='running'
+        """, (
+            company_id,
+            completed_at,
+            completed_at,
+            source,
+            actor["username"],
+            json.dumps(result, ensure_ascii=False),
+        ))
+        conn.commit()
+        conn.close()
+        return result
+
     started_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     stale_before = (
         datetime.now() - timedelta(minutes=30)
     ).strftime("%Y-%m-%d %H:%M")
-    week_start = (
-        now_dt.date() - timedelta(days=now_dt.date().weekday())
-    ).strftime("%Y-%m-%d")
-    result["enabled"] = True
+    first_week_start = (
+        range_start - timedelta(days=range_start.weekday())
+    )
+    week_starts = []
+    current_week_start = first_week_start
+
+    while current_week_start <= range_end:
+        week_starts.append(current_week_start)
+        current_week_start += timedelta(days=7)
+
     conn = connect()
     c = conn.cursor()
     c.execute("""
@@ -9703,34 +9935,79 @@ async def run_calendar_plan_scheduler(
             if not enabled:
                 continue
 
-            response = await api_calendar_dispatch_week_plans(
-                make_internal_calendar_plan_request(
-                    actor["username"],
-                    {
-                        "action": action,
-                        "week_start": week_start,
-                    },
-                    source=source,
+            action_result = {
+                "ok": True,
+                "action": action,
+                "source": source,
+                "summary": {},
+                "items": [],
+                "weeks": [],
+                "operation_run_id": 0,
+                "operation_run_ids": [],
+            }
+
+            for week_start in week_starts:
+                response = await api_calendar_dispatch_week_plans(
+                    make_internal_calendar_plan_request(
+                        actor["username"],
+                        {
+                            "action": action,
+                            "week_start": week_start.strftime(
+                                "%Y-%m-%d"
+                            ),
+                            "date_from": result["range_start"],
+                            "date_to": result["range_end"],
+                        },
+                        source=source,
+                    )
                 )
-            )
 
-            if isinstance(response, JSONResponse):
-                response_data = json.loads(
-                    response.body.decode("utf-8")
+                if isinstance(response, JSONResponse):
+                    response_data = json.loads(
+                        response.body.decode("utf-8")
+                    )
+                else:
+                    response_data = response
+
+                action_result["weeks"].append(response_data)
+
+                if not response_data.get("ok"):
+                    action_result["ok"] = False
+                    result["error"] = response_data.get(
+                        "error",
+                        "operation_failed",
+                    )
+                    continue
+
+                action_result["items"].extend(
+                    response_data.get("items", [])
                 )
-            else:
-                response_data = response
-
-            result[result_key] = response_data
-
-            if not response_data.get("ok"):
-                result["error"] = response_data.get(
-                    "error",
-                    "operation_failed",
+                operation_run_id = int(
+                    response_data.get("operation_run_id") or 0
                 )
-                continue
 
-            action_summary = response_data["summary"]
+                if operation_run_id:
+                    action_result["operation_run_ids"].append(
+                        operation_run_id
+                    )
+
+                    if not action_result["operation_run_id"]:
+                        action_result["operation_run_id"] = (
+                            operation_run_id
+                        )
+
+                for key, value in response_data.get(
+                    "summary",
+                    {},
+                ).items():
+                    if isinstance(value, int):
+                        action_result["summary"][key] = (
+                            action_result["summary"].get(key, 0)
+                            + value
+                        )
+
+            result[result_key] = action_result
+            action_summary = action_result["summary"]
             result["changed_days"] += (
                 action_summary.get("published_days", 0)
                 + action_summary.get("updated_days", 0)
