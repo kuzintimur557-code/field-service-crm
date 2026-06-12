@@ -4033,6 +4033,8 @@ def get_platform_calendar_company_detail(
     incident_event_labels = {
         "opened": ("Открыт", "error"),
         "acknowledged": ("Принят в работу", "waiting"),
+        "recovery_started": ("Запущено восстановление", "running"),
+        "recovery_failed": ("Восстановление не выполнено", "error"),
         "recovered": ("Восстановлен", "healthy"),
     }
     operation_labels = {
@@ -4336,6 +4338,8 @@ async def platform_calendar_health_page(
 async def platform_calendar_company_health_page(
     request: Request,
     company_id: int,
+    notice: str = "",
+    error: str = "",
 ):
     username = get_user(request)
 
@@ -4355,6 +4359,47 @@ async def platform_calendar_company_health_page(
             status_code=302,
         )
 
+    page_messages = {
+        "acknowledged": (
+            "Инцидент принят в работу от имени платформы.",
+            "success",
+        ),
+        "recovered": (
+            "Проверка выполнена успешно. Инцидент закрыт.",
+            "success",
+        ),
+        "incident_not_found": (
+            "Активный инцидент уже закрыт или не найден.",
+            "error",
+        ),
+        "already_acknowledged": (
+            "Инцидент уже принят в работу.",
+            "error",
+        ),
+        "automation_disabled": (
+            "Автоматизация календаря выключена у компании.",
+            "error",
+        ),
+        "calendar_disabled": (
+            "Модуль календаря выключен у компании.",
+            "error",
+        ),
+        "scheduler_already_running": (
+            "Планировщик уже выполняется. Повторите позже.",
+            "error",
+        ),
+        "actor_not_found": (
+            "У компании нет активного владельца или менеджера.",
+            "error",
+        ),
+        "recovery_failed": (
+            "Восстановление завершилось с ошибкой. Проверьте журнал.",
+            "error",
+        ),
+    }
+    message_key = notice or error
+    page_message = page_messages.get(message_key)
+
     return templates.TemplateResponse(
         request,
         "platform_calendar_company_health.html",
@@ -4368,7 +4413,138 @@ async def platform_calendar_company_health_page(
             "runs": detail["runs"],
             "incidents": detail["incidents"],
             "operations": detail["operations"],
+            "page_message": (
+                page_message[0] if page_message else ""
+            ),
+            "page_message_tone": (
+                page_message[1] if page_message else ""
+            ),
         },
+    )
+
+
+@app.post(
+    "/platform/calendar-health/{company_id}/acknowledge",
+)
+async def platform_calendar_incident_acknowledge(
+    request: Request,
+    company_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    result = acknowledge_calendar_scheduler_incident(
+        company_id,
+        username,
+    )
+    query_key = "notice" if result["ok"] else "error"
+    query_value = (
+        "acknowledged" if result["ok"] else result["error"]
+    )
+    return RedirectResponse(
+        (
+            f"/platform/calendar-health/{company_id}"
+            f"?{query_key}={query_value}"
+        ),
+        status_code=302,
+    )
+
+
+@app.post(
+    "/platform/calendar-health/{company_id}/recover",
+)
+async def platform_calendar_incident_recover(
+    request: Request,
+    company_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+    company = c.execute("""
+    SELECT
+        companies.id,
+        scheduler.active_incident
+    FROM companies
+    LEFT JOIN calendar_plan_scheduler_status AS scheduler
+      ON scheduler.company_id=companies.id
+    WHERE companies.id=?
+    """, (company_id,)).fetchone()
+    conn.close()
+
+    if not company or not str(company["active_incident"] or ""):
+        return RedirectResponse(
+            (
+                f"/platform/calendar-health/{company_id}"
+                "?error=incident_not_found"
+            ),
+            status_code=302,
+        )
+
+    log_calendar_scheduler_recovery_attempt(
+        company_id,
+        "recovery_started",
+        username,
+        "Платформа запустила внеплановую проверку автоматизации.",
+    )
+    result = await run_calendar_plan_scheduler(
+        company_id,
+        source="manual_run",
+    )
+
+    if result["error"]:
+        error_code = (
+            result["error"]
+            if result["error"] in {
+                "automation_disabled",
+                "calendar_disabled",
+                "scheduler_already_running",
+                "actor_not_found",
+            }
+            else "recovery_failed"
+        )
+        log_calendar_scheduler_recovery_attempt(
+            company_id,
+            "recovery_failed",
+            username,
+            (
+                "Внеплановая проверка завершилась с ошибкой: "
+                f"{result['error']}"
+            ),
+        )
+        return RedirectResponse(
+            (
+                f"/platform/calendar-health/{company_id}"
+                f"?error={error_code}"
+            ),
+            status_code=302,
+        )
+
+    close_calendar_scheduler_incident(
+        company_id,
+        actor_username=username,
+        recovery_message=(
+            "Платформа выполнила внеплановую проверку. "
+            "Автоматизация календаря работает штатно."
+        ),
+    )
+    return RedirectResponse(
+        (
+            f"/platform/calendar-health/{company_id}"
+            "?notice=recovered"
+        ),
+        status_code=302,
     )
 
 
@@ -10607,6 +10783,8 @@ def open_calendar_scheduler_incident(
 def close_calendar_scheduler_incident(
     company_id,
     allowed_types=None,
+    actor_username="",
+    recovery_message="",
 ):
     now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
     conn = connect()
@@ -10634,7 +10812,7 @@ def close_calendar_scheduler_incident(
         status_row["incident_started_at"] or "неизвестно"
     )
     title = "Автоматизация календаря восстановлена"
-    message = (
+    message = str(recovery_message or "").strip()[:500] or (
         "Планировщик снова работает штатно. "
         f"Инцидент начался: {incident_started_at}."
     )
@@ -10681,6 +10859,7 @@ def close_calendar_scheduler_incident(
         incident_type,
         "recovered",
         message,
+        actor_username=actor_username,
         created_at=now_value,
     )
     conn.commit()
@@ -10700,6 +10879,113 @@ def close_calendar_scheduler_incident(
             pass
 
     return len(recipients)
+
+
+def acknowledge_calendar_scheduler_incident(
+    company_id,
+    actor_username,
+):
+    now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    c = conn.cursor()
+    incident = c.execute("""
+    SELECT
+        active_incident,
+        incident_message,
+        incident_acknowledged_at
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+
+    if not incident or not str(incident["active_incident"] or ""):
+        conn.close()
+        return {
+            "ok": False,
+            "error": "incident_not_found",
+            "message": "Активный инцидент не найден.",
+        }
+
+    if incident["incident_acknowledged_at"]:
+        conn.close()
+        return {
+            "ok": False,
+            "error": "already_acknowledged",
+            "message": "Инцидент уже принят в работу.",
+        }
+
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET incident_acknowledged_at=?,
+        incident_acknowledged_by=?
+    WHERE company_id=?
+      AND active_incident!=''
+      AND incident_acknowledged_at IS NULL
+    """, (
+        now_value,
+        actor_username,
+        company_id,
+    ))
+
+    if c.rowcount == 0:
+        conn.close()
+        return {
+            "ok": False,
+            "error": "already_acknowledged",
+            "message": "Инцидент уже принят в работу.",
+        }
+
+    log_calendar_scheduler_incident_event(
+        c,
+        company_id,
+        incident["active_incident"],
+        "acknowledged",
+        incident["incident_message"],
+        actor_username=actor_username,
+        created_at=now_value,
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "ok": True,
+        "message": "Инцидент принят в работу.",
+        "acknowledged_at": now_value,
+        "acknowledged_by": actor_username,
+    }
+
+
+def log_calendar_scheduler_recovery_attempt(
+    company_id,
+    event_type,
+    actor_username,
+    message,
+):
+    if event_type not in {"recovery_started", "recovery_failed"}:
+        return False
+
+    conn = connect()
+    c = conn.cursor()
+    incident = c.execute("""
+    SELECT active_incident
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+
+    if not incident or not str(incident["active_incident"] or ""):
+        conn.close()
+        return False
+
+    log_calendar_scheduler_incident_event(
+        c,
+        company_id,
+        incident["active_incident"],
+        event_type,
+        message,
+        actor_username=actor_username,
+    )
+    conn.commit()
+    conn.close()
+    return True
 
 
 async def run_calendar_plan_scheduler(
@@ -11305,61 +11591,16 @@ async def api_calendar_dispatch_incident_acknowledge(request: Request):
             status_code=403,
         )
 
-    now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+    result = acknowledge_calendar_scheduler_incident(
+        company_id,
+        username,
+    )
+
+    if not result["ok"]:
+        return JSONResponse(result, status_code=409)
+
     conn = connect()
     c = conn.cursor()
-    incident = c.execute("""
-    SELECT
-        active_incident,
-        incident_message,
-        incident_acknowledged_at
-    FROM calendar_plan_scheduler_status
-    WHERE company_id=?
-    """, (company_id,)).fetchone()
-
-    if not incident or not str(incident["active_incident"] or ""):
-        conn.close()
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "incident_not_found",
-                "message": "Активный инцидент не найден.",
-            },
-            status_code=409,
-        )
-
-    if incident["incident_acknowledged_at"]:
-        conn.close()
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "already_acknowledged",
-                "message": "Инцидент уже принят в работу.",
-            },
-            status_code=409,
-        )
-
-    c.execute("""
-    UPDATE calendar_plan_scheduler_status
-    SET incident_acknowledged_at=?,
-        incident_acknowledged_by=?
-    WHERE company_id=?
-      AND active_incident!=''
-      AND incident_acknowledged_at IS NULL
-    """, (
-        now_value,
-        username,
-        company_id,
-    ))
-    log_calendar_scheduler_incident_event(
-        c,
-        company_id,
-        incident["active_incident"],
-        "acknowledged",
-        incident["incident_message"],
-        actor_username=username,
-        created_at=now_value,
-    )
     c.execute("""
     UPDATE notifications
     SET is_read=1
@@ -11374,12 +11615,7 @@ async def api_calendar_dispatch_incident_acknowledge(request: Request):
     conn.commit()
     conn.close()
 
-    return {
-        "ok": True,
-        "message": "Инцидент принят в работу.",
-        "acknowledged_at": now_value,
-        "acknowledged_by": username,
-    }
+    return result
 
 
 async def run_calendar_plan_scheduler_for_all_companies(now_dt=None):
