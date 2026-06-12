@@ -26,6 +26,11 @@ h1{margin:0;font-size:32px}
 .week-plans-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin-bottom:12px}
 .week-plans-title{margin:0;font-size:18px}
 .week-plans-note{margin-top:4px;color:#6b7280;font-size:12px;font-weight:800}
+.week-plans-controls{display:grid;gap:8px;justify-items:end}
+.week-plans-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.week-plan-button{padding:9px 11px;border:0;border-radius:7px;background:#2563eb;color:white;font-size:12px;font-weight:900;cursor:pointer}
+.week-plan-button.remind{background:#d97706}
+.week-plan-button:disabled{cursor:not-allowed;opacity:.5}
 .week-plans-stats{display:flex;gap:8px;flex-wrap:wrap}
 .week-plans-stat{padding:6px 8px;border-radius:6px;background:#e5e7eb;color:#374151;font-size:11px;font-weight:900}
 .week-plans-grid{display:grid;grid-template-columns:repeat(7,minmax(145px,1fr));gap:8px}
@@ -125,6 +130,8 @@ h1{margin:0;font-size:32px}
     h1{font-size:27px}
     .summary{grid-template-columns:1fr 1fr}
     .week-plans-head{align-items:flex-start;flex-direction:column}
+    .week-plans-controls{width:100%;justify-items:stretch}
+    .week-plans-actions,.week-plan-button{width:100%}
     .week-plans-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(220px,72vw);overflow-x:auto;padding-bottom:5px;scroll-snap-type:x proximity}
     .week-plan-day{scroll-snap-align:start}
     .header-actions,.header-actions .button,.toolbar,.filters,.filters>div,.filters select,.filters button,.filters a,.week-nav,.week-nav a,.week-jump,.week-jump input,.week-jump button{width:100%}
@@ -186,11 +193,31 @@ h1{margin:0;font-size:32px}
                 <h2 class="week-plans-title" id="week-plans-title">Планы команды на неделю</h2>
                 <div class="week-plans-note">Публикация и принятие дневных маршрутов исполнителями</div>
             </div>
-            <div class="week-plans-stats">
-                <span class="week-plans-stat">Опубликовано: {{ week_publication["summary"]["published_days"] }}</span>
-                <span class="week-plans-stat">Черновики: {{ week_publication["summary"]["draft_days"] }}</span>
-                <span class="week-plans-stat">Изменено: {{ week_publication["summary"]["changed_days"] }}</span>
-                <span class="week-plans-stat">Ожидают принятия: {{ week_publication["summary"]["pending_acknowledgements"] }}</span>
+            <div class="week-plans-controls">
+                <div class="week-plans-actions">
+                    <button
+                        class="week-plan-button"
+                        id="publish-week-plans"
+                        type="button"
+                        {% if not week_publication["summary"]["publishable_days"] %}disabled{% endif %}
+                    >
+                        Опубликовать готовые ({{ week_publication["summary"]["publishable_days"] }})
+                    </button>
+                    <button
+                        class="week-plan-button remind"
+                        id="remind-week-plans"
+                        type="button"
+                        {% if not week_publication["summary"]["remindable_workers"] %}disabled{% endif %}
+                    >
+                        Напомнить команде ({{ week_publication["summary"]["remindable_workers"] }})
+                    </button>
+                </div>
+                <div class="week-plans-stats">
+                    <span class="week-plans-stat">Опубликовано: {{ week_publication["summary"]["published_days"] }}</span>
+                    <span class="week-plans-stat">Черновики: {{ week_publication["summary"]["draft_days"] }}</span>
+                    <span class="week-plans-stat">Изменено: {{ week_publication["summary"]["changed_days"] }}</span>
+                    <span class="week-plans-stat">Ожидают принятия: {{ week_publication["summary"]["pending_acknowledgements"] }}</span>
+                </div>
             </div>
         </header>
         <div class="week-plans-grid">
@@ -213,8 +240,15 @@ h1{margin:0;font-size:32px}
                     {% endif %}
                     {% elif day["state"] == "changed" %}
                     <span>Требуется повторная публикация</span>
+                    {% if day["readiness_score"] != 100 %}
+                    <span>Готовность расписания: {{ day["readiness_score"] }}</span>
+                    {% endif %}
                     {% elif day["task_count"] and day["state"] == "draft" %}
-                    <span>Требуется публикация</span>
+                    {% if day["readiness_score"] == 100 %}
+                    <span>Готов к публикации</span>
+                    {% else %}
+                    <span>Готовность расписания: {{ day["readiness_score"] }}</span>
+                    {% endif %}
                     {% endif %}
                 </div>
                 <span class="week-plan-action">Открыть день</span>
@@ -402,6 +436,8 @@ h1{margin:0;font-size:32px}
     const plannerProblemList = document.getElementById("planner-problem-list");
     const plannerSelectAll = document.getElementById("planner-select-all");
     const plannerSelected = document.getElementById("planner-selected");
+    const publishWeekPlans = document.getElementById("publish-week-plans");
+    const remindWeekPlans = document.getElementById("remind-week-plans");
     let plannerItems = [];
     let draggedCard = null;
 
@@ -441,6 +477,53 @@ h1{margin:0;font-size:32px}
         }
 
         return message;
+    }
+
+    async function runWeekPlanAction(action) {
+        const isPublish = action === "publish_ready";
+        const confirmation = isPublish
+            ? "Опубликовать все готовые планы этой недели?"
+            : "Отправить напоминания всем, кто ещё не принял актуальный план?";
+
+        if (!window.confirm(confirmation)) {
+            return;
+        }
+
+        publishWeekPlans.disabled = true;
+        remindWeekPlans.disabled = true;
+
+        try {
+            const response = await fetch("/api/calendar/dispatch/week-plans", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    action,
+                    week_start: "{{ selected_week_start }}"
+                })
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                throw new Error(data.message || "Не удалось обработать планы недели.");
+            }
+
+            showToast(data.message);
+            window.setTimeout(() => window.location.reload(), 1200);
+        } catch (error) {
+            showToast(
+                error.message || "Не удалось обработать планы недели.",
+                true
+            );
+            publishWeekPlans.disabled = (
+                {{ 0 if week_publication["summary"]["publishable_days"] else 1 }}
+                === 1
+            );
+            remindWeekPlans.disabled = (
+                {{ 0 if week_publication["summary"]["remindable_workers"] else 1 }}
+                === 1
+            );
+        }
     }
 
     function updatePlannerSelection() {
@@ -683,6 +766,12 @@ h1{margin:0;font-size:32px}
         if (event.target === plannerDialog) {
             plannerDialog.close();
         }
+    });
+    publishWeekPlans.addEventListener("click", () => {
+        runWeekPlanAction("publish_ready");
+    });
+    remindWeekPlans.addEventListener("click", () => {
+        runWeekPlanAction("remind_pending");
     });
 })();
 </script>

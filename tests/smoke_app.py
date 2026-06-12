@@ -5266,10 +5266,11 @@ async def assert_dispatch_board():
     c.execute("""
     INSERT INTO tasks (
         company_id, client, description, task_date,
-        worker, workers, status, archived, created_at
+        worker, workers, status, archived, created_at,
+        time_from, time_to
     )
     VALUES (2, 'Dispatch mover', 'Dispatch smoke', ?,
-            'helper2', 'helper2', 'Новая', 0, ?)
+            'helper2', 'helper2', 'Новая', 0, ?, '09:00', '10:00')
     """, (
         original_date,
         datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -5278,10 +5279,11 @@ async def assert_dispatch_board():
     c.execute("""
     INSERT INTO tasks (
         company_id, client, description, task_date,
-        worker, workers, status, archived, created_at
+        worker, workers, status, archived, created_at,
+        time_from, time_to
     )
     VALUES (2, 'Dispatch blocker', 'Dispatch smoke', ?,
-            'helper2', 'helper2', 'Новая', 0, ?)
+            'helper2', 'helper2', 'Новая', 0, ?, '10:00', '11:00')
     """, (
         capacity_date,
         datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -5384,6 +5386,12 @@ async def assert_dispatch_board():
     assert publication_day["url"] == (
         f"/calendar/day?date={original_date}"
     )
+    assert page.context["week_publication"]["summary"][
+        "publishable_days"
+    ] == 1
+    assert 'id="publish-week-plans"' in page_html
+    assert 'id="remind-week-plans"' in page_html
+    assert "/api/calendar/dispatch/week-plans" in page_html
     backlog_column = page.context["board_columns"][0]
     assert backlog_column["is_backlog"] is True
     assert any(
@@ -5402,6 +5410,152 @@ async def assert_dispatch_board():
     assert filtered_page.context["selected_worker"] == "helper2"
     assert filtered_page.context["summary"]["tasks"] == 2
     assert "Dispatch backlog" not in filtered_page.body.decode("utf-8")
+
+    anonymous_week_action = (
+        await crm.api_calendar_dispatch_week_plans(
+            make_json_request(
+                None,
+                "/api/calendar/dispatch/week-plans",
+                {
+                    "action": "publish_ready",
+                    "week_start": original_date,
+                },
+            )
+        )
+    )
+    assert anonymous_week_action.status_code == 401
+    worker_week_action = (
+        await crm.api_calendar_dispatch_week_plans(
+            make_json_request(
+                "helper2",
+                "/api/calendar/dispatch/week-plans",
+                {
+                    "action": "publish_ready",
+                    "week_start": original_date,
+                },
+            )
+        )
+    )
+    assert worker_week_action.status_code == 403
+    invalid_week_action = (
+        await crm.api_calendar_dispatch_week_plans(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/week-plans",
+                {
+                    "action": "remove_all",
+                    "week_start": original_date,
+                },
+            )
+        )
+    )
+    assert invalid_week_action.status_code == 400
+    invalid_week_date = (
+        await crm.api_calendar_dispatch_week_plans(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/week-plans",
+                {
+                    "action": "publish_ready",
+                    "week_start": "bad-date",
+                },
+            )
+        )
+    )
+    assert invalid_week_date.status_code == 400
+    outsider_week_action = (
+        await crm.api_calendar_dispatch_week_plans(
+            make_json_request(
+                "manager1",
+                "/api/calendar/dispatch/week-plans",
+                {
+                    "action": "publish_ready",
+                    "week_start": original_date,
+                },
+            )
+        )
+    )
+    assert outsider_week_action["summary"]["published_days"] == 0
+    assert outsider_week_action["summary"]["updated_days"] == 0
+    assert outsider_week_action["summary"]["notified_workers"] == 0
+
+    original_send_message_to_chat = crm.send_message_to_chat
+    week_plan_messages = []
+    crm.send_message_to_chat = (
+        lambda chat_id, text: week_plan_messages.append(
+            (chat_id, text)
+        )
+    )
+
+    try:
+        week_publish = await crm.api_calendar_dispatch_week_plans(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/week-plans",
+                {
+                    "action": "publish_ready",
+                    "week_start": original_date,
+                },
+            )
+        )
+        week_remind = await crm.api_calendar_dispatch_week_plans(
+            make_json_request(
+                "owner2",
+                "/api/calendar/dispatch/week-plans",
+                {
+                    "action": "remind_pending",
+                    "week_start": original_date,
+                },
+            )
+        )
+        week_remind_again = (
+            await crm.api_calendar_dispatch_week_plans(
+                make_json_request(
+                    "owner2",
+                    "/api/calendar/dispatch/week-plans",
+                    {
+                        "action": "remind_pending",
+                        "week_start": original_date,
+                    },
+                )
+            )
+        )
+    finally:
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert week_publish["summary"] == {
+        "published_days": 1,
+        "updated_days": 0,
+        "notified_workers": 1,
+        "skipped_days": 6,
+    }
+    assert any(
+        item["date"] == capacity_date
+        and item["status"] == "published"
+        for item in week_publish["items"]
+    )
+    assert week_remind["summary"]["affected_days"] == 1
+    assert week_remind["summary"]["sent_reminders"] == 1
+    assert week_remind_again["summary"]["sent_reminders"] == 0
+    assert week_remind_again["summary"]["cooldown_workers"] == 1
+    assert len(week_plan_messages) == 2
+    assert all(
+        chat_id == "dispatch-smoke-chat"
+        for chat_id, _ in week_plan_messages
+    )
+    assert capacity_date in week_plan_messages[0][1]
+    assert capacity_date in week_plan_messages[1][1]
+
+    published_week_page = await crm.calendar_dispatch_page(
+        make_asgi_request("owner2", "/calendar/dispatch"),
+        week_start=original_date,
+    )
+    published_week_summary = published_week_page.context[
+        "week_publication"
+    ]["summary"]
+    assert published_week_summary["published_days"] == 2
+    assert published_week_summary["pending_acknowledgements"] == 1
+    assert published_week_summary["remindable_workers"] == 0
 
     anonymous = await crm.api_calendar_dispatch_move(
         make_json_request(
@@ -5581,16 +5735,29 @@ async def assert_dispatch_board():
     )
     c.execute("""
     DELETE FROM calendar_day_publications
-    WHERE company_id=2 AND plan_date=?
-    """, (original_date,))
+    WHERE company_id=2 AND plan_date IN (?, ?)
+    """, (original_date, capacity_date))
     c.execute("""
     DELETE FROM calendar_day_acknowledgements
-    WHERE company_id=2 AND plan_date=?
-    """, (original_date,))
+    WHERE company_id=2 AND plan_date IN (?, ?)
+    """, (original_date, capacity_date))
     c.execute("""
     DELETE FROM calendar_day_ack_reminders
-    WHERE company_id=2 AND plan_date=?
-    """, (original_date,))
+    WHERE company_id=2 AND plan_date IN (?, ?)
+    """, (original_date, capacity_date))
+    c.execute("""
+    DELETE FROM notifications
+    WHERE company_id=2
+      AND link IN (?, ?)
+      AND title IN (
+          'План дня опубликован',
+          'План дня обновлён',
+          'Подтвердите план дня'
+      )
+    """, (
+        f"/calendar/day?date={original_date}",
+        f"/calendar/day?date={capacity_date}",
+    ))
     c.execute(
         "DELETE FROM worker_unavailability WHERE id=?",
         (absence_id,),
