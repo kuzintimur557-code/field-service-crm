@@ -7755,6 +7755,12 @@ async def assert_platform_calendar_health():
             in detail_html
         )
         assert "Сначала примите инцидент в работу." in detail_html
+        assert "Следующее действие" in detail_html
+        assert "Принять в работу" in detail_html
+        assert (
+            "Инцидент ещё не закреплён за администратором."
+            in detail_html
+        )
         assert "Регламент: реакция" in detail_html
         anonymous_detail_export = (
             await crm.platform_calendar_company_health_export(
@@ -7797,6 +7803,10 @@ async def assert_platform_calendar_health():
         assert "Последние запуски" in detail_export_csv
         assert "История инцидентов" in detail_export_csv
         assert "Операции с планами" in detail_export_csv
+        assert "Следующее действие,Принять в работу" in (
+            detail_export_csv
+        )
+        assert "Подсказка действия" in detail_export_csv
         assert company_name in detail_export_csv
         assert "Smoke scheduler failure" in detail_export_csv
         assert "Публикация готовых планов" in detail_export_csv

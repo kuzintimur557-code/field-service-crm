@@ -6260,6 +6260,8 @@ async def platform_calendar_company_health_export(
         "Восстановление просрочено",
         "да" if company["recovery_overdue"] else "нет",
     ])
+    writer.writerow(["Следующее действие", company["next_action_label"]])
+    writer.writerow(["Подсказка действия", company["next_action_hint"]])
     writer.writerow([])
 
     writer.writerow(["Последние запуски"])
