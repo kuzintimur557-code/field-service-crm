@@ -6435,6 +6435,12 @@ def get_platform_release_readiness_history(limit=8):
             else 0
         )
         item["delta_score"] = delta
+        item["detail_url"] = (
+            f"/platform/readiness/snapshots/{item['id']}"
+        )
+        item["export_url"] = (
+            f"/platform/readiness/snapshots/{item['id']}/export"
+        )
         if delta > 0:
             item["delta_label"] = f"+{delta}"
             item["delta_tone"] = "ok"
@@ -6446,6 +6452,61 @@ def get_platform_release_readiness_history(limit=8):
             item["delta_tone"] = "warning"
 
     return history
+
+
+def get_platform_release_readiness_snapshot(snapshot_id):
+    conn = connect()
+    c = conn.cursor()
+    row = c.execute("""
+    SELECT *
+    FROM platform_release_readiness_snapshots
+    WHERE id=?
+    """, (snapshot_id,)).fetchone()
+
+    if not row:
+        conn.close()
+        return None
+
+    previous_row = c.execute("""
+    SELECT *
+    FROM platform_release_readiness_snapshots
+    WHERE id<?
+    ORDER BY id DESC
+    LIMIT 1
+    """, (snapshot_id,)).fetchone()
+    conn.close()
+    snapshot = dict(row)
+    previous = dict(previous_row) if previous_row else None
+
+    try:
+        payload = json.loads(snapshot.get("payload_json") or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    snapshot["checks"] = payload.get("checks") or []
+    snapshot["categories"] = payload.get("categories") or []
+    snapshot["next_actions"] = payload.get("next_actions") or []
+    snapshot["environment"] = payload.get("environment") or ""
+    delta = (
+        int(snapshot["score"] or 0) - int(previous["score"] or 0)
+        if previous
+        else 0
+    )
+    snapshot["delta_score"] = delta
+    if delta > 0:
+        snapshot["delta_label"] = f"+{delta}"
+        snapshot["delta_tone"] = "ok"
+    elif delta < 0:
+        snapshot["delta_label"] = str(delta)
+        snapshot["delta_tone"] = "critical"
+    else:
+        snapshot["delta_label"] = "0"
+        snapshot["delta_tone"] = "warning"
+    snapshot["detail_url"] = f"/platform/readiness/snapshots/{snapshot['id']}"
+    snapshot["export_url"] = (
+        f"/platform/readiness/snapshots/{snapshot['id']}/export"
+    )
+    return snapshot
 
 
 @app.get("/platform", response_class=HTMLResponse)
@@ -6701,6 +6762,162 @@ async def platform_readiness_export(request: Request):
         headers={
             "Content-Disposition": (
                 "attachment; filename=platform_release_readiness.csv"
+            ),
+        },
+    )
+
+
+@app.get(
+    "/platform/readiness/snapshots/{snapshot_id}",
+    response_class=HTMLResponse,
+)
+async def platform_readiness_snapshot_page(
+    request: Request,
+    snapshot_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    snapshot = get_platform_release_readiness_snapshot(snapshot_id)
+
+    if not snapshot:
+        return RedirectResponse(
+            "/platform/readiness?error=snapshot_not_found",
+            status_code=302,
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_readiness_snapshot.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "snapshot": snapshot,
+        },
+    )
+
+
+@app.get("/platform/readiness/snapshots/{snapshot_id}/export")
+async def platform_readiness_snapshot_export(
+    request: Request,
+    snapshot_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    snapshot = get_platform_release_readiness_snapshot(snapshot_id)
+
+    if not snapshot:
+        return RedirectResponse(
+            "/platform/readiness?error=snapshot_not_found",
+            status_code=302,
+        )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Снимок готовности релиза"])
+    writer.writerow(["ID", snapshot["id"]])
+    writer.writerow(["Дата", snapshot["created_at"]])
+    writer.writerow(["Автор", snapshot["created_by"]])
+    writer.writerow(["Статус", snapshot["status_label"]])
+    writer.writerow(["Оценка", snapshot["score"]])
+    writer.writerow(["Динамика", snapshot["delta_label"]])
+    writer.writerow(["Критично", snapshot["critical_count"]])
+    writer.writerow(["Внимание", snapshot["warning_count"]])
+    writer.writerow(["Готово", snapshot["ok_count"]])
+    writer.writerow(["Резюме", snapshot["headline"]])
+    writer.writerow(["Окружение", snapshot["environment"]])
+    writer.writerow([])
+
+    writer.writerow(["Категории"])
+    writer.writerow([
+        "Категория",
+        "Статус",
+        "Оценка",
+        "Проверок",
+        "Готово",
+        "Внимание",
+        "Критично",
+    ])
+    for category in snapshot["categories"]:
+        writer.writerow([
+            category["label"],
+            category["status_label"],
+            category["score"],
+            category["checks"],
+            category["ok"],
+            category["warning"],
+            category["critical"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Следующие действия"])
+    writer.writerow([
+        "Категория",
+        "Проверка",
+        "Статус",
+        "Описание",
+        "Действие",
+        "Ссылка",
+    ])
+    for check in snapshot["next_actions"]:
+        writer.writerow([
+            check["category_label"],
+            check["title"],
+            check["status_label"],
+            check["description"],
+            check["action"],
+            check["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Все проверки"])
+    writer.writerow([
+        "Категория",
+        "Ключ",
+        "Проверка",
+        "Статус",
+        "Вес",
+        "Баллы",
+        "Описание",
+        "Действие",
+        "Ссылка",
+    ])
+    for check in snapshot["checks"]:
+        writer.writerow([
+            check["category_label"],
+            check["key"],
+            check["title"],
+            check["status_label"],
+            check["weight"],
+            check["points"],
+            check["description"],
+            check["action"],
+            check["url"],
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename="
+                f"platform_release_readiness_snapshot_{snapshot_id}.csv"
             ),
         },
     )

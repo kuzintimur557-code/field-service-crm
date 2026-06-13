@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Снимок готовности релиза</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1180px;margin:auto;padding:28px}
+.header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start;margin-bottom:18px}
+.eyebrow{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
+h1{margin:6px 0 0;font-size:32px}
+.subtitle{margin-top:8px;color:#6b7280;font-size:13px;font-weight:800;line-height:1.5}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.button{display:inline-flex;padding:11px 13px;border-radius:9px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
+.button.secondary{border:1px solid #d1d5db;background:white;color:#374151}
+.summary{display:grid;grid-template-columns:180px repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.score{display:flex;min-height:150px;align-items:center;justify-content:center;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#047857;font-size:38px;font-weight:900}
+.score.warning{border-color:#fde68a;background:#fffbeb;color:#b45309}
+.score.critical{border-color:#fecaca;background:#fef2f2;color:#b91c1c}
+.metric{padding:18px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.metric-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
+.metric-value{margin-top:8px;font-size:24px;font-weight:900}
+.section{margin-top:18px}
+.section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
+.section-title{margin:0;font-size:20px}
+.section-note{color:#6b7280;font-size:12px;font-weight:800}
+.categories{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.category{padding:14px;border:1px solid #bbf7d0;border-radius:10px;background:#f8fffb}
+.category.warning{border-color:#fde68a;background:#fffdf4}
+.category.critical{border-color:#fecaca;background:#fff7f7}
+.category-label{font-size:13px;font-weight:900}
+.category-score{margin-top:8px;font-size:24px;font-weight:900}
+.category-meta{margin-top:5px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.4}
+.list{display:grid;gap:8px}
+.item{display:grid;grid-template-columns:minmax(0,1fr) 100px auto;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.item.warning{border-color:#fde68a;background:#fffdf4}
+.item.critical{border-color:#fecaca;background:#fff7f7}
+.item-title{font-size:14px;font-weight:900}
+.item-text{margin-top:5px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.45}
+.badge{display:inline-flex;justify-content:center;padding:7px 9px;border-radius:8px;background:#d1fae5;color:#065f46;font-size:11px;font-weight:900;text-transform:uppercase}
+.badge.warning{background:#fef3c7;color:#92400e}
+.badge.critical{background:#991b1b;color:white}
+.check-link{display:inline-flex;justify-content:center;padding:9px 11px;border:1px solid #d1d5db;border-radius:9px;background:white;color:#111827;text-decoration:none;font-size:12px;font-weight:900}
+.empty{padding:16px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#065f46;font-weight:900}
+@media(max-width:860px){
+.container{padding:16px}
+.header{grid-template-columns:1fr}
+.actions{justify-content:stretch}
+.button{width:100%;justify-content:center}
+.summary{grid-template-columns:1fr}
+.categories{grid-template-columns:1fr}
+.section-head{display:block}
+.section-note{margin-top:5px}
+.item{grid-template-columns:1fr}
+.score{min-height:112px}
+.badge,.check-link{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <header class="header">
+        <div>
+            <div class="eyebrow">Платформа</div>
+            <h1>Снимок готовности релиза #{{ snapshot["id"] }}</h1>
+            <div class="subtitle">
+                Сохранено: {{ snapshot["created_at"] }}.
+                Автор: {{ snapshot["created_by"] }}.
+                Окружение: {{ snapshot["environment"] or "не указано" }}.
+            </div>
+        </div>
+        <div class="actions">
+            <a class="button secondary" href="/platform/readiness">Назад</a>
+            <a class="button secondary" href="{{ snapshot['export_url'] }}">Экспорт CSV</a>
+            <a class="button" href="/platform/calendar-health">Инциденты</a>
+        </div>
+    </header>
+
+    <section class="summary">
+        <div class="score {{ snapshot['status'] }}">
+            {{ snapshot["score"] }}%
+        </div>
+        <div class="metric">
+            <div class="metric-label">Статус</div>
+            <div class="metric-value">{{ snapshot["status_label"] }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Динамика</div>
+            <div class="metric-value">{{ snapshot["delta_label"] }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Внимание</div>
+            <div class="metric-value">{{ snapshot["warning_count"] }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Критично</div>
+            <div class="metric-value">{{ snapshot["critical_count"] }}</div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Категории снимка</h2>
+            <div class="section-note">{{ snapshot["headline"] }}</div>
+        </div>
+        {% if snapshot["categories"] %}
+        <div class="categories">
+            {% for category in snapshot["categories"] %}
+            <div class="category {{ category['status'] }}">
+                <div class="category-label">{{ category["label"] }}</div>
+                <div class="category-score">{{ category["score"] }}%</div>
+                <div class="category-meta">
+                    {{ category["status_label"] }} ·
+                    проверок {{ category["checks"] }} ·
+                    критично {{ category["critical"] }} ·
+                    внимание {{ category["warning"] }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">В снимке нет данных по категориям.</div>
+        {% endif %}
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Следующие действия снимка</h2>
+            <div class="section-note">Задачи, которые были актуальны на момент сохранения.</div>
+        </div>
+        {% if snapshot["next_actions"] %}
+        <div class="list">
+            {% for check in snapshot["next_actions"] %}
+            <div class="item {{ check['status'] }}">
+                <div>
+                    <div class="item-title">
+                        {{ check["category_label"] }} · {{ check["title"] }}
+                    </div>
+                    <div class="item-text">
+                        {{ check["description"] }}
+                        {{ check["action"] }}
+                    </div>
+                </div>
+                <span class="badge {{ check['status'] }}">
+                    {{ check["status_label"] }}
+                </span>
+                <a class="check-link" href="{{ check['url'] }}">Открыть</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">На момент снимка не было предупреждений и блокеров.</div>
+        {% endif %}
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Все проверки снимка</h2>
+            <div class="section-note">Полный состав сохранённого состояния.</div>
+        </div>
+        <div class="list">
+            {% for check in snapshot["checks"] %}
+            <div class="item {{ check['status'] }}">
+                <div>
+                    <div class="item-title">
+                        {{ check["category_label"] }} · {{ check["title"] }}
+                    </div>
+                    <div class="item-text">
+                        {{ check["description"] }}
+                        {{ check["action"] }}
+                    </div>
+                </div>
+                <span class="badge {{ check['status'] }}">
+                    {{ check["status_label"] }}
+                </span>
+                <a class="check-link" href="{{ check['url'] }}">Открыть</a>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+</body>
+</html>

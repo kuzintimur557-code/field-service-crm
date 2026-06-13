@@ -9662,6 +9662,10 @@ async def assert_platform_calendar_health():
         assert readiness_history
         assert readiness_history[0]["created_by"] == backup_admin_username
         assert "delta_label" in readiness_history[0]
+        assert readiness_history[0]["detail_url"].startswith(
+            "/platform/readiness/snapshots/"
+        )
+        snapshot_id = readiness_history[0]["id"]
         saved_readiness_page = await crm.platform_readiness_page(
             make_asgi_request("super", "/platform/readiness"),
             notice="snapshot_saved",
@@ -9670,6 +9674,57 @@ async def assert_platform_calendar_health():
         assert "Снимок готовности сохранён." in saved_readiness_html
         assert "История снимков" in saved_readiness_html
         assert backup_admin_username in saved_readiness_html
+        assert f"/platform/readiness/snapshots/{snapshot_id}" in (
+            saved_readiness_html
+        )
+        anonymous_snapshot_page = (
+            await crm.platform_readiness_snapshot_page(
+                make_public_asgi_request(
+                    f"/platform/readiness/snapshots/{snapshot_id}",
+                ),
+                snapshot_id,
+            )
+        )
+        assert anonymous_snapshot_page.status_code == 302
+        assert anonymous_snapshot_page.headers["location"] == "/login"
+        boss_snapshot_page = await crm.platform_readiness_snapshot_page(
+            make_asgi_request(
+                "owner2",
+                f"/platform/readiness/snapshots/{snapshot_id}",
+            ),
+            snapshot_id,
+        )
+        assert boss_snapshot_page.status_code == 302
+        assert boss_snapshot_page.headers["location"] == "/"
+        snapshot_page = await crm.platform_readiness_snapshot_page(
+            make_asgi_request(
+                "super",
+                f"/platform/readiness/snapshots/{snapshot_id}",
+            ),
+            snapshot_id,
+        )
+        assert snapshot_page.status_code == 200
+        snapshot_html = snapshot_page.body.decode("utf-8")
+        assert "Снимок готовности релиза" in snapshot_html
+        assert "Категории снимка" in snapshot_html
+        assert "Следующие действия снимка" in snapshot_html
+        assert "Все проверки снимка" in snapshot_html
+        assert backup_admin_username in snapshot_html
+        assert (
+            f"/platform/readiness/snapshots/{snapshot_id}/export"
+            in snapshot_html
+        )
+        missing_snapshot_page = await crm.platform_readiness_snapshot_page(
+            make_asgi_request(
+                "super",
+                "/platform/readiness/snapshots/999999999",
+            ),
+            999999999,
+        )
+        assert missing_snapshot_page.status_code == 302
+        assert missing_snapshot_page.headers["location"] == (
+            "/platform/readiness?error=snapshot_not_found"
+        )
         anonymous_readiness_export = (
             await crm.platform_readiness_export(
                 make_public_asgi_request("/platform/readiness/export"),
@@ -9698,6 +9753,47 @@ async def assert_platform_calendar_health():
         assert "История снимков" in readiness_csv
         assert "Секрет приложения" in readiness_csv
         assert backup_admin_username in readiness_csv
+        anonymous_snapshot_export = (
+            await crm.platform_readiness_snapshot_export(
+                make_public_asgi_request(
+                    f"/platform/readiness/snapshots/{snapshot_id}/export",
+                ),
+                snapshot_id,
+            )
+        )
+        assert anonymous_snapshot_export.status_code == 302
+        assert anonymous_snapshot_export.headers["location"] == "/login"
+        boss_snapshot_export = (
+            await crm.platform_readiness_snapshot_export(
+                make_asgi_request(
+                    "owner2",
+                    f"/platform/readiness/snapshots/{snapshot_id}/export",
+                ),
+                snapshot_id,
+            )
+        )
+        assert boss_snapshot_export.status_code == 302
+        assert boss_snapshot_export.headers["location"] == "/"
+        snapshot_export_response = (
+            await crm.platform_readiness_snapshot_export(
+                make_asgi_request(
+                    "super",
+                    f"/platform/readiness/snapshots/{snapshot_id}/export",
+                ),
+                snapshot_id,
+            )
+        )
+        assert snapshot_export_response.status_code == 200
+        assert snapshot_export_response.headers["content-disposition"] == (
+            "attachment; filename="
+            f"platform_release_readiness_snapshot_{snapshot_id}.csv"
+        )
+        snapshot_csv = snapshot_export_response.body.decode("utf-8")
+        assert snapshot_csv.startswith("\ufeff")
+        assert "Снимок готовности релиза" in snapshot_csv
+        assert "Категории" in snapshot_csv
+        assert "Все проверки" in snapshot_csv
+        assert backup_admin_username in snapshot_csv
         anonymous_readiness_api = await crm.api_platform_readiness(
             make_public_asgi_request("/api/platform/readiness"),
         )
