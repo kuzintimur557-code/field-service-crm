@@ -5891,6 +5891,140 @@ async def platform_calendar_incident_analytics_page(
     )
 
 
+@app.get("/platform/calendar-health/analytics/export")
+async def platform_calendar_incident_analytics_export(
+    request: Request,
+    days: int = 30,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    analytics = get_platform_calendar_incident_analytics(days=days)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    summary = analytics["summary"]
+
+    writer.writerow(["Сводка"])
+    writer.writerow(["Период", analytics["date_from"], analytics["date_to"]])
+    writer.writerow(["Инцидентов", summary["incidents"]])
+    writer.writerow(["Восстановлено", summary["recovered"]])
+    writer.writerow(["Активных", summary["active"]])
+    writer.writerow(["Закрыто %", summary["recovery_rate"]])
+    writer.writerow(["SLA реакции %", summary["response_sla_percent"]])
+    writer.writerow([
+        "SLA восстановления %",
+        summary["recovery_sla_percent"],
+    ])
+    writer.writerow([
+        "Средняя реакция",
+        summary["average_response_label"],
+    ])
+    writer.writerow([
+        "Среднее восстановление",
+        summary["average_recovery_label"],
+    ])
+    writer.writerow(["Попыток восстановления", summary["recovery_attempts"]])
+    writer.writerow(["Ошибок восстановления", summary["recovery_failures"]])
+    writer.writerow(["Эскалаций", summary["escalations"]])
+    writer.writerow([])
+
+    writer.writerow(["Компании"])
+    writer.writerow([
+        "ID компании",
+        "Компания",
+        "Инциденты",
+        "Восстановлено",
+        "Активные",
+        "Эскалации",
+        "Просрочено восстановление",
+        "Средняя реакция",
+        "Среднее восстановление",
+        "Ссылка",
+    ])
+    for company in analytics["companies"]:
+        writer.writerow([
+            company["company_id"],
+            company["company_name"],
+            company["incidents"],
+            company["recovered"],
+            company["active"],
+            company["escalations"],
+            company["recovery_overdue"],
+            company["average_response_label"],
+            company["average_recovery_label"],
+            company["detail_url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Причины"])
+    writer.writerow([
+        "Тип",
+        "Инциденты",
+        "Восстановлено",
+        "Активные",
+    ])
+    for incident_type in analytics["types"]:
+        writer.writerow([
+            incident_type["label"],
+            incident_type["incidents"],
+            incident_type["recovered"],
+            incident_type["active"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Динамика"])
+    writer.writerow(["Дата", "Инциденты", "Восстановлено", "Активные"])
+    for day in analytics["daily"]:
+        writer.writerow([
+            day["date"],
+            day["incidents"],
+            day["recovered"],
+            day["active"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Последние инциденты"])
+    writer.writerow([
+        "Компания",
+        "Тип",
+        "Открыт",
+        "Реакция",
+        "Восстановление",
+        "Состояние",
+        "Эскалации",
+    ])
+    for incident in analytics["recent_sessions"]:
+        writer.writerow([
+            incident["company_name"],
+            incident["incident_type_label"],
+            incident["opened_at_value"],
+            incident["response_label"],
+            (
+                incident["recovery_work_label"]
+                if incident["is_active"] and incident["acknowledged_at"]
+                else incident["recovery_label"]
+            ),
+            incident["status_label"],
+            incident["escalations"],
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename="
+                f"platform_calendar_incidents_{analytics['days']}d.csv"
+            ),
+        },
+    )
+
+
 @app.get(
     "/platform/calendar-health/{company_id}",
     response_class=HTMLResponse,

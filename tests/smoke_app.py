@@ -9216,6 +9216,10 @@ async def assert_platform_calendar_health():
         analytics_html = analytics_page.body.decode("utf-8")
         assert "Аналитика календарных инцидентов" in analytics_html
         assert (
+            "/platform/calendar-health/analytics/export?days=30"
+            in analytics_html
+        )
+        assert (
             "Реакция до "
             f"{analytics['policy']['response_minutes']} минут"
             in analytics_html
@@ -9229,6 +9233,53 @@ async def assert_platform_calendar_health():
         assert "Последние инциденты" in analytics_html
         assert "Динамика" in analytics_html
         assert company_name in analytics_html
+        anonymous_analytics_export = (
+            await crm.platform_calendar_incident_analytics_export(
+                make_public_asgi_request(
+                    "/platform/calendar-health/analytics/export"
+                ),
+            )
+        )
+        assert anonymous_analytics_export.status_code == 302
+        assert anonymous_analytics_export.headers["location"] == "/login"
+        boss_analytics_export = (
+            await crm.platform_calendar_incident_analytics_export(
+                make_asgi_request(
+                    "owner2",
+                    "/platform/calendar-health/analytics/export",
+                ),
+            )
+        )
+        assert boss_analytics_export.status_code == 302
+        assert boss_analytics_export.headers["location"] == "/"
+        analytics_export_response = (
+            await crm.platform_calendar_incident_analytics_export(
+                make_asgi_request(
+                    "super",
+                    "/platform/calendar-health/analytics/export?days=30",
+                ),
+                days=30,
+            )
+        )
+        assert analytics_export_response.status_code == 200
+        assert (
+            analytics_export_response.headers["content-disposition"]
+            == (
+                "attachment; filename="
+                "platform_calendar_incidents_30d.csv"
+            )
+        )
+        analytics_export_csv = (
+            analytics_export_response.body.decode("utf-8")
+        )
+        assert analytics_export_csv.startswith("\ufeff")
+        assert "Сводка" in analytics_export_csv
+        assert "Компании" in analytics_export_csv
+        assert "Причины" in analytics_export_csv
+        assert "Динамика" in analytics_export_csv
+        assert "Последние инциденты" in analytics_export_csv
+        assert company_name in analytics_export_csv
+        assert "Передан платформе" in analytics_export_csv
         missing_detail = (
             await crm.platform_calendar_company_health_page(
                 make_asgi_request(
