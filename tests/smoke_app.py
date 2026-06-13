@@ -7717,6 +7717,10 @@ async def assert_platform_calendar_health():
         assert "Smoke scheduler failure" in detail_html
         assert "Публикация готовых планов" in detail_html
         assert (
+            f"/platform/calendar-health/{company_id}/export"
+            in detail_html
+        )
+        assert (
             f"/platform/calendar-health/{company_id}/acknowledge"
             in detail_html
         )
@@ -7735,6 +7739,63 @@ async def assert_platform_calendar_health():
         )
         assert "Сначала примите инцидент в работу." in detail_html
         assert "Регламент: реакция" in detail_html
+        anonymous_detail_export = (
+            await crm.platform_calendar_company_health_export(
+                make_public_asgi_request(
+                    f"/platform/calendar-health/{company_id}/export"
+                ),
+                company_id,
+            )
+        )
+        assert anonymous_detail_export.status_code == 302
+        assert anonymous_detail_export.headers["location"] == "/login"
+        boss_detail_export = (
+            await crm.platform_calendar_company_health_export(
+                make_asgi_request(
+                    "owner2",
+                    f"/platform/calendar-health/{company_id}/export",
+                ),
+                company_id,
+            )
+        )
+        assert boss_detail_export.status_code == 302
+        assert boss_detail_export.headers["location"] == "/"
+        detail_export_response = (
+            await crm.platform_calendar_company_health_export(
+                make_asgi_request(
+                    "super",
+                    f"/platform/calendar-health/{company_id}/export",
+                ),
+                company_id,
+            )
+        )
+        assert detail_export_response.status_code == 200
+        assert detail_export_response.headers["content-disposition"] == (
+            "attachment; filename="
+            f"platform_calendar_company_{company_id}.csv"
+        )
+        detail_export_csv = detail_export_response.body.decode("utf-8")
+        assert detail_export_csv.startswith("\ufeff")
+        assert "Сводка" in detail_export_csv
+        assert "Последние запуски" in detail_export_csv
+        assert "История инцидентов" in detail_export_csv
+        assert "Операции с планами" in detail_export_csv
+        assert company_name in detail_export_csv
+        assert "Smoke scheduler failure" in detail_export_csv
+        assert "Публикация готовых планов" in detail_export_csv
+        missing_detail_export = (
+            await crm.platform_calendar_company_health_export(
+                make_asgi_request(
+                    "super",
+                    "/platform/calendar-health/999999/export",
+                ),
+                999999,
+            )
+        )
+        assert missing_detail_export.status_code == 302
+        assert missing_detail_export.headers["location"] == (
+            "/platform/calendar-health?error=company_not_found"
+        )
         anonymous_note = await crm.platform_calendar_incident_note(
             make_public_asgi_request(
                 f"/platform/calendar-health/{company_id}/note"

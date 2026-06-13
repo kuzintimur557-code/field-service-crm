@@ -6025,6 +6025,136 @@ async def platform_calendar_incident_analytics_export(
     )
 
 
+@app.get("/platform/calendar-health/{company_id}/export")
+async def platform_calendar_company_health_export(
+    request: Request,
+    company_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    detail = get_platform_calendar_company_detail(company_id)
+
+    if not detail:
+        return RedirectResponse(
+            "/platform/calendar-health?error=company_not_found",
+            status_code=302,
+        )
+
+    company = detail["company"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["Сводка"])
+    writer.writerow(["ID компании", company["company_id"]])
+    writer.writerow(["Компания", company["company_name"]])
+    writer.writerow(["Владелец", company["owner_username"]])
+    writer.writerow(["Состояние", company["status_label"]])
+    writer.writerow(["Приоритет", company["priority_label"]])
+    writer.writerow([
+        "Автоматизация включена",
+        "да" if company["automation_enabled"] else "нет",
+    ])
+    writer.writerow([
+        "Автопубликация",
+        "да" if company["calendar_auto_publish"] else "нет",
+    ])
+    writer.writerow([
+        "Автонаповещения",
+        "да" if company["calendar_auto_remind"] else "нет",
+    ])
+    writer.writerow(["Активный инцидент", company["incident_label"]])
+    writer.writerow(["Сообщение инцидента", company["incident_message"] or ""])
+    writer.writerow(["Возраст инцидента", company["incident_age_label"] or ""])
+    writer.writerow([
+        "Принят в работу",
+        "да" if company["is_acknowledged"] else "нет",
+    ])
+    writer.writerow(["Ответственный", company["assignee_username"] or ""])
+    writer.writerow([
+        "Восстановление просрочено",
+        "да" if company["recovery_overdue"] else "нет",
+    ])
+    writer.writerow([])
+
+    writer.writerow(["Последние запуски"])
+    writer.writerow([
+        "Состояние",
+        "Источник",
+        "Начало",
+        "Завершение",
+        "Период с",
+        "Период по",
+        "Изменено дней",
+        "Уведомлений",
+        "Причина",
+    ])
+    for run in detail["runs"]:
+        writer.writerow([
+            run["status_label"],
+            run["source_label"],
+            run["started_at"] or "",
+            run["completed_at"] or "",
+            run["range_start"] or "",
+            run["range_end"] or "",
+            run["changed_days"] or 0,
+            run["notifications_sent"] or 0,
+            run["reason"] or "",
+        ])
+    writer.writerow([])
+
+    writer.writerow(["История инцидентов"])
+    writer.writerow(["Событие", "Тип", "Дата", "Участник", "Описание"])
+    for incident in detail["incidents"]:
+        writer.writerow([
+            incident["event_type_label"],
+            incident["incident_type_label"],
+            incident["created_at"] or "",
+            incident["actor_username"] or "система",
+            incident["message"] or "",
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Операции с планами"])
+    writer.writerow([
+        "Операция",
+        "Источник",
+        "Период с",
+        "Период по",
+        "Исполнитель",
+        "Изменено дней",
+        "Уведомлений",
+        "Пропущено дней",
+    ])
+    for operation in detail["operations"]:
+        writer.writerow([
+            operation["action_label"],
+            operation["source_label"],
+            operation["week_start"] or "",
+            operation["week_end"] or "",
+            operation["actor_username"] or "система",
+            operation["changed_days"] or 0,
+            operation["notifications_sent"] or 0,
+            operation["skipped_days"] or 0,
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename="
+                f"platform_calendar_company_{company_id}.csv"
+            ),
+        },
+    )
+
+
 @app.get(
     "/platform/calendar-health/{company_id}",
     response_class=HTMLResponse,
