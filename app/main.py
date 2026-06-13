@@ -6373,15 +6373,252 @@ def get_platform_release_readiness(
     }
 
 
+def make_release_launch_item(
+    title,
+    description,
+    url,
+    status="warning",
+):
+    labels = {
+        "ok": "Готово",
+        "warning": "Внимание",
+        "critical": "Критично",
+    }
+    normalized_status = status if status in labels else "warning"
+    return {
+        "title": title,
+        "description": description,
+        "url": url,
+        "status": normalized_status,
+        "status_label": labels[normalized_status],
+    }
+
+
+def get_platform_release_launch_plan(readiness):
+    checks_by_key = {
+        item["key"]: item for item in readiness["checks"]
+    }
+    categories_by_key = {
+        item["key"]: item for item in readiness["categories"]
+    }
+    score = int(readiness["score"] or 0)
+    critical_count = int(readiness["critical_count"] or 0)
+    warning_count = int(readiness["warning_count"] or 0)
+    calendar_check = checks_by_key.get("calendar_ops", {})
+    security_category = categories_by_key.get("security", {})
+    blockers = sorted(
+        readiness["blockers"],
+        key=lambda item: (-item["weight"], item["title"]),
+    )
+    warnings = sorted(
+        [
+            item for item in readiness["checks"]
+            if item["status"] == "warning"
+        ],
+        key=lambda item: (-item["weight"], item["title"]),
+    )
+
+    if critical_count:
+        decision = "blocked"
+        label = "Запуск заблокирован"
+        tone = "critical"
+        recommended_mode = "Не запускать production"
+        summary = "Сначала нужно закрыть критичные блокеры."
+    elif score < 80 or warning_count >= 4:
+        decision = "pilot"
+        label = "Только пилот"
+        tone = "warning"
+        recommended_mode = "Закрытый пилот"
+        summary = "Критичных блокеров нет, но релиз лучше начинать с пилота."
+    else:
+        decision = "ready"
+        label = "Можно запускать"
+        tone = "ok"
+        recommended_mode = "Production запуск"
+        summary = "Ключевые проверки позволяют запускать платформу."
+
+    gates = [
+        make_release_launch_item(
+            "Критичных блокеров нет",
+            (
+                "Критичные блокеры отсутствуют."
+                if critical_count == 0
+                else f"Критичных блокеров: {critical_count}."
+            ),
+            "/platform/readiness",
+            "ok" if critical_count == 0 else "critical",
+        ),
+        make_release_launch_item(
+            "Оценка готовности не ниже 80%",
+            f"Текущая оценка готовности: {score}%.",
+            "/platform/readiness",
+            "ok" if score >= 80 else "warning",
+        ),
+        make_release_launch_item(
+            "Безопасность не критична",
+            (
+                "Критичных проблем безопасности нет."
+                if not security_category.get("critical")
+                else (
+                    "Критичных проблем безопасности: "
+                    f"{security_category['critical']}."
+                )
+            ),
+            "/system",
+            "ok" if not security_category.get("critical") else "critical",
+        ),
+        make_release_launch_item(
+            "Операционный контроль стабилен",
+            calendar_check.get(
+                "description",
+                "Проверьте состояние календарных автоматизаций.",
+            ),
+            "/platform/calendar-health",
+            (
+                "critical"
+                if calendar_check.get("status") == "critical"
+                else (
+                    "warning"
+                    if calendar_check.get("status") == "warning"
+                    else "ok"
+                )
+            ),
+        ),
+    ]
+
+    mandatory_items = [
+        make_release_launch_item(
+            item["title"],
+            item["action"],
+            item["url"],
+            item["status"],
+        )
+        for item in blockers
+    ]
+    if not mandatory_items:
+        mandatory_items = [
+            make_release_launch_item(
+                "Критичные блокеры закрыты",
+                "Можно переходить к предрелизной подготовке.",
+                "/platform/readiness",
+                "ok",
+            ),
+        ]
+
+    preparation_items = [
+        make_release_launch_item(
+            item["title"],
+            item["action"],
+            item["url"],
+            item["status"],
+        )
+        for item in warnings[:5]
+    ]
+    preparation_items.extend([
+        make_release_launch_item(
+            "Сохранить финальный снимок",
+            "Зафиксируйте состояние готовности перед выкладкой.",
+            "/platform/readiness",
+            "warning",
+        ),
+        make_release_launch_item(
+            "Экспортировать CSV отчёт",
+            "Сохраните список проверок и действий для контроля релиза.",
+            "/platform/readiness/export",
+            "warning",
+        ),
+    ])
+
+    monitoring_items = [
+        make_release_launch_item(
+            "Проверить инциденты календаря",
+            "После запуска следите за критичными инцидентами компаний.",
+            "/platform/calendar-health",
+            "warning",
+        ),
+        make_release_launch_item(
+            "Проверить системные настройки",
+            "Убедитесь, что окружение и интеграции работают после деплоя.",
+            "/system",
+            "warning",
+        ),
+        make_release_launch_item(
+            "Повторить readiness после первых клиентов",
+            "Сохраните новый снимок и сравните динамику.",
+            "/platform/readiness",
+            "warning",
+        ),
+    ]
+
+    phases = [
+        {
+            "key": "decision",
+            "title": "Решение по запуску",
+            "status": tone,
+            "status_label": label,
+            "items": gates,
+        },
+        {
+            "key": "mandatory",
+            "title": "Обязательные исправления",
+            "status": "critical" if blockers else "ok",
+            "status_label": (
+                "Нужно исправить" if blockers else "Готово"
+            ),
+            "items": mandatory_items,
+        },
+        {
+            "key": "preparation",
+            "title": "Предрелизная подготовка",
+            "status": "warning" if preparation_items else "ok",
+            "status_label": "Подготовка",
+            "items": preparation_items,
+        },
+        {
+            "key": "monitoring",
+            "title": "Мониторинг после запуска",
+            "status": "warning",
+            "status_label": "Контроль",
+            "items": monitoring_items,
+        },
+    ]
+
+    next_items = []
+    for phase in phases:
+        for item in phase["items"]:
+            if item["status"] != "ok":
+                next_items.append({
+                    "phase": phase["title"],
+                    **item,
+                })
+
+    return {
+        "decision": decision,
+        "label": label,
+        "tone": tone,
+        "summary": summary,
+        "recommended_mode": recommended_mode,
+        "score": score,
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+        "gates": gates,
+        "phases": phases,
+        "next_items": next_items[:8],
+        "blocked": decision == "blocked",
+    }
+
+
 def create_platform_release_readiness_snapshot(username, readiness=None):
     readiness = readiness or get_platform_release_readiness()
     conn = connect()
     c = conn.cursor()
+    launch_plan = get_platform_release_launch_plan(readiness)
     payload = {
         "checks": readiness["checks"],
         "categories": readiness["categories"],
         "next_actions": readiness["next_actions"],
         "environment": readiness["environment"],
+        "launch_plan": launch_plan,
     }
     c.execute("""
     INSERT INTO platform_release_readiness_snapshots (
@@ -6487,6 +6724,13 @@ def get_platform_release_readiness_snapshot(snapshot_id):
     snapshot["categories"] = payload.get("categories") or []
     snapshot["next_actions"] = payload.get("next_actions") or []
     snapshot["environment"] = payload.get("environment") or ""
+    snapshot["blockers"] = [
+        item for item in snapshot["checks"] if item["status"] == "critical"
+    ]
+    snapshot["launch_plan"] = (
+        payload.get("launch_plan")
+        or get_platform_release_launch_plan(snapshot)
+    )
     snapshot["previous_id"] = previous["id"] if previous else 0
     snapshot["previous_url"] = (
         f"/platform/readiness/snapshots/{previous['id']}"
@@ -6885,6 +7129,7 @@ async def platform_readiness_page(
         readiness,
     )
     trend = get_platform_release_readiness_trend(history)
+    launch_plan = get_platform_release_launch_plan(readiness)
 
     return templates.TemplateResponse(
         request,
@@ -6897,6 +7142,7 @@ async def platform_readiness_page(
             "history": history,
             "comparison": comparison,
             "trend": trend,
+            "launch_plan": launch_plan,
             "notice": notice,
         },
     )
@@ -6939,6 +7185,7 @@ async def platform_readiness_export(request: Request):
         readiness,
     )
     trend = get_platform_release_readiness_trend(history)
+    launch_plan = get_platform_release_launch_plan(readiness)
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -6994,6 +7241,28 @@ async def platform_readiness_export(request: Request):
     writer.writerow(["Динамика предупреждений", trend["warning_change"]])
     writer.writerow(["Лучший снимок", trend["best_score"], trend["best_date"]])
     writer.writerow(["Худший снимок", trend["worst_score"], trend["worst_date"]])
+    writer.writerow([])
+
+    writer.writerow(["План запуска"])
+    writer.writerow(["Решение", launch_plan["label"]])
+    writer.writerow(["Режим", launch_plan["recommended_mode"]])
+    writer.writerow(["Резюме", launch_plan["summary"]])
+    writer.writerow(["Оценка", launch_plan["score"]])
+    writer.writerow(["Критично", launch_plan["critical_count"]])
+    writer.writerow(["Внимание", launch_plan["warning_count"]])
+    writer.writerow([])
+
+    writer.writerow(["Этапы запуска"])
+    writer.writerow(["Этап", "Статус", "Действие", "Описание", "Ссылка"])
+    for phase in launch_plan["phases"]:
+        for item in phase["items"]:
+            writer.writerow([
+                phase["title"],
+                item["status_label"],
+                item["title"],
+                item["description"],
+                item["url"],
+            ])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -7139,6 +7408,7 @@ async def platform_readiness_snapshot_page(
             "role": role,
             "snapshot": snapshot,
             "snapshot_comparison": snapshot_comparison,
+            "launch_plan": snapshot["launch_plan"],
         },
     )
 
@@ -7169,6 +7439,7 @@ async def platform_readiness_snapshot_export(
     snapshot_comparison = compare_platform_release_readiness_snapshots(
         snapshot,
     )
+    launch_plan = snapshot["launch_plan"]
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -7238,6 +7509,28 @@ async def platform_readiness_snapshot_export(
             check["to_status"],
             check["action"],
         ])
+    writer.writerow([])
+
+    writer.writerow(["План запуска снимка"])
+    writer.writerow(["Решение", launch_plan["label"]])
+    writer.writerow(["Режим", launch_plan["recommended_mode"]])
+    writer.writerow(["Резюме", launch_plan["summary"]])
+    writer.writerow(["Оценка", launch_plan["score"]])
+    writer.writerow(["Критично", launch_plan["critical_count"]])
+    writer.writerow(["Внимание", launch_plan["warning_count"]])
+    writer.writerow([])
+
+    writer.writerow(["Этапы запуска"])
+    writer.writerow(["Этап", "Статус", "Действие", "Описание", "Ссылка"])
+    for phase in launch_plan["phases"]:
+        for item in phase["items"]:
+            writer.writerow([
+                phase["title"],
+                item["status_label"],
+                item["title"],
+                item["description"],
+                item["url"],
+            ])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -7336,7 +7629,24 @@ async def api_platform_readiness(request: Request):
         compare_platform_release_readiness_to_snapshot(readiness)
     )
     readiness["trend"] = get_platform_release_readiness_trend()
+    readiness["launch_plan"] = get_platform_release_launch_plan(readiness)
     return readiness
+
+
+@app.get("/api/platform/readiness/launch-plan")
+async def api_platform_readiness_launch_plan(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    readiness = get_platform_release_readiness()
+    return get_platform_release_launch_plan(readiness)
 
 
 @app.get("/platform/calendar-health", response_class=HTMLResponse)

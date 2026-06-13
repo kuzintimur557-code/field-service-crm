@@ -54,6 +54,28 @@ button.button{border:0;cursor:pointer}
 .trend-bar-fill{display:flex;width:100%;min-height:8px;align-items:flex-start;justify-content:center;border-radius:8px 8px 4px 4px;background:#d1fae5;color:#065f46;font-size:10px;font-weight:900;padding-top:5px}
 .trend-bar-fill.warning{background:#fef3c7;color:#92400e}
 .trend-bar-fill.critical{background:#fecaca;color:#991b1b}
+.launch{margin-top:18px;padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb}
+.launch.ok{border-color:#bbf7d0;background:#f0fdf4}
+.launch.critical{border-color:#fecaca;background:#fff7f7}
+.launch-head{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;align-items:start}
+.launch-label{font-size:13px;font-weight:900}
+.launch-value{margin-top:6px;font-size:28px;font-weight:900}
+.launch-mode{display:inline-flex;margin-top:8px;padding:7px 9px;border-radius:8px;background:white;font-size:11px;font-weight:900}
+.launch-text{color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.launch-phases{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.launch-phase{padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.launch-phase.ok{border-color:#bbf7d0}
+.launch-phase.warning{border-color:#fde68a}
+.launch-phase.critical{border-color:#fecaca}
+.launch-phase-title{font-size:13px;font-weight:900}
+.launch-phase-meta{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800}
+.launch-items{display:grid;gap:7px;margin-top:10px}
+.launch-item{display:block;padding:9px;border-radius:8px;background:#f9fafb;color:#111827;text-decoration:none}
+.launch-item.warning{background:#fffbeb}
+.launch-item.critical{background:#fff7f7}
+.launch-item-title{font-size:12px;font-weight:900}
+.launch-item-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
+.launch-next{margin-top:12px}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -100,6 +122,8 @@ button.button{border:0;cursor:pointer}
 .trend-head{grid-template-columns:1fr}
 .trend-grid{grid-template-columns:1fr}
 .trend-bars{height:120px}
+.launch-head{grid-template-columns:1fr}
+.launch-phases{grid-template-columns:1fr}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -241,6 +265,46 @@ button.button{border:0;cursor:pointer}
                     {{ bar["score"] }}
                 </span>
             </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="launch {{ launch_plan['tone'] }}">
+        <div class="launch-head">
+            <div>
+                <div class="launch-label">План запуска</div>
+                <div class="launch-value">{{ launch_plan["label"] }}</div>
+                <div class="launch-mode">{{ launch_plan["recommended_mode"] }}</div>
+            </div>
+            <div class="launch-text">
+                {{ launch_plan["summary"] }}
+                Оценка: {{ launch_plan["score"] }}%.
+                Критично: {{ launch_plan["critical_count"] }}.
+                Внимание: {{ launch_plan["warning_count"] }}.
+            </div>
+        </div>
+        <div class="launch-phases">
+            {% for phase in launch_plan["phases"] %}
+            <div class="launch-phase {{ phase['status'] }}">
+                <div class="launch-phase-title">{{ phase["title"] }}</div>
+                <div class="launch-phase-meta">{{ phase["status_label"] }}</div>
+                <div class="launch-items">
+                    {% for item in phase["items"][:3] %}
+                    <a class="launch-item {{ item['status'] }}" href="{{ item['url'] }}">
+                        <div class="launch-item-title">{{ item["title"] }}</div>
+                        <div class="launch-item-text">{{ item["description"] }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if launch_plan["next_items"] %}
+        <div class="launch-text launch-next">
+            Ближайшие действия:
+            {% for item in launch_plan["next_items"][:5] %}
+            {{ item["phase"] }} - {{ item["title"] }}{% if not loop.last %}; {% endif %}
             {% endfor %}
         </div>
         {% endif %}
