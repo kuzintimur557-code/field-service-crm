@@ -6023,6 +6023,150 @@ async def platform_companies_page(request: Request):
     )
 
 
+def format_file_size(size):
+    size = int(size or 0)
+    units = ["байт", "КБ", "МБ", "ГБ"]
+    value = float(size)
+
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == "байт":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value = value / 1024
+
+    return f"{size} байт"
+
+
+def format_backup_age(age_hours):
+    if age_hours is None:
+        return "нет"
+
+    if age_hours < 1:
+        return "меньше часа"
+
+    if age_hours < 24:
+        return f"{int(age_hours)} ч"
+
+    return f"{int(age_hours // 24)} д"
+
+
+def get_backup_status():
+    db_path = DATA_DIR / "crm.db"
+    backup_path = DATA_DIR / "backups"
+    db_exists = db_path.exists()
+    backup_path_exists = backup_path.exists()
+    files = []
+
+    if backup_path_exists:
+        files = [
+            file
+            for file in backup_path.iterdir()
+            if file.is_file()
+            and file.suffix.lower() in (".db", ".sqlite", ".sqlite3")
+        ]
+
+    files.sort(
+        key=lambda file: file.stat().st_mtime,
+        reverse=True,
+    )
+    latest = files[0] if files else None
+    now = datetime.now()
+    latest_at = None
+    latest_age_hours = None
+
+    if latest:
+        latest_at = datetime.fromtimestamp(latest.stat().st_mtime)
+        latest_age_hours = (now - latest_at).total_seconds() / 3600
+
+    if not db_exists:
+        status = "critical"
+        status_label = "База не найдена"
+        summary = "Невозможно создать резервную копию: файл базы не найден."
+        action = "Проверьте DATA_DIR и запуск базы данных."
+    elif not backup_path_exists:
+        status = "warning"
+        status_label = "Папка не создана"
+        summary = "Папка резервных копий пока не создана."
+        action = "Создайте первую резервную копию перед релизом."
+    elif not files:
+        status = "warning"
+        status_label = "Копий нет"
+        summary = "Резервных копий базы пока нет."
+        action = "Создайте первую резервную копию перед релизом."
+    elif latest_age_hours > 168:
+        status = "critical"
+        status_label = "Копия устарела"
+        summary = "Последняя резервная копия старше 7 дней."
+        action = "Создайте свежую резервную копию перед запуском."
+    elif latest_age_hours > 72:
+        status = "warning"
+        status_label = "Нужна свежая копия"
+        summary = "Последняя резервная копия старше 3 дней."
+        action = "Обновите резервную копию перед запуском."
+    else:
+        status = "ok"
+        status_label = "Копия свежая"
+        summary = "Резервная копия базы актуальна."
+        action = "Продолжайте регулярное резервное копирование."
+
+    total_size = sum(file.stat().st_size for file in files)
+    recent_files = []
+
+    for file in files[:8]:
+        stat = file.stat()
+        file_at = datetime.fromtimestamp(stat.st_mtime)
+        file_age_hours = (now - file_at).total_seconds() / 3600
+        recent_files.append({
+            "name": file.name,
+            "size": stat.st_size,
+            "size_label": format_file_size(stat.st_size),
+            "created_at": file_at.strftime("%Y-%m-%d %H:%M"),
+            "age_label": format_backup_age(file_age_hours),
+        })
+
+    return {
+        "status": status,
+        "status_label": status_label,
+        "summary": summary,
+        "action": action,
+        "db_exists": db_exists,
+        "db_path": str(db_path),
+        "db_size": db_path.stat().st_size if db_exists else 0,
+        "db_size_label": (
+            format_file_size(db_path.stat().st_size) if db_exists else "0 байт"
+        ),
+        "backup_path": str(backup_path),
+        "backup_path_exists": backup_path_exists,
+        "count": len(files),
+        "total_size": total_size,
+        "total_size_label": format_file_size(total_size),
+        "latest_name": latest.name if latest else "",
+        "latest_created_at": (
+            latest_at.strftime("%Y-%m-%d %H:%M") if latest_at else ""
+        ),
+        "latest_age_hours": int(latest_age_hours or 0),
+        "latest_age_label": format_backup_age(latest_age_hours),
+        "recent_files": recent_files,
+        "url": "/backup",
+        "export_url": "/backup/export",
+    }
+
+
+def create_database_backup(username):
+    db_path = DATA_DIR / "crm.db"
+
+    if not db_path.exists():
+        return None, "db_missing"
+
+    backup_path = DATA_DIR / "backups"
+    backup_path.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    destination = backup_path / f"crm_backup_{timestamp}.db"
+    shutil.copy2(db_path, destination)
+    return destination.name, ""
+
+
 def make_release_readiness_check(
     key,
     title,
@@ -6111,7 +6255,7 @@ def get_platform_release_readiness(
     chat_id_configured = bool((os.getenv("CHAT_ID") or "").strip())
     default_secret = SECRET_KEY == "dev-secret-change-me"
     db_path = DATA_DIR / "crm.db"
-    backup_path = DATA_DIR / "backups"
+    backup_status = get_backup_status()
 
     checks = [
         make_release_readiness_check(
@@ -6258,15 +6402,15 @@ def get_platform_release_readiness(
         make_release_readiness_check(
             "backups",
             "Резервные копии",
-            "ok" if backup_path.exists() else "warning",
+            backup_status["status"],
             (
-                "Папка backups найдена."
-                if backup_path.exists()
-                else "Папка backups пока не найдена."
+                f"{backup_status['summary']} "
+                f"Последняя копия: {backup_status['latest_age_label']}. "
+                f"Всего копий: {backup_status['count']}."
             ),
-            "Проверьте создание резервной копии перед релизом.",
+            backup_status["action"],
             "/backup",
-            6,
+            8,
             "infrastructure",
             "Инфраструктура",
         ),
@@ -6368,6 +6512,7 @@ def get_platform_release_readiness(
         "warning_count": warning_count,
         "ok_count": sum(1 for item in checks if item["status"] == "ok"),
         "environment": env_name,
+        "backup_status": backup_status,
         "export_url": "/platform/readiness/export",
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -7725,6 +7870,7 @@ def create_platform_release_readiness_snapshot(username, readiness=None):
         "categories": readiness["categories"],
         "next_actions": readiness["next_actions"],
         "environment": readiness["environment"],
+        "backup_status": readiness.get("backup_status", {}),
         "launch_plan": launch_plan,
     }
     c.execute("""
@@ -7831,6 +7977,7 @@ def get_platform_release_readiness_snapshot(snapshot_id):
     snapshot["categories"] = payload.get("categories") or []
     snapshot["next_actions"] = payload.get("next_actions") or []
     snapshot["environment"] = payload.get("environment") or ""
+    snapshot["backup_status"] = payload.get("backup_status") or {}
     snapshot["blockers"] = [
         item for item in snapshot["checks"] if item["status"] == "critical"
     ]
@@ -8396,6 +8543,17 @@ async def platform_readiness_export(request: Request):
     writer.writerow(["Внимание", readiness["warning_count"]])
     writer.writerow(["Критично", readiness["critical_count"]])
     writer.writerow(["Резюме", readiness["headline"]])
+    writer.writerow([])
+
+    backup_status = readiness["backup_status"]
+    writer.writerow(["Резервные копии"])
+    writer.writerow(["Статус", backup_status["status_label"]])
+    writer.writerow(["Резюме", backup_status["summary"]])
+    writer.writerow(["Действие", backup_status["action"]])
+    writer.writerow(["Копий", backup_status["count"]])
+    writer.writerow(["Последняя копия", backup_status["latest_name"]])
+    writer.writerow(["Возраст последней", backup_status["latest_age_label"]])
+    writer.writerow(["Общий размер", backup_status["total_size_label"]])
     writer.writerow([])
 
     writer.writerow(["Сравнение с последним снимком"])
@@ -28735,6 +28893,134 @@ async def system_page(request: Request):
             "app_version": APP_VERSION
         }
     )
+
+
+@app.get("/backup", response_class=HTMLResponse)
+async def backup_page(
+    request: Request,
+    notice: str = "",
+    error: str = "",
+    file: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    backup_status = get_backup_status()
+
+    return templates.TemplateResponse(
+        request,
+        "backup.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "backup_status": backup_status,
+            "notice": notice,
+            "error": error,
+            "file": file,
+        },
+    )
+
+
+@app.post("/backup/create")
+async def backup_create(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    filename, error = create_database_backup(username)
+
+    if error:
+        return RedirectResponse(
+            f"/backup?error={error}",
+            status_code=302,
+        )
+
+    return RedirectResponse(
+        f"/backup?notice=backup_created&file={filename}",
+        status_code=302,
+    )
+
+
+@app.get("/backup/export")
+async def backup_export(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    backup_status = get_backup_status()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Резервные копии"])
+    writer.writerow(["Статус", backup_status["status_label"]])
+    writer.writerow(["Резюме", backup_status["summary"]])
+    writer.writerow(["Действие", backup_status["action"]])
+    writer.writerow(["База найдена", "да" if backup_status["db_exists"] else "нет"])
+    writer.writerow(["Размер базы", backup_status["db_size_label"]])
+    writer.writerow([
+        "Папка копий",
+        "да" if backup_status["backup_path_exists"] else "нет",
+    ])
+    writer.writerow(["Копий", backup_status["count"]])
+    writer.writerow(["Общий размер", backup_status["total_size_label"]])
+    writer.writerow(["Последняя копия", backup_status["latest_name"]])
+    writer.writerow(["Дата последней", backup_status["latest_created_at"]])
+    writer.writerow(["Возраст последней", backup_status["latest_age_label"]])
+    writer.writerow([])
+
+    writer.writerow(["Последние копии"])
+    writer.writerow(["Файл", "Дата", "Возраст", "Размер"])
+    for item in backup_status["recent_files"]:
+        writer.writerow([
+            item["name"],
+            item["created_at"],
+            item["age_label"],
+            item["size_label"],
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=platform_backups.csv"
+            ),
+        },
+    )
+
+
+@app.get("/api/platform/backup-status")
+async def api_platform_backup_status(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return get_backup_status()
 
 
 @app.get("/debug", response_class=HTMLResponse)

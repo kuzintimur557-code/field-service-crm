@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Резервные копии</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1050px;margin:auto;padding:28px}
+.header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:18px}
+.eyebrow{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
+h1{margin:6px 0 0;font-size:34px}
+.subtitle{margin-top:8px;color:#6b7280;font-size:14px;font-weight:800;line-height:1.5}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.actions form{margin:0}
+.button{display:inline-flex;padding:11px 13px;border:0;border-radius:10px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900;cursor:pointer}
+.button.secondary{border:1px solid #d1d5db;background:white;color:#374151}
+.notice{margin-bottom:14px;padding:12px 14px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#065f46;font-size:13px;font-weight:900}
+.notice.error{border-color:#fecaca;background:#fff7f7;color:#991b1b}
+.status{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;padding:16px;border:1px solid #fde68a;border-radius:12px;background:#fffbeb}
+.status.ok{border-color:#bbf7d0;background:#f0fdf4}
+.status.critical{border-color:#fecaca;background:#fff7f7}
+.status-label{font-size:13px;font-weight:900}
+.status-value{margin-top:6px;font-size:28px;font-weight:900}
+.status-text{color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.metric{padding:13px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.metric-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.metric-value{margin-top:6px;font-size:20px;font-weight:900}
+.section{margin-top:18px}
+.section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
+.section-title{margin:0;font-size:20px}
+.section-note{color:#6b7280;font-size:12px;font-weight:800}
+.files{display:grid;gap:8px}
+.file{display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 110px;gap:10px;align-items:center;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.file-name{font-size:13px;font-weight:900}
+.file-meta{color:#6b7280;font-size:11px;font-weight:800}
+.empty{padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:900}
+@media(max-width:760px){
+.container{padding:16px}
+.header{grid-template-columns:1fr}
+.actions{justify-content:stretch}
+.button{width:100%;justify-content:center}
+.status{grid-template-columns:1fr}
+.grid{grid-template-columns:1fr}
+.section-head{display:block}
+.section-note{margin-top:5px}
+.file{grid-template-columns:1fr}
+h1{font-size:28px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <header class="header">
+        <div>
+            <div class="eyebrow">Платформа</div>
+            <h1>Резервные копии</h1>
+            <div class="subtitle">
+                Контроль копий базы данных перед релизом и рабочим запуском.
+                Доступно только суперадмину.
+            </div>
+        </div>
+        <div class="actions">
+            <a class="button secondary" href="/platform">Платформа</a>
+            <a class="button secondary" href="/system">Система</a>
+            <a class="button secondary" href="{{ backup_status['export_url'] }}">Экспорт CSV</a>
+            <form method="post" action="/backup/create">
+                <button class="button" type="submit">Создать копию</button>
+            </form>
+        </div>
+    </header>
+
+    {% if notice == "backup_created" %}
+    <div class="notice">Резервная копия создана: {{ file }}.</div>
+    {% endif %}
+    {% if error == "db_missing" %}
+    <div class="notice error">Файл базы данных не найден. Копию создать нельзя.</div>
+    {% endif %}
+
+    <section class="status {{ backup_status['status'] }}">
+        <div>
+            <div class="status-label">Состояние</div>
+            <div class="status-value">{{ backup_status["status_label"] }}</div>
+        </div>
+        <div class="status-text">
+            {{ backup_status["summary"] }}
+            {{ backup_status["action"] }}
+            Последняя копия: {{ backup_status["latest_age_label"] }}.
+        </div>
+    </section>
+
+    <section class="grid">
+        <div class="metric">
+            <div class="metric-label">База данных</div>
+            <div class="metric-value">{{ "есть" if backup_status["db_exists"] else "нет" }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Размер базы</div>
+            <div class="metric-value">{{ backup_status["db_size_label"] }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Копий</div>
+            <div class="metric-value">{{ backup_status["count"] }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Общий размер</div>
+            <div class="metric-value">{{ backup_status["total_size_label"] }}</div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Последние копии</h2>
+            <div class="section-note">{{ backup_status["backup_path"] }}</div>
+        </div>
+        {% if backup_status["recent_files"] %}
+        <div class="files">
+            {% for item in backup_status["recent_files"] %}
+            <div class="file">
+                <div>
+                    <div class="file-name">{{ item["name"] }}</div>
+                    <div class="file-meta">Создана: {{ item["created_at"] }}</div>
+                </div>
+                <div class="file-meta">Возраст: {{ item["age_label"] }}</div>
+                <div class="file-meta">{{ item["size_label"] }}</div>
+                <div class="file-meta">SQLite</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">
+            Резервных копий пока нет. Создайте первую копию перед релизом.
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% include 'mobile_nav.html' %}
+</body>
+</html>

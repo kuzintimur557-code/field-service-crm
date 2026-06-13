@@ -11,6 +11,8 @@
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .container{max-width:900px;margin:auto;padding:28px}
 .back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.top-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.top-actions a{display:inline-flex;padding:10px 12px;border-radius:10px;background:white;color:#111827;text-decoration:none;font-size:12px;font-weight:900;border:1px solid #d1d5db}
 .card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
 h1{margin:0 0 14px;font-size:34px}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
@@ -18,12 +20,15 @@ h1{margin:0 0 14px;font-size:34px}
 .label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
 .value{font-size:24px;font-weight:900}
 .ok{color:#166534}.bad{color:#991b1b}
-@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}}
+@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}.top-actions a{width:100%;justify-content:center}h1{font-size:28px}}
 </style>
 </head>
 <body>
 <div class="container">
-<a href="/admin" class="back">← Назад</a>
+<div class="top-actions">
+    <a href="/admin">Назад</a>
+    <a href="/backup">Резервные копии</a>
+</div>
 
 <div class="card">
 <h1>🟢 Статус системы</h1>

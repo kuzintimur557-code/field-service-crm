@@ -9542,6 +9542,9 @@ async def assert_platform_calendar_health():
         assert platform_page.context["release_readiness"]["export_url"] == (
             "/platform/readiness/export"
         )
+        assert platform_page.context["release_readiness"]["backup_status"][
+            "status_label"
+        ]
         assert "Безопасность" in {
             item["label"]
             for item in platform_page.context["release_readiness"][
@@ -9620,6 +9623,60 @@ async def assert_platform_calendar_health():
         )
         assert "/platform/calendar-health?assignee=me" in platform_html
         assert "/platform/readiness/export" in platform_html
+        assert "/backup" in platform_html
+        anonymous_backup_page = await crm.backup_page(
+            make_public_asgi_request("/backup"),
+        )
+        assert anonymous_backup_page.status_code == 302
+        assert anonymous_backup_page.headers["location"] == "/login"
+        boss_backup_page = await crm.backup_page(
+            make_asgi_request("owner2", "/backup"),
+        )
+        assert boss_backup_page.status_code == 302
+        assert boss_backup_page.headers["location"] == "/"
+        backup_page = await crm.backup_page(
+            make_asgi_request("super", "/backup"),
+        )
+        assert backup_page.status_code == 200
+        backup_html = backup_page.body.decode("utf-8")
+        assert "Резервные копии" in backup_html
+        assert "Создать копию" in backup_html
+        assert "Экспорт CSV" in backup_html
+        assert backup_page.context["backup_status"]["status_label"]
+        anonymous_backup_export = await crm.backup_export(
+            make_public_asgi_request("/backup/export"),
+        )
+        assert anonymous_backup_export.status_code == 302
+        assert anonymous_backup_export.headers["location"] == "/login"
+        boss_backup_export = await crm.backup_export(
+            make_asgi_request("owner2", "/backup/export"),
+        )
+        assert boss_backup_export.status_code == 302
+        assert boss_backup_export.headers["location"] == "/"
+        backup_export = await crm.backup_export(
+            make_asgi_request("super", "/backup/export"),
+        )
+        assert backup_export.status_code == 200
+        assert backup_export.headers["content-disposition"] == (
+            "attachment; filename=platform_backups.csv"
+        )
+        backup_csv = backup_export.body.decode("utf-8")
+        assert backup_csv.startswith("\ufeff")
+        assert "Резервные копии" in backup_csv
+        assert "Последние копии" in backup_csv
+        anonymous_backup_api = await crm.api_platform_backup_status(
+            make_public_asgi_request("/api/platform/backup-status"),
+        )
+        assert anonymous_backup_api.status_code == 401
+        boss_backup_api = await crm.api_platform_backup_status(
+            make_asgi_request("owner2", "/api/platform/backup-status"),
+        )
+        assert boss_backup_api.status_code == 403
+        backup_api = await crm.api_platform_backup_status(
+            make_asgi_request("super", "/api/platform/backup-status"),
+        )
+        assert backup_api["status_label"]
+        assert "recent_files" in backup_api
         anonymous_readiness = await crm.platform_readiness_page(
             make_public_asgi_request("/platform/readiness"),
         )
@@ -9837,6 +9894,8 @@ async def assert_platform_calendar_health():
         readiness_csv = readiness_export_response.body.decode("utf-8")
         assert readiness_csv.startswith("\ufeff")
         assert "Готовность релиза" in readiness_csv
+        assert "Резервные копии" in readiness_csv
+        assert "Последняя копия" in readiness_csv
         assert "Сравнение с последним снимком" in readiness_csv
         assert "Новые блокеры" in readiness_csv
         assert "Закрытые блокеры" in readiness_csv
