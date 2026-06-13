@@ -9636,6 +9636,8 @@ async def assert_platform_calendar_health():
         assert "Решение по запуску" in readiness_html
         assert "Подтверждение запуска" in readiness_html
         assert "Журнал релиза" in readiness_html
+        assert "Регламент релиза" in readiness_html
+        assert "Триггеры отката:" in readiness_html
         assert "Категории" in readiness_html
         assert "Следующие действия" in readiness_html
         assert "Все проверки" in readiness_html
@@ -9694,7 +9696,7 @@ async def assert_platform_calendar_health():
                 "/platform/readiness/signoff",
                 {
                     "decision": "production",
-                    "comment": "Smoke production blocked",
+                    "comment": "Тестовый боевой запуск заблокирован",
                 },
             ),
         )
@@ -9708,7 +9710,7 @@ async def assert_platform_calendar_health():
                 "/platform/readiness/signoff",
                 {
                     "decision": "blocked",
-                    "comment": "Smoke release sign-off",
+                    "comment": "Тестовое подтверждение релиза",
                 },
             ),
         )
@@ -9719,7 +9721,7 @@ async def assert_platform_calendar_health():
         signoffs = crm.get_platform_release_signoff_history()
         assert signoffs
         assert signoffs[0]["decision_label"] == "Запуск отложен"
-        assert signoffs[0]["comment"] == "Smoke release sign-off"
+        assert signoffs[0]["comment"] == "Тестовое подтверждение релиза"
         assert signoffs[0]["snapshot_url"].startswith(
             "/platform/readiness/snapshots/"
         )
@@ -9741,9 +9743,10 @@ async def assert_platform_calendar_health():
         assert "Последний снимок:" in saved_readiness_html
         assert "Последняя оценка" in saved_readiness_html
         assert "Запуск отложен" in saved_readiness_html
-        assert "Smoke release sign-off" in saved_readiness_html
+        assert "Тестовое подтверждение релиза" in saved_readiness_html
         assert "Последнее событие:" in saved_readiness_html
         assert "Решений" in saved_readiness_html
+        assert "Ближайшие шаги:" in saved_readiness_html
         assert backup_admin_username in saved_readiness_html
         assert f"/platform/readiness/snapshots/{snapshot_id}" in (
             saved_readiness_html
@@ -9781,7 +9784,7 @@ async def assert_platform_calendar_health():
         assert "Предыдущий снимок:" in snapshot_html
         assert "План запуска снимка" in snapshot_html
         assert "Подтверждения по снимку" in snapshot_html
-        assert "Smoke release sign-off" in snapshot_html
+        assert "Тестовое подтверждение релиза" in snapshot_html
         assert "Категории снимка" in snapshot_html
         assert "Следующие действия снимка" in snapshot_html
         assert "Все проверки снимка" in snapshot_html
@@ -9831,6 +9834,9 @@ async def assert_platform_calendar_health():
         assert "Этапы запуска" in readiness_csv
         assert "Подтверждения запуска" in readiness_csv
         assert "Журнал релиза" in readiness_csv
+        assert "Регламент релиза" in readiness_csv
+        assert "Шаги регламента" in readiness_csv
+        assert "Триггеры отката" in readiness_csv
         assert "Категории" in readiness_csv
         assert "Следующие действия" in readiness_csv
         assert "Все проверки" in readiness_csv
@@ -9901,7 +9907,22 @@ async def assert_platform_calendar_health():
         assert readiness_api["launch_plan"]["phases"]
         assert readiness_api["signoffs"]
         assert readiness_api["timeline"]["events"]
+        assert readiness_api["runbook"]["sections"]
         assert readiness_api["export_url"] == "/platform/readiness/export"
+        anonymous_runbook_api = await crm.api_platform_readiness_runbook(
+            make_public_asgi_request("/api/platform/readiness/runbook"),
+        )
+        assert anonymous_runbook_api.status_code == 401
+        boss_runbook_api = await crm.api_platform_readiness_runbook(
+            make_asgi_request("owner2", "/api/platform/readiness/runbook"),
+        )
+        assert boss_runbook_api.status_code == 403
+        runbook_api = await crm.api_platform_readiness_runbook(
+            make_asgi_request("super", "/api/platform/readiness/runbook"),
+        )
+        assert runbook_api["sections"]
+        assert runbook_api["rollback_triggers"]
+        assert runbook_api["steps_count"] >= 1
         anonymous_timeline_api = await crm.api_platform_readiness_timeline(
             make_public_asgi_request("/api/platform/readiness/timeline"),
         )

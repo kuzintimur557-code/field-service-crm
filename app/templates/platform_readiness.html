@@ -108,6 +108,34 @@ button.button{border:0;cursor:pointer}
 .timeline-type{font-size:11px;font-weight:900;text-transform:uppercase}
 .timeline-title{font-size:13px;font-weight:900}
 .timeline-meta{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.4}
+.runbook{margin-top:18px;padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb}
+.runbook.ok{border-color:#bbf7d0;background:#f0fdf4}
+.runbook.critical{border-color:#fecaca;background:#fff7f7}
+.runbook-head{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;align-items:start}
+.runbook-label{font-size:13px;font-weight:900}
+.runbook-value{margin-top:6px;font-size:26px;font-weight:900}
+.runbook-mode{display:inline-flex;margin-top:8px;padding:7px 9px;border-radius:8px;background:white;font-size:11px;font-weight:900}
+.runbook-text{color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.runbook-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.runbook-stat{padding:10px;border-radius:8px;background:white}
+.runbook-stat-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.runbook-stat-value{margin-top:5px;font-size:18px;font-weight:900}
+.runbook-sections{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.runbook-section{padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.runbook-section.warning{border-color:#fde68a}
+.runbook-section.critical{border-color:#fecaca}
+.runbook-section.ok{border-color:#bbf7d0}
+.runbook-section-title{font-size:13px;font-weight:900}
+.runbook-section-meta{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800}
+.runbook-steps{display:grid;gap:7px;margin-top:10px}
+.runbook-step{display:block;padding:9px;border-radius:8px;background:#f9fafb;color:#111827;text-decoration:none}
+.runbook-step.warning{background:#fffbeb}
+.runbook-step.critical{background:#fff7f7}
+.runbook-step.ok{background:#f0fdf4}
+.runbook-step-title{font-size:12px;font-weight:900}
+.runbook-step-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
+.runbook-next{margin-top:12px}
+.runbook-triggers{display:grid;gap:6px;margin-top:12px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.4}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -162,6 +190,9 @@ button.button{border:0;cursor:pointer}
 .timeline-head{grid-template-columns:1fr}
 .timeline-stats{grid-template-columns:1fr}
 .timeline-item{grid-template-columns:1fr}
+.runbook-head{grid-template-columns:1fr}
+.runbook-stats{grid-template-columns:1fr}
+.runbook-sections{grid-template-columns:1fr}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -448,6 +479,68 @@ button.button{border:0;cursor:pointer}
         {% else %}
         <div class="empty offset">Событий релиза пока нет.</div>
         {% endif %}
+    </section>
+
+    <section class="runbook {{ runbook['status'] }}">
+        <div class="runbook-head">
+            <div>
+                <div class="runbook-label">Регламент релиза</div>
+                <div class="runbook-value">{{ runbook["label"] }}</div>
+                <div class="runbook-mode">{{ runbook["mode"] }}</div>
+            </div>
+            <div class="runbook-text">
+                {{ runbook["summary"] }}
+                Оценка: {{ runbook["score"] }}%.
+                Критично: {{ runbook["critical_count"] }}.
+                Внимание: {{ runbook["warning_count"] }}.
+            </div>
+        </div>
+        <div class="runbook-stats">
+            <div class="runbook-stat">
+                <div class="runbook-stat-label">Шагов</div>
+                <div class="runbook-stat-value">{{ runbook["steps_count"] }}</div>
+            </div>
+            <div class="runbook-stat">
+                <div class="runbook-stat-label">Критичных</div>
+                <div class="runbook-stat-value">{{ runbook["critical_steps_count"] }}</div>
+            </div>
+            <div class="runbook-stat">
+                <div class="runbook-stat-label">Подтверждение</div>
+                <div class="runbook-stat-value">{{ "да" if runbook["has_signoff"] else "нет" }}</div>
+            </div>
+        </div>
+        <div class="runbook-sections">
+            {% for section in runbook["sections"] %}
+            <div class="runbook-section {{ section['status'] }}">
+                <div class="runbook-section-title">{{ section["title"] }}</div>
+                <div class="runbook-section-meta">{{ section["status_label"] }}</div>
+                <div class="runbook-steps">
+                    {% for step in section["steps"][:3] %}
+                    <a class="runbook-step {{ step['status'] }}" href="{{ step['url'] }}">
+                        <div class="runbook-step-title">{{ step["title"] }}</div>
+                        <div class="runbook-step-text">
+                            {{ step["description"] }}
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if runbook["next_steps"] %}
+        <div class="runbook-text runbook-next">
+            Ближайшие шаги:
+            {% for step in runbook["next_steps"][:5] %}
+            {{ step["section"] }} - {{ step["title"] }}{% if not loop.last %}; {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="runbook-triggers">
+            <strong>Триггеры отката:</strong>
+            {% for trigger in runbook["rollback_triggers"][:3] %}
+            <span>{{ trigger }}</span>
+            {% endfor %}
+        </div>
     </section>
 
     <section class="section">

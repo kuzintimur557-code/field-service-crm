@@ -6807,6 +6807,236 @@ def get_platform_release_timeline(history=None, signoffs=None, limit=12):
     }
 
 
+def make_release_runbook_step(
+    title,
+    description,
+    url,
+    status="warning",
+    owner="Администратор платформы",
+):
+    labels = {
+        "ok": "Готово",
+        "warning": "Выполнить",
+        "critical": "Блокер",
+    }
+    normalized_status = status if status in labels else "warning"
+    return {
+        "title": title,
+        "description": description,
+        "url": url,
+        "status": normalized_status,
+        "status_label": labels[normalized_status],
+        "owner": owner,
+    }
+
+
+def get_platform_release_runbook(
+    readiness=None,
+    launch_plan=None,
+    timeline=None,
+):
+    readiness = readiness or get_platform_release_readiness()
+    launch_plan = launch_plan or get_platform_release_launch_plan(readiness)
+    timeline = timeline or get_platform_release_timeline()
+    has_signoff = timeline["signoffs_count"] > 0
+    blocked = launch_plan["blocked"]
+    score = int(readiness["score"] or 0)
+    critical_count = int(readiness["critical_count"] or 0)
+    warning_count = int(readiness["warning_count"] or 0)
+
+    if blocked:
+        status = "critical"
+        label = "Запуск нельзя проводить"
+        summary = "Регламент готов, но сначала нужно закрыть критичные блокеры."
+    elif score < 80 or warning_count >= 4:
+        status = "warning"
+        label = "Запускать только пилот"
+        summary = "Запуск возможен как закрытый пилот с усиленным контролем."
+    else:
+        status = "ok"
+        label = "Регламент готов"
+        summary = "Можно идти по сценарию запуска и мониторинга."
+
+    sections = [
+        {
+            "key": "preflight",
+            "title": "Перед запуском",
+            "status": "critical" if blocked else "warning",
+            "status_label": "Подготовка",
+            "steps": [
+                make_release_runbook_step(
+                    "Закрыть критичные блокеры",
+                    (
+                        "Критичных блокеров нет."
+                        if critical_count == 0
+                        else f"Критичных блокеров: {critical_count}."
+                    ),
+                    "/platform/readiness",
+                    "ok" if critical_count == 0 else "critical",
+                ),
+                make_release_runbook_step(
+                    "Сохранить финальный снимок",
+                    "Зафиксируйте состояние платформы перед релизом.",
+                    "/platform/readiness",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Экспортировать отчёт готовности",
+                    "Сохраните отчёт готовности для контроля и разбора после запуска.",
+                    "/platform/readiness/export",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Зафиксировать решение запуска",
+                    (
+                        "Решение уже зафиксировано."
+                        if has_signoff
+                        else "Сохраните подтверждение перед запуском."
+                    ),
+                    "/platform/readiness",
+                    "ok" if has_signoff else "warning",
+                ),
+            ],
+        },
+        {
+            "key": "launch",
+            "title": "Во время запуска",
+            "status": "critical" if blocked else "warning",
+            "status_label": launch_plan["recommended_mode"],
+            "steps": [
+                make_release_runbook_step(
+                    "Выполнить публикацию",
+                    "Выкатите текущую основную ветку в рабочее окружение.",
+                    "/system",
+                    "critical" if blocked else "warning",
+                ),
+                make_release_runbook_step(
+                    "Проверить вход суперадмина",
+                    "После публикации проверьте вход владельца платформы.",
+                    "/platform",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Проверить системные настройки",
+                    "Проверьте переменные окружения, загрузки файлов и интеграции.",
+                    "/system",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Проверить операционный контроль",
+                    "Убедитесь, что нет критичных календарных инцидентов.",
+                    "/platform/calendar-health",
+                    "warning",
+                ),
+            ],
+        },
+        {
+            "key": "rollback",
+            "title": "Откат",
+            "status": "warning",
+            "status_label": "План отката",
+            "steps": [
+                make_release_runbook_step(
+                    "Остановить новые подключения",
+                    "Если появились критичные ошибки, временно остановите запуск новых компаний.",
+                    "/platform",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Вернуть предыдущую публикацию",
+                    "Откатите рабочее окружение на предыдущую стабильную версию.",
+                    "/system",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Сохранить аварийный снимок",
+                    "После отката сохраните снимок готовности для разбора.",
+                    "/platform/readiness",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Проверить инциденты",
+                    "Разберите календарные и системные инциденты после отката.",
+                    "/platform/calendar-health",
+                    "warning",
+                ),
+            ],
+        },
+        {
+            "key": "aftercare",
+            "title": "После запуска",
+            "status": "warning",
+            "status_label": "Контроль",
+            "steps": [
+                make_release_runbook_step(
+                    "Повторить проверку готовности",
+                    "Сохраните новый снимок после первых рабочих действий.",
+                    "/platform/readiness",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Проверить журнал релиза",
+                    "Убедитесь, что снимки и решения видны в журнале.",
+                    "/platform/readiness",
+                    "ok" if timeline["total_events"] else "warning",
+                ),
+                make_release_runbook_step(
+                    "Проверить инциденты платформы",
+                    "Контролируйте активные проблемы компаний после запуска.",
+                    "/platform/calendar-health",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Экспортировать финальный отчёт",
+                    "Сохраните CSV после проверки первых клиентов.",
+                    "/platform/readiness/export",
+                    "warning",
+                ),
+            ],
+        },
+    ]
+
+    steps = [
+        step
+        for section in sections
+        for step in section["steps"]
+    ]
+    next_steps = [
+        {
+            "section": section["title"],
+            **step,
+        }
+        for section in sections
+        for step in section["steps"]
+        if step["status"] != "ok"
+    ][:8]
+    rollback_triggers = [
+        "Появился новый критичный блокер готовности.",
+        "Вход суперадмина или владельца компании перестал работать.",
+        "Появились критичные календарные инциденты.",
+        "Интеграции или загрузки файлов перестали работать после публикации.",
+        "Оценка готовности упала относительно финального снимка.",
+    ]
+
+    return {
+        "status": status,
+        "label": label,
+        "summary": summary,
+        "mode": launch_plan["recommended_mode"],
+        "score": score,
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+        "has_signoff": has_signoff,
+        "sections": sections,
+        "next_steps": next_steps,
+        "rollback_triggers": rollback_triggers,
+        "steps_count": len(steps),
+        "critical_steps_count": sum(
+            1 for step in steps if step["status"] == "critical"
+        ),
+    }
+
+
 def create_platform_release_readiness_snapshot(username, readiness=None):
     readiness = readiness or get_platform_release_readiness()
     conn = connect()
@@ -7332,6 +7562,11 @@ async def platform_readiness_page(
     launch_plan = get_platform_release_launch_plan(readiness)
     signoffs = get_platform_release_signoff_history()
     timeline = get_platform_release_timeline(history, signoffs)
+    runbook = get_platform_release_runbook(
+        readiness,
+        launch_plan,
+        timeline,
+    )
 
     return templates.TemplateResponse(
         request,
@@ -7347,6 +7582,7 @@ async def platform_readiness_page(
             "launch_plan": launch_plan,
             "signoffs": signoffs,
             "timeline": timeline,
+            "runbook": runbook,
             "notice": notice,
             "error": error,
         },
@@ -7426,6 +7662,11 @@ async def platform_readiness_export(request: Request):
     launch_plan = get_platform_release_launch_plan(readiness)
     signoffs = get_platform_release_signoff_history()
     timeline = get_platform_release_timeline(history, signoffs)
+    runbook = get_platform_release_runbook(
+        readiness,
+        launch_plan,
+        timeline,
+    )
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -7553,6 +7794,34 @@ async def platform_readiness_export(request: Request):
             event["description"],
             event["url"],
         ])
+    writer.writerow([])
+
+    writer.writerow(["Регламент релиза"])
+    writer.writerow(["Состояние", runbook["label"]])
+    writer.writerow(["Режим", runbook["mode"]])
+    writer.writerow(["Резюме", runbook["summary"]])
+    writer.writerow(["Шагов", runbook["steps_count"]])
+    writer.writerow(["Критичных шагов", runbook["critical_steps_count"]])
+    writer.writerow(["Есть подтверждение", "да" if runbook["has_signoff"] else "нет"])
+    writer.writerow([])
+
+    writer.writerow(["Шаги регламента"])
+    writer.writerow(["Раздел", "Статус", "Владелец", "Шаг", "Описание", "Ссылка"])
+    for section in runbook["sections"]:
+        for step in section["steps"]:
+            writer.writerow([
+                section["title"],
+                step["status_label"],
+                step["owner"],
+                step["title"],
+                step["description"],
+                step["url"],
+            ])
+    writer.writerow([])
+
+    writer.writerow(["Триггеры отката"])
+    for trigger in runbook["rollback_triggers"]:
+        writer.writerow([trigger])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -7953,10 +8222,34 @@ async def api_platform_readiness(request: Request):
     readiness["launch_plan"] = get_platform_release_launch_plan(readiness)
     signoffs = get_platform_release_signoff_history()
     readiness["signoffs"] = signoffs
-    readiness["timeline"] = get_platform_release_timeline(
+    timeline = get_platform_release_timeline(
         signoffs=signoffs,
     )
+    readiness["timeline"] = timeline
+    readiness["runbook"] = get_platform_release_runbook(
+        readiness,
+        readiness["launch_plan"],
+        timeline,
+    )
     return readiness
+
+
+@app.get("/api/platform/readiness/runbook")
+async def api_platform_readiness_runbook(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    readiness = get_platform_release_readiness()
+    launch_plan = get_platform_release_launch_plan(readiness)
+    timeline = get_platform_release_timeline()
+    return get_platform_release_runbook(readiness, launch_plan, timeline)
 
 
 @app.get("/api/platform/readiness/timeline")
