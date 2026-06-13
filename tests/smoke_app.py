@@ -9284,6 +9284,10 @@ async def assert_platform_calendar_health():
         assert analytics["summary"]["response_overdue"] >= 1
         assert analytics["summary"]["recovery_overdue"] == 0
         assert analytics["summary"]["recovery_overdue_events"] >= 1
+        assert analytics["summary"]["high_risk_companies"] >= 1
+        assert analytics["summary"]["medium_risk_companies"] >= 0
+        assert analytics["summary"]["top_risk_company_name"]
+        assert analytics["summary"]["top_risk_company_score"] >= 1
         assert analytics_company["incidents"] == 2
         assert analytics_company["recovered"] == 1
         assert analytics_company["active"] == 1
@@ -9327,6 +9331,10 @@ async def assert_platform_calendar_health():
         assert analytics["recommendations"]
         assert any(
             item["title"] == "Разберите активные инциденты"
+            for item in analytics["recommendations"]
+        )
+        assert any(
+            item["title"] == "Разберите компании высокого риска"
             for item in analytics["recommendations"]
         )
         assert any(
@@ -9388,6 +9396,7 @@ async def assert_platform_calendar_health():
         )
         assert "Среднее восстановление" in analytics_html
         assert "Риск" in analytics_html
+        assert "Высокий риск" in analytics_html
         assert "Сначала компании с нарушенной реакцией" in analytics_html
         assert "Реакция просрочена" in analytics_html
         assert "Рекомендации" in analytics_html
@@ -9436,6 +9445,8 @@ async def assert_platform_calendar_health():
         )
         assert analytics_export_csv.startswith("\ufeff")
         assert "Сводка" in analytics_export_csv
+        assert "Компаний высокого риска" in analytics_export_csv
+        assert "Топ риск компания" in analytics_export_csv
         assert "Просрочена реакция" in analytics_export_csv
         assert "Реакция %" in analytics_export_csv
         assert "Оценка риска" in analytics_export_csv

@@ -4519,6 +4519,15 @@ def get_platform_calendar_incident_analytics(
         key=lambda item: item["opened_at_value"],
         reverse=True,
     )
+    high_risk_companies = [
+        company for company in companies if company["risk_score"] >= 80
+    ]
+    medium_risk_companies = [
+        company
+        for company in companies
+        if 40 <= company["risk_score"] < 80
+    ]
+    top_risk_company = companies[0] if companies else None
     summary = {
         "incidents": len(sessions),
         "recovered": len(recovered),
@@ -4556,8 +4565,36 @@ def get_platform_calendar_incident_analytics(
         "escalations": sum(
             item["escalations"] for item in sessions
         ),
+        "high_risk_companies": len(high_risk_companies),
+        "medium_risk_companies": len(medium_risk_companies),
+        "top_risk_company_name": (
+            top_risk_company["company_name"]
+            if top_risk_company
+            else ""
+        ),
+        "top_risk_company_score": (
+            top_risk_company["risk_score"]
+            if top_risk_company
+            else 0
+        ),
     }
     recommendations = []
+
+    if summary["high_risk_companies"]:
+        recommendations.append({
+            "tone": "error",
+            "title": "Разберите компании высокого риска",
+            "description": (
+                f"Компаний высокого риска: "
+                f"{summary['high_risk_companies']}. "
+                f"Начните с {summary['top_risk_company_name']}."
+            ),
+            "url": (
+                top_risk_company["detail_url"]
+                if top_risk_company
+                else "/platform/calendar-health/analytics"
+            ),
+        })
 
     if summary["active"]:
         recommendations.append({
@@ -6234,6 +6271,10 @@ async def platform_calendar_incident_analytics_export(
     writer.writerow(["Инцидентов", summary["incidents"]])
     writer.writerow(["Восстановлено", summary["recovered"]])
     writer.writerow(["Активных", summary["active"]])
+    writer.writerow(["Компаний высокого риска", summary["high_risk_companies"]])
+    writer.writerow(["Компаний среднего риска", summary["medium_risk_companies"]])
+    writer.writerow(["Топ риск компания", summary["top_risk_company_name"]])
+    writer.writerow(["Топ риск оценка", summary["top_risk_company_score"]])
     writer.writerow(["Закрыто %", summary["recovery_rate"]])
     writer.writerow(["SLA реакции %", summary["response_sla_percent"]])
     writer.writerow([

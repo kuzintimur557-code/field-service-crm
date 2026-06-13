@@ -127,6 +127,14 @@ tr:last-child td{border-bottom:0}
             <div class="metric-meta">{{ summary["recovered"] }} восстановлено</div>
         </div>
         <div class="metric">
+            <div class="metric-label">Высокий риск</div>
+            <div class="metric-value">{{ summary["high_risk_companies"] }}</div>
+            <div class="metric-meta">
+                Топ: {{ summary["top_risk_company_name"] or "нет" }}
+                · {{ summary["top_risk_company_score"] }}/100
+            </div>
+        </div>
+        <div class="metric">
             <div class="metric-label">
                 Реакция до {{ analytics["policy"]["response_minutes"] }} минут
             </div>
