@@ -230,6 +230,9 @@ tr:last-child td{border-bottom:0}
                         <div class="type-meta">
                             Закрыто: {{ type["recovered"] }}
                             · активно: {{ type["active"] }}
+                            {% if type["response_overdue"] %}
+                            · реакция: {{ type["response_overdue"] }}
+                            {% endif %}
                         </div>
                     </div>
                     <div class="type-value">{{ type["incidents"] }}</div>

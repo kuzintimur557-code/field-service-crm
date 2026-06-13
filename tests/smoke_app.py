@@ -9305,6 +9305,10 @@ async def assert_platform_calendar_health():
             item["type"] == "error"
             for item in analytics["types"]
         )
+        assert any(
+            item["response_overdue"] >= 1
+            for item in analytics["types"]
+        )
         assert analytics["daily"]
         assert any(
             item["response_overdue"] >= 1

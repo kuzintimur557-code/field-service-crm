@@ -4341,6 +4341,7 @@ def get_platform_calendar_incident_analytics(
             "incidents": 0,
             "recovered": 0,
             "active": 0,
+            "response_overdue": 0,
         }
         for incident_type, label in (
             ("error", "Ошибки запуска"),
@@ -4395,11 +4396,15 @@ def get_platform_calendar_incident_analytics(
                 "incidents": 0,
                 "recovered": 0,
                 "active": 0,
+                "response_overdue": 0,
             },
         )
         incident_type["incidents"] += 1
         incident_type["recovered"] += int(session["is_recovered"])
         incident_type["active"] += int(session["is_active"])
+        incident_type["response_overdue"] += int(
+            session["response_overdue"]
+        )
         opened_date = (
             session["opened_at"].strftime("%Y-%m-%d")
             if session["opened_at"]
@@ -6284,6 +6289,7 @@ async def platform_calendar_incident_analytics_export(
         "Инциденты",
         "Восстановлено",
         "Активные",
+        "Просрочена реакция",
     ])
     for incident_type in analytics["types"]:
         writer.writerow([
@@ -6291,6 +6297,7 @@ async def platform_calendar_incident_analytics_export(
             incident_type["incidents"],
             incident_type["recovered"],
             incident_type["active"],
+            incident_type["response_overdue"],
         ])
     writer.writerow([])
 
