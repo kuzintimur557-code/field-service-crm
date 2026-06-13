@@ -137,6 +137,10 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
 
     <section class="stats">
         <div class="stat">
+            <div class="stat-label">Общий статус</div>
+            <div class="stat-value">{{ summary["overall_status_label"] }}</div>
+        </div>
+        <div class="stat">
             <div class="stat-label">Компаний</div>
             <div class="stat-value">{{ summary["total_companies"] }}</div>
         </div>
@@ -179,6 +183,10 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
         <div class="stat">
             <div class="stat-label">Назначено мне</div>
             <div class="stat-value">{{ summary["my_incidents"] }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Старейший инцидент</div>
+            <div class="stat-value">{{ summary["oldest_active_incident_label"] }}</div>
         </div>
     </section>
 

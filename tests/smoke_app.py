@@ -7578,6 +7578,9 @@ async def assert_platform_calendar_health():
         html = page.body.decode("utf-8")
         assert "Здоровье календарных автоматизаций" in html
         assert "Рабочая очередь компаний" in html
+        assert "Общий статус" in html
+        assert "Критично" in html
+        assert "Старейший инцидент" in html
         assert "Критические" in html
         assert "Не приняты" in html
         assert "Критический" in html
