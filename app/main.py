@@ -4459,6 +4459,8 @@ def get_platform_calendar_incident_analytics(
 def get_platform_calendar_health(
     now_dt=None,
     status_filter="all",
+    assignee_filter="all",
+    current_username="",
     stale_after_hours=None,
     response_target_minutes=None,
     recovery_target_minutes=None,
@@ -4563,7 +4565,35 @@ def get_platform_calendar_health(
       )
     ORDER BY settings.company_id
     """).fetchall()
+    platform_admin_rows = c.execute("""
+    SELECT username
+    FROM users
+    WHERE role='superadmin'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY username
+    """).fetchall()
     conn.close()
+    platform_admins = [
+        str(row["username"] or "")
+        for row in platform_admin_rows
+        if str(row["username"] or "")
+    ]
+    current_username = str(current_username or "").strip()
+    assignee_filter = str(assignee_filter or "all").strip()
+
+    if assignee_filter == "me":
+        assignee_target = current_username
+    elif assignee_filter in platform_admins:
+        assignee_target = assignee_filter
+    elif assignee_filter == "unassigned":
+        assignee_target = ""
+    else:
+        assignee_filter = "all"
+        assignee_target = ""
+
+    if assignee_filter == "me" and not assignee_target:
+        assignee_filter = "all"
+
     items = []
     incident_labels = {
         "error": "Ошибка запуска",
@@ -4675,6 +4705,14 @@ def get_platform_calendar_health(
         }
         item["is_acknowledged"] = bool(
             item["incident_acknowledged_at"]
+        )
+        item["assignee_username"] = str(
+            item["incident_acknowledged_by"] or ""
+        )
+        item["is_mine"] = bool(
+            active_incident
+            and current_username
+            and item["assignee_username"] == current_username
         )
         incident_started_value = str(
             item["incident_started_at"] or ""
@@ -4792,7 +4830,78 @@ def get_platform_calendar_health(
         "recovery_overdue": sum(
             1 for item in items if item["recovery_overdue"]
         ),
+        "active_incidents": sum(
+            1 for item in items if item["active_incident"]
+        ),
+        "assigned": sum(
+            1
+            for item in items
+            if item["active_incident"] and item["is_acknowledged"]
+        ),
+        "unassigned": sum(
+            1
+            for item in items
+            if item["active_incident"] and not item["is_acknowledged"]
+        ),
+        "my_incidents": sum(
+            1 for item in items if item["is_mine"]
+        ),
     }
+    admin_workload = []
+
+    for admin_username in platform_admins:
+        assigned_items = [
+            item
+            for item in items
+            if item["active_incident"]
+            and item["assignee_username"] == admin_username
+        ]
+        oldest_age_minutes = max(
+            (
+                int(item["incident_age_minutes"] or 0)
+                for item in assigned_items
+            ),
+            default=0,
+        )
+        admin_workload.append({
+            "username": admin_username,
+            "assigned": len(assigned_items),
+            "critical": sum(
+                1
+                for item in assigned_items
+                if item["priority_code"] == "critical"
+            ),
+            "recovery_overdue": sum(
+                1
+                for item in assigned_items
+                if item["recovery_overdue"]
+            ),
+            "oldest_age_minutes": oldest_age_minutes,
+            "oldest_age_label": (
+                format_calendar_incident_age(oldest_age_minutes)
+                if assigned_items
+                else "нет"
+            ),
+            "is_current": admin_username == current_username,
+            "filter_url": (
+                "/platform/calendar-health?"
+                + urlencode({
+                    "assignee": (
+                        "me"
+                        if admin_username == current_username
+                        else admin_username
+                    ),
+                })
+            ),
+        })
+
+    admin_workload.sort(
+        key=lambda item: (
+            -item["assigned"],
+            -item["critical"],
+            item["username"].lower(),
+        )
+    )
 
     if status_filter == "problem":
         filtered_items = [
@@ -4833,6 +4942,20 @@ def get_platform_calendar_health(
     else:
         filtered_items = items
 
+    if assignee_filter == "unassigned":
+        filtered_items = [
+            item
+            for item in filtered_items
+            if item["active_incident"] and not item["is_acknowledged"]
+        ]
+    elif assignee_filter != "all":
+        filtered_items = [
+            item
+            for item in filtered_items
+            if item["active_incident"]
+            and item["assignee_username"] == assignee_target
+        ]
+
     filtered_items.sort(
         key=lambda item: (
             item["priority_rank"],
@@ -4846,6 +4969,10 @@ def get_platform_calendar_health(
         "summary": summary,
         "items": filtered_items,
         "status_filter": status_filter,
+        "assignee_filter": assignee_filter,
+        "assignee_target": assignee_target,
+        "platform_admins": platform_admins,
+        "admin_workload": admin_workload,
         "stale_after_hours": stale_after_hours,
         "policy": policy,
         "generated_at": now_dt.strftime("%Y-%m-%d %H:%M"),
@@ -5200,6 +5327,7 @@ async def platform_dashboard(request: Request):
 async def platform_calendar_health_page(
     request: Request,
     status: str = "all",
+    assignee: str = "all",
 ):
     username = get_user(request)
 
@@ -5213,6 +5341,8 @@ async def platform_calendar_health_page(
 
     health = get_platform_calendar_health(
         status_filter=status,
+        assignee_filter=assignee,
+        current_username=username,
     )
 
     return templates.TemplateResponse(
@@ -5226,6 +5356,9 @@ async def platform_calendar_health_page(
             "summary": health["summary"],
             "companies": health["items"],
             "selected_status": health["status_filter"],
+            "selected_assignee": health["assignee_filter"],
+            "platform_admins": health["platform_admins"],
+            "admin_workload": health["admin_workload"],
         },
     )
 

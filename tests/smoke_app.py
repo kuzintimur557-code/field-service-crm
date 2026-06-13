@@ -7427,6 +7427,17 @@ async def assert_platform_calendar_health():
         assert health["summary"]["problems"] >= 1
         assert health["summary"]["critical"] >= 1
         assert health["summary"]["unacknowledged"] >= 1
+        assert health["summary"]["active_incidents"] >= 1
+        assert health["summary"]["assigned"] == 0
+        assert health["summary"]["unassigned"] >= 1
+        assert health["summary"]["my_incidents"] == 0
+        assert {
+            item["username"] for item in health["admin_workload"]
+        } >= {"super", backup_admin_username}
+        assert all(
+            item["assigned"] == 0
+            for item in health["admin_workload"]
+        )
         assert all(item["is_problem"] for item in health["items"])
 
         critical_health = crm.get_platform_calendar_health(
@@ -7454,6 +7465,33 @@ async def assert_platform_calendar_health():
             item["requires_response"]
             for item in unacknowledged_health["items"]
         )
+        unassigned_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            assignee_filter="unassigned",
+        )
+        assert unassigned_health["assignee_filter"] == "unassigned"
+        assert any(
+            item["company_id"] == company_id
+            for item in unassigned_health["items"]
+        )
+        assert all(
+            item["active_incident"] and not item["is_acknowledged"]
+            for item in unassigned_health["items"]
+        )
+        empty_personal_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            assignee_filter="me",
+            current_username="super",
+        )
+        assert empty_personal_health["assignee_filter"] == "me"
+        assert empty_personal_health["assignee_target"] == "super"
+        assert empty_personal_health["items"] == []
+        invalid_assignee_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            assignee_filter="missing_admin",
+            current_username="super",
+        )
+        assert invalid_assignee_health["assignee_filter"] == "all"
         normalized = crm.get_platform_calendar_health(
             now_dt=now_dt,
             status_filter="unknown",
@@ -7482,6 +7520,7 @@ async def assert_platform_calendar_health():
         )
         assert page.status_code == 200
         assert page.context["selected_status"] == "problem"
+        assert page.context["selected_assignee"] == "all"
         assert any(
             item["company_id"] == company_id
             for item in page.context["companies"]
@@ -7493,6 +7532,11 @@ async def assert_platform_calendar_health():
         assert "Не приняты" in html
         assert "Критический" in html
         assert "Реакция просрочена" in html
+        assert "Назначено мне" in html
+        assert "Нагрузка администраторов" in html
+        assert "Мои инциденты" in html
+        assert "Без ответственного" in html
+        assert backup_admin_username in html
         assert (
             f"реакция: {health['policy']['response_minutes']} мин."
             in html
@@ -7717,6 +7761,41 @@ async def assert_platform_calendar_health():
             in acknowledged_html
         )
         assert backup_admin_username in acknowledged_html
+        personal_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            status_filter="problem",
+            assignee_filter="me",
+            current_username="super",
+        )
+        assert personal_health["assignee_filter"] == "me"
+        assert personal_health["assignee_target"] == "super"
+        assert [
+            item["company_id"] for item in personal_health["items"]
+        ] == [company_id]
+        assert personal_health["items"][0]["is_mine"] is True
+        assert personal_health["summary"]["assigned"] == 1
+        assert personal_health["summary"]["my_incidents"] == 1
+        super_workload = next(
+            item
+            for item in personal_health["admin_workload"]
+            if item["username"] == "super"
+        )
+        assert super_workload["assigned"] == 1
+        assert super_workload["is_current"] is True
+        personal_page = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "super",
+                "/platform/calendar-health",
+            ),
+            status="problem",
+            assignee="me",
+        )
+        assert personal_page.context["selected_assignee"] == "me"
+        personal_html = personal_page.body.decode("utf-8")
+        assert "Ответственный super" in personal_html
+        assert "· вы" in personal_html
+        assert "status=critical" in personal_html
+        assert "assignee=me" in personal_html
         empty_note = await crm.platform_calendar_incident_note(
             make_form_request(
                 "super",
@@ -7856,6 +7935,47 @@ async def assert_platform_calendar_health():
         )
         assert len(assignment_notifications) == 1
         assert company_name in assignment_notifications[0]["message"]
+        reassigned_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            assignee_filter=backup_admin_username,
+            current_username="super",
+        )
+        assert reassigned_health["assignee_filter"] == (
+            backup_admin_username
+        )
+        assert [
+            item["company_id"] for item in reassigned_health["items"]
+        ] == [company_id]
+        assert reassigned_health["items"][0]["is_mine"] is False
+        assert reassigned_health["items"][0][
+            "assignee_username"
+        ] == backup_admin_username
+        assert reassigned_health["summary"]["my_incidents"] == 0
+        backup_workload = next(
+            item
+            for item in reassigned_health["admin_workload"]
+            if item["username"] == backup_admin_username
+        )
+        assert backup_workload["assigned"] == 1
+        assert backup_workload["critical"] == 0
+        assert backup_workload["filter_url"].endswith(
+            f"assignee={backup_admin_username}"
+        )
+        previous_admin_workload = next(
+            item
+            for item in reassigned_health["admin_workload"]
+            if item["username"] == "super"
+        )
+        assert previous_admin_workload["assigned"] == 0
+        combined_reassigned_health = (
+            crm.get_platform_calendar_health(
+                now_dt=now_dt,
+                status_filter="critical",
+                assignee_filter=backup_admin_username,
+                current_username="super",
+            )
+        )
+        assert combined_reassigned_health["items"] == []
         assigned_detail = (
             await crm.platform_calendar_company_health_page(
                 make_asgi_request(
@@ -7874,6 +7994,7 @@ async def assert_platform_calendar_health():
         acknowledged_health = crm.get_platform_calendar_health(
             now_dt=now_dt,
             status_filter="problem",
+            current_username="super",
         )
         acknowledged_company = next(
             item
@@ -7884,6 +8005,10 @@ async def assert_platform_calendar_health():
         assert acknowledged_company["priority_label"] == "В работе"
         assert acknowledged_company["requires_response"] is False
         assert acknowledged_company["response_overdue"] is False
+        assert acknowledged_company["assignee_username"] == (
+            backup_admin_username
+        )
+        assert acknowledged_company["is_mine"] is False
         acknowledged_at = (
             now_dt - timedelta(minutes=110)
         ).strftime("%Y-%m-%d %H:%M")
