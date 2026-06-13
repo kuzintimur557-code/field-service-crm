@@ -9534,6 +9534,8 @@ async def assert_platform_calendar_health():
         assert "/platform/calendar-health" in platform_html
         assert "/platform/readiness" in platform_html
         assert "Готовность релиза" in platform_html
+        assert "Релизный штаб" in platform_html
+        assert "Быстрые действия" in platform_html
         assert platform_page.context["release_readiness"]["checks"]
         assert platform_page.context["release_readiness"]["score"] >= 0
         assert platform_page.context["release_readiness"]["categories"]
@@ -9547,6 +9549,11 @@ async def assert_platform_calendar_health():
             ]
         }
         assert "next_actions" in platform_page.context["release_readiness"]
+        assert platform_page.context["release_dashboard"]["metrics"]
+        assert platform_page.context["release_dashboard"]["quick_actions"]
+        assert platform_page.context["release_dashboard"]["alerts"]
+        assert platform_page.context["release_dashboard"]["next_checkpoint"]
+        assert platform_page.context["release_dashboard"]["mode"]
         assert "secret_key" in {
             item["key"]
             for item in platform_page.context["release_readiness"]["checks"]

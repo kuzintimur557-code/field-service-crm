@@ -7504,6 +7504,217 @@ def get_platform_release_post_launch_review(
     }
 
 
+def make_release_dashboard_item(
+    title,
+    description,
+    value="",
+    status="warning",
+    url="/platform/readiness",
+):
+    labels = {
+        "ok": "Норма",
+        "warning": "Контроль",
+        "critical": "Стоп",
+    }
+    normalized_status = status if status in labels else "warning"
+    return {
+        "title": title,
+        "description": description,
+        "value": value,
+        "status": normalized_status,
+        "status_label": labels[normalized_status],
+        "url": url,
+    }
+
+
+def get_platform_release_dashboard_summary(
+    readiness=None,
+    history=None,
+    calendar_health_summary=None,
+):
+    readiness = readiness or get_platform_release_readiness(
+        calendar_health_summary=calendar_health_summary,
+    )
+    history = (
+        history
+        if history is not None
+        else get_platform_release_readiness_history()
+    )
+    comparison = compare_platform_release_readiness_to_snapshot(readiness)
+    trend = get_platform_release_readiness_trend(history)
+    launch_plan = get_platform_release_launch_plan(readiness)
+    signoffs = get_platform_release_signoff_history()
+    timeline = get_platform_release_timeline(history, signoffs)
+    runbook = get_platform_release_runbook(
+        readiness,
+        launch_plan,
+        timeline,
+    )
+    control_center = get_platform_release_control_center(
+        readiness,
+        launch_plan,
+        timeline,
+        runbook,
+    )
+    post_launch_review = get_platform_release_post_launch_review(
+        readiness,
+        comparison,
+        trend,
+        launch_plan,
+        timeline,
+        control_center,
+        history,
+        signoffs,
+    )
+
+    if launch_plan["blocked"]:
+        status = "critical"
+        label = "Стоп релиза"
+        summary = "Есть критичные блокеры. Сначала закрываем обязательные исправления."
+    elif control_center["status"] == "critical":
+        status = "critical"
+        label = "Высокий риск"
+        summary = control_center["summary"]
+    elif not control_center["has_signoff"]:
+        status = "warning"
+        label = "Нужно решение"
+        summary = "Перед запуском нужно зафиксировать решение владельца платформы."
+    elif post_launch_review["status"] == "critical":
+        status = "critical"
+        label = "Нужен разбор"
+        summary = post_launch_review["summary"]
+    elif readiness["warning_count"]:
+        status = "warning"
+        label = "Под контролем"
+        summary = "Критичных блокеров нет, но есть предупреждения перед запуском."
+    else:
+        status = "ok"
+        label = "Готово"
+        summary = "Ключевые сигналы релиза стабильны."
+
+    latest_decision = (
+        signoffs[0]["decision_label"] if signoffs else "Решения пока нет"
+    )
+    latest_decision_at = signoffs[0]["signed_at"] if signoffs else ""
+    next_checkpoint = control_center["next_checkpoint"]
+
+    metrics = [
+        make_release_dashboard_item(
+            "Оценка",
+            "Текущая оценка готовности релиза.",
+            f"{readiness['score']}%",
+            readiness["status"],
+            "/platform/readiness",
+        ),
+        make_release_dashboard_item(
+            "Риск",
+            "Уровень риска по центру контроля запуска.",
+            control_center["risk_level"],
+            control_center["status"],
+            "/platform/readiness",
+        ),
+        make_release_dashboard_item(
+            "Решение",
+            "Последнее сохранённое решение по запуску.",
+            latest_decision,
+            "ok" if signoffs else "warning",
+            "/platform/readiness",
+        ),
+        make_release_dashboard_item(
+            "Снимков",
+            "Количество сохранённых снимков готовности.",
+            str(trend["total_snapshots"]),
+            "ok" if trend["has_history"] else "warning",
+            "/platform/readiness",
+        ),
+        make_release_dashboard_item(
+            "Динамика",
+            "Изменение оценки относительно истории снимков.",
+            str(trend["score_change"]),
+            trend["tone"],
+            "/platform/readiness",
+        ),
+        make_release_dashboard_item(
+            "Разбор",
+            "Состояние пострелизного разбора.",
+            post_launch_review["outcome"],
+            post_launch_review["status"],
+            "/platform/readiness",
+        ),
+    ]
+
+    alerts = [
+        make_release_dashboard_item(
+            item["title"],
+            item["action"],
+            item["category_label"],
+            item["status"],
+            item["url"],
+        )
+        for item in readiness["next_actions"][:4]
+    ]
+    if not alerts:
+        alerts = [
+            make_release_dashboard_item(
+                "Критичных задач нет",
+                "Продолжайте мониторинг запуска и первых клиентов.",
+                "Мониторинг",
+                "ok",
+                "/platform/readiness",
+            ),
+        ]
+
+    quick_actions = [
+        make_release_dashboard_item(
+            next_checkpoint["title"],
+            next_checkpoint["description"],
+            next_checkpoint["value"],
+            next_checkpoint["status"],
+            next_checkpoint["url"],
+        ),
+        make_release_dashboard_item(
+            "Сохранить снимок",
+            "Зафиксируйте текущее состояние готовности релиза.",
+            "действие",
+            "warning",
+            "/platform/readiness",
+        ),
+        make_release_dashboard_item(
+            "Открыть инциденты",
+            "Проверьте календарные и операционные сигналы платформы.",
+            control_center["risk_level"],
+            control_center["status"],
+            "/platform/calendar-health",
+        ),
+        make_release_dashboard_item(
+            "Экспортировать CSV",
+            "Сохраните отчёт готовности и контроля запуска.",
+            "отчёт",
+            "warning",
+            readiness["export_url"],
+        ),
+    ]
+
+    return {
+        "status": status,
+        "label": label,
+        "summary": summary,
+        "mode": launch_plan["recommended_mode"],
+        "score": readiness["score"],
+        "risk_level": control_center["risk_level"],
+        "latest_decision": latest_decision,
+        "latest_decision_at": latest_decision_at,
+        "latest_event": timeline["latest_label"],
+        "latest_event_at": timeline["latest_at"],
+        "next_checkpoint": next_checkpoint,
+        "control_label": control_center["label"],
+        "review_label": post_launch_review["label"],
+        "metrics": metrics,
+        "alerts": alerts,
+        "quick_actions": quick_actions,
+    }
+
+
 def create_platform_release_readiness_snapshot(username, readiness=None):
     readiness = readiness or get_platform_release_readiness()
     conn = connect()
@@ -7979,6 +8190,10 @@ async def platform_dashboard(request: Request):
         },
         calendar_health_summary=calendar_health["summary"],
     )
+    release_dashboard = get_platform_release_dashboard_summary(
+        release_readiness,
+        calendar_health_summary=calendar_health["summary"],
+    )
 
     return templates.TemplateResponse(
         request,
@@ -8000,6 +8215,7 @@ async def platform_dashboard(request: Request):
             ),
             "calendar_recommendations": calendar_recommendations,
             "release_readiness": release_readiness,
+            "release_dashboard": release_dashboard,
         }
     )
 

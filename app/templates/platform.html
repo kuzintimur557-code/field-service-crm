@@ -37,6 +37,37 @@ h1{margin:0;font-size:38px}
 .release-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .release-actions a{display:inline-flex;padding:10px 12px;border-radius:10px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
 .release-actions a.secondary{border:1px solid #d1d5db;background:white;color:#374151}
+.release-command{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start}
+.release-command.critical{border:1px solid #fecaca;background:#fff7f7}
+.release-command.warning{border:1px solid #fde68a;background:#fffbeb}
+.release-command.ok{border:1px solid #bbf7d0;background:#f0fdf4}
+.release-command-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.release-command-title{margin:0;font-size:22px}
+.release-command-badge{display:inline-flex;padding:7px 9px;border-radius:9px;background:white;font-size:11px;font-weight:900}
+.release-command-text{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800;line-height:1.45}
+.release-command-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.release-command-metric{display:block;min-height:80px;padding:11px;border-radius:12px;background:white;color:#111827;text-decoration:none}
+.release-command-metric.ok{background:#f0fdf4}
+.release-command-metric.warning{background:#fffbeb}
+.release-command-metric.critical{background:#fff7f7}
+.release-command-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.release-command-value{margin-top:5px;font-size:18px;font-weight:900}
+.release-command-meta{margin-top:4px;color:#6b7280;font-size:10px;font-weight:800;line-height:1.35}
+.release-command-side{display:grid;gap:8px}
+.release-command-side-title{font-size:12px;font-weight:900}
+.release-command-action{display:block;padding:10px;border-radius:10px;background:white;color:#111827;text-decoration:none}
+.release-command-action.warning{background:#fffbeb}
+.release-command-action.critical{background:#fff7f7}
+.release-command-action.ok{background:#f0fdf4}
+.release-command-action strong{display:block;font-size:12px}
+.release-command-action span{display:block;margin-top:4px;color:#6b7280;font-size:10px;font-weight:800;line-height:1.35}
+.release-command-alerts{display:grid;grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:4px}
+.release-command-alert{display:block;padding:10px;border-radius:10px;background:white;color:#111827;text-decoration:none}
+.release-command-alert.warning{background:#fffbeb}
+.release-command-alert.critical{background:#fff7f7}
+.release-command-alert.ok{background:#f0fdf4}
+.release-command-alert strong{display:block;font-size:12px}
+.release-command-alert span{display:block;margin-top:4px;color:#6b7280;font-size:10px;font-weight:800;line-height:1.35}
 .ops-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center}
 .ops-heading{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .ops-title{margin:0;font-size:22px}
@@ -91,6 +122,11 @@ h1{margin:0;font-size:38px}
 .release-score{width:92px;height:92px;font-size:25px}
 .release-actions{justify-content:stretch}
 .release-actions a{width:100%;justify-content:center}
+.release-command{grid-template-columns:1fr}
+.release-command-head{display:block}
+.release-command-badge{margin-top:8px}
+.release-command-metrics{grid-template-columns:1fr}
+.release-command-alerts{grid-template-columns:1fr}
 .ops-card{grid-template-columns:1fr}
 .ops-metrics{grid-template-columns:1fr 1fr}
 .ops-actions{justify-content:stretch}
@@ -179,6 +215,63 @@ h1{font-size:30px}
         <a href="/platform/readiness">Открыть центр</a>
         <a class="secondary" href="{{ release_readiness['export_url'] }}">CSV</a>
         <a class="secondary" href="/system">Система</a>
+    </div>
+</div>
+
+<div class="card release-command {{ release_dashboard['status'] }}">
+    <div>
+        <div class="release-command-head">
+            <div>
+                <h2 class="release-command-title">Релизный штаб</h2>
+                <div class="release-command-text">
+                    {{ release_dashboard["summary"] }}
+                    Режим: {{ release_dashboard["mode"] }}.
+                    Последнее событие: {{ release_dashboard["latest_event"] }}{% if release_dashboard["latest_event_at"] %},
+                    {{ release_dashboard["latest_event_at"] }}{% endif %}.
+                </div>
+            </div>
+            <span class="release-command-badge">
+                {{ release_dashboard["label"] }} · риск {{ release_dashboard["risk_level"] }}
+            </span>
+        </div>
+        <div class="release-command-metrics">
+            {% for metric in release_dashboard["metrics"] %}
+            <a class="release-command-metric {{ metric['status'] }}" href="{{ metric['url'] }}">
+                <div class="release-command-label">{{ metric["title"] }}</div>
+                <div class="release-command-value">{{ metric["value"] }}</div>
+                <div class="release-command-meta">{{ metric["status_label"] }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="release-command-side">
+        <div>
+            <div class="release-command-side-title">Следующий шаг</div>
+            <a class="release-command-action {{ release_dashboard['next_checkpoint']['status'] }}" href="{{ release_dashboard['next_checkpoint']['url'] }}">
+                <strong>{{ release_dashboard["next_checkpoint"]["title"] }}</strong>
+                <span>
+                    {{ release_dashboard["next_checkpoint"]["value"] }} ·
+                    {{ release_dashboard["next_checkpoint"]["description"] }}
+                </span>
+            </a>
+        </div>
+        <div>
+            <div class="release-command-side-title">Быстрые действия</div>
+            {% for action in release_dashboard["quick_actions"][1:] %}
+            <a class="release-command-action {{ action['status'] }}" href="{{ action['url'] }}">
+                <strong>{{ action["title"] }}</strong>
+                <span>{{ action["value"] }} · {{ action["description"] }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="release-command-alerts">
+        {% for alert in release_dashboard["alerts"] %}
+        <a class="release-command-alert {{ alert['status'] }}" href="{{ alert['url'] }}">
+            <strong>{{ alert["value"] }} · {{ alert["title"] }}</strong>
+            <span>{{ alert["description"] }}</span>
+        </a>
+        {% endfor %}
     </div>
 </div>
 
