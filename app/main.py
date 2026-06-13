@@ -5565,6 +5565,44 @@ def get_platform_calendar_company_detail(
     if not company:
         return None
 
+    analytics = get_platform_calendar_incident_analytics(
+        days=30,
+        now_dt=now_dt,
+    )
+    company_analytics = next(
+        (
+            item
+            for item in analytics["companies"]
+            if int(item["company_id"]) == int(company_id)
+        ),
+        None,
+    )
+    if company_analytics:
+        company["risk_score"] = company_analytics["risk_score"]
+        company["risk_label"] = company_analytics["risk_label"]
+        company["risk_tone"] = company_analytics["risk_tone"]
+        company["risk_incidents"] = company_analytics["incidents"]
+        company["risk_active"] = company_analytics["active"]
+        company["risk_response_overdue"] = (
+            company_analytics["response_overdue"]
+        )
+        company["risk_response_overdue_percent"] = (
+            company_analytics["response_overdue_percent"]
+        )
+        company["risk_escalations"] = company_analytics["escalations"]
+    else:
+        company["risk_score"] = 0
+        company["risk_label"] = "Низкий"
+        company["risk_tone"] = "healthy"
+        company["risk_incidents"] = 0
+        company["risk_active"] = 0
+        company["risk_response_overdue"] = 0
+        company["risk_response_overdue_percent"] = 0
+        company["risk_escalations"] = 0
+    company["risk_analytics_url"] = (
+        "/platform/calendar-health/analytics"
+    )
+
     conn = connect()
     c = conn.cursor()
     run_rows = c.execute("""
@@ -6501,6 +6539,20 @@ async def platform_calendar_company_health_export(
     writer.writerow(["Владелец", company["owner_username"]])
     writer.writerow(["Состояние", company["status_label"]])
     writer.writerow(["Приоритет", company["priority_label"]])
+    writer.writerow(["Риск 30 дней", company["risk_label"]])
+    writer.writerow(["Оценка риска", company["risk_score"]])
+    writer.writerow([
+        "Инцидентов за 30 дней",
+        company["risk_incidents"],
+    ])
+    writer.writerow([
+        "Просрочена реакция за 30 дней",
+        company["risk_response_overdue"],
+    ])
+    writer.writerow([
+        "Реакция просрочена %",
+        company["risk_response_overdue_percent"],
+    ])
     writer.writerow([
         "Автоматизация включена",
         "да" if company["automation_enabled"] else "нет",

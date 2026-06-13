@@ -309,6 +309,21 @@ tr:last-child td{border-bottom:0}
             </span>
         </div>
         <div class="overview-item">
+            <div class="overview-label">Риск 30 дней</div>
+            <div class="overview-value">{{ company["risk_score"] }}/100</div>
+            <div class="meta">
+                <span class="pill {{ company['risk_tone'] }}">
+                    {{ company["risk_label"] }}
+                </span>
+                · реакция {{ company["risk_response_overdue_percent"] }}%
+            </div>
+            <div class="meta">
+                {{ company["risk_incidents"] }} инц.
+                · активно {{ company["risk_active"] }}
+                · эскалаций {{ company["risk_escalations"] }}
+            </div>
+        </div>
+        <div class="overview-item">
             <div class="overview-label">Запусков</div>
             <div class="overview-value">{{ summary["runs"] }}</div>
         </div>
