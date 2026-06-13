@@ -9429,6 +9429,7 @@ async def assert_platform_calendar_health():
         assert "Разберите активные инциденты" in platform_html
         assert "В работе <strong>" in platform_html
         assert "Критические</a>" in platform_html
+        assert "Действие: Принять в работу" in platform_html
         assert "Ответственный:" in platform_html
         assert f"/platform/calendar-health/{company_id}" in platform_html
         assert (

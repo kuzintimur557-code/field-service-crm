@@ -188,6 +188,8 @@ h1{font-size:30px}
                 {{ incident["priority_label"] }}
             </span>
             <div class="incident-meta">
+                Действие: {{ incident["next_action_label"] }}
+                <br>
                 Ответственный:
                 {{ incident["assignee_username"] or "не назначен" }}
             </div>
