@@ -57,6 +57,14 @@ h1{margin:0;font-size:38px}
 .admin-load-current{color:#1d4ed8;font-size:9px;text-transform:uppercase}
 .admin-load-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:#6b7280;font-size:10px;font-weight:800}
 .admin-load-meta strong{color:#111827}
+.ops-recommendations{display:grid;grid-column:1/-1;gap:8px;margin-top:10px}
+.ops-recommendation-title{color:#374151;font-size:12px;font-weight:900}
+.ops-recommendation{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px;border:1px solid #e5e7eb;border-radius:12px;background:white}
+.ops-recommendation.error{border-color:#fecaca;background:#fff7f7}
+.ops-recommendation.warning{border-color:#fde68a;background:#fffbeb}
+.ops-recommendation.healthy{border-color:#bbf7d0;background:#f0fdf4}
+.ops-recommendation strong{display:block;font-size:12px}
+.ops-recommendation span{display:block;margin-top:3px;color:#6b7280;font-size:10px;font-weight:800;line-height:1.4}
 .company{display:grid;grid-template-columns:.5fr 1.5fr 1fr 1fr;gap:14px;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px;align-items:center}
 .name{font-size:18px;font-weight:900}
 .meta{font-size:14px;color:#6b7280;font-weight:800}
@@ -70,6 +78,7 @@ h1{margin:0;font-size:38px}
 .incident-row{grid-template-columns:1fr}
 .incident-link{justify-content:center}
 .admin-load-grid{grid-template-columns:1fr}
+.ops-recommendation{grid-template-columns:1fr}
 .nav a{width:100%;text-align:center}
 h1{font-size:30px}
 }
@@ -209,6 +218,22 @@ h1{font-size:30px}
             </a>
             {% endfor %}
         </div>
+    </div>
+    {% endif %}
+    {% if calendar_recommendations %}
+    <div class="ops-recommendations">
+        <div class="ops-recommendation-title">Рекомендации</div>
+        {% for recommendation in calendar_recommendations %}
+        <div class="ops-recommendation {{ recommendation['tone'] }}">
+            <div>
+                <strong>{{ recommendation["title"] }}</strong>
+                <span>{{ recommendation["description"] }}</span>
+            </div>
+            <a class="incident-link" href="{{ recommendation['url'] }}">
+                Открыть
+            </a>
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
 </div>

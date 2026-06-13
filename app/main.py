@@ -5624,6 +5624,11 @@ async def platform_dashboard(request: Request):
         item for item in calendar_health["items"] if item["active_incident"]
     ][:5]
     calendar_admin_workload = calendar_health["admin_workload"][:4]
+    calendar_recommendations = (
+        get_platform_calendar_incident_analytics(days=30)[
+            "recommendations"
+        ][:3]
+    )
 
     return templates.TemplateResponse(
         request,
@@ -5640,6 +5645,7 @@ async def platform_dashboard(request: Request):
             "calendar_health_summary": calendar_health["summary"],
             "calendar_health_incidents": calendar_health_incidents,
             "calendar_admin_workload": calendar_admin_workload,
+            "calendar_recommendations": calendar_recommendations,
         }
     )
 

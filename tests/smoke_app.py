@@ -9393,6 +9393,11 @@ async def assert_platform_calendar_health():
             item["username"] == "super"
             for item in platform_page.context["calendar_admin_workload"]
         )
+        assert platform_page.context["calendar_recommendations"]
+        assert any(
+            item["title"] == "Разберите активные инциденты"
+            for item in platform_page.context["calendar_recommendations"]
+        )
         assert any(
             item["company_id"] == company_id
             for item in platform_page.context["calendar_health_incidents"]
@@ -9401,6 +9406,8 @@ async def assert_platform_calendar_health():
         assert "Критично" in platform_html
         assert "Старейший" in platform_html
         assert "Нагрузка администраторов" in platform_html
+        assert "Рекомендации" in platform_html
+        assert "Разберите активные инциденты" in platform_html
         assert "В работе <strong>" in platform_html
         assert "Критические</a>" in platform_html
         assert "Ответственный:" in platform_html
