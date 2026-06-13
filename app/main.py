@@ -4178,6 +4178,17 @@ def build_calendar_incident_sessions(
             response_minutes is not None
             and response_minutes <= response_target_minutes
         )
+        session["response_overdue"] = bool(
+            (
+                response_minutes is not None
+                and response_minutes > response_target_minutes
+            )
+            or (
+                not acknowledged_at
+                and session["age_minutes"] is not None
+                and session["age_minutes"] >= response_target_minutes
+            )
+        )
         session["recovery_sla_met"] = bool(
             recovery_minutes is not None
             and recovery_minutes <= recovery_target_minutes
@@ -4351,6 +4362,7 @@ def get_platform_calendar_incident_analytics(
                 "response_minutes": [],
                 "recovery_minutes": [],
                 "escalations": 0,
+                "response_overdue": 0,
                 "recovery_overdue": 0,
             },
         )
@@ -4358,6 +4370,9 @@ def get_platform_calendar_incident_analytics(
         company["recovered"] += int(session["is_recovered"])
         company["active"] += int(session["is_active"])
         company["escalations"] += int(session["escalations"] or 0)
+        company["response_overdue"] += int(
+            session["response_overdue"]
+        )
         company["recovery_overdue"] += int(
             session["recovery_overdue"]
         )
@@ -4499,6 +4514,9 @@ def get_platform_calendar_incident_analytics(
         "recovery_failures": sum(
             item["recovery_failures"] for item in sessions
         ),
+        "response_overdue": sum(
+            1 for item in sessions if item["response_overdue"]
+        ),
         "recovery_overdue": sum(
             1 for item in sessions if item["recovery_overdue"]
         ),
@@ -4531,6 +4549,18 @@ def get_platform_calendar_incident_analytics(
                 "Передайте их ответственным администраторам."
             ),
             "url": "/platform/calendar-health?status=recovery_overdue",
+        })
+
+    if summary["response_overdue"]:
+        recommendations.append({
+            "tone": "warning",
+            "title": "Ускорьте реакцию",
+            "description": (
+                f"За период нарушений реакции: "
+                f"{summary['response_overdue']}. Проверьте очередь "
+                "непринятых инцидентов и ответственных."
+            ),
+            "url": "/platform/calendar-health?status=response_overdue",
         })
 
     if summary["response_sla_percent"] < 90:
@@ -6190,6 +6220,11 @@ async def platform_calendar_incident_analytics_export(
     ])
     writer.writerow(["Попыток восстановления", summary["recovery_attempts"]])
     writer.writerow(["Ошибок восстановления", summary["recovery_failures"]])
+    writer.writerow(["Просрочена реакция", summary["response_overdue"]])
+    writer.writerow([
+        "Просрочено восстановление",
+        summary["recovery_overdue"],
+    ])
     writer.writerow(["Эскалаций", summary["escalations"]])
     writer.writerow([])
 
@@ -6211,6 +6246,7 @@ async def platform_calendar_incident_analytics_export(
         "Восстановлено",
         "Активные",
         "Эскалации",
+        "Просрочена реакция",
         "Просрочено восстановление",
         "Средняя реакция",
         "Среднее восстановление",
@@ -6224,6 +6260,7 @@ async def platform_calendar_incident_analytics_export(
             company["recovered"],
             company["active"],
             company["escalations"],
+            company["response_overdue"],
             company["recovery_overdue"],
             company["average_response_label"],
             company["average_recovery_label"],
@@ -6266,6 +6303,7 @@ async def platform_calendar_incident_analytics_export(
         "Реакция",
         "Восстановление",
         "Состояние",
+        "Реакция просрочена",
         "Эскалации",
     ])
     for incident in analytics["recent_sessions"]:
@@ -6280,6 +6318,7 @@ async def platform_calendar_incident_analytics_export(
                 else incident["recovery_label"]
             ),
             incident["status_label"],
+            "да" if incident["response_overdue"] else "нет",
             incident["escalations"],
         ])
 

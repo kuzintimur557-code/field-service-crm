@@ -9279,12 +9279,14 @@ async def assert_platform_calendar_health():
         assert analytics["summary"]["recovery_failures"] >= 1
         assert analytics["summary"]["escalations"] >= 1
         assert analytics["summary"]["recovery_sla_percent"] == 100
+        assert analytics["summary"]["response_overdue"] >= 1
         assert analytics["summary"]["recovery_overdue"] == 0
         assert analytics["summary"]["recovery_overdue_events"] >= 1
         assert analytics_company["incidents"] == 2
         assert analytics_company["recovered"] == 1
         assert analytics_company["active"] == 1
         assert analytics_company["escalations"] == 1
+        assert analytics_company["response_overdue"] >= 1
         assert analytics_company["recovery_overdue"] == 0
         assert analytics_company["detail_url"] == (
             f"/platform/calendar-health/{company_id}"
@@ -9297,9 +9299,14 @@ async def assert_platform_calendar_health():
         assert analytics["recent_sessions"][0][
             "status_label"
         ] == "Передан платформе"
+        assert analytics["recent_sessions"][0]["response_overdue"] is True
         assert analytics["recommendations"]
         assert any(
             item["title"] == "Разберите активные инциденты"
+            for item in analytics["recommendations"]
+        )
+        assert any(
+            item["title"] == "Ускорьте реакцию"
             for item in analytics["recommendations"]
         )
         normalized_analytics = (
@@ -9356,6 +9363,7 @@ async def assert_platform_calendar_health():
             in analytics_html
         )
         assert "Среднее восстановление" in analytics_html
+        assert "Реакция просрочена" in analytics_html
         assert "Рекомендации" in analytics_html
         assert "Разберите активные инциденты" in analytics_html
         assert "Последние инциденты" in analytics_html
@@ -9402,6 +9410,8 @@ async def assert_platform_calendar_health():
         )
         assert analytics_export_csv.startswith("\ufeff")
         assert "Сводка" in analytics_export_csv
+        assert "Просрочена реакция" in analytics_export_csv
+        assert "Реакция просрочена" in analytics_export_csv
         assert "Рекомендации" in analytics_export_csv
         assert "Разберите активные инциденты" in analytics_export_csv
         assert "Компании" in analytics_export_csv

@@ -128,7 +128,10 @@ tr:last-child td{border-bottom:0}
                 Реакция до {{ analytics["policy"]["response_minutes"] }} минут
             </div>
             <div class="metric-value">{{ summary["response_sla_percent"] }}%</div>
-            <div class="metric-meta">Среднее: {{ summary["average_response_label"] }}</div>
+            <div class="metric-meta">
+                Среднее: {{ summary["average_response_label"] }}
+                · Реакция просрочена: {{ summary["response_overdue"] }}
+            </div>
         </div>
         <div class="metric">
             <div class="metric-label">
@@ -175,7 +178,8 @@ tr:last-child td{border-bottom:0}
                             <th>Инциденты</th>
                             <th>Активные</th>
                             <th>Эскалации</th>
-                            <th>Просрочено</th>
+                            <th>Реакция</th>
+                            <th>Восстановление</th>
                             <th>Средняя реакция</th>
                             <th>Среднее восстановление</th>
                         </tr>
@@ -191,7 +195,8 @@ tr:last-child td{border-bottom:0}
                             <td data-label="Инциденты">{{ company["incidents"] }}</td>
                             <td data-label="Активные">{{ company["active"] }}</td>
                             <td data-label="Эскалации">{{ company["escalations"] }}</td>
-                            <td data-label="Просрочено">{{ company["recovery_overdue"] }}</td>
+                            <td data-label="Реакция">{{ company["response_overdue"] }}</td>
+                            <td data-label="Восстановление">{{ company["recovery_overdue"] }}</td>
                             <td data-label="Средняя реакция">{{ company["average_response_label"] }}</td>
                             <td data-label="Среднее восстановление">{{ company["average_recovery_label"] }}</td>
                         </tr>
@@ -268,6 +273,11 @@ tr:last-child td{border-bottom:0}
                                 {% if incident["escalations"] %}
                                 <div class="escalation-note">
                                     Эскалаций: {{ incident["escalations"] }}
+                                </div>
+                                {% endif %}
+                                {% if incident["response_overdue"] %}
+                                <div class="overdue-note">
+                                    Реакция просрочена
                                 </div>
                                 {% endif %}
                                 {% if incident["recovery_overdue_events"] %}
