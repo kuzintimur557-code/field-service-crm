@@ -91,6 +91,23 @@ button.button{border:0;cursor:pointer}
 .signoff-item.ok{background:#f0fdf4;border-color:#bbf7d0}
 .signoff-label{font-size:12px;font-weight:900}
 .signoff-meta{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.4}
+.timeline{margin-top:18px;padding:16px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.timeline-head{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;align-items:start}
+.timeline-label{font-size:13px;font-weight:900}
+.timeline-value{margin-top:6px;font-size:24px;font-weight:900}
+.timeline-text{color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.timeline-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.timeline-stat{padding:10px;border-radius:8px;background:#f9fafb}
+.timeline-stat-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.timeline-stat-value{margin-top:5px;font-size:18px;font-weight:900}
+.timeline-list{display:grid;gap:8px;margin-top:12px}
+.timeline-item{display:grid;grid-template-columns:110px minmax(0,1fr) 110px auto;gap:10px;align-items:center;padding:11px;border:1px solid #e5e7eb;border-radius:9px;background:#f9fafb}
+.timeline-item.warning{background:#fffbeb;border-color:#fde68a}
+.timeline-item.critical{background:#fff7f7;border-color:#fecaca}
+.timeline-item.ok{background:#f0fdf4;border-color:#bbf7d0}
+.timeline-type{font-size:11px;font-weight:900;text-transform:uppercase}
+.timeline-title{font-size:13px;font-weight:900}
+.timeline-meta{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.4}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -142,6 +159,9 @@ button.button{border:0;cursor:pointer}
 .launch-phases{grid-template-columns:1fr}
 .signoff-grid{grid-template-columns:1fr}
 .signoff-item{grid-template-columns:1fr}
+.timeline-head{grid-template-columns:1fr}
+.timeline-stats{grid-template-columns:1fr}
+.timeline-item{grid-template-columns:1fr}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -378,6 +398,56 @@ button.button{border:0;cursor:pointer}
                 <button class="button" type="submit">Сохранить решение</button>
             </form>
         </div>
+    </section>
+
+    <section class="timeline">
+        <div class="timeline-head">
+            <div>
+                <div class="timeline-label">Журнал релиза</div>
+                <div class="timeline-value">{{ timeline["latest_label"] }}</div>
+            </div>
+            <div class="timeline-text">
+                Последнее событие: {{ timeline["latest_at"] or "нет" }}.
+                Последнее решение: {{ timeline["latest_signoff_label"] }}{% if timeline["latest_signoff_at"] %},
+                {{ timeline["latest_signoff_at"] }}{% endif %}.
+            </div>
+        </div>
+        <div class="timeline-stats">
+            <div class="timeline-stat">
+                <div class="timeline-stat-label">Событий</div>
+                <div class="timeline-stat-value">{{ timeline["total_events"] }}</div>
+            </div>
+            <div class="timeline-stat">
+                <div class="timeline-stat-label">Снимков</div>
+                <div class="timeline-stat-value">{{ timeline["snapshots_count"] }}</div>
+            </div>
+            <div class="timeline-stat">
+                <div class="timeline-stat-label">Решений</div>
+                <div class="timeline-stat-value">{{ timeline["signoffs_count"] }}</div>
+            </div>
+        </div>
+        {% if timeline["events"] %}
+        <div class="timeline-list">
+            {% for event in timeline["events"] %}
+            <div class="timeline-item {{ event['tone'] }}">
+                <div class="timeline-type">{{ event["type_label"] }}</div>
+                <div>
+                    <div class="timeline-title">{{ event["title"] }}</div>
+                    <div class="timeline-meta">
+                        {{ event["at"] }} · {{ event["actor"] }}
+                        {% if event["description"] %}
+                        <br>{{ event["description"] }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="timeline-title">{{ event["badge"] }}</div>
+                <a class="check-link" href="{{ event['url'] }}">Открыть</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty offset">Событий релиза пока нет.</div>
+        {% endif %}
     </section>
 
     <section class="section">

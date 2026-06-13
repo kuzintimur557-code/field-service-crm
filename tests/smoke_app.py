@@ -9635,6 +9635,7 @@ async def assert_platform_calendar_health():
         assert "План запуска" in readiness_html
         assert "Решение по запуску" in readiness_html
         assert "Подтверждение запуска" in readiness_html
+        assert "Журнал релиза" in readiness_html
         assert "Категории" in readiness_html
         assert "Следующие действия" in readiness_html
         assert "Все проверки" in readiness_html
@@ -9741,6 +9742,8 @@ async def assert_platform_calendar_health():
         assert "Последняя оценка" in saved_readiness_html
         assert "Запуск отложен" in saved_readiness_html
         assert "Smoke release sign-off" in saved_readiness_html
+        assert "Последнее событие:" in saved_readiness_html
+        assert "Решений" in saved_readiness_html
         assert backup_admin_username in saved_readiness_html
         assert f"/platform/readiness/snapshots/{snapshot_id}" in (
             saved_readiness_html
@@ -9827,6 +9830,7 @@ async def assert_platform_calendar_health():
         assert "План запуска" in readiness_csv
         assert "Этапы запуска" in readiness_csv
         assert "Подтверждения запуска" in readiness_csv
+        assert "Журнал релиза" in readiness_csv
         assert "Категории" in readiness_csv
         assert "Следующие действия" in readiness_csv
         assert "Все проверки" in readiness_csv
@@ -9896,7 +9900,22 @@ async def assert_platform_calendar_health():
         assert readiness_api["trend"]["has_history"] is True
         assert readiness_api["launch_plan"]["phases"]
         assert readiness_api["signoffs"]
+        assert readiness_api["timeline"]["events"]
         assert readiness_api["export_url"] == "/platform/readiness/export"
+        anonymous_timeline_api = await crm.api_platform_readiness_timeline(
+            make_public_asgi_request("/api/platform/readiness/timeline"),
+        )
+        assert anonymous_timeline_api.status_code == 401
+        boss_timeline_api = await crm.api_platform_readiness_timeline(
+            make_asgi_request("owner2", "/api/platform/readiness/timeline"),
+        )
+        assert boss_timeline_api.status_code == 403
+        timeline_api = await crm.api_platform_readiness_timeline(
+            make_asgi_request("super", "/api/platform/readiness/timeline"),
+        )
+        assert timeline_api["events"]
+        assert timeline_api["signoffs_count"] >= 1
+        assert timeline_api["snapshots_count"] >= 1
         anonymous_signoffs_api = await crm.api_platform_readiness_signoffs(
             make_public_asgi_request("/api/platform/readiness/signoffs"),
         )

@@ -6728,6 +6728,85 @@ def create_platform_release_signoff(username, decision, comment=""):
     return signoff_id, ""
 
 
+def get_platform_release_timeline(history=None, signoffs=None, limit=12):
+    history = (
+        history
+        if history is not None
+        else get_platform_release_readiness_history()
+    )
+    signoffs = (
+        signoffs
+        if signoffs is not None
+        else get_platform_release_signoff_history()
+    )
+    events = []
+
+    for snapshot in history:
+        events.append({
+            "type": "snapshot",
+            "type_label": "Снимок",
+            "title": f"Снимок готовности {snapshot['score']}%",
+            "description": snapshot["headline"] or "",
+            "at": snapshot["created_at"],
+            "actor": snapshot["created_by"] or "система",
+            "tone": snapshot["status"],
+            "badge": snapshot["status_label"],
+            "url": snapshot["detail_url"],
+            "score": int(snapshot["score"] or 0),
+            "order": int(snapshot["id"] or 0),
+        })
+
+    for signoff in signoffs:
+        comment = str(signoff.get("comment") or "").strip()
+        description = (
+            f"{signoff['recommended_mode']}. "
+            f"Оценка: {signoff['score']}%."
+        )
+        if comment:
+            description = f"{description} {comment}"
+        events.append({
+            "type": "signoff",
+            "type_label": "Решение",
+            "title": signoff["decision_label"],
+            "description": description,
+            "at": signoff["signed_at"],
+            "actor": signoff["signed_by"] or "система",
+            "tone": signoff["tone"],
+            "badge": signoff["recommended_mode"],
+            "url": signoff["snapshot_url"] or "/platform/readiness",
+            "score": int(signoff["score"] or 0),
+            "order": int(signoff["id"] or 0),
+        })
+
+    events.sort(
+        key=lambda item: (
+            item["at"] or "",
+            item["order"],
+            item["type"],
+        ),
+        reverse=True,
+    )
+    latest = events[0] if events else None
+    latest_signoff = next(
+        (event for event in events if event["type"] == "signoff"),
+        None,
+    )
+
+    return {
+        "events": events[:limit],
+        "total_events": len(events),
+        "snapshots_count": len(history),
+        "signoffs_count": len(signoffs),
+        "latest_label": latest["title"] if latest else "Событий пока нет",
+        "latest_at": latest["at"] if latest else "",
+        "latest_tone": latest["tone"] if latest else "warning",
+        "latest_signoff_label": (
+            latest_signoff["title"] if latest_signoff else "Решений пока нет"
+        ),
+        "latest_signoff_at": latest_signoff["at"] if latest_signoff else "",
+    }
+
+
 def create_platform_release_readiness_snapshot(username, readiness=None):
     readiness = readiness or get_platform_release_readiness()
     conn = connect()
@@ -7252,6 +7331,7 @@ async def platform_readiness_page(
     trend = get_platform_release_readiness_trend(history)
     launch_plan = get_platform_release_launch_plan(readiness)
     signoffs = get_platform_release_signoff_history()
+    timeline = get_platform_release_timeline(history, signoffs)
 
     return templates.TemplateResponse(
         request,
@@ -7266,6 +7346,7 @@ async def platform_readiness_page(
             "trend": trend,
             "launch_plan": launch_plan,
             "signoffs": signoffs,
+            "timeline": timeline,
             "notice": notice,
             "error": error,
         },
@@ -7344,6 +7425,7 @@ async def platform_readiness_export(request: Request):
     trend = get_platform_release_readiness_trend(history)
     launch_plan = get_platform_release_launch_plan(readiness)
     signoffs = get_platform_release_signoff_history()
+    timeline = get_platform_release_timeline(history, signoffs)
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -7446,6 +7528,30 @@ async def platform_readiness_export(request: Request):
             signoff["warning_count"],
             signoff["comment"],
             signoff["snapshot_url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Журнал релиза"])
+    writer.writerow([
+        "Дата",
+        "Тип",
+        "Событие",
+        "Автор",
+        "Статус",
+        "Оценка",
+        "Описание",
+        "Ссылка",
+    ])
+    for event in timeline["events"]:
+        writer.writerow([
+            event["at"],
+            event["type_label"],
+            event["title"],
+            event["actor"],
+            event["badge"],
+            event["score"],
+            event["description"],
+            event["url"],
         ])
     writer.writerow([])
 
@@ -7845,8 +7951,27 @@ async def api_platform_readiness(request: Request):
     )
     readiness["trend"] = get_platform_release_readiness_trend()
     readiness["launch_plan"] = get_platform_release_launch_plan(readiness)
-    readiness["signoffs"] = get_platform_release_signoff_history()
+    signoffs = get_platform_release_signoff_history()
+    readiness["signoffs"] = signoffs
+    readiness["timeline"] = get_platform_release_timeline(
+        signoffs=signoffs,
+    )
     return readiness
+
+
+@app.get("/api/platform/readiness/timeline")
+async def api_platform_readiness_timeline(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return get_platform_release_timeline()
 
 
 @app.get("/api/platform/readiness/signoffs")
