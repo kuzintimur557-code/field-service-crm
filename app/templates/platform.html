@@ -44,6 +44,15 @@ h1{margin:0;font-size:38px}
 .incident-pill.critical{background:#991b1b;color:white}
 .incident-pill.high{background:#fef3c7;color:#92400e}
 .incident-link{display:inline-flex;padding:8px 10px;border-radius:9px;background:white;color:#111827;text-decoration:none;font-size:11px;font-weight:900;border:1px solid #d1d5db}
+.admin-load{display:grid;grid-column:1/-1;gap:8px;margin-top:10px}
+.admin-load-title{color:#374151;font-size:12px;font-weight:900}
+.admin-load-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.admin-load-item{display:block;padding:11px;border:1px solid #e5e7eb;border-radius:12px;background:white;color:#111827;text-decoration:none}
+.admin-load-item.current{border-color:#93c5fd;background:#eff6ff}
+.admin-load-name{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:900}
+.admin-load-current{color:#1d4ed8;font-size:9px;text-transform:uppercase}
+.admin-load-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:#6b7280;font-size:10px;font-weight:800}
+.admin-load-meta strong{color:#111827}
 .company{display:grid;grid-template-columns:.5fr 1.5fr 1fr 1fr;gap:14px;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px;align-items:center}
 .name{font-size:18px;font-weight:900}
 .meta{font-size:14px;color:#6b7280;font-weight:800}
@@ -56,6 +65,7 @@ h1{margin:0;font-size:38px}
 .ops-actions a{width:100%;justify-content:center}
 .incident-row{grid-template-columns:1fr}
 .incident-link{justify-content:center}
+.admin-load-grid{grid-template-columns:1fr}
 .nav a{width:100%;text-align:center}
 h1{font-size:30px}
 }
@@ -168,6 +178,28 @@ h1{font-size:30px}
             </a>
         </div>
         {% endfor %}
+    </div>
+    {% endif %}
+    {% if calendar_admin_workload %}
+    <div class="admin-load">
+        <div class="admin-load-title">Нагрузка администраторов</div>
+        <div class="admin-load-grid">
+            {% for admin in calendar_admin_workload %}
+            <a class="admin-load-item {% if admin['is_current'] %}current{% endif %}" href="{{ admin['filter_url'] }}">
+                <div class="admin-load-name">
+                    <span>{{ admin["username"] }}</span>
+                    {% if admin["is_current"] %}
+                    <span class="admin-load-current">Вы</span>
+                    {% endif %}
+                </div>
+                <div class="admin-load-meta">
+                    <span>В работе <strong>{{ admin["assigned"] }}</strong></span>
+                    <span>Критичных <strong>{{ admin["critical"] }}</strong></span>
+                    <span>Старейший <strong>{{ admin["oldest_age_label"] }}</strong></span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
     </div>
     {% endif %}
 </div>

@@ -9367,12 +9367,19 @@ async def assert_platform_calendar_health():
         assert platform_page.context["calendar_health_summary"][
             "oldest_active_incident_label"
         ]
+        assert platform_page.context["calendar_admin_workload"]
+        assert any(
+            item["username"] == "super"
+            for item in platform_page.context["calendar_admin_workload"]
+        )
         assert any(
             item["company_id"] == company_id
             for item in platform_page.context["calendar_health_incidents"]
         )
         assert "Операционный контроль платформы" in platform_html
         assert "Старейший" in platform_html
+        assert "Нагрузка администраторов" in platform_html
+        assert "В работе <strong>" in platform_html
         assert "Критические</a>" in platform_html
         assert "Ответственный:" in platform_html
         assert f"/platform/calendar-health/{company_id}" in platform_html
