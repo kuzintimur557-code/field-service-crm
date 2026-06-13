@@ -157,6 +157,10 @@ h1{font-size:30px}
                 <div class="ops-metric-label">Восстановление</div>
                 <div class="ops-metric-value">{{ calendar_health_summary["recovery_overdue"] }}</div>
             </div>
+            <div class="ops-metric danger">
+                <div class="ops-metric-label">Высокий риск</div>
+                <div class="ops-metric-value">{{ calendar_incident_analytics_summary["high_risk_companies"] }}</div>
+            </div>
             <div class="ops-metric">
                 <div class="ops-metric-label">Активные</div>
                 <div class="ops-metric-value">{{ calendar_health_summary["active_incidents"] }}</div>
@@ -175,6 +179,7 @@ h1{font-size:30px}
         <a href="/platform/calendar-health?status=critical">Критические</a>
         <a href="/platform/calendar-health?status=unacknowledged&amp;assignee=unassigned">Не приняты</a>
         <a href="/platform/calendar-health?status=response_overdue">Реакция</a>
+        <a href="/platform/calendar-health/analytics">Риски</a>
         <a class="secondary" href="/platform/calendar-health?assignee=me">Мои</a>
     </div>
     {% if calendar_health_incidents %}
