@@ -6031,6 +6031,8 @@ def make_release_readiness_check(
     action,
     url,
     weight=10,
+    category="core",
+    category_label="Основа",
 ):
     labels = {
         "ok": "Готово",
@@ -6056,6 +6058,8 @@ def make_release_readiness_check(
         "url": url,
         "weight": weight,
         "points": points[normalized_status],
+        "category": category,
+        "category_label": category_label,
     }
 
 
@@ -6122,6 +6126,8 @@ def get_platform_release_readiness(
             "Перед production укажите сильный SECRET_KEY.",
             "/system",
             14,
+            "security",
+            "Безопасность",
         ),
         make_release_readiness_check(
             "secure_cookie",
@@ -6135,6 +6141,8 @@ def get_platform_release_readiness(
             "Для production включите COOKIE_SECURE или Railway окружение.",
             "/system",
             8,
+            "security",
+            "Безопасность",
         ),
         make_release_readiness_check(
             "database",
@@ -6148,6 +6156,8 @@ def get_platform_release_readiness(
             "Проверьте DATA_DIR и запуск init_db.",
             "/system",
             12,
+            "infrastructure",
+            "Инфраструктура",
         ),
         make_release_readiness_check(
             "platform_admins",
@@ -6157,6 +6167,8 @@ def get_platform_release_readiness(
             "Должен быть хотя бы один активный superadmin.",
             "/debug",
             12,
+            "security",
+            "Безопасность",
         ),
         make_release_readiness_check(
             "tenant_data",
@@ -6169,6 +6181,8 @@ def get_platform_release_readiness(
             "Создайте первую компанию и владельца.",
             "/platform/companies",
             10,
+            "business",
+            "Бизнес-данные",
         ),
         make_release_readiness_check(
             "company_isolation",
@@ -6185,6 +6199,8 @@ def get_platform_release_readiness(
             "Исправьте пользователей без company_id перед релизом.",
             "/debug",
             12,
+            "security",
+            "Безопасность",
         ),
         make_release_readiness_check(
             "telegram",
@@ -6198,6 +6214,8 @@ def get_platform_release_readiness(
             "Добавьте Telegram переменные окружения.",
             "/system",
             8,
+            "integrations",
+            "Интеграции",
         ),
         make_release_readiness_check(
             "uploads",
@@ -6211,6 +6229,8 @@ def get_platform_release_readiness(
             "Проверьте DATA_DIR и права на uploads.",
             "/system",
             8,
+            "infrastructure",
+            "Инфраструктура",
         ),
         make_release_readiness_check(
             "calendar_ops",
@@ -6232,6 +6252,8 @@ def get_platform_release_readiness(
             "Разберите критичные календарные инциденты.",
             "/platform/calendar-health",
             10,
+            "operations",
+            "Операции",
         ),
         make_release_readiness_check(
             "backups",
@@ -6245,6 +6267,8 @@ def get_platform_release_readiness(
             "Проверьте создание резервной копии перед релизом.",
             "/backup",
             6,
+            "infrastructure",
+            "Инфраструктура",
         ),
     ]
     total_weight = sum(item["weight"] for item in checks) or 1
@@ -6257,26 +6281,94 @@ def get_platform_release_readiness(
     warning_count = sum(
         1 for item in checks if item["status"] == "warning"
     )
+    categories_map = {}
+
+    for check in checks:
+        category = categories_map.setdefault(
+            check["category"],
+            {
+                "key": check["category"],
+                "label": check["category_label"],
+                "checks": 0,
+                "ok": 0,
+                "warning": 0,
+                "critical": 0,
+                "weight": 0,
+                "points": 0,
+            },
+        )
+        category["checks"] += 1
+        category[check["status"]] += 1
+        category["weight"] += check["weight"]
+        category["points"] += check["points"]
+
+    categories = []
+
+    for category in categories_map.values():
+        category["score"] = round(
+            category["points"] * 100 / category["weight"],
+        ) if category["weight"] else 0
+        if category["critical"]:
+            category["status"] = "critical"
+            category["status_label"] = "Критично"
+        elif category["warning"]:
+            category["status"] = "warning"
+            category["status_label"] = "Внимание"
+        else:
+            category["status"] = "ok"
+            category["status_label"] = "Готово"
+        categories.append(category)
+
+    categories.sort(
+        key=lambda item: (
+            {"critical": 0, "warning": 1, "ok": 2}[item["status"]],
+            item["label"],
+        )
+    )
+    action_priority = {
+        "critical": 0,
+        "warning": 1,
+        "ok": 2,
+    }
+    blockers = [
+        item for item in checks if item["status"] == "critical"
+    ]
+    next_actions = sorted(
+        [item for item in checks if item["status"] != "ok"],
+        key=lambda item: (
+            action_priority[item["status"]],
+            -item["weight"],
+            item["title"],
+        ),
+    )[:6]
 
     if critical_count:
         status = "critical"
         status_label = "Требует подготовки"
+        headline = "До релиза нужно закрыть критичные блокеры."
     elif warning_count:
         status = "warning"
         status_label = "Почти готово"
+        headline = "Критичных блокеров нет, но есть задачи перед релизом."
     else:
         status = "ok"
         status_label = "Готово к релизу"
+        headline = "Ключевые проверки готовы к запуску."
 
     return {
         "score": score,
         "status": status,
         "status_label": status_label,
+        "headline": headline,
         "checks": checks,
+        "categories": categories,
+        "blockers": blockers,
+        "next_actions": next_actions,
         "critical_count": critical_count,
         "warning_count": warning_count,
         "ok_count": sum(1 for item in checks if item["status"] == "ok"),
         "environment": env_name,
+        "export_url": "/platform/readiness/export",
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -6380,6 +6472,126 @@ async def platform_readiness_page(request: Request):
             "readiness": readiness,
         },
     )
+
+
+@app.get("/platform/readiness/export")
+async def platform_readiness_export(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    readiness = get_platform_release_readiness()
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["Готовность релиза"])
+    writer.writerow(["Сгенерировано", readiness["generated_at"]])
+    writer.writerow(["Окружение", readiness["environment"]])
+    writer.writerow(["Статус", readiness["status_label"]])
+    writer.writerow(["Оценка", readiness["score"]])
+    writer.writerow(["Готово", readiness["ok_count"]])
+    writer.writerow(["Внимание", readiness["warning_count"]])
+    writer.writerow(["Критично", readiness["critical_count"]])
+    writer.writerow(["Резюме", readiness["headline"]])
+    writer.writerow([])
+
+    writer.writerow(["Категории"])
+    writer.writerow([
+        "Категория",
+        "Статус",
+        "Оценка",
+        "Проверок",
+        "Готово",
+        "Внимание",
+        "Критично",
+    ])
+    for category in readiness["categories"]:
+        writer.writerow([
+            category["label"],
+            category["status_label"],
+            category["score"],
+            category["checks"],
+            category["ok"],
+            category["warning"],
+            category["critical"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Следующие действия"])
+    writer.writerow([
+        "Категория",
+        "Проверка",
+        "Статус",
+        "Описание",
+        "Действие",
+        "Ссылка",
+    ])
+    for check in readiness["next_actions"]:
+        writer.writerow([
+            check["category_label"],
+            check["title"],
+            check["status_label"],
+            check["description"],
+            check["action"],
+            check["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Все проверки"])
+    writer.writerow([
+        "Категория",
+        "Ключ",
+        "Проверка",
+        "Статус",
+        "Вес",
+        "Баллы",
+        "Описание",
+        "Действие",
+        "Ссылка",
+    ])
+    for check in readiness["checks"]:
+        writer.writerow([
+            check["category_label"],
+            check["key"],
+            check["title"],
+            check["status_label"],
+            check["weight"],
+            check["points"],
+            check["description"],
+            check["action"],
+            check["url"],
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=platform_release_readiness.csv"
+            ),
+        },
+    )
+
+
+@app.get("/api/platform/readiness")
+async def api_platform_readiness(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return get_platform_release_readiness()
 
 
 @app.get("/platform/calendar-health", response_class=HTMLResponse)

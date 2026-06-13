@@ -29,6 +29,7 @@ h1{margin:0;font-size:38px}
 .release-card.critical .release-score{border-color:#fecaca;color:#b91c1c}
 .release-title{margin:0;font-size:22px}
 .release-meta{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800;line-height:1.45}
+.release-headline{margin-top:8px;color:#111827;font-size:13px;font-weight:900}
 .release-checks{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
 .release-check{display:inline-flex;padding:7px 9px;border-radius:9px;background:#ecfdf5;color:#166534;font-size:11px;font-weight:900}
 .release-check.warning{background:#fffbeb;color:#92400e}
@@ -160,16 +161,23 @@ h1{font-size:30px}
             внимание {{ release_readiness["warning_count"] }},
             критично {{ release_readiness["critical_count"] }}.
         </div>
+        <div class="release-headline">
+            {{ release_readiness["headline"] }}
+        </div>
         <div class="release-checks">
-            {% for check in release_readiness["checks"][:5] %}
+            {% for check in release_readiness["next_actions"][:5] %}
             <span class="release-check {{ check['status'] }}">
                 {{ check["title"] }} · {{ check["status_label"] }}
             </span>
             {% endfor %}
+            {% if not release_readiness["next_actions"] %}
+            <span class="release-check">Все ключевые проверки закрыты</span>
+            {% endif %}
         </div>
     </div>
     <div class="release-actions">
         <a href="/platform/readiness">Открыть центр</a>
+        <a class="secondary" href="{{ release_readiness['export_url'] }}">CSV</a>
         <a class="secondary" href="/system">Система</a>
     </div>
 </div>

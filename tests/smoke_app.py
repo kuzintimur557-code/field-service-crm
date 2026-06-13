@@ -9536,6 +9536,17 @@ async def assert_platform_calendar_health():
         assert "Готовность релиза" in platform_html
         assert platform_page.context["release_readiness"]["checks"]
         assert platform_page.context["release_readiness"]["score"] >= 0
+        assert platform_page.context["release_readiness"]["categories"]
+        assert platform_page.context["release_readiness"]["export_url"] == (
+            "/platform/readiness/export"
+        )
+        assert "Безопасность" in {
+            item["label"]
+            for item in platform_page.context["release_readiness"][
+                "categories"
+            ]
+        }
+        assert "next_actions" in platform_page.context["release_readiness"]
         assert "secret_key" in {
             item["key"]
             for item in platform_page.context["release_readiness"]["checks"]
@@ -9601,6 +9612,7 @@ async def assert_platform_calendar_health():
             in platform_html
         )
         assert "/platform/calendar-health?assignee=me" in platform_html
+        assert "/platform/readiness/export" in platform_html
         anonymous_readiness = await crm.platform_readiness_page(
             make_public_asgi_request("/platform/readiness"),
         )
@@ -9618,10 +9630,54 @@ async def assert_platform_calendar_health():
         readiness_html = readiness_page.body.decode("utf-8")
         assert "Готовность релиза" in readiness_html
         assert "Проверки готовности" in readiness_html
+        assert "Категории" in readiness_html
+        assert "Следующие действия" in readiness_html
+        assert "Все проверки" in readiness_html
         assert "Секрет приложения" in readiness_html
         assert "Telegram уведомления" in readiness_html
         assert "Операционный контроль" in readiness_html
+        assert "/platform/readiness/export" in readiness_html
         assert "/platform/calendar-health" in readiness_html
+        anonymous_readiness_export = (
+            await crm.platform_readiness_export(
+                make_public_asgi_request("/platform/readiness/export"),
+            )
+        )
+        assert anonymous_readiness_export.status_code == 302
+        assert anonymous_readiness_export.headers["location"] == "/login"
+        boss_readiness_export = await crm.platform_readiness_export(
+            make_asgi_request("owner2", "/platform/readiness/export"),
+        )
+        assert boss_readiness_export.status_code == 302
+        assert boss_readiness_export.headers["location"] == "/"
+        readiness_export_response = await crm.platform_readiness_export(
+            make_asgi_request("super", "/platform/readiness/export"),
+        )
+        assert readiness_export_response.status_code == 200
+        assert readiness_export_response.headers["content-disposition"] == (
+            "attachment; filename=platform_release_readiness.csv"
+        )
+        readiness_csv = readiness_export_response.body.decode("utf-8")
+        assert readiness_csv.startswith("\ufeff")
+        assert "Готовность релиза" in readiness_csv
+        assert "Категории" in readiness_csv
+        assert "Следующие действия" in readiness_csv
+        assert "Все проверки" in readiness_csv
+        assert "Секрет приложения" in readiness_csv
+        anonymous_readiness_api = await crm.api_platform_readiness(
+            make_public_asgi_request("/api/platform/readiness"),
+        )
+        assert anonymous_readiness_api.status_code == 401
+        boss_readiness_api = await crm.api_platform_readiness(
+            make_asgi_request("owner2", "/api/platform/readiness"),
+        )
+        assert boss_readiness_api.status_code == 403
+        readiness_api = await crm.api_platform_readiness(
+            make_asgi_request("super", "/api/platform/readiness"),
+        )
+        assert readiness_api["checks"]
+        assert readiness_api["categories"]
+        assert readiness_api["export_url"] == "/platform/readiness/export"
     finally:
         conn = connect()
         c = conn.cursor()
