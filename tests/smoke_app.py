@@ -7458,6 +7458,8 @@ async def assert_platform_calendar_health():
         assert company["response_overdue"] is True
         assert company["incident_age_minutes"] == 120
         assert company["incident_age_label"] == "2 ч"
+        assert "Реакция просрочена на" in company["sla_deadline_label"]
+        assert company["sla_deadline_tone"] == "error"
         assert company["next_action_label"] == "Принять в работу"
         assert company["next_action_tone"] == "error"
         assert company["last_activity_at"] == incident_value
@@ -7613,6 +7615,7 @@ async def assert_platform_calendar_health():
             in html
         )
         assert "Возраст: 2 ч" in html
+        assert "Реакция просрочена на" in html
         assert "/platform/calendar-health/analytics" in html
         assert (
             "/platform/calendar-health/export?status=problem"
@@ -7665,6 +7668,8 @@ async def assert_platform_calendar_health():
         assert "Компании" in export_csv
         assert "ID компании,Компания,Владелец,Приоритет" in export_csv
         assert "Реакция просрочена" in export_csv
+        assert "SLA срок" in export_csv
+        assert "Реакция просрочена на" in export_csv
         assert "Следующее действие" in export_csv
         assert "Принять в работу" in export_csv
         assert company_name in export_csv
@@ -7757,6 +7762,7 @@ async def assert_platform_calendar_health():
         assert "Сначала примите инцидент в работу." in detail_html
         assert "Следующее действие" in detail_html
         assert "Принять в работу" in detail_html
+        assert "Реакция просрочена на" in detail_html
         assert (
             "Инцидент ещё не закреплён за администратором."
             in detail_html
@@ -7806,6 +7812,8 @@ async def assert_platform_calendar_health():
         assert "Следующее действие,Принять в работу" in (
             detail_export_csv
         )
+        assert "SLA срок" in detail_export_csv
+        assert "Реакция просрочена на" in detail_export_csv
         assert "Подсказка действия" in detail_export_csv
         assert company_name in detail_export_csv
         assert "Smoke scheduler failure" in detail_export_csv
@@ -8690,6 +8698,9 @@ async def assert_platform_calendar_health():
         )
         assert acknowledged_company["next_action_label"] == (
             "Контроль ответственного"
+        )
+        assert "Восстановление через" in (
+            acknowledged_company["sla_deadline_label"]
         )
         assert acknowledged_company["is_mine"] is False
         acknowledged_at = (

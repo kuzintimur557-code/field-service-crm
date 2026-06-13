@@ -69,6 +69,9 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
 .priority.medium{background:#dbeafe;color:#1e40af}
 .priority.normal{background:#d1fae5;color:#065f46}
 .incident{max-width:320px;color:#991b1b;line-height:1.35}
+.sla-deadline{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:900}
+.sla-deadline.error{background:#fee2e2;color:#991b1b}
+.sla-deadline.waiting{background:#fef3c7;color:#92400e}
 .ack{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:900}
 .ack.mine{background:#dbeafe;color:#1e40af}
 .overdue{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#991b1b;color:white;font-size:9px;font-weight:900}
@@ -383,6 +386,11 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                             <div class="muted">
                                 Возраст: {{ company["incident_age_label"] }}
                             </div>
+                            {% if company["sla_deadline_label"] %}
+                            <div class="sla-deadline {{ company['sla_deadline_tone'] }}">
+                                {{ company["sla_deadline_label"] }}
+                            </div>
+                            {% endif %}
                             {% if company["is_acknowledged"] %}
                             <div class="muted">
                                 В работе: {{ company["recovery_age_label"] }}

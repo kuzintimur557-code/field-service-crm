@@ -3745,6 +3745,74 @@ def format_calendar_incident_age(age_minutes):
     )
 
 
+def build_calendar_incident_sla_deadline(
+    active_incident,
+    is_acknowledged,
+    incident_age_minutes,
+    recovery_age_minutes,
+    response_target_minutes,
+    recovery_target_minutes,
+):
+    if not active_incident:
+        return {
+            "label": "",
+            "tone": "",
+        }
+
+    if is_acknowledged:
+        if recovery_age_minutes is None:
+            return {
+                "label": "Срок восстановления неизвестен",
+                "tone": "waiting",
+            }
+
+        remaining_minutes = (
+            int(recovery_target_minutes) - int(recovery_age_minutes)
+        )
+        if remaining_minutes >= 0:
+            return {
+                "label": (
+                    "Восстановление через "
+                    f"{format_calendar_incident_age(remaining_minutes)}"
+                ),
+                "tone": "waiting",
+            }
+
+        return {
+            "label": (
+                "Восстановление просрочено на "
+                f"{format_calendar_incident_age(abs(remaining_minutes))}"
+            ),
+            "tone": "error",
+        }
+
+    if incident_age_minutes is None:
+        return {
+            "label": "Срок реакции неизвестен",
+            "tone": "waiting",
+        }
+
+    remaining_minutes = (
+        int(response_target_minutes) - int(incident_age_minutes)
+    )
+    if remaining_minutes >= 0:
+        return {
+            "label": (
+                "Реакция через "
+                f"{format_calendar_incident_age(remaining_minutes)}"
+            ),
+            "tone": "waiting",
+        }
+
+    return {
+        "label": (
+            "Реакция просрочена на "
+            f"{format_calendar_incident_age(abs(remaining_minutes))}"
+        ),
+        "tone": "error",
+    }
+
+
 def get_bounded_environment_int(
     name,
     default,
@@ -4874,6 +4942,16 @@ def get_platform_calendar_health(
         item["recovery_overdue_notified"] = bool(
             active_incident and item["recovery_overdue_notified"]
         )
+        sla_deadline = build_calendar_incident_sla_deadline(
+            active_incident,
+            item["is_acknowledged"],
+            incident_age_minutes,
+            recovery_age_minutes,
+            response_target_minutes,
+            recovery_target_minutes,
+        )
+        item["sla_deadline_label"] = sla_deadline["label"]
+        item["sla_deadline_tone"] = sla_deadline["tone"]
         item["requires_response"] = bool(
             active_incident and not item["is_acknowledged"]
         )
@@ -5975,6 +6053,7 @@ async def platform_calendar_health_export(
         "Принят в работу",
         "Ответственный",
         "В работе",
+        "SLA срок",
         "Следующее действие",
         "Подсказка действия",
         "Ссылка",
@@ -6002,6 +6081,7 @@ async def platform_calendar_health_export(
             "да" if item["is_acknowledged"] else "нет",
             item["assignee_username"] or "",
             item["recovery_age_label"] or "",
+            item["sla_deadline_label"] or "",
             item["next_action_label"],
             item["next_action_hint"],
             item["detail_url"],
@@ -6260,6 +6340,7 @@ async def platform_calendar_company_health_export(
         "Восстановление просрочено",
         "да" if company["recovery_overdue"] else "нет",
     ])
+    writer.writerow(["SLA срок", company["sla_deadline_label"] or ""])
     writer.writerow(["Следующее действие", company["next_action_label"]])
     writer.writerow(["Подсказка действия", company["next_action_hint"]])
     writer.writerow([])
