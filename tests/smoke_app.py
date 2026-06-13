@@ -9431,6 +9431,9 @@ async def assert_platform_calendar_health():
         assert platform_page.context["calendar_health_summary"][
             "critical"
         ] >= 1
+        assert "response_overdue" in (
+            platform_page.context["calendar_health_summary"]
+        )
         assert platform_page.context["calendar_health_summary"][
             "oldest_active_incident_label"
         ]
@@ -9454,6 +9457,8 @@ async def assert_platform_calendar_health():
         assert "Операционный контроль платформы" in platform_html
         assert "Критично" in platform_html
         assert "Старейший" in platform_html
+        assert "Реакция" in platform_html
+        assert "status=response_overdue" in platform_html
         assert "Нагрузка администраторов" in platform_html
         assert "Рекомендации" in platform_html
         assert "Разберите активные инциденты" in platform_html

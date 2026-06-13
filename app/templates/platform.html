@@ -150,6 +150,10 @@ h1{font-size:30px}
                 <div class="ops-metric-value">{{ calendar_health_summary["unacknowledged"] }}</div>
             </div>
             <div class="ops-metric danger">
+                <div class="ops-metric-label">Реакция</div>
+                <div class="ops-metric-value">{{ calendar_health_summary["response_overdue"] }}</div>
+            </div>
+            <div class="ops-metric danger">
                 <div class="ops-metric-label">Восстановление</div>
                 <div class="ops-metric-value">{{ calendar_health_summary["recovery_overdue"] }}</div>
             </div>
@@ -170,6 +174,7 @@ h1{font-size:30px}
     <div class="ops-actions">
         <a href="/platform/calendar-health?status=critical">Критические</a>
         <a href="/platform/calendar-health?status=unacknowledged&amp;assignee=unassigned">Не приняты</a>
+        <a href="/platform/calendar-health?status=response_overdue">Реакция</a>
         <a class="secondary" href="/platform/calendar-health?assignee=me">Мои</a>
     </div>
     {% if calendar_health_incidents %}
