@@ -6023,6 +6023,264 @@ async def platform_companies_page(request: Request):
     )
 
 
+def make_release_readiness_check(
+    key,
+    title,
+    status,
+    description,
+    action,
+    url,
+    weight=10,
+):
+    labels = {
+        "ok": "Готово",
+        "warning": "Внимание",
+        "critical": "Критично",
+    }
+    points = {
+        "ok": weight,
+        "warning": weight * 0.5,
+        "critical": 0,
+    }
+    normalized_status = (
+        status if status in labels else "warning"
+    )
+
+    return {
+        "key": key,
+        "title": title,
+        "status": normalized_status,
+        "status_label": labels[normalized_status],
+        "description": description,
+        "action": action,
+        "url": url,
+        "weight": weight,
+        "points": points[normalized_status],
+    }
+
+
+def get_platform_release_readiness(
+    counts=None,
+    calendar_health_summary=None,
+):
+    counts = counts or {}
+    conn = connect()
+    c = conn.cursor()
+
+    if not counts:
+        counts = {
+            "companies": c.execute(
+                "SELECT COUNT(*) FROM companies"
+            ).fetchone()[0],
+            "users": c.execute(
+                "SELECT COUNT(*) FROM users"
+            ).fetchone()[0],
+            "tasks": c.execute(
+                "SELECT COUNT(*) FROM tasks"
+            ).fetchone()[0],
+            "clients": c.execute(
+                "SELECT COUNT(*) FROM clients"
+            ).fetchone()[0],
+        }
+
+    platform_admins = c.execute("""
+    SELECT COUNT(*)
+    FROM users
+    WHERE role='superadmin'
+      AND COALESCE(is_active, 1)=1
+    """).fetchone()[0]
+    users_without_company = c.execute("""
+    SELECT COUNT(*)
+    FROM users
+    WHERE role!='superadmin'
+      AND company_id IS NULL
+    """).fetchone()[0]
+    conn.close()
+
+    if calendar_health_summary is None:
+        calendar_health_summary = get_platform_calendar_health()[
+            "summary"
+        ]
+
+    env_name = (os.getenv("ENV") or "development").strip()
+    bot_token_configured = bool((os.getenv("BOT_TOKEN") or "").strip())
+    chat_id_configured = bool((os.getenv("CHAT_ID") or "").strip())
+    default_secret = SECRET_KEY == "dev-secret-change-me"
+    db_path = DATA_DIR / "crm.db"
+    backup_path = DATA_DIR / "backups"
+
+    checks = [
+        make_release_readiness_check(
+            "secret_key",
+            "Секрет приложения",
+            "critical" if default_secret else "ok",
+            (
+                "Используется dev SECRET_KEY."
+                if default_secret
+                else "SECRET_KEY настроен."
+            ),
+            "Перед production укажите сильный SECRET_KEY.",
+            "/system",
+            14,
+        ),
+        make_release_readiness_check(
+            "secure_cookie",
+            "Безопасные cookie",
+            "ok" if COOKIE_SECURE else "warning",
+            (
+                "Secure cookie включены."
+                if COOKIE_SECURE
+                else "Secure cookie не включены в текущем окружении."
+            ),
+            "Для production включите COOKIE_SECURE или Railway окружение.",
+            "/system",
+            8,
+        ),
+        make_release_readiness_check(
+            "database",
+            "База данных",
+            "ok" if db_path.exists() else "critical",
+            (
+                "SQLite база доступна."
+                if db_path.exists()
+                else "Файл SQLite базы не найден."
+            ),
+            "Проверьте DATA_DIR и запуск init_db.",
+            "/system",
+            12,
+        ),
+        make_release_readiness_check(
+            "platform_admins",
+            "Администраторы платформы",
+            "ok" if platform_admins else "critical",
+            f"Активных superadmin: {platform_admins}.",
+            "Должен быть хотя бы один активный superadmin.",
+            "/debug",
+            12,
+        ),
+        make_release_readiness_check(
+            "tenant_data",
+            "Рабочие данные",
+            "ok" if counts["companies"] and counts["users"] else "warning",
+            (
+                f"Компаний: {counts['companies']}, "
+                f"пользователей: {counts['users']}."
+            ),
+            "Создайте первую компанию и владельца.",
+            "/platform/companies",
+            10,
+        ),
+        make_release_readiness_check(
+            "company_isolation",
+            "Изоляция компаний",
+            "ok" if users_without_company == 0 else "critical",
+            (
+                "Все обычные пользователи привязаны к компаниям."
+                if users_without_company == 0
+                else (
+                    "Пользователей без company_id: "
+                    f"{users_without_company}."
+                )
+            ),
+            "Исправьте пользователей без company_id перед релизом.",
+            "/debug",
+            12,
+        ),
+        make_release_readiness_check(
+            "telegram",
+            "Telegram уведомления",
+            "ok" if bot_token_configured and chat_id_configured else "warning",
+            (
+                "BOT_TOKEN и CHAT_ID настроены."
+                if bot_token_configured and chat_id_configured
+                else "BOT_TOKEN или CHAT_ID не настроены."
+            ),
+            "Добавьте Telegram переменные окружения.",
+            "/system",
+            8,
+        ),
+        make_release_readiness_check(
+            "uploads",
+            "Хранилище файлов",
+            "ok" if UPLOAD_DIR.exists() else "critical",
+            (
+                "Папка uploads доступна."
+                if UPLOAD_DIR.exists()
+                else "Папка uploads недоступна."
+            ),
+            "Проверьте DATA_DIR и права на uploads.",
+            "/system",
+            8,
+        ),
+        make_release_readiness_check(
+            "calendar_ops",
+            "Операционный контроль",
+            (
+                "critical"
+                if calendar_health_summary["overall_status_code"]
+                == "critical"
+                else (
+                    "warning"
+                    if calendar_health_summary["problems"]
+                    else "ok"
+                )
+            ),
+            (
+                "Состояние календарных автоматизаций: "
+                f"{calendar_health_summary['overall_status_label']}."
+            ),
+            "Разберите критичные календарные инциденты.",
+            "/platform/calendar-health",
+            10,
+        ),
+        make_release_readiness_check(
+            "backups",
+            "Резервные копии",
+            "ok" if backup_path.exists() else "warning",
+            (
+                "Папка backups найдена."
+                if backup_path.exists()
+                else "Папка backups пока не найдена."
+            ),
+            "Проверьте создание резервной копии перед релизом.",
+            "/backup",
+            6,
+        ),
+    ]
+    total_weight = sum(item["weight"] for item in checks) or 1
+    score = round(
+        sum(item["points"] for item in checks) * 100 / total_weight
+    )
+    critical_count = sum(
+        1 for item in checks if item["status"] == "critical"
+    )
+    warning_count = sum(
+        1 for item in checks if item["status"] == "warning"
+    )
+
+    if critical_count:
+        status = "critical"
+        status_label = "Требует подготовки"
+    elif warning_count:
+        status = "warning"
+        status_label = "Почти готово"
+    else:
+        status = "ok"
+        status_label = "Готово к релизу"
+
+    return {
+        "score": score,
+        "status": status,
+        "status_label": status_label,
+        "checks": checks,
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+        "ok_count": sum(1 for item in checks if item["status"] == "ok"),
+        "environment": env_name,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_dashboard(request: Request):
 
@@ -6064,6 +6322,15 @@ async def platform_dashboard(request: Request):
     calendar_recommendations = calendar_incident_analytics[
         "recommendations"
     ][:3]
+    release_readiness = get_platform_release_readiness(
+        counts={
+            "companies": companies_count,
+            "users": users_count,
+            "tasks": tasks_count,
+            "clients": clients_count,
+        },
+        calendar_health_summary=calendar_health["summary"],
+    )
 
     return templates.TemplateResponse(
         request,
@@ -6084,7 +6351,34 @@ async def platform_dashboard(request: Request):
                 calendar_incident_analytics["summary"]
             ),
             "calendar_recommendations": calendar_recommendations,
+            "release_readiness": release_readiness,
         }
+    )
+
+
+@app.get("/platform/readiness", response_class=HTMLResponse)
+async def platform_readiness_page(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    readiness = get_platform_release_readiness()
+
+    return templates.TemplateResponse(
+        request,
+        "platform_readiness.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "readiness": readiness,
+        },
     )
 
 

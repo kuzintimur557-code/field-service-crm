@@ -9532,6 +9532,14 @@ async def assert_platform_calendar_health():
         )
         platform_html = platform_page.body.decode("utf-8")
         assert "/platform/calendar-health" in platform_html
+        assert "/platform/readiness" in platform_html
+        assert "Готовность релиза" in platform_html
+        assert platform_page.context["release_readiness"]["checks"]
+        assert platform_page.context["release_readiness"]["score"] >= 0
+        assert "secret_key" in {
+            item["key"]
+            for item in platform_page.context["release_readiness"]["checks"]
+        }
         assert platform_page.context["calendar_health_summary"][
             "critical"
         ] >= 1
@@ -9593,6 +9601,27 @@ async def assert_platform_calendar_health():
             in platform_html
         )
         assert "/platform/calendar-health?assignee=me" in platform_html
+        anonymous_readiness = await crm.platform_readiness_page(
+            make_public_asgi_request("/platform/readiness"),
+        )
+        assert anonymous_readiness.status_code == 302
+        assert anonymous_readiness.headers["location"] == "/login"
+        boss_readiness = await crm.platform_readiness_page(
+            make_asgi_request("owner2", "/platform/readiness"),
+        )
+        assert boss_readiness.status_code == 302
+        assert boss_readiness.headers["location"] == "/"
+        readiness_page = await crm.platform_readiness_page(
+            make_asgi_request("super", "/platform/readiness"),
+        )
+        assert readiness_page.status_code == 200
+        readiness_html = readiness_page.body.decode("utf-8")
+        assert "Готовность релиза" in readiness_html
+        assert "Проверки готовности" in readiness_html
+        assert "Секрет приложения" in readiness_html
+        assert "Telegram уведомления" in readiness_html
+        assert "Операционный контроль" in readiness_html
+        assert "/platform/calendar-health" in readiness_html
     finally:
         conn = connect()
         c = conn.cursor()
