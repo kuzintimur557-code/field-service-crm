@@ -4451,6 +4451,11 @@ def get_platform_calendar_incident_analytics(
             if recovery_values
             else "Нет данных"
         )
+        company["response_overdue_percent"] = (
+            round(company["response_overdue"] * 100 / company["incidents"])
+            if company["incidents"]
+            else 0
+        )
         company["detail_url"] = (
             f"/platform/calendar-health/{company['company_id']}"
         )
@@ -4458,6 +4463,7 @@ def get_platform_calendar_incident_analytics(
 
     companies.sort(
         key=lambda item: (
+            -item["response_overdue"],
             -item["active"],
             -item["incidents"],
             item["company_name"].lower(),
@@ -6249,6 +6255,7 @@ async def platform_calendar_incident_analytics_export(
         "Активные",
         "Эскалации",
         "Просрочена реакция",
+        "Реакция %",
         "Просрочено восстановление",
         "Средняя реакция",
         "Среднее восстановление",
@@ -6263,6 +6270,7 @@ async def platform_calendar_incident_analytics_export(
             company["active"],
             company["escalations"],
             company["response_overdue"],
+            company["response_overdue_percent"],
             company["recovery_overdue"],
             company["average_response_label"],
             company["average_recovery_label"],

@@ -45,6 +45,7 @@ th{background:#f9fafb;color:#6b7280;font-size:9px;font-weight:900;text-transform
 td{font-size:10px;font-weight:800}
 tr:last-child td{border-bottom:0}
 .company-link{color:#111827;font-weight:900;text-decoration:none}
+.table-meta{margin-top:3px;color:#6b7280;font-size:9px;font-weight:900}
 .pill{display:inline-flex;padding:4px 6px;border-radius:6px;background:#e5e7eb;color:#374151;font-size:9px;font-weight:900}
 .pill.healthy{background:#d1fae5;color:#065f46}
 .pill.waiting{background:#fef3c7;color:#92400e}
@@ -169,7 +170,7 @@ tr:last-child td{border-bottom:0}
         <section class="section">
             <div class="section-head">
                 <h2>Компании</h2>
-                <div class="note">Сначала компании с активными проблемами</div>
+                <div class="note">Сначала компании с нарушенной реакцией</div>
             </div>
             {% if companies %}
             <div class="panel table-panel table-wrap">
@@ -197,7 +198,12 @@ tr:last-child td{border-bottom:0}
                             <td data-label="Инциденты">{{ company["incidents"] }}</td>
                             <td data-label="Активные">{{ company["active"] }}</td>
                             <td data-label="Эскалации">{{ company["escalations"] }}</td>
-                            <td data-label="Реакция">{{ company["response_overdue"] }}</td>
+                            <td data-label="Реакция">
+                                <strong>{{ company["response_overdue"] }}</strong>
+                                <div class="table-meta">
+                                    {{ company["response_overdue_percent"] }}%
+                                </div>
+                            </td>
                             <td data-label="Восстановление">{{ company["recovery_overdue"] }}</td>
                             <td data-label="Средняя реакция">{{ company["average_response_label"] }}</td>
                             <td data-label="Среднее восстановление">{{ company["average_recovery_label"] }}</td>

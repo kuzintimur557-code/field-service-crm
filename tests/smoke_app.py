@@ -9289,10 +9289,18 @@ async def assert_platform_calendar_health():
         assert analytics_company["active"] == 1
         assert analytics_company["escalations"] == 1
         assert analytics_company["response_overdue"] >= 1
+        assert analytics_company["response_overdue_percent"] >= 1
         assert analytics_company["recovery_overdue"] == 0
         assert analytics_company["detail_url"] == (
             f"/platform/calendar-health/{company_id}"
         )
+        assert [
+            item["response_overdue"]
+            for item in analytics["companies"]
+        ] == sorted(
+            item["response_overdue"]
+            for item in analytics["companies"]
+        )[::-1]
         assert any(
             item["type"] == "error"
             for item in analytics["types"]
@@ -9369,6 +9377,7 @@ async def assert_platform_calendar_health():
             in analytics_html
         )
         assert "Среднее восстановление" in analytics_html
+        assert "Сначала компании с нарушенной реакцией" in analytics_html
         assert "Реакция просрочена" in analytics_html
         assert "Рекомендации" in analytics_html
         assert "Разберите активные инциденты" in analytics_html
@@ -9417,6 +9426,7 @@ async def assert_platform_calendar_health():
         assert analytics_export_csv.startswith("\ufeff")
         assert "Сводка" in analytics_export_csv
         assert "Просрочена реакция" in analytics_export_csv
+        assert "Реакция %" in analytics_export_csv
         assert "Реакция просрочена" in analytics_export_csv
         assert "Рекомендации" in analytics_export_csv
         assert "Разберите активные инциденты" in analytics_export_csv
