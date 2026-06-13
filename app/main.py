@@ -4893,6 +4893,13 @@ def get_platform_calendar_company_detail(
     ORDER BY id DESC
     LIMIT 20
     """, (company_id,)).fetchall()
+    platform_admin_rows = c.execute("""
+    SELECT username
+    FROM users
+    WHERE role='superadmin'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY username
+    """).fetchall()
     conn.close()
     run_labels = {
         "done": ("Выполнено", "healthy"),
@@ -4921,6 +4928,8 @@ def get_platform_calendar_company_detail(
         ),
         "recovery_started": ("Запущено восстановление", "running"),
         "recovery_failed": ("Восстановление не выполнено", "error"),
+        "note": ("Рабочая заметка", "waiting"),
+        "reassigned": ("Ответственный изменён", "running"),
         "recovered": ("Восстановлен", "healthy"),
     }
     operation_labels = {
@@ -4999,6 +5008,9 @@ def get_platform_calendar_company_detail(
         "runs": runs,
         "incidents": incidents,
         "operations": operations,
+        "platform_admins": [
+            row["username"] for row in platform_admin_rows
+        ],
         "policy": health["policy"],
         "generated_at": now_dt.strftime("%Y-%m-%d %H:%M"),
     }
@@ -5289,6 +5301,14 @@ async def platform_calendar_company_health_page(
             "Инцидент принят в работу от имени платформы.",
             "success",
         ),
+        "note_added": (
+            "Рабочая заметка добавлена в журнал инцидента.",
+            "success",
+        ),
+        "assigned": (
+            "Ответственный за инцидент изменён.",
+            "success",
+        ),
         "recovered": (
             "Проверка выполнена успешно. Инцидент закрыт.",
             "success",
@@ -5299,6 +5319,26 @@ async def platform_calendar_company_health_page(
         ),
         "already_acknowledged": (
             "Инцидент уже принят в работу.",
+            "error",
+        ),
+        "empty_note": (
+            "Введите текст рабочей заметки.",
+            "error",
+        ),
+        "note_too_long": (
+            "Заметка не должна превышать 500 символов.",
+            "error",
+        ),
+        "assignee_not_found": (
+            "Ответственный не найден или отключён.",
+            "error",
+        ),
+        "incident_not_acknowledged": (
+            "Сначала примите инцидент в работу.",
+            "error",
+        ),
+        "already_assigned": (
+            "Этот администратор уже отвечает за инцидент.",
             "error",
         ),
         "automation_disabled": (
@@ -5338,6 +5378,7 @@ async def platform_calendar_company_health_page(
             "runs": detail["runs"],
             "incidents": detail["incidents"],
             "operations": detail["operations"],
+            "platform_admins": detail["platform_admins"],
             "page_message": (
                 page_message[0] if page_message else ""
             ),
@@ -5371,6 +5412,72 @@ async def platform_calendar_incident_acknowledge(
     query_value = (
         "acknowledged" if result["ok"] else result["error"]
     )
+    return RedirectResponse(
+        (
+            f"/platform/calendar-health/{company_id}"
+            f"?{query_key}={query_value}"
+        ),
+        status_code=302,
+    )
+
+
+@app.post(
+    "/platform/calendar-health/{company_id}/note",
+)
+async def platform_calendar_incident_note(
+    request: Request,
+    company_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = add_calendar_scheduler_incident_note(
+        company_id,
+        username,
+        form.get("message"),
+    )
+    query_key = "notice" if result["ok"] else "error"
+    query_value = (
+        "note_added" if result["ok"] else result["error"]
+    )
+    return RedirectResponse(
+        (
+            f"/platform/calendar-health/{company_id}"
+            f"?{query_key}={query_value}"
+        ),
+        status_code=302,
+    )
+
+
+@app.post(
+    "/platform/calendar-health/{company_id}/assign",
+)
+async def platform_calendar_incident_assign(
+    request: Request,
+    company_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = reassign_calendar_scheduler_incident(
+        company_id,
+        username,
+        form.get("assignee_username"),
+    )
+    query_key = "notice" if result["ok"] else "error"
+    query_value = "assigned" if result["ok"] else result["error"]
     return RedirectResponse(
         (
             f"/platform/calendar-health/{company_id}"
@@ -11890,6 +11997,248 @@ def acknowledge_calendar_scheduler_incident(
         "message": "Инцидент принят в работу.",
         "acknowledged_at": now_value,
         "acknowledged_by": actor_username,
+    }
+
+
+def add_calendar_scheduler_incident_note(
+    company_id,
+    actor_username,
+    message,
+):
+    message = str(message or "").strip()
+
+    if not message:
+        return {
+            "ok": False,
+            "error": "empty_note",
+            "message": "Введите текст заметки.",
+        }
+
+    if len(message) > 500:
+        return {
+            "ok": False,
+            "error": "note_too_long",
+            "message": "Заметка не должна превышать 500 символов.",
+        }
+
+    conn = connect()
+    conn.execute("BEGIN IMMEDIATE")
+    c = conn.cursor()
+    actor = c.execute("""
+    SELECT username
+    FROM users
+    WHERE username=?
+      AND role='superadmin'
+      AND COALESCE(is_active, 1)=1
+    LIMIT 1
+    """, (actor_username,)).fetchone()
+    incident = c.execute("""
+    SELECT active_incident
+    FROM calendar_plan_scheduler_status
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+
+    if not actor:
+        conn.close()
+        return {
+            "ok": False,
+            "error": "actor_not_found",
+            "message": "Администратор платформы не найден.",
+        }
+
+    if not incident or not str(incident["active_incident"] or ""):
+        conn.close()
+        return {
+            "ok": False,
+            "error": "incident_not_found",
+            "message": "Активный инцидент не найден.",
+        }
+
+    log_calendar_scheduler_incident_event(
+        c,
+        company_id,
+        incident["active_incident"],
+        "note",
+        message,
+        actor_username=actor_username,
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "ok": True,
+        "message": "Заметка добавлена в журнал.",
+    }
+
+
+def reassign_calendar_scheduler_incident(
+    company_id,
+    actor_username,
+    assignee_username,
+):
+    assignee_username = str(assignee_username or "").strip()
+
+    if not assignee_username:
+        return {
+            "ok": False,
+            "error": "assignee_not_found",
+            "message": "Выберите ответственного.",
+        }
+
+    now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    conn.execute("BEGIN IMMEDIATE")
+    c = conn.cursor()
+    actor = c.execute("""
+    SELECT username
+    FROM users
+    WHERE username=?
+      AND role='superadmin'
+      AND COALESCE(is_active, 1)=1
+    LIMIT 1
+    """, (actor_username,)).fetchone()
+    assignee = c.execute("""
+    SELECT username, company_id, telegram_chat_id
+    FROM users
+    WHERE username=?
+      AND role='superadmin'
+      AND COALESCE(is_active, 1)=1
+    LIMIT 1
+    """, (assignee_username,)).fetchone()
+    incident = c.execute("""
+    SELECT
+        scheduler.active_incident,
+        scheduler.incident_acknowledged_at,
+        scheduler.incident_acknowledged_by,
+        COALESCE(
+            companies.name,
+            settings.company_name,
+            'Компания #' || scheduler.company_id
+        ) AS company_name
+    FROM calendar_plan_scheduler_status AS scheduler
+    LEFT JOIN companies
+      ON companies.id=scheduler.company_id
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=scheduler.company_id
+    WHERE scheduler.company_id=?
+    """, (company_id,)).fetchone()
+
+    if not actor:
+        conn.close()
+        return {
+            "ok": False,
+            "error": "actor_not_found",
+            "message": "Администратор платформы не найден.",
+        }
+
+    if not assignee:
+        conn.close()
+        return {
+            "ok": False,
+            "error": "assignee_not_found",
+            "message": "Ответственный не найден или отключён.",
+        }
+
+    if not incident or not str(incident["active_incident"] or ""):
+        conn.close()
+        return {
+            "ok": False,
+            "error": "incident_not_found",
+            "message": "Активный инцидент не найден.",
+        }
+
+    if not incident["incident_acknowledged_at"]:
+        conn.close()
+        return {
+            "ok": False,
+            "error": "incident_not_acknowledged",
+            "message": "Сначала примите инцидент в работу.",
+        }
+
+    previous_assignee = str(
+        incident["incident_acknowledged_by"] or ""
+    )
+
+    if previous_assignee == assignee_username:
+        conn.close()
+        return {
+            "ok": False,
+            "error": "already_assigned",
+            "message": "Этот администратор уже назначен.",
+        }
+
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET incident_acknowledged_by=?
+    WHERE company_id=?
+      AND active_incident!=''
+      AND incident_acknowledged_at IS NOT NULL
+    """, (
+        assignee_username,
+        company_id,
+    ))
+
+    if c.rowcount == 0:
+        conn.close()
+        return {
+            "ok": False,
+            "error": "incident_not_found",
+            "message": "Активный инцидент уже закрыт.",
+        }
+
+    assignment_message = (
+        f"Ответственный изменён: "
+        f"{previous_assignee or 'не назначен'} → {assignee_username}."
+    )
+    log_calendar_scheduler_incident_event(
+        c,
+        company_id,
+        incident["active_incident"],
+        "reassigned",
+        assignment_message,
+        actor_username=actor_username,
+        created_at=now_value,
+    )
+    c.execute("""
+    INSERT INTO notifications (
+        company_id, username, title, message,
+        link, is_read, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, 0, ?)
+    """, (
+        int(assignee["company_id"] or 1),
+        assignee_username,
+        "Назначен календарный инцидент",
+        (
+            f"Вам передан инцидент: {incident['company_name']} "
+            f"(#{company_id}). "
+            f"Назначил: {actor_username}."
+        ),
+        f"/platform/calendar-health/{company_id}",
+        now_value,
+    ))
+    conn.commit()
+    conn.close()
+
+    chat_id = str(assignee["telegram_chat_id"] or "").strip()
+
+    if chat_id:
+        try:
+            send_message_to_chat(
+                chat_id,
+                (
+                    "Назначен календарный инцидент\n"
+                    f"{incident['company_name']} (#{company_id}). "
+                    f"Назначил: {actor_username}."
+                ),
+            )
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "message": "Ответственный изменён.",
+        "assigned_to": assignee_username,
+        "assigned_by": actor_username,
     }
 
 

@@ -53,6 +53,16 @@ tr:last-child td{border-bottom:0}
 .incident-actions form{margin:0}
 .accepted{display:inline-flex;padding:7px 9px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:900}
 .accepted.overdue{background:#991b1b;color:white}
+.incident-workspace{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr);gap:10px;margin-bottom:14px}
+.incident-tool{padding:13px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.incident-tool h2{margin:0 0 4px;font-size:14px}
+.incident-tool p{margin:0 0 10px;color:#6b7280;font-size:10px;font-weight:800;line-height:1.4}
+.incident-form{display:flex;gap:8px;align-items:flex-end}
+.incident-field{flex:1;min-width:0}
+.incident-field label{display:block;margin-bottom:5px;color:#374151;font-size:10px;font-weight:900}
+.incident-field textarea,.incident-field select{display:block;width:100%;border:1px solid #d1d5db;border-radius:7px;background:white;color:#111827;font:700 12px Arial,sans-serif}
+.incident-field textarea{min-height:72px;padding:9px;resize:vertical}
+.incident-field select{height:38px;padding:0 9px}
 .empty{padding:24px;color:#6b7280;text-align:center;font-size:11px;font-weight:900}
 @media(max-width:900px){
     .container{padding:16px}
@@ -61,6 +71,9 @@ tr:last-child td{border-bottom:0}
     .actions,.button{width:100%;justify-content:center}
     .incident-active{grid-template-columns:1fr}
     .incident-actions,.incident-actions form{width:100%}
+    .incident-workspace{grid-template-columns:1fr}
+    .incident-form{align-items:stretch;flex-direction:column}
+    .incident-form .button{width:100%}
     .overview{grid-template-columns:1fr 1fr}
     .overview-main{grid-column:1/-1}
     .table-wrap{overflow:visible;border:0;background:transparent}
@@ -143,6 +156,70 @@ tr:last-child td{border-bottom:0}
                     Запустить восстановление
                 </button>
             </form>
+        </div>
+    </section>
+
+    <section class="incident-workspace" aria-label="Сопровождение инцидента">
+        <div class="incident-tool">
+            <h2>Рабочая заметка</h2>
+            <p>Зафиксируйте диагностику, договорённость или следующий шаг.</p>
+            <form
+                class="incident-form"
+                method="post"
+                action="/platform/calendar-health/{{ company['company_id'] }}/note"
+            >
+                <div class="incident-field">
+                    <label for="incident-message">Текст заметки</label>
+                    <textarea
+                        id="incident-message"
+                        name="message"
+                        maxlength="500"
+                        placeholder="Например: проверяем журнал последнего запуска"
+                        required
+                    ></textarea>
+                </div>
+                <button class="button secondary" type="submit">
+                    Добавить в журнал
+                </button>
+            </form>
+        </div>
+
+        <div class="incident-tool">
+            <h2>Ответственный</h2>
+            {% if company["is_acknowledged"] %}
+            <p>
+                Сейчас отвечает:
+                {{ company["incident_acknowledged_by"] or "не назначен" }}.
+            </p>
+            <form
+                class="incident-form"
+                method="post"
+                action="/platform/calendar-health/{{ company['company_id'] }}/assign"
+            >
+                <div class="incident-field">
+                    <label for="assignee-username">Администратор платформы</label>
+                    <select
+                        id="assignee-username"
+                        name="assignee_username"
+                        required
+                    >
+                        {% for admin_username in platform_admins %}
+                        <option
+                            value="{{ admin_username }}"
+                            {% if admin_username == company["incident_acknowledged_by"] %}selected{% endif %}
+                        >
+                            {{ admin_username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button class="button secondary" type="submit">
+                    Передать
+                </button>
+            </form>
+            {% else %}
+            <p>Передача станет доступна после принятия инцидента в работу.</p>
+            {% endif %}
         </div>
     </section>
     {% endif %}

@@ -7154,6 +7154,7 @@ async def assert_platform_calendar_health():
     company_id = 901
     company_name = "Smoke Calendar Health"
     owner_username = "smoke_health_owner"
+    backup_admin_username = "smoke_platform_backup"
     now_dt = datetime.now()
     old_value = (
         now_dt - timedelta(hours=8)
@@ -7183,6 +7184,16 @@ async def assert_platform_calendar_health():
     """, (
         owner_username,
         company_id,
+        old_value,
+    ))
+    c.execute("""
+    INSERT INTO users (
+        username, password, role, company_id,
+        is_active, last_seen
+    )
+    VALUES (?, 'x', 'superadmin', 1, 1, ?)
+    """, (
+        backup_admin_username,
         old_value,
     ))
     c.execute("""
@@ -7506,6 +7517,8 @@ async def assert_platform_calendar_health():
         )
         assert detail["company"]["company_name"] == company_name
         assert detail["policy"] == health["policy"]
+        assert "super" in detail["platform_admins"]
+        assert backup_admin_username in detail["platform_admins"]
         assert detail["summary"] == {
             "runs": 2,
             "successful": 1,
@@ -7570,8 +7583,56 @@ async def assert_platform_calendar_health():
             f"/platform/calendar-health/{company_id}/recover"
             in detail_html
         )
+        assert (
+            f"/platform/calendar-health/{company_id}/note"
+            in detail_html
+        )
+        assert "Рабочая заметка" in detail_html
+        assert (
+            "Передача станет доступна после принятия инцидента"
+            in detail_html
+        )
         assert "Возможна публикация планов" in detail_html
         assert "Регламент: реакция" in detail_html
+        anonymous_note = await crm.platform_calendar_incident_note(
+            make_public_asgi_request(
+                f"/platform/calendar-health/{company_id}/note"
+            ),
+            company_id,
+        )
+        assert anonymous_note.status_code == 302
+        assert anonymous_note.headers["location"] == "/login"
+        boss_note = await crm.platform_calendar_incident_note(
+            make_form_request(
+                "owner2",
+                f"/platform/calendar-health/{company_id}/note",
+                {"message": "Недоступная заметка"},
+            ),
+            company_id,
+        )
+        assert boss_note.status_code == 302
+        assert boss_note.headers["location"] == "/"
+        assignment_before_acknowledge = (
+            await crm.platform_calendar_incident_assign(
+                make_form_request(
+                    "super",
+                    (
+                        f"/platform/calendar-health/{company_id}"
+                        "/assign"
+                    ),
+                    {
+                        "assignee_username": (
+                            backup_admin_username
+                        ),
+                    },
+                ),
+                company_id,
+            )
+        )
+        assert assignment_before_acknowledge.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=incident_not_acknowledged"
+        )
         anonymous_acknowledge = (
             await crm.platform_calendar_incident_acknowledge(
                 make_public_asgi_request(
@@ -7651,6 +7712,165 @@ async def assert_platform_calendar_health():
             f"/platform/calendar-health/{company_id}/acknowledge"
             not in acknowledged_html
         )
+        assert (
+            f"/platform/calendar-health/{company_id}/assign"
+            in acknowledged_html
+        )
+        assert backup_admin_username in acknowledged_html
+        empty_note = await crm.platform_calendar_incident_note(
+            make_form_request(
+                "super",
+                f"/platform/calendar-health/{company_id}/note",
+                {"message": "   "},
+            ),
+            company_id,
+        )
+        assert empty_note.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=empty_note"
+        )
+        long_note = await crm.platform_calendar_incident_note(
+            make_form_request(
+                "super",
+                f"/platform/calendar-health/{company_id}/note",
+                {"message": "x" * 501},
+            ),
+            company_id,
+        )
+        assert long_note.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=note_too_long"
+        )
+        added_note = await crm.platform_calendar_incident_note(
+            make_form_request(
+                "super",
+                f"/platform/calendar-health/{company_id}/note",
+                {
+                    "message": (
+                        "Проверяем журнал и настройки окна запуска."
+                    ),
+                },
+            ),
+            company_id,
+        )
+        assert added_note.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?notice=note_added"
+        )
+        missing_assignee = (
+            await crm.platform_calendar_incident_assign(
+                make_form_request(
+                    "super",
+                    (
+                        f"/platform/calendar-health/{company_id}"
+                        "/assign"
+                    ),
+                    {"assignee_username": "missing_admin"},
+                ),
+                company_id,
+            )
+        )
+        assert missing_assignee.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=assignee_not_found"
+        )
+        assigned_incident = (
+            await crm.platform_calendar_incident_assign(
+                make_form_request(
+                    "super",
+                    (
+                        f"/platform/calendar-health/{company_id}"
+                        "/assign"
+                    ),
+                    {
+                        "assignee_username": (
+                            backup_admin_username
+                        ),
+                    },
+                ),
+                company_id,
+            )
+        )
+        assert assigned_incident.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?notice=assigned"
+        )
+        repeated_assignment = (
+            await crm.platform_calendar_incident_assign(
+                make_form_request(
+                    "super",
+                    (
+                        f"/platform/calendar-health/{company_id}"
+                        "/assign"
+                    ),
+                    {
+                        "assignee_username": (
+                            backup_admin_username
+                        ),
+                    },
+                ),
+                company_id,
+            )
+        )
+        assert repeated_assignment.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=already_assigned"
+        )
+        conn = connect()
+        c = conn.cursor()
+        assigned_status = c.execute("""
+        SELECT incident_acknowledged_by
+        FROM calendar_plan_scheduler_status
+        WHERE company_id=?
+        """, (company_id,)).fetchone()
+        collaboration_events = c.execute("""
+        SELECT event_type, actor_username, message
+        FROM calendar_scheduler_incident_events
+        WHERE company_id=?
+          AND event_type IN ('note', 'reassigned')
+        ORDER BY id
+        """, (company_id,)).fetchall()
+        assignment_notifications = c.execute("""
+        SELECT username, title, message, link
+        FROM notifications
+        WHERE username=?
+          AND title='Назначен календарный инцидент'
+          AND link=?
+        """, (
+            backup_admin_username,
+            f"/platform/calendar-health/{company_id}",
+        )).fetchall()
+        conn.close()
+        assert assigned_status["incident_acknowledged_by"] == (
+            backup_admin_username
+        )
+        assert [
+            row["event_type"] for row in collaboration_events
+        ] == ["note", "reassigned"]
+        assert collaboration_events[0]["actor_username"] == "super"
+        assert collaboration_events[0]["message"] == (
+            "Проверяем журнал и настройки окна запуска."
+        )
+        assert backup_admin_username in (
+            collaboration_events[1]["message"]
+        )
+        assert len(assignment_notifications) == 1
+        assert company_name in assignment_notifications[0]["message"]
+        assigned_detail = (
+            await crm.platform_calendar_company_health_page(
+                make_asgi_request(
+                    "super",
+                    f"/platform/calendar-health/{company_id}",
+                ),
+                company_id,
+                notice="assigned",
+            )
+        )
+        assigned_html = assigned_detail.body.decode("utf-8")
+        assert "Ответственный за инцидент изменён." in assigned_html
+        assert "Рабочая заметка" in assigned_html
+        assert "Ответственный изменён" in assigned_html
+        assert backup_admin_username in assigned_html
         acknowledged_health = crm.get_platform_calendar_health(
             now_dt=now_dt,
             status_filter="problem",
@@ -7698,11 +7918,11 @@ async def assert_platform_calendar_health():
             recovery_watchdog[
                 "recovery_overdue_notifications_sent"
             ]
-            == 1
+            == 2
         )
         assert recovery_overdue["checked"] == 1
         assert recovery_overdue["overdue"] == 1
-        assert recovery_overdue["notifications_sent"] == 1
+        assert recovery_overdue["notifications_sent"] == 2
         assert recovery_overdue["items"][0]["company_id"] == (
             company_id
         )
@@ -7890,6 +8110,8 @@ async def assert_platform_calendar_health():
         ] == [
             ("opened", ""),
             ("acknowledged", "super"),
+            ("note", "super"),
+            ("reassigned", "super"),
             ("recovery_overdue", "watchdog"),
             ("recovery_started", "super"),
             ("recovered", "super"),
@@ -8011,11 +8233,11 @@ async def assert_platform_calendar_health():
         assert escalation_watchdog["escalated"] == 1
         assert (
             escalation_watchdog["escalation_notifications_sent"]
-            == 1
+            == 2
         )
         assert escalation["checked"] == 1
         assert escalation["escalated"] == 1
-        assert escalation["notifications_sent"] == 1
+        assert escalation["notifications_sent"] == 2
         assert escalation["items"][0]["company_id"] == company_id
         assert escalation["items"][0]["age_minutes"] == 45
         repeated_watchdog = (
@@ -8212,6 +8434,17 @@ async def assert_platform_calendar_health():
         c.execute(
             "DELETE FROM notifications WHERE company_id=?",
             (company_id,),
+        )
+        c.execute("""
+        DELETE FROM notifications
+        WHERE username=? OR link=?
+        """, (
+            backup_admin_username,
+            f"/platform/calendar-health/{company_id}",
+        ))
+        c.execute(
+            "DELETE FROM users WHERE username=?",
+            (backup_admin_username,),
         )
         c.execute(
             "DELETE FROM company_settings WHERE company_id=?",
