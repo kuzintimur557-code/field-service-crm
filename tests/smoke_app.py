@@ -9638,6 +9638,8 @@ async def assert_platform_calendar_health():
         assert "Журнал релиза" in readiness_html
         assert "Регламент релиза" in readiness_html
         assert "Триггеры отката:" in readiness_html
+        assert "Центр контроля запуска" in readiness_html
+        assert "Условия остановки" in readiness_html
         assert "Категории" in readiness_html
         assert "Следующие действия" in readiness_html
         assert "Все проверки" in readiness_html
@@ -9837,6 +9839,10 @@ async def assert_platform_calendar_health():
         assert "Регламент релиза" in readiness_csv
         assert "Шаги регламента" in readiness_csv
         assert "Триггеры отката" in readiness_csv
+        assert "Центр контроля запуска" in readiness_csv
+        assert "Метрики контроля" in readiness_csv
+        assert "Контрольные точки" in readiness_csv
+        assert "Условия остановки" in readiness_csv
         assert "Категории" in readiness_csv
         assert "Следующие действия" in readiness_csv
         assert "Все проверки" in readiness_csv
@@ -9908,7 +9914,29 @@ async def assert_platform_calendar_health():
         assert readiness_api["signoffs"]
         assert readiness_api["timeline"]["events"]
         assert readiness_api["runbook"]["sections"]
+        assert readiness_api["control_center"]["metrics"]
         assert readiness_api["export_url"] == "/platform/readiness/export"
+        anonymous_control_api = (
+            await crm.api_platform_readiness_control_center(
+                make_public_asgi_request(
+                    "/api/platform/readiness/control-center",
+                ),
+            )
+        )
+        assert anonymous_control_api.status_code == 401
+        boss_control_api = await crm.api_platform_readiness_control_center(
+            make_asgi_request(
+                "owner2",
+                "/api/platform/readiness/control-center",
+            ),
+        )
+        assert boss_control_api.status_code == 403
+        control_api = await crm.api_platform_readiness_control_center(
+            make_asgi_request("super", "/api/platform/readiness/control-center"),
+        )
+        assert control_api["metrics"]
+        assert control_api["checkpoints"]
+        assert control_api["stop_conditions"]
         anonymous_runbook_api = await crm.api_platform_readiness_runbook(
             make_public_asgi_request("/api/platform/readiness/runbook"),
         )

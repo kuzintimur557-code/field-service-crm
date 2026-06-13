@@ -6538,12 +6538,12 @@ def get_platform_release_launch_plan(readiness):
         ),
         make_release_launch_item(
             "Проверить системные настройки",
-            "Убедитесь, что окружение и интеграции работают после деплоя.",
+            "Убедитесь, что окружение и интеграции работают после публикации.",
             "/system",
             "warning",
         ),
         make_release_launch_item(
-            "Повторить readiness после первых клиентов",
+            "Повторить проверку готовности после первых клиентов",
             "Сохраните новый снимок и сравните динамику.",
             "/platform/readiness",
             "warning",
@@ -7034,6 +7034,225 @@ def get_platform_release_runbook(
         "critical_steps_count": sum(
             1 for step in steps if step["status"] == "critical"
         ),
+    }
+
+
+def make_release_control_item(
+    title,
+    description,
+    value="",
+    status="warning",
+    url="/platform/readiness",
+):
+    labels = {
+        "ok": "Норма",
+        "warning": "Контроль",
+        "critical": "Стоп",
+    }
+    normalized_status = status if status in labels else "warning"
+    return {
+        "title": title,
+        "description": description,
+        "value": value,
+        "status": normalized_status,
+        "status_label": labels[normalized_status],
+        "url": url,
+    }
+
+
+def get_platform_release_control_center(
+    readiness=None,
+    launch_plan=None,
+    timeline=None,
+    runbook=None,
+):
+    readiness = readiness or get_platform_release_readiness()
+    launch_plan = launch_plan or get_platform_release_launch_plan(readiness)
+    timeline = timeline or get_platform_release_timeline()
+    runbook = runbook or get_platform_release_runbook(
+        readiness,
+        launch_plan,
+        timeline,
+    )
+    checks_by_key = {
+        item["key"]: item for item in readiness["checks"]
+    }
+    categories_by_key = {
+        item["key"]: item for item in readiness["categories"]
+    }
+    score = int(readiness["score"] or 0)
+    critical_count = int(readiness["critical_count"] or 0)
+    warning_count = int(readiness["warning_count"] or 0)
+    blocked = bool(launch_plan["blocked"])
+    has_signoff = bool(runbook["has_signoff"])
+    calendar_check = checks_by_key.get("calendar_ops", {})
+    security_category = categories_by_key.get("security", {})
+    calendar_status = calendar_check.get("status", "warning")
+
+    if blocked:
+        status = "critical"
+        label = "Запуск остановлен"
+        risk_level = "Высокий"
+        summary = "Есть критичные блокеры. Публикацию проводить нельзя."
+    elif not has_signoff:
+        status = "warning"
+        label = "Нужно решение"
+        risk_level = "Средний"
+        summary = "Перед запуском нужно зафиксировать управленческое решение."
+    elif score < 90 or warning_count:
+        status = "warning"
+        label = "Запуск под контролем"
+        risk_level = "Умеренный"
+        summary = "Запуск возможен, но первые часы нужно контролировать вручную."
+    else:
+        status = "ok"
+        label = "Контроль готов"
+        risk_level = "Низкий"
+        summary = "Ключевые сигналы стабильны, можно идти по плану запуска."
+
+    metrics = [
+        make_release_control_item(
+            "Оценка готовности",
+            "Общая оценка предрелизных проверок.",
+            f"{score}%",
+            "ok" if score >= 90 else ("warning" if score >= 75 else "critical"),
+            "/platform/readiness",
+        ),
+        make_release_control_item(
+            "Критичные блокеры",
+            "Проверки, которые останавливают запуск.",
+            str(critical_count),
+            "ok" if critical_count == 0 else "critical",
+            "/platform/readiness",
+        ),
+        make_release_control_item(
+            "Предупреждения",
+            "Некритичные задачи, которые нужно держать под контролем.",
+            str(warning_count),
+            "ok" if warning_count == 0 else "warning",
+            "/platform/readiness",
+        ),
+        make_release_control_item(
+            "Решение по запуску",
+            "Фиксация решения владельцем платформы.",
+            "есть" if has_signoff else "нет",
+            "ok" if has_signoff else "warning",
+            "/platform/readiness",
+        ),
+        make_release_control_item(
+            "Операционный контроль",
+            calendar_check.get(
+                "description",
+                "Состояние календарных автоматизаций.",
+            ),
+            calendar_check.get("status_label", "Проверить"),
+            (
+                "critical"
+                if calendar_status == "critical"
+                else ("warning" if calendar_status == "warning" else "ok")
+            ),
+            "/platform/calendar-health",
+        ),
+        make_release_control_item(
+            "Безопасность",
+            "Состояние проверок безопасности перед запуском.",
+            security_category.get("status_label", "Проверить"),
+            (
+                "critical"
+                if security_category.get("critical")
+                else (
+                    "warning"
+                    if security_category.get("warning")
+                    else "ok"
+                )
+            ),
+            "/system",
+        ),
+    ]
+
+    checkpoints = [
+        make_release_control_item(
+            "За сутки до запуска",
+            "Закрыть критичные блокеры и сохранить финальный снимок.",
+            "T-24 часа",
+            "critical" if critical_count else "warning",
+            "/platform/readiness",
+        ),
+        make_release_control_item(
+            "За час до запуска",
+            "Проверить вход суперадмина, системные настройки и решение.",
+            "T-1 час",
+            (
+                "critical"
+                if critical_count
+                else ("ok" if has_signoff else "warning")
+            ),
+            "/platform/readiness",
+        ),
+        make_release_control_item(
+            "Первые 30 минут",
+            "Проверить авторизацию, календарь, уведомления и загрузки файлов.",
+            "T+30 минут",
+            "warning",
+            "/system",
+        ),
+        make_release_control_item(
+            "Первые 24 часа",
+            "Сравнить новый снимок с финальным и проверить инциденты.",
+            "T+24 часа",
+            "warning",
+            "/platform/calendar-health",
+        ),
+    ]
+
+    watch_focus = [
+        make_release_control_item(
+            item["title"],
+            item["action"],
+            item["category_label"],
+            item["status"],
+            item["url"],
+        )
+        for item in readiness["next_actions"][:5]
+    ]
+    if not watch_focus:
+        watch_focus = [
+            make_release_control_item(
+                "Контроль стабильности",
+                "Критичных задач нет, держите под наблюдением первые действия клиентов.",
+                "Мониторинг",
+                "ok",
+                "/platform/readiness",
+            ),
+        ]
+
+    stop_conditions = [
+        "Появился новый критичный блокер готовности.",
+        "Оценка готовности упала ниже 75%.",
+        "Календарные инциденты стали критичными.",
+        "Суперадмин или владелец компании не может войти в систему.",
+        "Загрузки файлов или уведомления перестали работать.",
+    ]
+    next_checkpoint = next(
+        (item for item in checkpoints if item["status"] != "ok"),
+        checkpoints[-1],
+    )
+
+    return {
+        "status": status,
+        "label": label,
+        "summary": summary,
+        "risk_level": risk_level,
+        "mode": launch_plan["recommended_mode"],
+        "score": score,
+        "has_signoff": has_signoff,
+        "latest_event": timeline["latest_label"],
+        "latest_event_at": timeline["latest_at"],
+        "metrics": metrics,
+        "checkpoints": checkpoints,
+        "next_checkpoint": next_checkpoint,
+        "watch_focus": watch_focus,
+        "stop_conditions": stop_conditions,
     }
 
 
@@ -7567,6 +7786,12 @@ async def platform_readiness_page(
         launch_plan,
         timeline,
     )
+    control_center = get_platform_release_control_center(
+        readiness,
+        launch_plan,
+        timeline,
+        runbook,
+    )
 
     return templates.TemplateResponse(
         request,
@@ -7583,6 +7808,7 @@ async def platform_readiness_page(
             "signoffs": signoffs,
             "timeline": timeline,
             "runbook": runbook,
+            "control_center": control_center,
             "notice": notice,
             "error": error,
         },
@@ -7666,6 +7892,12 @@ async def platform_readiness_export(request: Request):
         readiness,
         launch_plan,
         timeline,
+    )
+    control_center = get_platform_release_control_center(
+        readiness,
+        launch_plan,
+        timeline,
+        runbook,
     )
     output = io.StringIO()
     writer = csv.writer(output)
@@ -7822,6 +8054,58 @@ async def platform_readiness_export(request: Request):
     writer.writerow(["Триггеры отката"])
     for trigger in runbook["rollback_triggers"]:
         writer.writerow([trigger])
+    writer.writerow([])
+
+    writer.writerow(["Центр контроля запуска"])
+    writer.writerow(["Состояние", control_center["label"]])
+    writer.writerow(["Риск", control_center["risk_level"]])
+    writer.writerow(["Режим", control_center["mode"]])
+    writer.writerow(["Резюме", control_center["summary"]])
+    writer.writerow([
+        "Следующая точка",
+        control_center["next_checkpoint"]["title"],
+    ])
+    writer.writerow([])
+
+    writer.writerow(["Метрики контроля"])
+    writer.writerow(["Метрика", "Значение", "Статус", "Описание", "Ссылка"])
+    for metric in control_center["metrics"]:
+        writer.writerow([
+            metric["title"],
+            metric["value"],
+            metric["status_label"],
+            metric["description"],
+            metric["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Контрольные точки"])
+    writer.writerow(["Точка", "Когда", "Статус", "Описание", "Ссылка"])
+    for checkpoint in control_center["checkpoints"]:
+        writer.writerow([
+            checkpoint["title"],
+            checkpoint["value"],
+            checkpoint["status_label"],
+            checkpoint["description"],
+            checkpoint["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Фокус мониторинга"])
+    writer.writerow(["Область", "Значение", "Статус", "Действие", "Ссылка"])
+    for item in control_center["watch_focus"]:
+        writer.writerow([
+            item["title"],
+            item["value"],
+            item["status_label"],
+            item["description"],
+            item["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Условия остановки"])
+    for condition in control_center["stop_conditions"]:
+        writer.writerow([condition])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -8231,7 +8515,41 @@ async def api_platform_readiness(request: Request):
         readiness["launch_plan"],
         timeline,
     )
+    readiness["control_center"] = get_platform_release_control_center(
+        readiness,
+        readiness["launch_plan"],
+        timeline,
+        readiness["runbook"],
+    )
     return readiness
+
+
+@app.get("/api/platform/readiness/control-center")
+async def api_platform_readiness_control_center(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    readiness = get_platform_release_readiness()
+    launch_plan = get_platform_release_launch_plan(readiness)
+    timeline = get_platform_release_timeline()
+    runbook = get_platform_release_runbook(
+        readiness,
+        launch_plan,
+        timeline,
+    )
+    return get_platform_release_control_center(
+        readiness,
+        launch_plan,
+        timeline,
+        runbook,
+    )
 
 
 @app.get("/api/platform/readiness/runbook")

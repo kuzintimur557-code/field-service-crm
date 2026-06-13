@@ -136,6 +136,36 @@ button.button{border:0;cursor:pointer}
 .runbook-step-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
 .runbook-next{margin-top:12px}
 .runbook-triggers{display:grid;gap:6px;margin-top:12px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.4}
+.control{margin-top:18px;padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb}
+.control.ok{border-color:#bbf7d0;background:#f0fdf4}
+.control.critical{border-color:#fecaca;background:#fff7f7}
+.control-head{display:grid;grid-template-columns:220px minmax(0,1fr) 180px;gap:14px;align-items:start}
+.control-label{font-size:13px;font-weight:900}
+.control-value{margin-top:6px;font-size:26px;font-weight:900}
+.control-risk{display:inline-flex;margin-top:8px;padding:7px 9px;border-radius:8px;background:white;font-size:11px;font-weight:900}
+.control-text{color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.control-next{padding:12px;border-radius:9px;background:white}
+.control-next-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.control-next-value{margin-top:6px;font-size:15px;font-weight:900}
+.control-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:12px;margin-top:12px}
+.control-panel{padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.control-panel-title{font-size:13px;font-weight:900}
+.control-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.control-metric{display:block;min-height:76px;padding:10px;border-radius:8px;background:#f9fafb;color:#111827;text-decoration:none}
+.control-metric.warning{background:#fffbeb}
+.control-metric.critical{background:#fff7f7}
+.control-metric.ok{background:#f0fdf4}
+.control-metric-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.control-metric-value{margin-top:5px;font-size:18px;font-weight:900}
+.control-metric-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.3}
+.control-list{display:grid;gap:7px;margin-top:10px}
+.control-item{display:block;padding:9px;border-radius:8px;background:#f9fafb;color:#111827;text-decoration:none}
+.control-item.warning{background:#fffbeb}
+.control-item.critical{background:#fff7f7}
+.control-item.ok{background:#f0fdf4}
+.control-item-title{font-size:12px;font-weight:900}
+.control-item-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
+.control-stops{display:grid;gap:6px;margin-top:12px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.4}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -193,6 +223,9 @@ button.button{border:0;cursor:pointer}
 .runbook-head{grid-template-columns:1fr}
 .runbook-stats{grid-template-columns:1fr}
 .runbook-sections{grid-template-columns:1fr}
+.control-head{grid-template-columns:1fr}
+.control-grid{grid-template-columns:1fr}
+.control-metrics{grid-template-columns:1fr}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -540,6 +573,82 @@ button.button{border:0;cursor:pointer}
             {% for trigger in runbook["rollback_triggers"][:3] %}
             <span>{{ trigger }}</span>
             {% endfor %}
+        </div>
+    </section>
+
+    <section class="control {{ control_center['status'] }}">
+        <div class="control-head">
+            <div>
+                <div class="control-label">Центр контроля запуска</div>
+                <div class="control-value">{{ control_center["label"] }}</div>
+                <div class="control-risk">Риск: {{ control_center["risk_level"] }}</div>
+            </div>
+            <div class="control-text">
+                {{ control_center["summary"] }}
+                Режим: {{ control_center["mode"] }}.
+                Последнее событие: {{ control_center["latest_event"] }}{% if control_center["latest_event_at"] %},
+                {{ control_center["latest_event_at"] }}{% endif %}.
+            </div>
+            <div class="control-next">
+                <div class="control-next-label">Следующая точка</div>
+                <div class="control-next-value">
+                    {{ control_center["next_checkpoint"]["title"] }}
+                </div>
+                <div class="control-metric-text">
+                    {{ control_center["next_checkpoint"]["value"] }} ·
+                    {{ control_center["next_checkpoint"]["status_label"] }}
+                </div>
+            </div>
+        </div>
+        <div class="control-grid">
+            <div class="control-panel">
+                <div class="control-panel-title">Метрики контроля</div>
+                <div class="control-metrics">
+                    {% for metric in control_center["metrics"] %}
+                    <a class="control-metric {{ metric['status'] }}" href="{{ metric['url'] }}">
+                        <div class="control-metric-label">{{ metric["title"] }}</div>
+                        <div class="control-metric-value">{{ metric["value"] }}</div>
+                        <div class="control-metric-text">{{ metric["status_label"] }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="control-panel">
+                <div class="control-panel-title">Фокус мониторинга</div>
+                <div class="control-list">
+                    {% for item in control_center["watch_focus"][:4] %}
+                    <a class="control-item {{ item['status'] }}" href="{{ item['url'] }}">
+                        <div class="control-item-title">
+                            {{ item["value"] }} · {{ item["title"] }}
+                        </div>
+                        <div class="control-item-text">{{ item["description"] }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="control-grid">
+            <div class="control-panel">
+                <div class="control-panel-title">Контрольные точки</div>
+                <div class="control-list">
+                    {% for checkpoint in control_center["checkpoints"] %}
+                    <a class="control-item {{ checkpoint['status'] }}" href="{{ checkpoint['url'] }}">
+                        <div class="control-item-title">
+                            {{ checkpoint["value"] }} · {{ checkpoint["title"] }}
+                        </div>
+                        <div class="control-item-text">{{ checkpoint["description"] }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="control-panel">
+                <div class="control-panel-title">Условия остановки</div>
+                <div class="control-stops">
+                    {% for condition in control_center["stop_conditions"] %}
+                    <span>{{ condition }}</span>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
     </section>
 
