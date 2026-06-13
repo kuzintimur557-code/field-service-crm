@@ -4461,6 +4461,22 @@ def get_platform_calendar_incident_analytics(
             if company["incidents"]
             else 0
         )
+        company["risk_score"] = min(
+            100,
+            company["response_overdue_percent"]
+            + company["active"] * 20
+            + company["escalations"] * 15
+            + company["recovery_overdue"] * 25,
+        )
+        if company["risk_score"] >= 80:
+            company["risk_label"] = "Высокий"
+            company["risk_tone"] = "error"
+        elif company["risk_score"] >= 40:
+            company["risk_label"] = "Средний"
+            company["risk_tone"] = "waiting"
+        else:
+            company["risk_label"] = "Низкий"
+            company["risk_tone"] = "healthy"
         company["detail_url"] = (
             f"/platform/calendar-health/{company['company_id']}"
         )
@@ -4468,6 +4484,7 @@ def get_platform_calendar_incident_analytics(
 
     companies.sort(
         key=lambda item: (
+            -item["risk_score"],
             -item["response_overdue"],
             -item["active"],
             -item["incidents"],
@@ -6255,6 +6272,8 @@ async def platform_calendar_incident_analytics_export(
     writer.writerow([
         "ID компании",
         "Компания",
+        "Риск",
+        "Оценка риска",
         "Инциденты",
         "Восстановлено",
         "Активные",
@@ -6270,6 +6289,8 @@ async def platform_calendar_incident_analytics_export(
         writer.writerow([
             company["company_id"],
             company["company_name"],
+            company["risk_label"],
+            company["risk_score"],
             company["incidents"],
             company["recovered"],
             company["active"],

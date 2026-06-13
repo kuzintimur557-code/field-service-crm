@@ -178,6 +178,7 @@ tr:last-child td{border-bottom:0}
                     <thead>
                         <tr>
                             <th>Компания</th>
+                            <th>Риск</th>
                             <th>Инциденты</th>
                             <th>Активные</th>
                             <th>Эскалации</th>
@@ -194,6 +195,14 @@ tr:last-child td{border-bottom:0}
                                 <a class="company-link" href="{{ company['detail_url'] }}">
                                     {{ company["company_name"] }}
                                 </a>
+                            </td>
+                            <td data-label="Риск">
+                                <span class="pill {{ company['risk_tone'] }}">
+                                    {{ company["risk_label"] }}
+                                </span>
+                                <div class="table-meta">
+                                    {{ company["risk_score"] }}/100
+                                </div>
                             </td>
                             <td data-label="Инциденты">{{ company["incidents"] }}</td>
                             <td data-label="Активные">{{ company["active"] }}</td>
