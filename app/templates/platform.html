@@ -24,8 +24,12 @@ h1{margin:0;font-size:38px}
 .value{font-size:32px;font-weight:900}
 .card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
 .ops-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center}
+.ops-heading{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .ops-title{margin:0;font-size:22px}
 .ops-subtitle{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800}
+.ops-status{display:inline-flex;padding:6px 8px;border-radius:9px;background:#d1fae5;color:#065f46;font-size:10px;font-weight:900;text-transform:uppercase}
+.ops-status.warning{background:#fef3c7;color:#92400e}
+.ops-status.critical{background:#991b1b;color:white}
 .ops-metrics{display:grid;grid-template-columns:repeat(6,minmax(90px,1fr));gap:10px;margin-top:16px}
 .ops-metric{padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb}
 .ops-metric.danger{border-color:#fecaca;background:#fff7f7}
@@ -118,7 +122,12 @@ h1{font-size:30px}
 
 <div class="card ops-card">
     <div>
-        <h2 class="ops-title">Календарные автоматизации</h2>
+        <div class="ops-heading">
+            <h2 class="ops-title">Календарные автоматизации</h2>
+            <span class="ops-status {{ calendar_health_summary['overall_status_code'] }}">
+                {{ calendar_health_summary["overall_status_label"] }}
+            </span>
+        </div>
         <div class="ops-subtitle">
             Операционный контроль платформы: инциденты, восстановление и ответственные.
         </div>

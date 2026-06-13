@@ -4880,6 +4880,15 @@ def get_platform_calendar_health(
             else "нет"
         ),
     }
+    if summary["critical"] or summary["recovery_overdue"]:
+        summary["overall_status_code"] = "critical"
+        summary["overall_status_label"] = "Критично"
+    elif summary["unacknowledged"] or summary["problems"]:
+        summary["overall_status_code"] = "warning"
+        summary["overall_status_label"] = "Требует внимания"
+    else:
+        summary["overall_status_code"] = "healthy"
+        summary["overall_status_label"] = "Стабильно"
     admin_workload = []
 
     for admin_username in platform_admins:
