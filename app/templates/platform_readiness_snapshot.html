@@ -25,6 +25,22 @@ h1{margin:6px 0 0;font-size:32px}
 .metric-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
 .metric-value{margin-top:8px;font-size:24px;font-weight:900}
 .section{margin-top:18px}
+.compare{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;margin-top:18px;padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb}
+.compare.ok{border-color:#bbf7d0;background:#f0fdf4}
+.compare.critical{border-color:#fecaca;background:#fff7f7}
+.compare-label{font-size:13px;font-weight:900}
+.compare-value{margin-top:8px;font-size:26px;font-weight:900}
+.compare-text{color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.compare-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.compare-stat{padding:10px;border-radius:8px;background:white}
+.compare-stat-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.compare-stat-value{margin-top:5px;font-size:18px;font-weight:900}
+.change-list{display:grid;gap:8px;margin-top:12px}
+.change-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:white}
+.change-item.warning{border-color:#fde68a}
+.change-item.critical{border-color:#fecaca}
+.change-title{font-size:12px;font-weight:900}
+.change-meta{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.4}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -52,6 +68,9 @@ h1{margin:6px 0 0;font-size:32px}
 .actions{justify-content:stretch}
 .button{width:100%;justify-content:center}
 .summary{grid-template-columns:1fr}
+.compare{grid-template-columns:1fr}
+.compare-grid{grid-template-columns:1fr}
+.change-item{grid-template-columns:1fr}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -99,6 +118,71 @@ h1{margin:6px 0 0;font-size:32px}
         <div class="metric">
             <div class="metric-label">Критично</div>
             <div class="metric-value">{{ snapshot["critical_count"] }}</div>
+        </div>
+    </section>
+
+    <section class="compare {{ snapshot_comparison['tone'] }}">
+        <div>
+            <div class="compare-label">Сравнение с предыдущим снимком</div>
+            <div class="compare-value">{{ snapshot_comparison["label"] }}</div>
+        </div>
+        <div>
+            <div class="compare-text">
+                {{ snapshot_comparison["summary"] }}
+                {% if snapshot_comparison["has_previous"] %}
+                Предыдущий снимок: {{ snapshot_comparison["previous_created_at"] }}.
+                <a href="{{ snapshot_comparison['previous_url'] }}">Открыть</a>
+                {% endif %}
+            </div>
+            <div class="compare-grid">
+                <div class="compare-stat">
+                    <div class="compare-stat-label">Оценка</div>
+                    <div class="compare-stat-value">{{ snapshot_comparison["score_delta"] }}</div>
+                </div>
+                <div class="compare-stat">
+                    <div class="compare-stat-label">Критично</div>
+                    <div class="compare-stat-value">{{ snapshot_comparison["critical_delta"] }}</div>
+                </div>
+                <div class="compare-stat">
+                    <div class="compare-stat-label">Внимание</div>
+                    <div class="compare-stat-value">{{ snapshot_comparison["warning_delta"] }}</div>
+                </div>
+            </div>
+            {% if snapshot_comparison["changed_checks"] %}
+            <div class="change-list">
+                {% for check in snapshot_comparison["changed_checks"] %}
+                <div class="change-item {{ check['tone'] }}">
+                    <div>
+                        <div class="change-title">
+                            {{ check["category_label"] }} · {{ check["title"] }}
+                        </div>
+                        <div class="change-meta">
+                            Было: {{ check["from_status"] }}.
+                            Стало: {{ check["to_status"] }}.
+                            {{ check["action"] }}
+                        </div>
+                    </div>
+                    <span class="badge {{ check['tone'] }}">{{ check["to_status"] }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if snapshot_comparison["new_blockers"] %}
+            <div class="compare-text">
+                Новые блокеры:
+                {% for check in snapshot_comparison["new_blockers"] %}
+                {{ check["title"] }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if snapshot_comparison["resolved_blockers"] %}
+            <div class="compare-text">
+                Закрытые блокеры:
+                {% for check in snapshot_comparison["resolved_blockers"] %}
+                {{ check["title"] }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
     </section>
 

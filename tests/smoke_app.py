@@ -9660,6 +9660,16 @@ async def assert_platform_calendar_health():
         assert saved_snapshot.headers["location"] == (
             "/platform/readiness?notice=snapshot_saved"
         )
+        second_saved_snapshot = await crm.platform_readiness_snapshot(
+            make_asgi_request(
+                backup_admin_username,
+                "/platform/readiness/snapshot",
+            ),
+        )
+        assert second_saved_snapshot.status_code == 302
+        assert second_saved_snapshot.headers["location"] == (
+            "/platform/readiness?notice=snapshot_saved"
+        )
         readiness_history = crm.get_platform_release_readiness_history()
         assert readiness_history
         assert readiness_history[0]["created_by"] == backup_admin_username
@@ -9710,6 +9720,8 @@ async def assert_platform_calendar_health():
         assert snapshot_page.status_code == 200
         snapshot_html = snapshot_page.body.decode("utf-8")
         assert "Снимок готовности релиза" in snapshot_html
+        assert "Сравнение с предыдущим снимком" in snapshot_html
+        assert "Предыдущий снимок:" in snapshot_html
         assert "Категории снимка" in snapshot_html
         assert "Следующие действия снимка" in snapshot_html
         assert "Все проверки снимка" in snapshot_html
@@ -9799,6 +9811,8 @@ async def assert_platform_calendar_health():
         snapshot_csv = snapshot_export_response.body.decode("utf-8")
         assert snapshot_csv.startswith("\ufeff")
         assert "Снимок готовности релиза" in snapshot_csv
+        assert "Сравнение с предыдущим снимком" in snapshot_csv
+        assert "Изменения проверок" in snapshot_csv
         assert "Категории" in snapshot_csv
         assert "Все проверки" in snapshot_csv
         assert backup_admin_username in snapshot_csv

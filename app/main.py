@@ -6487,6 +6487,12 @@ def get_platform_release_readiness_snapshot(snapshot_id):
     snapshot["categories"] = payload.get("categories") or []
     snapshot["next_actions"] = payload.get("next_actions") or []
     snapshot["environment"] = payload.get("environment") or ""
+    snapshot["previous_id"] = previous["id"] if previous else 0
+    snapshot["previous_url"] = (
+        f"/platform/readiness/snapshots/{previous['id']}"
+        if previous
+        else ""
+    )
     delta = (
         int(snapshot["score"] or 0) - int(previous["score"] or 0)
         if previous
@@ -6678,6 +6684,108 @@ def get_platform_release_readiness_trend(history=None):
         "worst_score": int(worst["score"] or 0),
         "worst_date": worst["created_at"],
         "bars": bars,
+    }
+
+
+def compare_platform_release_readiness_snapshots(
+    snapshot,
+    previous_snapshot=None,
+):
+    if previous_snapshot is None and snapshot.get("previous_id"):
+        previous_snapshot = get_platform_release_readiness_snapshot(
+            snapshot["previous_id"],
+        )
+
+    if not previous_snapshot:
+        return {
+            "has_previous": False,
+            "label": "Нет предыдущего снимка",
+            "tone": "warning",
+            "summary": "Это первый сохранённый снимок готовности релиза.",
+            "score_delta": 0,
+            "critical_delta": 0,
+            "warning_delta": 0,
+            "new_blockers": [],
+            "resolved_blockers": [],
+            "changed_checks": [],
+            "changed_count": 0,
+            "previous_url": "",
+            "previous_created_at": "",
+        }
+
+    current_checks = {
+        item["key"]: item for item in snapshot["checks"]
+    }
+    previous_checks = {
+        item["key"]: item for item in previous_snapshot["checks"]
+    }
+    score_delta = (
+        int(snapshot["score"] or 0)
+        - int(previous_snapshot["score"] or 0)
+    )
+    critical_delta = (
+        int(snapshot["critical_count"] or 0)
+        - int(previous_snapshot["critical_count"] or 0)
+    )
+    warning_delta = (
+        int(snapshot["warning_count"] or 0)
+        - int(previous_snapshot["warning_count"] or 0)
+    )
+    new_blockers = [
+        check
+        for key, check in current_checks.items()
+        if check["status"] == "critical"
+        and previous_checks.get(key, {}).get("status") != "critical"
+    ]
+    resolved_blockers = [
+        check
+        for key, check in previous_checks.items()
+        if check["status"] == "critical"
+        and current_checks.get(key, {}).get("status") != "critical"
+    ]
+    changed_checks = []
+    for key, check in current_checks.items():
+        previous_check = previous_checks.get(key)
+        if not previous_check:
+            continue
+        if previous_check["status"] == check["status"]:
+            continue
+        changed_checks.append({
+            "category_label": check["category_label"],
+            "title": check["title"],
+            "from_status": previous_check["status_label"],
+            "to_status": check["status_label"],
+            "tone": check["status"],
+            "action": check["action"],
+        })
+
+    if new_blockers or critical_delta > 0 or score_delta < 0:
+        label = "Стало хуже"
+        tone = "critical"
+        summary = "В этом снимке появились ухудшения."
+    elif resolved_blockers or critical_delta < 0 or score_delta > 0:
+        label = "Стало лучше"
+        tone = "ok"
+        summary = "В этом снимке готовность улучшилась."
+    else:
+        label = "Без изменений"
+        tone = "warning"
+        summary = "Состояние совпадает с предыдущим снимком."
+
+    return {
+        "has_previous": True,
+        "label": label,
+        "tone": tone,
+        "summary": summary,
+        "score_delta": score_delta,
+        "critical_delta": critical_delta,
+        "warning_delta": warning_delta,
+        "new_blockers": new_blockers,
+        "resolved_blockers": resolved_blockers,
+        "changed_checks": changed_checks[:8],
+        "changed_count": len(changed_checks),
+        "previous_url": previous_snapshot["detail_url"],
+        "previous_created_at": previous_snapshot["created_at"],
     }
 
 
@@ -7018,6 +7126,10 @@ async def platform_readiness_snapshot_page(
             status_code=302,
         )
 
+    snapshot_comparison = compare_platform_release_readiness_snapshots(
+        snapshot,
+    )
+
     return templates.TemplateResponse(
         request,
         "platform_readiness_snapshot.html",
@@ -7026,6 +7138,7 @@ async def platform_readiness_snapshot_page(
             "username": username,
             "role": role,
             "snapshot": snapshot,
+            "snapshot_comparison": snapshot_comparison,
         },
     )
 
@@ -7053,6 +7166,10 @@ async def platform_readiness_snapshot_export(
             status_code=302,
         )
 
+    snapshot_comparison = compare_platform_release_readiness_snapshots(
+        snapshot,
+    )
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Снимок готовности релиза"])
@@ -7067,6 +7184,60 @@ async def platform_readiness_snapshot_export(
     writer.writerow(["Готово", snapshot["ok_count"]])
     writer.writerow(["Резюме", snapshot["headline"]])
     writer.writerow(["Окружение", snapshot["environment"]])
+    writer.writerow([])
+
+    writer.writerow(["Сравнение с предыдущим снимком"])
+    writer.writerow([
+        "Есть предыдущий снимок",
+        "да" if snapshot_comparison["has_previous"] else "нет",
+    ])
+    writer.writerow(["Состояние", snapshot_comparison["label"]])
+    writer.writerow(["Резюме", snapshot_comparison["summary"]])
+    writer.writerow([
+        "Дата предыдущего снимка",
+        snapshot_comparison["previous_created_at"],
+    ])
+    writer.writerow(["Динамика оценки", snapshot_comparison["score_delta"]])
+    writer.writerow([
+        "Динамика критичных",
+        snapshot_comparison["critical_delta"],
+    ])
+    writer.writerow([
+        "Динамика предупреждений",
+        snapshot_comparison["warning_delta"],
+    ])
+    writer.writerow([])
+
+    writer.writerow(["Новые блокеры"])
+    writer.writerow(["Категория", "Проверка", "Действие"])
+    for check in snapshot_comparison["new_blockers"]:
+        writer.writerow([
+            check["category_label"],
+            check["title"],
+            check["action"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Закрытые блокеры"])
+    writer.writerow(["Категория", "Проверка", "Действие"])
+    for check in snapshot_comparison["resolved_blockers"]:
+        writer.writerow([
+            check["category_label"],
+            check["title"],
+            check["action"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Изменения проверок"])
+    writer.writerow(["Категория", "Проверка", "Было", "Стало", "Действие"])
+    for check in snapshot_comparison["changed_checks"]:
+        writer.writerow([
+            check["category_label"],
+            check["title"],
+            check["from_status"],
+            check["to_status"],
+            check["action"],
+        ])
     writer.writerow([])
 
     writer.writerow(["Категории"])
