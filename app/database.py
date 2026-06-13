@@ -510,6 +510,22 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS platform_release_readiness_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        score INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        status_label TEXT NOT NULL,
+        critical_count INTEGER DEFAULT 0,
+        warning_count INTEGER DEFAULT 0,
+        ok_count INTEGER DEFAULT 0,
+        headline TEXT,
+        created_by TEXT,
+        created_at TEXT NOT NULL,
+        payload_json TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS autonomous_action_approvals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -887,6 +903,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_system_health_snapshots_company_created
     ON system_health_snapshots(company_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_platform_release_readiness_created
+    ON platform_release_readiness_snapshots(created_at, id)
     """)
 
 

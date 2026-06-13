@@ -6373,6 +6373,81 @@ def get_platform_release_readiness(
     }
 
 
+def create_platform_release_readiness_snapshot(username, readiness=None):
+    readiness = readiness or get_platform_release_readiness()
+    conn = connect()
+    c = conn.cursor()
+    payload = {
+        "checks": readiness["checks"],
+        "categories": readiness["categories"],
+        "next_actions": readiness["next_actions"],
+        "environment": readiness["environment"],
+    }
+    c.execute("""
+    INSERT INTO platform_release_readiness_snapshots (
+        score,
+        status,
+        status_label,
+        critical_count,
+        warning_count,
+        ok_count,
+        headline,
+        created_by,
+        created_at,
+        payload_json
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        readiness["score"],
+        readiness["status"],
+        readiness["status_label"],
+        readiness["critical_count"],
+        readiness["warning_count"],
+        readiness["ok_count"],
+        readiness["headline"],
+        username,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        json.dumps(payload, ensure_ascii=False),
+    ))
+    snapshot_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return snapshot_id
+
+
+def get_platform_release_readiness_history(limit=8):
+    conn = connect()
+    c = conn.cursor()
+    rows = c.execute("""
+    SELECT *
+    FROM platform_release_readiness_snapshots
+    ORDER BY id DESC
+    LIMIT ?
+    """, (limit,)).fetchall()
+    conn.close()
+    history = [dict(row) for row in rows]
+
+    for index, item in enumerate(history):
+        previous = history[index + 1] if index + 1 < len(history) else None
+        delta = (
+            int(item["score"] or 0) - int(previous["score"] or 0)
+            if previous
+            else 0
+        )
+        item["delta_score"] = delta
+        if delta > 0:
+            item["delta_label"] = f"+{delta}"
+            item["delta_tone"] = "ok"
+        elif delta < 0:
+            item["delta_label"] = str(delta)
+            item["delta_tone"] = "critical"
+        else:
+            item["delta_label"] = "0"
+            item["delta_tone"] = "warning"
+
+    return history
+
+
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_dashboard(request: Request):
 
@@ -6449,7 +6524,10 @@ async def platform_dashboard(request: Request):
 
 
 @app.get("/platform/readiness", response_class=HTMLResponse)
-async def platform_readiness_page(request: Request):
+async def platform_readiness_page(
+    request: Request,
+    notice: str = "",
+):
     username = get_user(request)
 
     if not username:
@@ -6461,6 +6539,7 @@ async def platform_readiness_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     readiness = get_platform_release_readiness()
+    history = get_platform_release_readiness_history()
 
     return templates.TemplateResponse(
         request,
@@ -6470,7 +6549,28 @@ async def platform_readiness_page(request: Request):
             "username": username,
             "role": role,
             "readiness": readiness,
+            "history": history,
+            "notice": notice,
         },
+    )
+
+
+@app.post("/platform/readiness/snapshot")
+async def platform_readiness_snapshot(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    create_platform_release_readiness_snapshot(username)
+    return RedirectResponse(
+        "/platform/readiness?notice=snapshot_saved",
+        status_code=302,
     )
 
 
@@ -6487,6 +6587,7 @@ async def platform_readiness_export(request: Request):
         return RedirectResponse("/", status_code=302)
 
     readiness = get_platform_release_readiness()
+    history = get_platform_release_readiness_history()
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -6566,6 +6667,32 @@ async def platform_readiness_export(request: Request):
             check["description"],
             check["action"],
             check["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["История снимков"])
+    writer.writerow([
+        "Дата",
+        "Автор",
+        "Статус",
+        "Оценка",
+        "Динамика",
+        "Критично",
+        "Внимание",
+        "Готово",
+        "Резюме",
+    ])
+    for snapshot in history:
+        writer.writerow([
+            snapshot["created_at"],
+            snapshot["created_by"],
+            snapshot["status_label"],
+            snapshot["score"],
+            snapshot["delta_label"],
+            snapshot["critical_count"],
+            snapshot["warning_count"],
+            snapshot["ok_count"],
+            snapshot["headline"],
         ])
 
     return Response(

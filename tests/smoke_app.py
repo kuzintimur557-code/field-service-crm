@@ -9638,6 +9638,38 @@ async def assert_platform_calendar_health():
         assert "Операционный контроль" in readiness_html
         assert "/platform/readiness/export" in readiness_html
         assert "/platform/calendar-health" in readiness_html
+        anonymous_snapshot = await crm.platform_readiness_snapshot(
+            make_public_asgi_request("/platform/readiness/snapshot"),
+        )
+        assert anonymous_snapshot.status_code == 302
+        assert anonymous_snapshot.headers["location"] == "/login"
+        boss_snapshot = await crm.platform_readiness_snapshot(
+            make_asgi_request("owner2", "/platform/readiness/snapshot"),
+        )
+        assert boss_snapshot.status_code == 302
+        assert boss_snapshot.headers["location"] == "/"
+        saved_snapshot = await crm.platform_readiness_snapshot(
+            make_asgi_request(
+                backup_admin_username,
+                "/platform/readiness/snapshot",
+            ),
+        )
+        assert saved_snapshot.status_code == 302
+        assert saved_snapshot.headers["location"] == (
+            "/platform/readiness?notice=snapshot_saved"
+        )
+        readiness_history = crm.get_platform_release_readiness_history()
+        assert readiness_history
+        assert readiness_history[0]["created_by"] == backup_admin_username
+        assert "delta_label" in readiness_history[0]
+        saved_readiness_page = await crm.platform_readiness_page(
+            make_asgi_request("super", "/platform/readiness"),
+            notice="snapshot_saved",
+        )
+        saved_readiness_html = saved_readiness_page.body.decode("utf-8")
+        assert "Снимок готовности сохранён." in saved_readiness_html
+        assert "История снимков" in saved_readiness_html
+        assert backup_admin_username in saved_readiness_html
         anonymous_readiness_export = (
             await crm.platform_readiness_export(
                 make_public_asgi_request("/platform/readiness/export"),
@@ -9663,7 +9695,9 @@ async def assert_platform_calendar_health():
         assert "Категории" in readiness_csv
         assert "Следующие действия" in readiness_csv
         assert "Все проверки" in readiness_csv
+        assert "История снимков" in readiness_csv
         assert "Секрет приложения" in readiness_csv
+        assert backup_admin_username in readiness_csv
         anonymous_readiness_api = await crm.api_platform_readiness(
             make_public_asgi_request("/api/platform/readiness"),
         )
@@ -9786,6 +9820,10 @@ async def assert_platform_calendar_health():
         ))
         c.execute(
             "DELETE FROM users WHERE username=?",
+            (backup_admin_username,),
+        )
+        c.execute(
+            "DELETE FROM platform_release_readiness_snapshots WHERE created_by=?",
             (backup_admin_username,),
         )
         c.execute(
