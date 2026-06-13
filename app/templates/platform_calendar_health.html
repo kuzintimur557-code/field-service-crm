@@ -72,7 +72,9 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
             <h1>Здоровье календарных автоматизаций</h1>
             <div class="subtitle">
                 Рабочая очередь компаний на {{ health["generated_at"] }}.
-                Просрочка: {{ health["stale_after_hours"] }} ч.
+                Контроль запуска: {{ health["policy"]["stale_hours"] }} ч.
+                · реакция: {{ health["policy"]["response_minutes"] }} мин.
+                · эскалация: {{ health["policy"]["escalation_minutes"] }} мин.
             </div>
         </div>
         <div class="header-actions">

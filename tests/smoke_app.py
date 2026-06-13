@@ -7082,6 +7082,63 @@ async def assert_dispatch_planner():
 
 
 async def assert_platform_calendar_health():
+    policy_environment_names = (
+        "CALENDAR_INCIDENT_RESPONSE_MINUTES",
+        "CALENDAR_INCIDENT_ESCALATION_MINUTES",
+        "CALENDAR_WATCHDOG_STALE_HOURS",
+        "CALENDAR_SCHEDULER_STUCK_MINUTES",
+    )
+    previous_policy_environment = {
+        name: os.environ.get(name)
+        for name in policy_environment_names
+    }
+
+    try:
+        os.environ["CALENDAR_INCIDENT_RESPONSE_MINUTES"] = "45"
+        os.environ["CALENDAR_INCIDENT_ESCALATION_MINUTES"] = "20"
+        os.environ["CALENDAR_WATCHDOG_STALE_HOURS"] = "12"
+        os.environ["CALENDAR_SCHEDULER_STUCK_MINUTES"] = "invalid"
+        configured_policy = crm.get_calendar_incident_policy()
+        assert configured_policy == {
+            "response_minutes": 45,
+            "escalation_minutes": 45,
+            "stale_hours": 12,
+            "stuck_minutes": 30,
+        }
+        bounded_policy = crm.get_calendar_incident_policy(
+            response_minutes=500,
+            escalation_minutes=1,
+            stale_hours=100,
+            stuck_minutes=2,
+        )
+        assert bounded_policy == {
+            "response_minutes": 240,
+            "escalation_minutes": 240,
+            "stale_hours": 72,
+            "stuck_minutes": 5,
+        }
+    finally:
+        for name, value in previous_policy_environment.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+    assert crm.get_calendar_incident_priority(
+        "stale",
+        "stale",
+        False,
+        20,
+        response_target_minutes=25,
+    )["response_overdue"] is False
+    assert crm.get_calendar_incident_priority(
+        "stale",
+        "stale",
+        False,
+        20,
+        response_target_minutes=15,
+    )["response_overdue"] is True
+
     company_id = 901
     company_name = "Smoke Calendar Health"
     owner_username = "smoke_health_owner"
@@ -7307,6 +7364,7 @@ async def assert_platform_calendar_health():
             now_dt=now_dt,
             status_filter="problem",
         )
+        assert health["policy"] == crm.get_calendar_incident_policy()
         company = next(
             item
             for item in health["items"]
@@ -7399,6 +7457,14 @@ async def assert_platform_calendar_health():
         assert "Не приняты" in html
         assert "Критический" in html
         assert "Реакция просрочена" in html
+        assert (
+            f"реакция: {health['policy']['response_minutes']} мин."
+            in html
+        )
+        assert (
+            f"эскалация: {health['policy']['escalation_minutes']} мин."
+            in html
+        )
         assert "Возраст: 2 ч" in html
         assert "/platform/calendar-health/analytics" in html
         assert company_name in html
@@ -7409,6 +7475,7 @@ async def assert_platform_calendar_health():
             now_dt=now_dt,
         )
         assert detail["company"]["company_name"] == company_name
+        assert detail["policy"] == health["policy"]
         assert detail["summary"] == {
             "runs": 2,
             "successful": 1,
@@ -7474,6 +7541,7 @@ async def assert_platform_calendar_health():
             in detail_html
         )
         assert "Возможна публикация планов" in detail_html
+        assert "Регламент: реакция" in detail_html
         anonymous_acknowledge = (
             await crm.platform_calendar_incident_acknowledge(
                 make_public_asgi_request(
@@ -7851,6 +7919,7 @@ async def assert_platform_calendar_health():
             if item["company_id"] == company_id
         )
         assert analytics["days"] == 30
+        assert analytics["policy"] == crm.get_calendar_incident_policy()
         assert analytics["summary"]["incidents"] >= 2
         assert analytics["summary"]["recovered"] >= 1
         assert analytics["summary"]["active"] >= 1
@@ -7911,7 +7980,11 @@ async def assert_platform_calendar_health():
         assert analytics_page.context["selected_days"] == 30
         analytics_html = analytics_page.body.decode("utf-8")
         assert "Аналитика календарных инцидентов" in analytics_html
-        assert "Реакция до 30 минут" in analytics_html
+        assert (
+            "Реакция до "
+            f"{analytics['policy']['response_minutes']} минут"
+            in analytics_html
+        )
         assert "Среднее восстановление" in analytics_html
         assert "Последние инциденты" in analytics_html
         assert "Динамика" in analytics_html

@@ -3745,18 +3745,96 @@ def format_calendar_incident_age(age_minutes):
     )
 
 
+def get_bounded_environment_int(
+    name,
+    default,
+    minimum,
+    maximum,
+):
+    raw_value = str(os.getenv(name) or "").strip()
+
+    try:
+        value = int(raw_value) if raw_value else int(default)
+    except ValueError:
+        value = int(default)
+
+    return max(minimum, min(value, maximum))
+
+
+def get_calendar_incident_policy(
+    response_minutes=None,
+    escalation_minutes=None,
+    stale_hours=None,
+    stuck_minutes=None,
+):
+    response_minutes = (
+        get_bounded_environment_int(
+            "CALENDAR_INCIDENT_RESPONSE_MINUTES",
+            30,
+            5,
+            240,
+        )
+        if response_minutes is None
+        else max(5, min(int(response_minutes), 240))
+    )
+    escalation_minutes = (
+        get_bounded_environment_int(
+            "CALENDAR_INCIDENT_ESCALATION_MINUTES",
+            30,
+            5,
+            1440,
+        )
+        if escalation_minutes is None
+        else max(5, min(int(escalation_minutes), 1440))
+    )
+
+    return {
+        "response_minutes": response_minutes,
+        "escalation_minutes": max(
+            response_minutes,
+            escalation_minutes,
+        ),
+        "stale_hours": (
+            get_bounded_environment_int(
+                "CALENDAR_WATCHDOG_STALE_HOURS",
+                6,
+                1,
+                72,
+            )
+            if stale_hours is None
+            else max(1, min(int(stale_hours), 72))
+        ),
+        "stuck_minutes": (
+            get_bounded_environment_int(
+                "CALENDAR_SCHEDULER_STUCK_MINUTES",
+                30,
+                5,
+                240,
+            )
+            if stuck_minutes is None
+            else max(5, min(int(stuck_minutes), 240))
+        ),
+    }
+
+
 def get_calendar_incident_priority(
     status_code,
     active_incident,
     is_acknowledged,
     incident_age_minutes,
+    response_target_minutes=None,
 ):
+    if response_target_minutes is None:
+        response_target_minutes = get_calendar_incident_policy()[
+            "response_minutes"
+        ]
+
     has_incident = bool(active_incident)
     response_overdue = bool(
         has_incident
         and not is_acknowledged
         and incident_age_minutes is not None
-        and incident_age_minutes >= 30
+        and incident_age_minutes >= response_target_minutes
     )
 
     if (
@@ -3824,8 +3902,16 @@ def parse_calendar_incident_datetime(value):
         return None
 
 
-def build_calendar_incident_sessions(events, now_dt=None):
+def build_calendar_incident_sessions(
+    events,
+    now_dt=None,
+    response_target_minutes=None,
+):
     now_dt = now_dt or datetime.now()
+    if response_target_minutes is None:
+        response_target_minutes = get_calendar_incident_policy()[
+            "response_minutes"
+        ]
     sessions = []
     active_by_company = {}
 
@@ -3966,7 +4052,8 @@ def build_calendar_incident_sessions(events, now_dt=None):
         session["is_recovered"] = bool(recovered_at)
         session["is_active"] = not session["is_recovered"]
         session["response_sla_met"] = bool(
-            response_minutes is not None and response_minutes <= 30
+            response_minutes is not None
+            and response_minutes <= response_target_minutes
         )
         session["incident_type_label"] = (
             incident_type_labels.get(
@@ -3999,8 +4086,13 @@ def build_calendar_incident_sessions(events, now_dt=None):
 def get_platform_calendar_incident_analytics(
     days=30,
     now_dt=None,
+    response_target_minutes=None,
 ):
     now_dt = now_dt or datetime.now()
+    policy = get_calendar_incident_policy(
+        response_minutes=response_target_minutes,
+    )
+    response_target_minutes = policy["response_minutes"]
     selected_days = days if days in {7, 30, 90} else 30
     date_from = (
         now_dt.date() - timedelta(days=selected_days - 1)
@@ -4027,6 +4119,7 @@ def get_platform_calendar_incident_analytics(
     sessions = build_calendar_incident_sessions(
         event_rows,
         now_dt=now_dt,
+        response_target_minutes=response_target_minutes,
     )
     recovered = [
         item for item in sessions if item["is_recovered"]
@@ -4045,7 +4138,8 @@ def get_platform_calendar_incident_analytics(
         if (
             item["response_minutes"] is not None
             or item["is_recovered"]
-            or int(item["age_minutes"] or 0) >= 30
+            or int(item["age_minutes"] or 0)
+            >= response_target_minutes
         )
     ]
     response_sla_met = sum(
@@ -4252,16 +4346,26 @@ def get_platform_calendar_incident_analytics(
         "types": type_rows,
         "daily": daily,
         "recent_sessions": sessions[:20],
+        "policy": policy,
     }
 
 
 def get_platform_calendar_health(
     now_dt=None,
     status_filter="all",
-    stale_after_hours=6,
+    stale_after_hours=None,
+    response_target_minutes=None,
+    stuck_after_minutes=None,
 ):
     now_dt = now_dt or datetime.now()
-    stale_after_hours = max(1, int(stale_after_hours or 6))
+    policy = get_calendar_incident_policy(
+        response_minutes=response_target_minutes,
+        stale_hours=stale_after_hours,
+        stuck_minutes=stuck_after_minutes,
+    )
+    stale_after_hours = policy["stale_hours"]
+    response_target_minutes = policy["response_minutes"]
+    stuck_after_minutes = policy["stuck_minutes"]
     status_filter = (
         status_filter
         if status_filter in {
@@ -4412,7 +4516,8 @@ def get_platform_calendar_health(
             status_code = (
                 "stuck"
                 if latest_at
-                and now_dt - latest_at > timedelta(minutes=30)
+                and now_dt - latest_at
+                > timedelta(minutes=stuck_after_minutes)
                 else "running"
             )
         elif (
@@ -4475,6 +4580,7 @@ def get_platform_calendar_health(
             active_incident,
             item["is_acknowledged"],
             incident_age_minutes,
+            response_target_minutes=response_target_minutes,
         )
         item["incident_age_minutes"] = incident_age_minutes
         item["incident_age_label"] = (
@@ -4578,6 +4684,7 @@ def get_platform_calendar_health(
         "items": filtered_items,
         "status_filter": status_filter,
         "stale_after_hours": stale_after_hours,
+        "policy": policy,
         "generated_at": now_dt.strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -4725,6 +4832,7 @@ def get_platform_calendar_company_detail(
         "runs": runs,
         "incidents": incidents,
         "operations": operations,
+        "policy": health["policy"],
         "generated_at": now_dt.strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -9975,6 +10083,9 @@ async def calendar_dispatch_page(
     incident_event_labels = {
         "opened": "Открыт",
         "acknowledged": "Принят в работу",
+        "escalated": "Передан платформе",
+        "recovery_started": "Запущено восстановление",
+        "recovery_failed": "Восстановление не выполнено",
         "recovered": "Восстановлен",
     }
 
@@ -9994,6 +10105,7 @@ async def calendar_dispatch_page(
         calendar_settings["calendar_auto_publish"]
         or calendar_settings["calendar_auto_remind"]
     )
+    calendar_incident_policy = get_calendar_incident_policy()
 
     calendar_scheduler_incident = {
         "active": False,
@@ -10075,7 +10187,11 @@ async def calendar_dispatch_page(
                 )
                 is_stuck = (
                     datetime.now() - started_at
-                    > timedelta(minutes=30)
+                    > timedelta(
+                        minutes=calendar_incident_policy[
+                            "stuck_minutes"
+                        ],
+                    )
                 )
             except ValueError:
                 is_stuck = True
@@ -10106,7 +10222,11 @@ async def calendar_dispatch_page(
                 )
                 is_stale = (
                     datetime.now() - completed_at
-                    > timedelta(hours=6)
+                    > timedelta(
+                        hours=calendar_incident_policy[
+                            "stale_hours"
+                        ],
+                    )
                 )
             except ValueError:
                 is_stale = True
@@ -10328,6 +10448,7 @@ async def calendar_dispatch_page(
                 or "23:59"
             ),
             "calendar_scheduler_status": calendar_scheduler_status,
+            "calendar_incident_policy": calendar_incident_policy,
             "previous_week_url": dispatch_week_url(
                 board_week_start - timedelta(days=7)
             ),
@@ -11640,11 +11761,13 @@ def log_calendar_scheduler_recovery_attempt(
 
 def escalate_calendar_scheduler_incidents(
     now_dt=None,
-    after_minutes=30,
+    after_minutes=None,
     company_id=None,
 ):
     now_dt = now_dt or datetime.now()
-    after_minutes = max(5, int(after_minutes or 30))
+    after_minutes = get_calendar_incident_policy(
+        escalation_minutes=after_minutes,
+    )["escalation_minutes"]
     cutoff = now_dt - timedelta(minutes=after_minutes)
     now_value = now_dt.strftime("%Y-%m-%d %H:%M")
     conn = connect()
@@ -11881,6 +12004,7 @@ async def run_calendar_plan_scheduler(
         return result
 
     now_dt = now_dt or datetime.now()
+    calendar_incident_policy = get_calendar_incident_policy()
     range_start = now_dt.date()
     range_end = range_start + timedelta(days=auto_days_ahead)
     result["range_start"] = range_start.strftime("%Y-%m-%d")
@@ -11957,7 +12081,9 @@ async def run_calendar_plan_scheduler(
         return result
 
     stale_before = (
-        datetime.now() - timedelta(minutes=30)
+        datetime.now() - timedelta(
+            minutes=calendar_incident_policy["stuck_minutes"],
+        )
     ).strftime("%Y-%m-%d %H:%M")
     first_week_start = (
         range_start - timedelta(days=range_start.weekday())
@@ -12027,7 +12153,8 @@ async def run_calendar_plan_scheduler(
                 company_id,
                 "stuck",
                 (
-                    "Предыдущий запуск не завершился за 30 минут. "
+                    "Предыдущий запуск не завершился за "
+                    f"{calendar_incident_policy['stuck_minutes']} мин. "
                     "Система начала автоматическое восстановление."
                 ),
             )
@@ -12178,12 +12305,17 @@ async def run_calendar_plan_scheduler(
 
 def monitor_calendar_plan_schedulers(
     now_dt=None,
-    stale_after_hours=6,
+    stale_after_hours=None,
     company_id=None,
-    escalation_after_minutes=30,
+    escalation_after_minutes=None,
 ):
     now_dt = now_dt or datetime.now()
-    stale_after_hours = max(1, int(stale_after_hours or 6))
+    policy = get_calendar_incident_policy(
+        stale_hours=stale_after_hours,
+        escalation_minutes=escalation_after_minutes,
+    )
+    stale_after_hours = policy["stale_hours"]
+    escalation_after_minutes = policy["escalation_minutes"]
     cutoff = now_dt - timedelta(hours=stale_after_hours)
     conn = connect()
     c = conn.cursor()
@@ -12283,6 +12415,7 @@ def monitor_calendar_plan_schedulers(
             escalation["notifications_sent"]
         ),
         "stale_after_hours": stale_after_hours,
+        "policy": policy,
         "items": items,
     }
 

@@ -77,6 +77,7 @@ tr:last-child td{border-bottom:0}
             <div class="subtitle">
                 Период {{ analytics["date_from"] }} – {{ analytics["date_to"] }}
                 · обновлено {{ analytics["generated_at"] }}
+                · SLA реакции {{ analytics["policy"]["response_minutes"] }} мин.
             </div>
         </div>
         <div class="actions">
@@ -111,7 +112,9 @@ tr:last-child td{border-bottom:0}
             <div class="metric-meta">{{ summary["recovered"] }} восстановлено</div>
         </div>
         <div class="metric">
-            <div class="metric-label">Реакция до 30 минут</div>
+            <div class="metric-label">
+                Реакция до {{ analytics["policy"]["response_minutes"] }} минут
+            </div>
             <div class="metric-value">{{ summary["response_sla_percent"] }}%</div>
             <div class="metric-meta">Среднее: {{ summary["average_response_label"] }}</div>
         </div>

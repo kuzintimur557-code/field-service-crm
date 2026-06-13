@@ -108,6 +108,10 @@ tr:last-child td{border-bottom:0}
                 {{ company["incident_acknowledged_at"] }}
                 {% endif %}
             </div>
+            <div class="meta">
+                Регламент: реакция {{ detail["policy"]["response_minutes"] }} мин.
+                · эскалация {{ detail["policy"]["escalation_minutes"] }} мин.
+            </div>
         </div>
         <div class="incident-actions">
             {% if company["is_acknowledged"] %}
