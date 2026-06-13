@@ -7650,7 +7650,7 @@ async def assert_platform_calendar_health():
         )
         assert (
             f"/platform/calendar-health/{company_id}/recover"
-            in detail_html
+            not in detail_html
         )
         assert (
             f"/platform/calendar-health/{company_id}/note"
@@ -7661,7 +7661,7 @@ async def assert_platform_calendar_health():
             "Передача станет доступна после принятия инцидента"
             in detail_html
         )
-        assert "Возможна публикация планов" in detail_html
+        assert "Сначала примите инцидент в работу." in detail_html
         assert "Регламент: реакция" in detail_html
         anonymous_note = await crm.platform_calendar_incident_note(
             make_public_asgi_request(
@@ -7699,6 +7699,27 @@ async def assert_platform_calendar_health():
             )
         )
         assert assignment_before_acknowledge.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=incident_not_acknowledged"
+        )
+        recovery_before_acknowledge = (
+            await crm.platform_calendar_incident_recover(
+                make_form_request(
+                    "super",
+                    (
+                        f"/platform/calendar-health/{company_id}"
+                        "/recover"
+                    ),
+                    {
+                        "recovery_note": (
+                            "Проверка до принятия инцидента."
+                        ),
+                    },
+                ),
+                company_id,
+            )
+        )
+        assert recovery_before_acknowledge.headers["location"] == (
             f"/platform/calendar-health/{company_id}"
             "?error=incident_not_acknowledged"
         )
@@ -7785,6 +7806,12 @@ async def assert_platform_calendar_health():
             f"/platform/calendar-health/{company_id}/assign"
             in acknowledged_html
         )
+        assert (
+            f"/platform/calendar-health/{company_id}/recover"
+            in acknowledged_html
+        )
+        assert "Результат диагностики" in acknowledged_html
+        assert "Возможна публикация планов" in acknowledged_html
         assert backup_admin_username in acknowledged_html
         personal_health = crm.get_platform_calendar_health(
             now_dt=now_dt,
@@ -8028,6 +8055,14 @@ async def assert_platform_calendar_health():
         assert "Сейчас отвечает:" in assigned_html
         assert "Назначил: super" in assigned_html
         assert backup_admin_username in assigned_html
+        assert (
+            "Запуск доступен только ответственному:"
+            in assigned_html
+        )
+        assert (
+            f"/platform/calendar-health/{company_id}/recover"
+            not in assigned_html
+        )
         acknowledged_health = crm.get_platform_calendar_health(
             now_dt=now_dt,
             status_filter="problem",
@@ -8208,7 +8243,65 @@ async def assert_platform_calendar_health():
         )
         assert boss_recovery.status_code == 302
         assert boss_recovery.headers["location"] == "/"
+        wrong_assignee_recovery = (
+            await crm.platform_calendar_incident_recover(
+                make_form_request(
+                    "super",
+                    (
+                        f"/platform/calendar-health/{company_id}"
+                        "/recover"
+                    ),
+                    {
+                        "recovery_note": (
+                            "Проверка выполнена не ответственным."
+                        ),
+                    },
+                ),
+                company_id,
+            )
+        )
+        assert wrong_assignee_recovery.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=incident_not_assignee"
+        )
+        empty_recovery_note = (
+            await crm.platform_calendar_incident_recover(
+                make_form_request(
+                    backup_admin_username,
+                    (
+                        f"/platform/calendar-health/{company_id}"
+                        "/recover"
+                    ),
+                    {"recovery_note": "   "},
+                ),
+                company_id,
+            )
+        )
+        assert empty_recovery_note.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=recovery_note_required"
+        )
+        long_recovery_note = (
+            await crm.platform_calendar_incident_recover(
+                make_form_request(
+                    backup_admin_username,
+                    (
+                        f"/platform/calendar-health/{company_id}"
+                        "/recover"
+                    ),
+                    {"recovery_note": "x" * 501},
+                ),
+                company_id,
+            )
+        )
+        assert long_recovery_note.headers["location"] == (
+            f"/platform/calendar-health/{company_id}"
+            "?error=recovery_note_too_long"
+        )
         original_calendar_scheduler = crm.run_calendar_plan_scheduler
+        successful_recovery_note = (
+            "Проверены настройки окна и очередь запусков."
+        )
 
         async def successful_platform_recovery(
             recovery_company_id,
@@ -8230,12 +8323,17 @@ async def assert_platform_calendar_health():
         try:
             platform_recovery = (
                 await crm.platform_calendar_incident_recover(
-                    make_asgi_request(
-                        "super",
+                    make_form_request(
+                        backup_admin_username,
                         (
                             f"/platform/calendar-health/{company_id}"
                             "/recover"
                         ),
+                        {
+                            "recovery_note": (
+                                successful_recovery_note
+                            ),
+                        },
                     ),
                     company_id,
                 )
@@ -8265,7 +8363,7 @@ async def assert_platform_calendar_health():
         WHERE company_id=?
         """, (company_id,)).fetchone()
         recovery_events = c.execute("""
-        SELECT event_type, actor_username
+        SELECT event_type, actor_username, message
         FROM calendar_scheduler_incident_events
         WHERE company_id=?
         ORDER BY id
@@ -8287,9 +8385,11 @@ async def assert_platform_calendar_health():
             ("note", "super"),
             ("reassigned", "super"),
             ("recovery_overdue", "watchdog"),
-            ("recovery_started", "super"),
-            ("recovered", "super"),
+            ("recovery_started", backup_admin_username),
+            ("recovered", backup_admin_username),
         ]
+        assert successful_recovery_note in recovery_events[-2]["message"]
+        assert successful_recovery_note in recovery_events[-1]["message"]
         recovered_detail = crm.get_platform_calendar_company_detail(
             company_id,
         )
@@ -8298,9 +8398,10 @@ async def assert_platform_calendar_health():
         ] == "Восстановлен"
         missing_incident_recovery = (
             await crm.platform_calendar_incident_recover(
-                make_asgi_request(
-                    "super",
+                make_form_request(
+                    backup_admin_username,
                     f"/platform/calendar-health/{company_id}/recover",
+                    {"recovery_note": "Повторный запуск."},
                 ),
                 company_id,
             )
@@ -8314,6 +8415,13 @@ async def assert_platform_calendar_health():
             "error",
             "Повторная ошибка для проверки неудачного восстановления.",
         )
+        crm.acknowledge_calendar_scheduler_incident(
+            company_id,
+            "super",
+        )
+        failed_recovery_note = (
+            "Проверена очередь, ошибка повторяется."
+        )
 
         async def failed_platform_recovery(
             recovery_company_id,
@@ -8322,6 +8430,7 @@ async def assert_platform_calendar_health():
             source="scheduler",
         ):
             assert recovery_company_id == company_id
+            assert actor_username == ""
             assert source == "manual_run"
             return {
                 "error": "smoke_recovery_failure",
@@ -8334,12 +8443,17 @@ async def assert_platform_calendar_health():
         try:
             failed_recovery = (
                 await crm.platform_calendar_incident_recover(
-                    make_asgi_request(
+                    make_form_request(
                         "super",
                         (
                             f"/platform/calendar-health/{company_id}"
                             "/recover"
                         ),
+                        {
+                            "recovery_note": (
+                                failed_recovery_note
+                            ),
+                        },
                     ),
                     company_id,
                 )
@@ -8377,6 +8491,10 @@ async def assert_platform_calendar_health():
             row["actor_username"] == "super"
             for row in failed_events
         )
+        assert all(
+            failed_recovery_note in row["message"]
+            for row in failed_events
+        )
         failed_detail = crm.get_platform_calendar_company_detail(
             company_id,
         )
@@ -8397,6 +8515,30 @@ async def assert_platform_calendar_health():
             "Восстановление завершилось с ошибкой."
             in failed_page.body.decode("utf-8")
         )
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        UPDATE calendar_plan_scheduler_status
+        SET incident_acknowledged_at=NULL,
+            incident_acknowledged_by=NULL,
+            incident_assigned_at=NULL,
+            incident_assigned_to=NULL,
+            incident_assigned_by=NULL
+        WHERE company_id=?
+        """, (company_id,))
+        c.execute("""
+        DELETE FROM calendar_scheduler_incident_events
+        WHERE id=(
+            SELECT id
+            FROM calendar_scheduler_incident_events
+            WHERE company_id=?
+              AND event_type='acknowledged'
+            ORDER BY id DESC
+            LIMIT 1
+        )
+        """, (company_id,))
+        conn.commit()
+        conn.close()
         escalation_now = datetime.now() + timedelta(minutes=45)
         escalation_watchdog = crm.monitor_calendar_plan_schedulers(
             now_dt=escalation_now,

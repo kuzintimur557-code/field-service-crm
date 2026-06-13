@@ -5489,6 +5489,18 @@ async def platform_calendar_company_health_page(
             "Этот администратор уже отвечает за инцидент.",
             "error",
         ),
+        "incident_not_assignee": (
+            "Запустить восстановление может только текущий ответственный.",
+            "error",
+        ),
+        "recovery_note_required": (
+            "Опишите результат диагностики перед восстановлением.",
+            "error",
+        ),
+        "recovery_note_too_long": (
+            "Комментарий к восстановлению не должен превышать 500 символов.",
+            "error",
+        ),
         "automation_disabled": (
             "Автоматизация календаря выключена у компании.",
             "error",
@@ -5650,12 +5662,19 @@ async def platform_calendar_incident_recover(
     if get_role(username) != "superadmin":
         return RedirectResponse("/", status_code=302)
 
+    form = await request.form()
+    recovery_note = str(
+        form.get("recovery_note") or ""
+    ).strip()
     conn = connect()
     c = conn.cursor()
     company = c.execute("""
     SELECT
         companies.id,
-        scheduler.active_incident
+        scheduler.active_incident,
+        scheduler.incident_acknowledged_at,
+        scheduler.incident_acknowledged_by,
+        scheduler.incident_assigned_to
     FROM companies
     LEFT JOIN calendar_plan_scheduler_status AS scheduler
       ON scheduler.company_id=companies.id
@@ -5672,11 +5691,56 @@ async def platform_calendar_incident_recover(
             status_code=302,
         )
 
+    if not company["incident_acknowledged_at"]:
+        return RedirectResponse(
+            (
+                f"/platform/calendar-health/{company_id}"
+                "?error=incident_not_acknowledged"
+            ),
+            status_code=302,
+        )
+
+    assigned_to = str(
+        company["incident_assigned_to"]
+        or company["incident_acknowledged_by"]
+        or ""
+    )
+
+    if assigned_to != username:
+        return RedirectResponse(
+            (
+                f"/platform/calendar-health/{company_id}"
+                "?error=incident_not_assignee"
+            ),
+            status_code=302,
+        )
+
+    if not recovery_note:
+        return RedirectResponse(
+            (
+                f"/platform/calendar-health/{company_id}"
+                "?error=recovery_note_required"
+            ),
+            status_code=302,
+        )
+
+    if len(recovery_note) > 500:
+        return RedirectResponse(
+            (
+                f"/platform/calendar-health/{company_id}"
+                "?error=recovery_note_too_long"
+            ),
+            status_code=302,
+        )
+
     log_calendar_scheduler_recovery_attempt(
         company_id,
         "recovery_started",
         username,
-        "Платформа запустила внеплановую проверку автоматизации.",
+        (
+            "Платформа запустила внеплановую проверку автоматизации. "
+            f"Комментарий ответственного: {recovery_note}"
+        ),
     )
     result = await run_calendar_plan_scheduler(
         company_id,
@@ -5700,7 +5764,8 @@ async def platform_calendar_incident_recover(
             username,
             (
                 "Внеплановая проверка завершилась с ошибкой: "
-                f"{result['error']}"
+                f"{result['error']}. "
+                f"Комментарий ответственного: {recovery_note}"
             ),
         )
         return RedirectResponse(
@@ -5716,7 +5781,8 @@ async def platform_calendar_incident_recover(
         actor_username=username,
         recovery_message=(
             "Платформа выполнила внеплановую проверку. "
-            "Автоматизация календаря работает штатно."
+            "Автоматизация календаря работает штатно. "
+            f"Итог диагностики: {recovery_note}"
         ),
     )
     return RedirectResponse(
