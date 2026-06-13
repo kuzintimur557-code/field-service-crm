@@ -74,6 +74,12 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
 .overdue{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#991b1b;color:white;font-size:9px;font-weight:900}
 .recovery-overdue{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#7f1d1d;color:white;font-size:9px;font-weight:900}
 .escalated{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#111827;color:white;font-size:9px;font-weight:900}
+.next-action{display:grid;gap:4px;max-width:210px}
+.next-action-label{display:inline-flex;width:max-content;max-width:100%;padding:5px 7px;border-radius:6px;background:#e5e7eb;color:#374151;font-size:10px;font-weight:900}
+.next-action-label.error{background:#fee2e2;color:#991b1b}
+.next-action-label.warning,.next-action-label.waiting{background:#fef3c7;color:#92400e}
+.next-action-label.healthy{background:#d1fae5;color:#065f46}
+.next-action-hint{color:#6b7280;font-size:9px;font-weight:800;line-height:1.35}
 .row-actions{display:flex;gap:6px;align-items:stretch;flex-direction:column;min-width:112px}
 .row-actions form{margin:0}
 .quick-action{width:100%;padding:8px 10px;border:1px solid #2563eb;border-radius:7px;background:#2563eb;color:white;font:900 11px Arial,sans-serif;cursor:pointer}
@@ -294,6 +300,7 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                     <th>Последний запуск</th>
                     <th>Результат</th>
                     <th>Инцидент</th>
+                    <th>Следующее действие</th>
                     <th></th>
                 </tr>
             </thead>
@@ -385,6 +392,16 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                         {% else %}
                         <span class="muted">Нет активного инцидента</span>
                         {% endif %}
+                    </td>
+                    <td data-label="Следующее действие">
+                        <div class="next-action">
+                            <span class="next-action-label {{ company['next_action_tone'] }}">
+                                {{ company["next_action_label"] }}
+                            </span>
+                            <span class="next-action-hint">
+                                {{ company["next_action_hint"] }}
+                            </span>
+                        </div>
                     </td>
                     <td data-label="Диагностика">
                         <div class="row-actions">

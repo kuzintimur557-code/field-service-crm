@@ -7458,6 +7458,8 @@ async def assert_platform_calendar_health():
         assert company["response_overdue"] is True
         assert company["incident_age_minutes"] == 120
         assert company["incident_age_label"] == "2 ч"
+        assert company["next_action_label"] == "Принять в работу"
+        assert company["next_action_tone"] == "error"
         assert company["last_activity_at"] == incident_value
         assert company["detail_url"] == (
             f"/platform/calendar-health/{company_id}"
@@ -7585,6 +7587,8 @@ async def assert_platform_calendar_health():
         assert "Не приняты" in html
         assert "Критический" in html
         assert "Реакция просрочена" in html
+        assert "Следующее действие" in html
+        assert "Принять в работу" in html
         assert "Назначено мне" in html
         assert "Нагрузка администраторов" in html
         assert "Мои инциденты" in html
@@ -7661,6 +7665,8 @@ async def assert_platform_calendar_health():
         assert "Компании" in export_csv
         assert "ID компании,Компания,Владелец,Приоритет" in export_csv
         assert "Реакция просрочена" in export_csv
+        assert "Следующее действие" in export_csv
+        assert "Принять в работу" in export_csv
         assert company_name in export_csv
         assert "Критический" in export_csv
         detail = crm.get_platform_calendar_company_detail(
@@ -8671,6 +8677,9 @@ async def assert_platform_calendar_health():
         assert acknowledged_company["response_overdue"] is False
         assert acknowledged_company["assignee_username"] == (
             backup_admin_username
+        )
+        assert acknowledged_company["next_action_label"] == (
+            "Контроль ответственного"
         )
         assert acknowledged_company["is_mine"] is False
         acknowledged_at = (

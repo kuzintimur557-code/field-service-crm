@@ -4883,6 +4883,39 @@ def get_platform_calendar_health(
         item["detail_url"] = (
             f"/platform/calendar-health/{item['company_id']}"
         )
+        if item["requires_response"]:
+            item["next_action_label"] = "Принять в работу"
+            item["next_action_hint"] = (
+                "Инцидент ещё не закреплён за администратором."
+            )
+            item["next_action_tone"] = "error"
+        elif active_incident and item["is_mine"]:
+            item["next_action_label"] = "Запустить восстановление"
+            item["next_action_hint"] = (
+                "Вы ответственный. Проверьте диагностику и запустите "
+                "восстановление из карточки компании."
+            )
+            item["next_action_tone"] = (
+                "error" if item["recovery_overdue"] else "warning"
+            )
+        elif active_incident and item["is_acknowledged"]:
+            item["next_action_label"] = "Контроль ответственного"
+            item["next_action_hint"] = (
+                f"Ответственный: {item['assignee_username'] or 'не назначен'}."
+            )
+            item["next_action_tone"] = (
+                "error" if item["recovery_overdue"] else "waiting"
+            )
+        elif item["is_problem"]:
+            item["next_action_label"] = "Проверить настройки"
+            item["next_action_hint"] = (
+                "Активного инцидента нет, но состояние требует проверки."
+            )
+            item["next_action_tone"] = "warning"
+        else:
+            item["next_action_label"] = "Наблюдать"
+            item["next_action_hint"] = "Действия сейчас не требуются."
+            item["next_action_tone"] = "healthy"
         items.append(item)
 
     oldest_active_incident_minutes = max(
@@ -5942,6 +5975,8 @@ async def platform_calendar_health_export(
         "Принят в работу",
         "Ответственный",
         "В работе",
+        "Следующее действие",
+        "Подсказка действия",
         "Ссылка",
     ])
 
@@ -5967,6 +6002,8 @@ async def platform_calendar_health_export(
             "да" if item["is_acknowledged"] else "нет",
             item["assignee_username"] or "",
             item["recovery_age_label"] or "",
+            item["next_action_label"],
+            item["next_action_hint"],
             item["detail_url"],
         ])
 
