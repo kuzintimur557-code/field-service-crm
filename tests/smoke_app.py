@@ -7469,6 +7469,8 @@ async def assert_platform_calendar_health():
         assert health["summary"]["assigned"] == 0
         assert health["summary"]["unassigned"] >= 1
         assert health["summary"]["my_incidents"] == 0
+        assert health["summary"]["oldest_active_incident_minutes"] >= 120
+        assert health["summary"]["oldest_active_incident_label"] != "нет"
         assert {
             item["username"] for item in health["admin_workload"]
         } >= {"super", backup_admin_username}
@@ -9362,11 +9364,15 @@ async def assert_platform_calendar_health():
         assert platform_page.context["calendar_health_summary"][
             "critical"
         ] >= 1
+        assert platform_page.context["calendar_health_summary"][
+            "oldest_active_incident_label"
+        ]
         assert any(
             item["company_id"] == company_id
             for item in platform_page.context["calendar_health_incidents"]
         )
         assert "Операционный контроль платформы" in platform_html
+        assert "Старейший" in platform_html
         assert "Критические</a>" in platform_html
         assert "Ответственный:" in platform_html
         assert f"/platform/calendar-health/{company_id}" in platform_html

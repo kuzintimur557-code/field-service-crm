@@ -26,7 +26,7 @@ h1{margin:0;font-size:38px}
 .ops-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center}
 .ops-title{margin:0;font-size:22px}
 .ops-subtitle{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800}
-.ops-metrics{display:grid;grid-template-columns:repeat(5,minmax(90px,1fr));gap:10px;margin-top:16px}
+.ops-metrics{display:grid;grid-template-columns:repeat(6,minmax(90px,1fr));gap:10px;margin-top:16px}
 .ops-metric{padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb}
 .ops-metric.danger{border-color:#fecaca;background:#fff7f7}
 .ops-metric.warning{border-color:#fde68a;background:#fffbeb}
@@ -132,6 +132,10 @@ h1{font-size:30px}
             <div class="ops-metric">
                 <div class="ops-metric-label">Мои</div>
                 <div class="ops-metric-value">{{ calendar_health_summary["my_incidents"] }}</div>
+            </div>
+            <div class="ops-metric warning">
+                <div class="ops-metric-label">Старейший</div>
+                <div class="ops-metric-value">{{ calendar_health_summary["oldest_active_incident_label"] }}</div>
             </div>
         </div>
     </div>

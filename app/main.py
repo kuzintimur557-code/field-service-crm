@@ -4812,6 +4812,14 @@ def get_platform_calendar_health(
         )
         items.append(item)
 
+    oldest_active_incident_minutes = max(
+        (
+            int(item["incident_age_minutes"] or 0)
+            for item in items
+            if item["active_incident"]
+        ),
+        default=0,
+    )
     summary = {
         "total_companies": len(items),
         "enabled": sum(
@@ -4860,6 +4868,16 @@ def get_platform_calendar_health(
         ),
         "my_incidents": sum(
             1 for item in items if item["is_mine"]
+        ),
+        "oldest_active_incident_minutes": (
+            oldest_active_incident_minutes
+        ),
+        "oldest_active_incident_label": (
+            format_calendar_incident_age(
+                oldest_active_incident_minutes,
+            )
+            if oldest_active_incident_minutes
+            else "нет"
         ),
     }
     admin_workload = []
