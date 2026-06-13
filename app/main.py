@@ -5517,6 +5517,9 @@ async def platform_dashboard(request: Request):
     """).fetchall()
 
     conn.close()
+    calendar_health = get_platform_calendar_health(
+        current_username=username,
+    )
 
     return templates.TemplateResponse(
         request,
@@ -5529,7 +5532,8 @@ async def platform_dashboard(request: Request):
             "users_count": users_count,
             "tasks_count": tasks_count,
             "clients_count": clients_count,
-            "companies": companies
+            "companies": companies,
+            "calendar_health_summary": calendar_health["summary"],
         }
     )
 

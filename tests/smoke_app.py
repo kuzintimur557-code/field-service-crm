@@ -9357,9 +9357,19 @@ async def assert_platform_calendar_health():
         platform_page = await crm.platform_dashboard(
             make_asgi_request("super", "/platform"),
         )
-        assert "/platform/calendar-health" in (
-            platform_page.body.decode("utf-8")
+        platform_html = platform_page.body.decode("utf-8")
+        assert "/platform/calendar-health" in platform_html
+        assert platform_page.context["calendar_health_summary"][
+            "critical"
+        ] >= 1
+        assert "Операционный контроль платформы" in platform_html
+        assert "Критические</a>" in platform_html
+        assert (
+            "/platform/calendar-health?status=unacknowledged"
+            "&amp;assignee=unassigned"
+            in platform_html
         )
+        assert "/platform/calendar-health?assignee=me" in platform_html
     finally:
         conn = connect()
         c = conn.cursor()
