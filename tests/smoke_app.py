@@ -9325,6 +9325,10 @@ async def assert_platform_calendar_health():
             item["response_overdue"] >= 1
             for item in analytics["daily"]
         )
+        assert any(
+            item["risk_score"] >= 1
+            for item in analytics["daily"]
+        )
         assert analytics["recent_sessions"][0][
             "status_label"
         ] == "Передан платформе"
@@ -9404,6 +9408,7 @@ async def assert_platform_calendar_health():
         assert "Разберите активные инциденты" in analytics_html
         assert "Последние инциденты" in analytics_html
         assert "Динамика" in analytics_html
+        assert "риск:" in analytics_html
         assert company_name in analytics_html
         anonymous_analytics_export = (
             await crm.platform_calendar_incident_analytics_export(
@@ -9458,6 +9463,7 @@ async def assert_platform_calendar_health():
         assert "Причины" in analytics_export_csv
         assert "Динамика" in analytics_export_csv
         assert "Просрочена реакция" in analytics_export_csv
+        assert "Оценка риска" in analytics_export_csv
         assert "Последние инциденты" in analytics_export_csv
         assert company_name in analytics_export_csv
         assert "Передан платформе" in analytics_export_csv

@@ -4514,6 +4514,18 @@ def get_platform_calendar_incident_analytics(
             8,
             round(day["incidents"] * 100 / max_daily_incidents),
         )
+        day["risk_score"] = min(
+            100,
+            day["response_overdue"] * 35
+            + day["active"] * 20
+            + day["incidents"] * 5,
+        )
+        if day["risk_score"] >= 80:
+            day["risk_label"] = "Высокий"
+        elif day["risk_score"] >= 40:
+            day["risk_label"] = "Средний"
+        else:
+            day["risk_label"] = "Низкий"
 
     sessions.sort(
         key=lambda item: item["opened_at_value"],
@@ -6379,6 +6391,7 @@ async def platform_calendar_incident_analytics_export(
         "Восстановлено",
         "Активные",
         "Просрочена реакция",
+        "Оценка риска",
     ])
     for day in analytics["daily"]:
         writer.writerow([
@@ -6387,6 +6400,7 @@ async def platform_calendar_incident_analytics_export(
             day["recovered"],
             day["active"],
             day["response_overdue"],
+            day["risk_score"],
         ])
     writer.writerow([])
 

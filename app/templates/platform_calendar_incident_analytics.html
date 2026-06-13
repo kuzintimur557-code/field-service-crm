@@ -343,6 +343,9 @@ tr:last-child td{border-bottom:0}
                             реакция: {{ day["response_overdue"] }}
                         </div>
                         {% endif %}
+                        <div class="trend-note">
+                            риск: {{ day["risk_score"] }}/100
+                        </div>
                     </div>
                 </div>
                 {% else %}
