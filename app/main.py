@@ -4311,6 +4311,16 @@ def get_calendar_company_risk_trend(company):
     }
 
 
+def build_calendar_company_risk_summary(company):
+    return (
+        f"Риск: {company.get('risk_label', 'Низкий')} "
+        f"({company.get('risk_score', 0)}/100). "
+        f"Динамика: {company.get('risk_trend_label', 'Мало данных')}. "
+        f"Причина: {company.get('risk_main_factor', 'нет данных')}. "
+        f"Следующий шаг: {company.get('risk_next_action', 'наблюдать')}."
+    )
+
+
 def get_platform_calendar_incident_analytics(
     days=30,
     now_dt=None,
@@ -5727,6 +5737,7 @@ def get_platform_calendar_company_detail(
         company["risk_next_action"] = (
             "Риск низкий. Достаточно наблюдать динамику."
         )
+    company["risk_summary"] = build_calendar_company_risk_summary(company)
     company["risk_analytics_url"] = (
         "/platform/calendar-health/analytics"
     )
@@ -6676,6 +6687,7 @@ async def platform_calendar_company_health_export(
     writer.writerow(["Следующее действие риска", company["risk_next_action"]])
     writer.writerow(["Главный фактор риска", company["risk_main_factor"]])
     writer.writerow(["Динамика риска", company["risk_trend_label"]])
+    writer.writerow(["Краткое резюме риска", company["risk_summary"]])
     writer.writerow([
         "Инцидентов за 30 дней",
         company["risk_incidents"],

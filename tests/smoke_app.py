@@ -7714,6 +7714,7 @@ async def assert_platform_calendar_health():
             "waiting",
             "healthy",
         }
+        assert detail["company"]["risk_summary"]
         assert detail["policy"] == health["policy"]
         assert "super" in detail["platform_admins"]
         assert backup_admin_username in detail["platform_admins"]
@@ -7799,6 +7800,7 @@ async def assert_platform_calendar_health():
         assert "Действие:" in detail_html
         assert "Причина:" in detail_html
         assert "Динамика:" in detail_html
+        assert "Итог:" in detail_html
         assert "Следующее действие" in detail_html
         assert "Принять в работу" in detail_html
         assert "Реакция просрочена" in detail_html
@@ -7858,6 +7860,7 @@ async def assert_platform_calendar_health():
         assert "Следующее действие риска" in detail_export_csv
         assert "Главный фактор риска" in detail_export_csv
         assert "Динамика риска" in detail_export_csv
+        assert "Краткое резюме риска" in detail_export_csv
         assert "Реакция просрочена %" in detail_export_csv
         assert "Реакция просрочена,да" in detail_export_csv
         assert "Реакция просрочена на" in detail_export_csv
