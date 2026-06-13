@@ -5520,6 +5520,9 @@ async def platform_dashboard(request: Request):
     calendar_health = get_platform_calendar_health(
         current_username=username,
     )
+    calendar_health_incidents = [
+        item for item in calendar_health["items"] if item["active_incident"]
+    ][:5]
 
     return templates.TemplateResponse(
         request,
@@ -5534,6 +5537,7 @@ async def platform_dashboard(request: Request):
             "clients_count": clients_count,
             "companies": companies,
             "calendar_health_summary": calendar_health["summary"],
+            "calendar_health_incidents": calendar_health_incidents,
         }
     )
 
