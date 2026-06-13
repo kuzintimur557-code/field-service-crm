@@ -9630,6 +9630,7 @@ async def assert_platform_calendar_health():
         readiness_html = readiness_page.body.decode("utf-8")
         assert "Готовность релиза" in readiness_html
         assert "Проверки готовности" in readiness_html
+        assert "Сравнение" in readiness_html
         assert "Категории" in readiness_html
         assert "Следующие действия" in readiness_html
         assert "Все проверки" in readiness_html
@@ -9673,6 +9674,7 @@ async def assert_platform_calendar_health():
         saved_readiness_html = saved_readiness_page.body.decode("utf-8")
         assert "Снимок готовности сохранён." in saved_readiness_html
         assert "История снимков" in saved_readiness_html
+        assert "Последний снимок:" in saved_readiness_html
         assert backup_admin_username in saved_readiness_html
         assert f"/platform/readiness/snapshots/{snapshot_id}" in (
             saved_readiness_html
@@ -9747,6 +9749,9 @@ async def assert_platform_calendar_health():
         readiness_csv = readiness_export_response.body.decode("utf-8")
         assert readiness_csv.startswith("\ufeff")
         assert "Готовность релиза" in readiness_csv
+        assert "Сравнение с последним снимком" in readiness_csv
+        assert "Новые блокеры" in readiness_csv
+        assert "Закрытые блокеры" in readiness_csv
         assert "Категории" in readiness_csv
         assert "Следующие действия" in readiness_csv
         assert "Все проверки" in readiness_csv
@@ -9807,6 +9812,7 @@ async def assert_platform_calendar_health():
         )
         assert readiness_api["checks"]
         assert readiness_api["categories"]
+        assert readiness_api["comparison"]["has_snapshot"] is True
         assert readiness_api["export_url"] == "/platform/readiness/export"
     finally:
         conn = connect()

@@ -6509,6 +6509,89 @@ def get_platform_release_readiness_snapshot(snapshot_id):
     return snapshot
 
 
+def compare_platform_release_readiness_to_snapshot(
+    readiness,
+    snapshot=None,
+):
+    if snapshot is None:
+        history = get_platform_release_readiness_history(limit=1)
+        snapshot = (
+            get_platform_release_readiness_snapshot(history[0]["id"])
+            if history
+            else None
+        )
+
+    if not snapshot:
+        return {
+            "has_snapshot": False,
+            "label": "Нет снимка",
+            "tone": "warning",
+            "summary": "Сохраните первый снимок для сравнения.",
+            "score_delta": 0,
+            "critical_delta": 0,
+            "warning_delta": 0,
+            "new_blockers": [],
+            "resolved_blockers": [],
+            "snapshot_url": "",
+            "snapshot_created_at": "",
+        }
+
+    current_checks = {
+        item["key"]: item for item in readiness["checks"]
+    }
+    snapshot_checks = {
+        item["key"]: item for item in snapshot["checks"]
+    }
+    score_delta = int(readiness["score"] or 0) - int(snapshot["score"] or 0)
+    critical_delta = (
+        int(readiness["critical_count"] or 0)
+        - int(snapshot["critical_count"] or 0)
+    )
+    warning_delta = (
+        int(readiness["warning_count"] or 0)
+        - int(snapshot["warning_count"] or 0)
+    )
+    new_blockers = [
+        check
+        for key, check in current_checks.items()
+        if check["status"] == "critical"
+        and snapshot_checks.get(key, {}).get("status") != "critical"
+    ]
+    resolved_blockers = [
+        check
+        for key, check in snapshot_checks.items()
+        if check["status"] == "critical"
+        and current_checks.get(key, {}).get("status") != "critical"
+    ]
+
+    if new_blockers or critical_delta > 0 or score_delta < 0:
+        label = "Стало хуже"
+        tone = "critical"
+        summary = "Появились ухудшения относительно последнего снимка."
+    elif resolved_blockers or critical_delta < 0 or score_delta > 0:
+        label = "Стало лучше"
+        tone = "ok"
+        summary = "Готовность улучшилась относительно последнего снимка."
+    else:
+        label = "Без изменений"
+        tone = "warning"
+        summary = "Ключевые показатели не изменились."
+
+    return {
+        "has_snapshot": True,
+        "label": label,
+        "tone": tone,
+        "summary": summary,
+        "score_delta": score_delta,
+        "critical_delta": critical_delta,
+        "warning_delta": warning_delta,
+        "new_blockers": new_blockers,
+        "resolved_blockers": resolved_blockers,
+        "snapshot_url": snapshot["detail_url"],
+        "snapshot_created_at": snapshot["created_at"],
+    }
+
+
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_dashboard(request: Request):
 
@@ -6601,6 +6684,9 @@ async def platform_readiness_page(
 
     readiness = get_platform_release_readiness()
     history = get_platform_release_readiness_history()
+    comparison = compare_platform_release_readiness_to_snapshot(
+        readiness,
+    )
 
     return templates.TemplateResponse(
         request,
@@ -6611,6 +6697,7 @@ async def platform_readiness_page(
             "role": role,
             "readiness": readiness,
             "history": history,
+            "comparison": comparison,
             "notice": notice,
         },
     )
@@ -6649,6 +6736,9 @@ async def platform_readiness_export(request: Request):
 
     readiness = get_platform_release_readiness()
     history = get_platform_release_readiness_history()
+    comparison = compare_platform_release_readiness_to_snapshot(
+        readiness,
+    )
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -6661,6 +6751,36 @@ async def platform_readiness_export(request: Request):
     writer.writerow(["Внимание", readiness["warning_count"]])
     writer.writerow(["Критично", readiness["critical_count"]])
     writer.writerow(["Резюме", readiness["headline"]])
+    writer.writerow([])
+
+    writer.writerow(["Сравнение с последним снимком"])
+    writer.writerow(["Есть снимок", "да" if comparison["has_snapshot"] else "нет"])
+    writer.writerow(["Состояние", comparison["label"]])
+    writer.writerow(["Резюме", comparison["summary"]])
+    writer.writerow(["Дата снимка", comparison["snapshot_created_at"]])
+    writer.writerow(["Динамика оценки", comparison["score_delta"]])
+    writer.writerow(["Динамика критичных", comparison["critical_delta"]])
+    writer.writerow(["Динамика предупреждений", comparison["warning_delta"]])
+    writer.writerow([])
+
+    writer.writerow(["Новые блокеры"])
+    writer.writerow(["Категория", "Проверка", "Действие"])
+    for check in comparison["new_blockers"]:
+        writer.writerow([
+            check["category_label"],
+            check["title"],
+            check["action"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Закрытые блокеры"])
+    writer.writerow(["Категория", "Проверка", "Действие"])
+    for check in comparison["resolved_blockers"]:
+        writer.writerow([
+            check["category_label"],
+            check["title"],
+            check["action"],
+        ])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -6935,7 +7055,11 @@ async def api_platform_readiness(request: Request):
     if role != "superadmin":
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
-    return get_platform_release_readiness()
+    readiness = get_platform_release_readiness()
+    readiness["comparison"] = (
+        compare_platform_release_readiness_to_snapshot(readiness)
+    )
+    return readiness
 
 
 @app.get("/platform/calendar-health", response_class=HTMLResponse)
