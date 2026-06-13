@@ -326,6 +326,7 @@ h1{margin:0;font-size:32px}
                     · горизонт: {{ calendar_auto_days_ahead }} дн.
                     · окно: {{ calendar_auto_window_start }}–{{ calendar_auto_window_end }}
                     · контроль запуска: {{ calendar_incident_policy["stale_hours"] }} ч.
+                    · восстановление: {{ calendar_incident_policy["recovery_minutes"] }} мин.
                 </div>
                 <div class="scheduler-health {{ calendar_scheduler_status['tone'] }}" title="{{ calendar_scheduler_status['message'] }}">
                     {{ calendar_scheduler_status["title"] }}
@@ -403,6 +404,7 @@ h1{margin:0;font-size:32px}
                     <span>
                         Реакция: {{ calendar_incident_policy["response_minutes"] }} мин.
                         · эскалация: {{ calendar_incident_policy["escalation_minutes"] }} мин.
+                        · восстановление: {{ calendar_incident_policy["recovery_minutes"] }} мин.
                     </span>
                     {% if calendar_scheduler_incident["acknowledged_at"] %}
                     <span>

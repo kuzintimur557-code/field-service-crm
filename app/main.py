@@ -3764,6 +3764,7 @@ def get_bounded_environment_int(
 def get_calendar_incident_policy(
     response_minutes=None,
     escalation_minutes=None,
+    recovery_minutes=None,
     stale_hours=None,
     stuck_minutes=None,
 ):
@@ -3787,12 +3788,26 @@ def get_calendar_incident_policy(
         if escalation_minutes is None
         else max(5, min(int(escalation_minutes), 1440))
     )
+    recovery_minutes = (
+        get_bounded_environment_int(
+            "CALENDAR_INCIDENT_RECOVERY_MINUTES",
+            120,
+            15,
+            2880,
+        )
+        if recovery_minutes is None
+        else max(15, min(int(recovery_minutes), 2880))
+    )
 
     return {
         "response_minutes": response_minutes,
         "escalation_minutes": max(
             response_minutes,
             escalation_minutes,
+        ),
+        "recovery_minutes": max(
+            response_minutes,
+            recovery_minutes,
         ),
         "stale_hours": (
             get_bounded_environment_int(
@@ -3823,6 +3838,7 @@ def get_calendar_incident_priority(
     is_acknowledged,
     incident_age_minutes,
     response_target_minutes=None,
+    recovery_overdue=False,
 ):
     if response_target_minutes is None:
         response_target_minutes = get_calendar_incident_policy()[
@@ -3837,6 +3853,15 @@ def get_calendar_incident_priority(
         and incident_age_minutes >= response_target_minutes
     )
 
+    if has_incident and is_acknowledged and recovery_overdue:
+        return {
+            "code": "critical",
+            "label": "Критический",
+            "rank": 0,
+            "response_overdue": False,
+            "recovery_overdue": True,
+        }
+
     if (
         has_incident
         and not is_acknowledged
@@ -3850,6 +3875,7 @@ def get_calendar_incident_priority(
             "label": "Критический",
             "rank": 0,
             "response_overdue": response_overdue,
+            "recovery_overdue": False,
         }
 
     if has_incident and not is_acknowledged:
@@ -3858,6 +3884,7 @@ def get_calendar_incident_priority(
             "label": "Высокий",
             "rank": 1,
             "response_overdue": response_overdue,
+            "recovery_overdue": False,
         }
 
     if has_incident and is_acknowledged:
@@ -3866,6 +3893,7 @@ def get_calendar_incident_priority(
             "label": "В работе",
             "rank": 2,
             "response_overdue": False,
+            "recovery_overdue": False,
         }
 
     if status_code in {"error", "stuck"}:
@@ -3874,6 +3902,7 @@ def get_calendar_incident_priority(
             "label": "Высокий",
             "rank": 1,
             "response_overdue": False,
+            "recovery_overdue": False,
         }
 
     if status_code == "stale":
@@ -3882,6 +3911,7 @@ def get_calendar_incident_priority(
             "label": "Проверить",
             "rank": 2,
             "response_overdue": False,
+            "recovery_overdue": False,
         }
 
     return {
@@ -3889,6 +3919,7 @@ def get_calendar_incident_priority(
         "label": "Штатный",
         "rank": 3,
         "response_overdue": False,
+        "recovery_overdue": False,
     }
 
 
@@ -3906,12 +3937,15 @@ def build_calendar_incident_sessions(
     events,
     now_dt=None,
     response_target_minutes=None,
+    recovery_target_minutes=None,
 ):
     now_dt = now_dt or datetime.now()
-    if response_target_minutes is None:
-        response_target_minutes = get_calendar_incident_policy()[
-            "response_minutes"
-        ]
+    policy = get_calendar_incident_policy(
+        response_minutes=response_target_minutes,
+        recovery_minutes=recovery_target_minutes,
+    )
+    response_target_minutes = policy["response_minutes"]
+    recovery_target_minutes = policy["recovery_minutes"]
     sessions = []
     active_by_company = {}
 
@@ -3951,6 +3985,7 @@ def build_calendar_incident_sessions(
                 "recovered_by": "",
                 "recovery_attempts": 0,
                 "recovery_failures": 0,
+                "recovery_overdue_events": 0,
                 "escalations": 0,
                 "escalated_at": None,
                 "escalated_at_value": "",
@@ -3979,6 +4014,8 @@ def build_calendar_incident_sessions(
             session["recovery_attempts"] += 1
         elif event_type == "recovery_failed":
             session["recovery_failures"] += 1
+        elif event_type == "recovery_overdue":
+            session["recovery_overdue_events"] += 1
         elif event_type == "escalated":
             session["escalations"] += 1
             session["escalated_at"] = event_at
@@ -4007,6 +4044,7 @@ def build_calendar_incident_sessions(
         recovered_at = session["recovered_at"]
         response_minutes = None
         recovery_minutes = None
+        recovery_work_minutes = None
 
         if opened_at and acknowledged_at:
             response_minutes = max(
@@ -4017,14 +4055,25 @@ def build_calendar_incident_sessions(
                 ),
             )
 
-        if opened_at and recovered_at:
+        if acknowledged_at and recovered_at:
             recovery_minutes = max(
                 0,
                 int(
-                    (recovered_at - opened_at).total_seconds()
+                    (recovered_at - acknowledged_at).total_seconds()
                     // 60
                 ),
             )
+        elif acknowledged_at:
+            recovery_work_minutes = max(
+                0,
+                int(
+                    (now_dt - acknowledged_at).total_seconds()
+                    // 60
+                ),
+            )
+
+        if recovery_minutes is not None:
+            recovery_work_minutes = recovery_minutes
 
         session["response_minutes"] = response_minutes
         session["response_label"] = (
@@ -4037,6 +4086,12 @@ def build_calendar_incident_sessions(
             format_calendar_incident_age(recovery_minutes)
             if recovery_minutes is not None
             else "Не восстановлен"
+        )
+        session["recovery_work_minutes"] = recovery_work_minutes
+        session["recovery_work_label"] = (
+            format_calendar_incident_age(recovery_work_minutes)
+            if recovery_work_minutes is not None
+            else "Не принят"
         )
         session["age_minutes"] = (
             max(
@@ -4055,6 +4110,16 @@ def build_calendar_incident_sessions(
             response_minutes is not None
             and response_minutes <= response_target_minutes
         )
+        session["recovery_sla_met"] = bool(
+            recovery_minutes is not None
+            and recovery_minutes <= recovery_target_minutes
+        )
+        session["recovery_overdue"] = bool(
+            acknowledged_at
+            and not recovered_at
+            and recovery_work_minutes is not None
+            and recovery_work_minutes >= recovery_target_minutes
+        )
         session["incident_type_label"] = (
             incident_type_labels.get(
                 session["incident_type"],
@@ -4065,19 +4130,27 @@ def build_calendar_incident_sessions(
             "Восстановлен"
             if session["is_recovered"]
             else (
-                "Принят в работу"
-                if acknowledged_at
+                "Восстановление просрочено"
+                if session["recovery_overdue"]
                 else (
-                    "Передан платформе"
-                    if session["escalations"]
-                    else "Ожидает реакции"
+                    "Принят в работу"
+                    if acknowledged_at
+                    else (
+                        "Передан платформе"
+                        if session["escalations"]
+                        else "Ожидает реакции"
+                    )
                 )
             )
         )
         session["status_tone"] = (
             "healthy"
             if session["is_recovered"]
-            else ("waiting" if acknowledged_at else "error")
+            else (
+                "error"
+                if session["recovery_overdue"]
+                else ("waiting" if acknowledged_at else "error")
+            )
         )
 
     return sessions
@@ -4087,12 +4160,15 @@ def get_platform_calendar_incident_analytics(
     days=30,
     now_dt=None,
     response_target_minutes=None,
+    recovery_target_minutes=None,
 ):
     now_dt = now_dt or datetime.now()
     policy = get_calendar_incident_policy(
         response_minutes=response_target_minutes,
+        recovery_minutes=recovery_target_minutes,
     )
     response_target_minutes = policy["response_minutes"]
+    recovery_target_minutes = policy["recovery_minutes"]
     selected_days = days if days in {7, 30, 90} else 30
     date_from = (
         now_dt.date() - timedelta(days=selected_days - 1)
@@ -4120,6 +4196,7 @@ def get_platform_calendar_incident_analytics(
         event_rows,
         now_dt=now_dt,
         response_target_minutes=response_target_minutes,
+        recovery_target_minutes=recovery_target_minutes,
     )
     recovered = [
         item for item in sessions if item["is_recovered"]
@@ -4148,6 +4225,24 @@ def get_platform_calendar_incident_analytics(
     response_sla_percent = round(
         response_sla_met * 100 / len(response_eligible),
     ) if response_eligible else 100
+    recovery_eligible = [
+        item
+        for item in sessions
+        if (
+            item["acknowledged_at"]
+            and (
+                item["is_recovered"]
+                or int(item["recovery_work_minutes"] or 0)
+                >= recovery_target_minutes
+            )
+        )
+    ]
+    recovery_sla_met = sum(
+        1 for item in recovery_eligible if item["recovery_sla_met"]
+    )
+    recovery_sla_percent = round(
+        recovery_sla_met * 100 / len(recovery_eligible),
+    ) if recovery_eligible else 100
     recovery_rate = round(
         len(recovered) * 100 / len(sessions),
     ) if sessions else 100
@@ -4188,12 +4283,16 @@ def get_platform_calendar_incident_analytics(
                 "response_minutes": [],
                 "recovery_minutes": [],
                 "escalations": 0,
+                "recovery_overdue": 0,
             },
         )
         company["incidents"] += 1
         company["recovered"] += int(session["is_recovered"])
         company["active"] += int(session["is_active"])
         company["escalations"] += int(session["escalations"] or 0)
+        company["recovery_overdue"] += int(
+            session["recovery_overdue"]
+        )
 
         if session["response_minutes"] is not None:
             company["response_minutes"].append(
@@ -4313,6 +4412,7 @@ def get_platform_calendar_incident_analytics(
         "active": len(active),
         "recovery_rate": recovery_rate,
         "response_sla_percent": response_sla_percent,
+        "recovery_sla_percent": recovery_sla_percent,
         "average_response_minutes": average_response_minutes,
         "average_response_label": (
             format_calendar_incident_age(average_response_minutes)
@@ -4330,6 +4430,12 @@ def get_platform_calendar_incident_analytics(
         ),
         "recovery_failures": sum(
             item["recovery_failures"] for item in sessions
+        ),
+        "recovery_overdue": sum(
+            1 for item in sessions if item["recovery_overdue"]
+        ),
+        "recovery_overdue_events": sum(
+            item["recovery_overdue_events"] for item in sessions
         ),
         "escalations": sum(
             item["escalations"] for item in sessions
@@ -4355,16 +4461,19 @@ def get_platform_calendar_health(
     status_filter="all",
     stale_after_hours=None,
     response_target_minutes=None,
+    recovery_target_minutes=None,
     stuck_after_minutes=None,
 ):
     now_dt = now_dt or datetime.now()
     policy = get_calendar_incident_policy(
         response_minutes=response_target_minutes,
+        recovery_minutes=recovery_target_minutes,
         stale_hours=stale_after_hours,
         stuck_minutes=stuck_after_minutes,
     )
     stale_after_hours = policy["stale_hours"]
     response_target_minutes = policy["response_minutes"]
+    recovery_target_minutes = policy["recovery_minutes"]
     stuck_after_minutes = policy["stuck_minutes"]
     status_filter = (
         status_filter
@@ -4375,6 +4484,7 @@ def get_platform_calendar_health(
             "waiting",
             "disabled",
             "unacknowledged",
+            "recovery_overdue",
             "critical",
         }
         else "all"
@@ -4423,6 +4533,16 @@ def get_platform_calendar_health(
                   ''
               )
         ) AS incident_escalated,
+        EXISTS(
+            SELECT 1
+            FROM calendar_scheduler_incident_events AS recovery_breach
+            WHERE recovery_breach.company_id=settings.company_id
+              AND recovery_breach.event_type='recovery_overdue'
+              AND recovery_breach.created_at>=COALESCE(
+                  scheduler.incident_started_at,
+                  ''
+              )
+        ) AS recovery_overdue_notified,
         latest_run.started_at AS last_scheduler_run_at,
         latest_run.completed_at AS last_scheduler_completed_at,
         latest_run.status AS last_scheduler_run_status,
@@ -4574,6 +4694,31 @@ def get_platform_calendar_health(
             )
         except ValueError:
             incident_age_minutes = None
+        acknowledged_value = str(
+            item["incident_acknowledged_at"] or ""
+        )
+
+        try:
+            acknowledged_at = datetime.strptime(
+                acknowledged_value,
+                "%Y-%m-%d %H:%M",
+            )
+            recovery_age_minutes = max(
+                0,
+                int(
+                    (now_dt - acknowledged_at).total_seconds()
+                    // 60
+                ),
+            )
+        except ValueError:
+            recovery_age_minutes = None
+
+        recovery_overdue = bool(
+            active_incident
+            and item["is_acknowledged"]
+            and recovery_age_minutes is not None
+            and recovery_age_minutes >= recovery_target_minutes
+        )
 
         priority = get_calendar_incident_priority(
             status_code,
@@ -4581,6 +4726,7 @@ def get_platform_calendar_health(
             item["is_acknowledged"],
             incident_age_minutes,
             response_target_minutes=response_target_minutes,
+            recovery_overdue=recovery_overdue,
         )
         item["incident_age_minutes"] = incident_age_minutes
         item["incident_age_label"] = (
@@ -4592,6 +4738,16 @@ def get_platform_calendar_health(
         item["priority_label"] = priority["label"]
         item["priority_rank"] = priority["rank"]
         item["response_overdue"] = priority["response_overdue"]
+        item["recovery_overdue"] = priority["recovery_overdue"]
+        item["recovery_age_minutes"] = recovery_age_minutes
+        item["recovery_age_label"] = (
+            format_calendar_incident_age(recovery_age_minutes)
+            if item["is_acknowledged"]
+            else ""
+        )
+        item["recovery_overdue_notified"] = bool(
+            active_incident and item["recovery_overdue_notified"]
+        )
         item["requires_response"] = bool(
             active_incident and not item["is_acknowledged"]
         )
@@ -4633,6 +4789,9 @@ def get_platform_calendar_health(
         "escalated": sum(
             1 for item in items if item["is_escalated"]
         ),
+        "recovery_overdue": sum(
+            1 for item in items if item["recovery_overdue"]
+        ),
     }
 
     if status_filter == "problem":
@@ -4660,6 +4819,10 @@ def get_platform_calendar_health(
     elif status_filter == "unacknowledged":
         filtered_items = [
             item for item in items if item["requires_response"]
+        ]
+    elif status_filter == "recovery_overdue":
+        filtered_items = [
+            item for item in items if item["recovery_overdue"]
         ]
     elif status_filter == "critical":
         filtered_items = [
@@ -4752,6 +4915,10 @@ def get_platform_calendar_company_detail(
         "opened": ("Открыт", "error"),
         "acknowledged": ("Принят в работу", "waiting"),
         "escalated": ("Передан платформе", "error"),
+        "recovery_overdue": (
+            "Восстановление просрочено",
+            "error",
+        ),
         "recovery_started": ("Запущено восстановление", "running"),
         "recovery_failed": ("Восстановление не выполнено", "error"),
         "recovered": ("Восстановлен", "healthy"),
@@ -10084,6 +10251,7 @@ async def calendar_dispatch_page(
         "opened": "Открыт",
         "acknowledged": "Принят в работу",
         "escalated": "Передан платформе",
+        "recovery_overdue": "Восстановление просрочено",
         "recovery_started": "Запущено восстановление",
         "recovery_failed": "Восстановление не выполнено",
         "recovered": "Восстановлен",
@@ -11915,6 +12083,176 @@ def escalate_calendar_scheduler_incidents(
     }
 
 
+def notify_overdue_calendar_recoveries(
+    now_dt=None,
+    after_minutes=None,
+    company_id=None,
+):
+    now_dt = now_dt or datetime.now()
+    after_minutes = get_calendar_incident_policy(
+        recovery_minutes=after_minutes,
+    )["recovery_minutes"]
+    cutoff = now_dt - timedelta(minutes=after_minutes)
+    now_value = now_dt.strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    conn.execute("BEGIN IMMEDIATE")
+    c = conn.cursor()
+    incidents = c.execute("""
+    SELECT
+        scheduler.company_id,
+        scheduler.active_incident,
+        scheduler.incident_started_at,
+        scheduler.incident_message,
+        scheduler.incident_acknowledged_at,
+        scheduler.incident_acknowledged_by,
+        COALESCE(
+            companies.name,
+            settings.company_name,
+            'Компания #' || scheduler.company_id
+        ) AS company_name
+    FROM calendar_plan_scheduler_status AS scheduler
+    LEFT JOIN companies
+      ON companies.id=scheduler.company_id
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=scheduler.company_id
+    WHERE COALESCE(scheduler.active_incident, '')!=''
+      AND scheduler.incident_acknowledged_at IS NOT NULL
+      AND (? IS NULL OR scheduler.company_id=?)
+    ORDER BY
+        scheduler.incident_acknowledged_at,
+        scheduler.company_id
+    """, (
+        company_id,
+        company_id,
+    )).fetchall()
+    recipients = c.execute("""
+    SELECT username, company_id, telegram_chat_id
+    FROM users
+    WHERE role='superadmin'
+      AND COALESCE(is_active, 1)=1
+    ORDER BY id
+    """).fetchall()
+    overdue_items = []
+    telegram_messages = []
+
+    for incident in incidents:
+        acknowledged_at = parse_calendar_incident_datetime(
+            incident["incident_acknowledged_at"],
+        )
+
+        if not acknowledged_at or acknowledged_at > cutoff:
+            continue
+
+        already_notified = c.execute("""
+        SELECT 1
+        FROM calendar_scheduler_incident_events
+        WHERE company_id=?
+          AND event_type='recovery_overdue'
+          AND created_at>=?
+        LIMIT 1
+        """, (
+            incident["company_id"],
+            incident["incident_started_at"],
+        )).fetchone()
+
+        if already_notified:
+            continue
+
+        recovery_age_minutes = max(
+            0,
+            int(
+                (now_dt - acknowledged_at).total_seconds()
+                // 60
+            ),
+        )
+        recovery_age_label = format_calendar_incident_age(
+            recovery_age_minutes,
+        )
+        company_name = str(incident["company_name"] or "")
+        title = "Просрочено восстановление календаря"
+        message = (
+            f"{company_name}: инцидент в работе "
+            f"{recovery_age_label}, но не восстановлен. "
+            f"Ответственный: "
+            f"{incident['incident_acknowledged_by'] or 'не указан'}."
+        )
+        log_calendar_scheduler_incident_event(
+            c,
+            incident["company_id"],
+            incident["active_incident"],
+            "recovery_overdue",
+            message,
+            actor_username="watchdog",
+            created_at=now_value,
+        )
+
+        for recipient in recipients:
+            recipient_company_id = int(
+                recipient["company_id"] or 1
+            )
+            c.execute("""
+            INSERT INTO notifications (
+                company_id, username, title, message,
+                link, is_read, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, 0, ?)
+            """, (
+                recipient_company_id,
+                recipient["username"],
+                title,
+                message,
+                (
+                    "/platform/calendar-health/"
+                    f"{incident['company_id']}"
+                ),
+                now_value,
+            ))
+            chat_id = str(
+                recipient["telegram_chat_id"] or ""
+            ).strip()
+
+            if chat_id:
+                telegram_messages.append((
+                    chat_id,
+                    f"{title}\n{message}",
+                ))
+
+        overdue_items.append({
+            "company_id": incident["company_id"],
+            "company_name": company_name,
+            "incident_type": incident["active_incident"],
+            "incident_started_at": incident["incident_started_at"],
+            "acknowledged_at": incident[
+                "incident_acknowledged_at"
+            ],
+            "acknowledged_by": incident[
+                "incident_acknowledged_by"
+            ],
+            "recovery_age_minutes": recovery_age_minutes,
+            "recovery_age_label": recovery_age_label,
+            "recipients": len(recipients),
+        })
+
+    conn.commit()
+    conn.close()
+
+    for chat_id, message in telegram_messages:
+        try:
+            send_message_to_chat(chat_id, message)
+        except Exception:
+            pass
+
+    return {
+        "checked": len(incidents),
+        "overdue": len(overdue_items),
+        "notifications_sent": (
+            len(overdue_items) * len(recipients)
+        ),
+        "after_minutes": after_minutes,
+        "items": overdue_items,
+    }
+
+
 async def run_calendar_plan_scheduler(
     company_id,
     now_dt=None,
@@ -12308,14 +12646,17 @@ def monitor_calendar_plan_schedulers(
     stale_after_hours=None,
     company_id=None,
     escalation_after_minutes=None,
+    recovery_after_minutes=None,
 ):
     now_dt = now_dt or datetime.now()
     policy = get_calendar_incident_policy(
         stale_hours=stale_after_hours,
         escalation_minutes=escalation_after_minutes,
+        recovery_minutes=recovery_after_minutes,
     )
     stale_after_hours = policy["stale_hours"]
     escalation_after_minutes = policy["escalation_minutes"]
+    recovery_after_minutes = policy["recovery_minutes"]
     cutoff = now_dt - timedelta(hours=stale_after_hours)
     conn = connect()
     c = conn.cursor()
@@ -12396,6 +12737,11 @@ def monitor_calendar_plan_schedulers(
         after_minutes=escalation_after_minutes,
         company_id=company_id,
     )
+    recovery_overdue = notify_overdue_calendar_recoveries(
+        now_dt=now_dt,
+        after_minutes=recovery_after_minutes,
+        company_id=company_id,
+    )
 
     return {
         "companies": len(items),
@@ -12413,6 +12759,11 @@ def monitor_calendar_plan_schedulers(
         "escalated": escalation["escalated"],
         "escalation_notifications_sent": (
             escalation["notifications_sent"]
+        ),
+        "recovery_overdue": recovery_overdue,
+        "recoveries_overdue": recovery_overdue["overdue"],
+        "recovery_overdue_notifications_sent": (
+            recovery_overdue["notifications_sent"]
         ),
         "stale_after_hours": stale_after_hours,
         "policy": policy,

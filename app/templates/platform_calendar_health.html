@@ -47,6 +47,7 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
 .incident{max-width:320px;color:#991b1b;line-height:1.35}
 .ack{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:900}
 .overdue{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#991b1b;color:white;font-size:9px;font-weight:900}
+.recovery-overdue{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#7f1d1d;color:white;font-size:9px;font-weight:900}
 .escalated{display:inline-flex;margin-top:5px;padding:4px 6px;border-radius:6px;background:#111827;color:white;font-size:9px;font-weight:900}
 .empty{padding:32px;color:#6b7280;text-align:center;font-weight:900}
 @media(max-width:900px){
@@ -75,6 +76,7 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                 Контроль запуска: {{ health["policy"]["stale_hours"] }} ч.
                 · реакция: {{ health["policy"]["response_minutes"] }} мин.
                 · эскалация: {{ health["policy"]["escalation_minutes"] }} мин.
+                · восстановление: {{ health["policy"]["recovery_minutes"] }} мин.
             </div>
         </div>
         <div class="header-actions">
@@ -118,12 +120,17 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
             <div class="stat-label">Передано платформе</div>
             <div class="stat-value">{{ summary["escalated"] }}</div>
         </div>
+        <div class="stat">
+            <div class="stat-label">Просрочено восстановление</div>
+            <div class="stat-value">{{ summary["recovery_overdue"] }}</div>
+        </div>
     </section>
 
     <nav class="filters" aria-label="Фильтры состояния">
         <a class="filter {% if selected_status == 'all' %}active{% endif %}" href="/platform/calendar-health">Все</a>
         <a class="filter {% if selected_status == 'critical' %}active{% endif %}" href="/platform/calendar-health?status=critical">Критические · {{ summary["critical"] }}</a>
         <a class="filter {% if selected_status == 'unacknowledged' %}active{% endif %}" href="/platform/calendar-health?status=unacknowledged">Не приняты · {{ summary["unacknowledged"] }}</a>
+        <a class="filter {% if selected_status == 'recovery_overdue' %}active{% endif %}" href="/platform/calendar-health?status=recovery_overdue">Восстановление · {{ summary["recovery_overdue"] }}</a>
         <a class="filter {% if selected_status == 'problem' %}active{% endif %}" href="/platform/calendar-health?status=problem">Проблемы · {{ summary["problems"] }}</a>
         <a class="filter {% if selected_status == 'healthy' %}active{% endif %}" href="/platform/calendar-health?status=healthy">Работают · {{ summary["healthy"] }}</a>
         <a class="filter {% if selected_status == 'waiting' %}active{% endif %}" href="/platform/calendar-health?status=waiting">Ожидают · {{ summary["waiting"] }}</a>
@@ -161,6 +168,11 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                         </span>
                         {% if company["response_overdue"] %}
                         <div class="overdue">Реакция просрочена</div>
+                        {% endif %}
+                        {% if company["recovery_overdue"] %}
+                        <div class="recovery-overdue">
+                            Восстановление просрочено
+                        </div>
                         {% endif %}
                         {% if company["is_escalated"] %}
                         <div class="escalated">Передано платформе</div>
@@ -218,6 +230,11 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                             <div class="muted">
                                 Возраст: {{ company["incident_age_label"] }}
                             </div>
+                            {% if company["is_acknowledged"] %}
+                            <div class="muted">
+                                В работе: {{ company["recovery_age_label"] }}
+                            </div>
+                            {% endif %}
                         </div>
                         {% else %}
                         <span class="muted">Нет активного инцидента</span>

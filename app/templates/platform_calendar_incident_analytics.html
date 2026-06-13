@@ -42,6 +42,7 @@ tr:last-child td{border-bottom:0}
 .pill.waiting{background:#fef3c7;color:#92400e}
 .pill.error{background:#fee2e2;color:#991b1b}
 .escalation-note{margin-top:4px;color:#991b1b;font-size:9px;font-weight:900}
+.overdue-note{margin-top:4px;color:#991b1b;font-size:9px;font-weight:900}
 .type-list{display:grid;gap:8px;padding:12px}
 .type-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px;border:1px solid #e5e7eb;border-radius:7px}
 .type-title{font-size:11px;font-weight:900}
@@ -78,6 +79,7 @@ tr:last-child td{border-bottom:0}
                 Период {{ analytics["date_from"] }} – {{ analytics["date_to"] }}
                 · обновлено {{ analytics["generated_at"] }}
                 · SLA реакции {{ analytics["policy"]["response_minutes"] }} мин.
+                · восстановления {{ analytics["policy"]["recovery_minutes"] }} мин.
             </div>
         </div>
         <div class="actions">
@@ -119,11 +121,13 @@ tr:last-child td{border-bottom:0}
             <div class="metric-meta">Среднее: {{ summary["average_response_label"] }}</div>
         </div>
         <div class="metric">
-            <div class="metric-label">Среднее восстановление</div>
-            <div class="metric-value">{{ summary["average_recovery_label"] }}</div>
+            <div class="metric-label">
+                Восстановление до {{ analytics["policy"]["recovery_minutes"] }} минут
+            </div>
+            <div class="metric-value">{{ summary["recovery_sla_percent"] }}%</div>
             <div class="metric-meta">
-                Попыток: {{ summary["recovery_attempts"] }}
-                · ошибок: {{ summary["recovery_failures"] }}
+                Среднее: {{ summary["average_recovery_label"] }}
+                · просрочено: {{ summary["recovery_overdue"] }}
             </div>
         </div>
     </section>
@@ -143,6 +147,7 @@ tr:last-child td{border-bottom:0}
                             <th>Инциденты</th>
                             <th>Активные</th>
                             <th>Эскалации</th>
+                            <th>Просрочено</th>
                             <th>Средняя реакция</th>
                             <th>Среднее восстановление</th>
                         </tr>
@@ -158,6 +163,7 @@ tr:last-child td{border-bottom:0}
                             <td data-label="Инциденты">{{ company["incidents"] }}</td>
                             <td data-label="Активные">{{ company["active"] }}</td>
                             <td data-label="Эскалации">{{ company["escalations"] }}</td>
+                            <td data-label="Просрочено">{{ company["recovery_overdue"] }}</td>
                             <td data-label="Средняя реакция">{{ company["average_response_label"] }}</td>
                             <td data-label="Среднее восстановление">{{ company["average_recovery_label"] }}</td>
                         </tr>
@@ -220,7 +226,13 @@ tr:last-child td{border-bottom:0}
                             <td data-label="Тип">{{ incident["incident_type_label"] }}</td>
                             <td data-label="Открыт">{{ incident["opened_at_value"] }}</td>
                             <td data-label="Реакция">{{ incident["response_label"] }}</td>
-                            <td data-label="Восстановление">{{ incident["recovery_label"] }}</td>
+                            <td data-label="Восстановление">
+                                {% if incident["is_active"] and incident["acknowledged_at"] %}
+                                В работе {{ incident["recovery_work_label"] }}
+                                {% else %}
+                                {{ incident["recovery_label"] }}
+                                {% endif %}
+                            </td>
                             <td data-label="Состояние">
                                 <span class="pill {{ incident['status_tone'] }}">
                                     {{ incident["status_label"] }}
@@ -228,6 +240,11 @@ tr:last-child td{border-bottom:0}
                                 {% if incident["escalations"] %}
                                 <div class="escalation-note">
                                     Эскалаций: {{ incident["escalations"] }}
+                                </div>
+                                {% endif %}
+                                {% if incident["recovery_overdue_events"] %}
+                                <div class="overdue-note">
+                                    Watchdog уведомил платформу
                                 </div>
                                 {% endif %}
                             </td>

@@ -52,6 +52,7 @@ tr:last-child td{border-bottom:0}
 .incident-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .incident-actions form{margin:0}
 .accepted{display:inline-flex;padding:7px 9px;border-radius:6px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:900}
+.accepted.overdue{background:#991b1b;color:white}
 .empty{padding:24px;color:#6b7280;text-align:center;font-size:11px;font-weight:900}
 @media(max-width:900px){
     .container{padding:16px}
@@ -111,11 +112,18 @@ tr:last-child td{border-bottom:0}
             <div class="meta">
                 Регламент: реакция {{ detail["policy"]["response_minutes"] }} мин.
                 · эскалация {{ detail["policy"]["escalation_minutes"] }} мин.
+                · восстановление {{ detail["policy"]["recovery_minutes"] }} мин.
             </div>
         </div>
         <div class="incident-actions">
             {% if company["is_acknowledged"] %}
-            <span class="accepted">Принят в работу</span>
+            <span class="accepted {% if company['recovery_overdue'] %}overdue{% endif %}">
+                {% if company["recovery_overdue"] %}
+                Восстановление просрочено
+                {% else %}
+                Принят в работу
+                {% endif %}
+            </span>
             {% else %}
             <form
                 method="post"

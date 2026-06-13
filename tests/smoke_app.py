@@ -7085,6 +7085,7 @@ async def assert_platform_calendar_health():
     policy_environment_names = (
         "CALENDAR_INCIDENT_RESPONSE_MINUTES",
         "CALENDAR_INCIDENT_ESCALATION_MINUTES",
+        "CALENDAR_INCIDENT_RECOVERY_MINUTES",
         "CALENDAR_WATCHDOG_STALE_HOURS",
         "CALENDAR_SCHEDULER_STUCK_MINUTES",
     )
@@ -7096,24 +7097,28 @@ async def assert_platform_calendar_health():
     try:
         os.environ["CALENDAR_INCIDENT_RESPONSE_MINUTES"] = "45"
         os.environ["CALENDAR_INCIDENT_ESCALATION_MINUTES"] = "20"
+        os.environ["CALENDAR_INCIDENT_RECOVERY_MINUTES"] = "90"
         os.environ["CALENDAR_WATCHDOG_STALE_HOURS"] = "12"
         os.environ["CALENDAR_SCHEDULER_STUCK_MINUTES"] = "invalid"
         configured_policy = crm.get_calendar_incident_policy()
         assert configured_policy == {
             "response_minutes": 45,
             "escalation_minutes": 45,
+            "recovery_minutes": 90,
             "stale_hours": 12,
             "stuck_minutes": 30,
         }
         bounded_policy = crm.get_calendar_incident_policy(
             response_minutes=500,
             escalation_minutes=1,
+            recovery_minutes=10,
             stale_hours=100,
             stuck_minutes=2,
         )
         assert bounded_policy == {
             "response_minutes": 240,
             "escalation_minutes": 240,
+            "recovery_minutes": 240,
             "stale_hours": 72,
             "stuck_minutes": 5,
         }
@@ -7138,6 +7143,13 @@ async def assert_platform_calendar_health():
         20,
         response_target_minutes=15,
     )["response_overdue"] is True
+    assert crm.get_calendar_incident_priority(
+        "stale",
+        "stale",
+        True,
+        20,
+        recovery_overdue=True,
+    )["code"] == "critical"
 
     company_id = 901
     company_name = "Smoke Calendar Health"
@@ -7313,13 +7325,23 @@ async def assert_platform_calendar_health():
                     "company_id": 77,
                     "company_name": "Тестовая компания",
                     "incident_type": "error",
+                    "event_type": "recovery_overdue",
+                    "actor_username": "watchdog",
+                    "message": "Просрочено",
+                    "created_at": "2026-06-10 10:55",
+                },
+                {
+                    "id": 5,
+                    "company_id": 77,
+                    "company_name": "Тестовая компания",
+                    "incident_type": "error",
                     "event_type": "recovered",
                     "actor_username": "super",
                     "message": "Готово",
                     "created_at": "2026-06-10 11:00",
                 },
                 {
-                    "id": 5,
+                    "id": 6,
                     "company_id": 77,
                     "company_name": "Тестовая компания",
                     "incident_type": "stale",
@@ -7330,11 +7352,14 @@ async def assert_platform_calendar_health():
                 },
             ],
             now_dt=datetime(2026, 6, 10, 13, 0),
+            recovery_target_minutes=30,
         )
         assert len(sample_sessions) == 2
         assert sample_sessions[0]["response_minutes"] == 20
-        assert sample_sessions[0]["recovery_minutes"] == 60
+        assert sample_sessions[0]["recovery_minutes"] == 40
         assert sample_sessions[0]["response_sla_met"] is True
+        assert sample_sessions[0]["recovery_sla_met"] is False
+        assert sample_sessions[0]["recovery_overdue_events"] == 1
         assert sample_sessions[0]["recovery_attempts"] == 1
         assert sample_sessions[0]["status_label"] == "Восстановлен"
         assert sample_sessions[1]["is_active"] is True
@@ -7463,6 +7488,11 @@ async def assert_platform_calendar_health():
         )
         assert (
             f"эскалация: {health['policy']['escalation_minutes']} мин."
+            in html
+        )
+        assert (
+            "восстановление: "
+            f"{health['policy']['recovery_minutes']} мин."
             in html
         )
         assert "Возраст: 2 ч" in html
@@ -7634,6 +7664,147 @@ async def assert_platform_calendar_health():
         assert acknowledged_company["priority_label"] == "В работе"
         assert acknowledged_company["requires_response"] is False
         assert acknowledged_company["response_overdue"] is False
+        acknowledged_at = (
+            now_dt - timedelta(minutes=110)
+        ).strftime("%Y-%m-%d %H:%M")
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        UPDATE calendar_plan_scheduler_status
+        SET incident_acknowledged_at=?
+        WHERE company_id=?
+        """, (
+            acknowledged_at,
+            company_id,
+        ))
+        c.execute("""
+        UPDATE calendar_scheduler_incident_events
+        SET created_at=?
+        WHERE company_id=? AND event_type='acknowledged'
+        """, (
+            acknowledged_at,
+            company_id,
+        ))
+        conn.commit()
+        conn.close()
+        recovery_watchdog = crm.monitor_calendar_plan_schedulers(
+            now_dt=now_dt,
+            company_id=company_id,
+            recovery_after_minutes=60,
+        )
+        recovery_overdue = recovery_watchdog["recovery_overdue"]
+        assert recovery_watchdog["recoveries_overdue"] == 1
+        assert (
+            recovery_watchdog[
+                "recovery_overdue_notifications_sent"
+            ]
+            == 1
+        )
+        assert recovery_overdue["checked"] == 1
+        assert recovery_overdue["overdue"] == 1
+        assert recovery_overdue["notifications_sent"] == 1
+        assert recovery_overdue["items"][0]["company_id"] == (
+            company_id
+        )
+        assert recovery_overdue["items"][0][
+            "recovery_age_minutes"
+        ] == 110
+        repeated_recovery_watchdog = (
+            crm.monitor_calendar_plan_schedulers(
+                now_dt=now_dt + timedelta(minutes=5),
+                company_id=company_id,
+                recovery_after_minutes=60,
+            )
+        )
+        assert repeated_recovery_watchdog[
+            "recoveries_overdue"
+        ] == 0
+        assert repeated_recovery_watchdog[
+            "recovery_overdue"
+        ]["notifications_sent"] == 0
+        conn = connect()
+        c = conn.cursor()
+        recovery_overdue_events = c.execute("""
+        SELECT event_type, actor_username
+        FROM calendar_scheduler_incident_events
+        WHERE company_id=? AND event_type='recovery_overdue'
+        """, (company_id,)).fetchall()
+        recovery_overdue_notifications = c.execute("""
+        SELECT company_id, username, title, link
+        FROM notifications
+        WHERE username='super'
+          AND title='Просрочено восстановление календаря'
+          AND link=?
+        """, (
+            f"/platform/calendar-health/{company_id}",
+        )).fetchall()
+        conn.close()
+        assert [
+            (row["event_type"], row["actor_username"])
+            for row in recovery_overdue_events
+        ] == [("recovery_overdue", "watchdog")]
+        assert len(recovery_overdue_notifications) == 1
+        overdue_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            status_filter="recovery_overdue",
+            recovery_target_minutes=60,
+        )
+        overdue_company = next(
+            item
+            for item in overdue_health["items"]
+            if item["company_id"] == company_id
+        )
+        assert overdue_company["priority_code"] == "critical"
+        assert overdue_company["recovery_overdue"] is True
+        assert overdue_company["recovery_age_minutes"] == 110
+        assert overdue_company["recovery_overdue_notified"] is True
+        assert overdue_health["summary"]["recovery_overdue"] >= 1
+        previous_recovery_policy = os.environ.get(
+            "CALENDAR_INCIDENT_RECOVERY_MINUTES"
+        )
+        os.environ["CALENDAR_INCIDENT_RECOVERY_MINUTES"] = "60"
+
+        try:
+            overdue_page = await crm.platform_calendar_health_page(
+                make_asgi_request(
+                    "super",
+                    "/platform/calendar-health",
+                ),
+                status="recovery_overdue",
+            )
+            overdue_detail_page = (
+                await crm.platform_calendar_company_health_page(
+                    make_asgi_request(
+                        "super",
+                        f"/platform/calendar-health/{company_id}",
+                    ),
+                    company_id,
+                )
+            )
+        finally:
+            if previous_recovery_policy is None:
+                os.environ.pop(
+                    "CALENDAR_INCIDENT_RECOVERY_MINUTES",
+                    None,
+                )
+            else:
+                os.environ[
+                    "CALENDAR_INCIDENT_RECOVERY_MINUTES"
+                ] = previous_recovery_policy
+
+        assert "Восстановление просрочено" in (
+            overdue_page.body.decode("utf-8")
+        )
+        assert "Восстановление просрочено" in (
+            overdue_detail_page.body.decode("utf-8")
+        )
+        overdue_detail = crm.get_platform_calendar_company_detail(
+            company_id,
+            now_dt=now_dt,
+        )
+        assert overdue_detail["incidents"][0][
+            "event_type_label"
+        ] == "Восстановление просрочено"
         anonymous_recovery = (
             await crm.platform_calendar_incident_recover(
                 make_public_asgi_request(
@@ -7719,6 +7890,7 @@ async def assert_platform_calendar_health():
         ] == [
             ("opened", ""),
             ("acknowledged", "super"),
+            ("recovery_overdue", "watchdog"),
             ("recovery_started", "super"),
             ("recovered", "super"),
         ]
@@ -7868,6 +8040,7 @@ async def assert_platform_calendar_health():
         SELECT company_id, username, title, link
         FROM notifications
         WHERE username='super'
+          AND title='Критический инцидент календаря'
           AND link=?
         """, (
             f"/platform/calendar-health/{company_id}",
@@ -7926,10 +8099,14 @@ async def assert_platform_calendar_health():
         assert analytics["summary"]["recovery_attempts"] >= 2
         assert analytics["summary"]["recovery_failures"] >= 1
         assert analytics["summary"]["escalations"] >= 1
+        assert analytics["summary"]["recovery_sla_percent"] == 100
+        assert analytics["summary"]["recovery_overdue"] == 0
+        assert analytics["summary"]["recovery_overdue_events"] >= 1
         assert analytics_company["incidents"] == 2
         assert analytics_company["recovered"] == 1
         assert analytics_company["active"] == 1
         assert analytics_company["escalations"] == 1
+        assert analytics_company["recovery_overdue"] == 0
         assert analytics_company["detail_url"] == (
             f"/platform/calendar-health/{company_id}"
         )
@@ -7983,6 +8160,11 @@ async def assert_platform_calendar_health():
         assert (
             "Реакция до "
             f"{analytics['policy']['response_minutes']} минут"
+            in analytics_html
+        )
+        assert (
+            "Восстановление до "
+            f"{analytics['policy']['recovery_minutes']} минут"
             in analytics_html
         )
         assert "Среднее восстановление" in analytics_html
