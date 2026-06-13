@@ -4270,6 +4270,47 @@ def get_calendar_company_risk_main_factor(company):
     return max(active_factors, key=lambda item: item[0])[1]
 
 
+def get_calendar_company_risk_trend(company):
+    recent_pressure = (
+        int(company.get("recent_incidents") or 0)
+        + int(company.get("recent_response_overdue") or 0) * 2
+    )
+    previous_pressure = (
+        int(company.get("previous_incidents") or 0)
+        + int(company.get("previous_response_overdue") or 0) * 2
+    )
+    total_compared = recent_pressure + previous_pressure
+
+    if total_compared <= 1:
+        return {
+            "label": "Мало данных",
+            "tone": "waiting",
+            "delta": recent_pressure - previous_pressure,
+        }
+
+    delta = recent_pressure - previous_pressure
+
+    if delta >= 2:
+        return {
+            "label": "Риск растёт",
+            "tone": "error",
+            "delta": delta,
+        }
+
+    if delta <= -2:
+        return {
+            "label": "Риск снижается",
+            "tone": "healthy",
+            "delta": delta,
+        }
+
+    return {
+        "label": "Стабильно",
+        "tone": "waiting",
+        "delta": delta,
+    }
+
+
 def get_platform_calendar_incident_analytics(
     days=30,
     now_dt=None,
@@ -4287,6 +4328,9 @@ def get_platform_calendar_incident_analytics(
     date_from = (
         now_dt.date() - timedelta(days=selected_days - 1)
     ).strftime("%Y-%m-%d")
+    trend_cutoff = now_dt.date() - timedelta(
+        days=max(1, selected_days // 2) - 1,
+    )
     conn = connect()
     c = conn.cursor()
     event_rows = c.execute("""
@@ -4400,6 +4444,10 @@ def get_platform_calendar_incident_analytics(
                 "escalations": 0,
                 "response_overdue": 0,
                 "recovery_overdue": 0,
+                "recent_incidents": 0,
+                "previous_incidents": 0,
+                "recent_response_overdue": 0,
+                "previous_response_overdue": 0,
             },
         )
         company["incidents"] += 1
@@ -4445,6 +4493,18 @@ def get_platform_calendar_incident_analytics(
             if session["opened_at"]
             else ""
         )
+        opened_day = session["opened_at"].date() if session["opened_at"] else None
+
+        if opened_day and opened_day >= trend_cutoff:
+            company["recent_incidents"] += 1
+            company["recent_response_overdue"] += int(
+                session["response_overdue"]
+            )
+        else:
+            company["previous_incidents"] += 1
+            company["previous_response_overdue"] += int(
+                session["response_overdue"]
+            )
 
         if opened_date:
             day = daily_map.setdefault(
@@ -4515,6 +4575,10 @@ def get_platform_calendar_incident_analytics(
         company["risk_main_factor"] = (
             get_calendar_company_risk_main_factor(company)
         )
+        risk_trend = get_calendar_company_risk_trend(company)
+        company["risk_trend_label"] = risk_trend["label"]
+        company["risk_trend_tone"] = risk_trend["tone"]
+        company["risk_trend_delta"] = risk_trend["delta"]
         company["detail_url"] = (
             f"/platform/calendar-health/{company['company_id']}"
         )
@@ -5629,6 +5693,9 @@ def get_platform_calendar_company_detail(
         )
         company["risk_escalations"] = company_analytics["escalations"]
         company["risk_main_factor"] = company_analytics["risk_main_factor"]
+        company["risk_trend_label"] = company_analytics["risk_trend_label"]
+        company["risk_trend_tone"] = company_analytics["risk_trend_tone"]
+        company["risk_trend_delta"] = company_analytics["risk_trend_delta"]
         if company["risk_score"] >= 80:
             company["risk_next_action"] = (
                 "Сначала разберите активные инциденты и просроченную "
@@ -5654,6 +5721,9 @@ def get_platform_calendar_company_detail(
         company["risk_main_factor"] = (
             "Серьёзных факторов риска не найдено."
         )
+        company["risk_trend_label"] = "Мало данных"
+        company["risk_trend_tone"] = "waiting"
+        company["risk_trend_delta"] = 0
         company["risk_next_action"] = (
             "Риск низкий. Достаточно наблюдать динамику."
         )
@@ -6460,6 +6530,7 @@ async def platform_calendar_incident_analytics_export(
         "Риск",
         "Оценка риска",
         "Главный фактор",
+        "Динамика риска",
         "Инциденты",
         "Восстановлено",
         "Активные",
@@ -6478,6 +6549,7 @@ async def platform_calendar_incident_analytics_export(
             company["risk_label"],
             company["risk_score"],
             company["risk_main_factor"],
+            company["risk_trend_label"],
             company["incidents"],
             company["recovered"],
             company["active"],
@@ -6603,6 +6675,7 @@ async def platform_calendar_company_health_export(
     writer.writerow(["Оценка риска", company["risk_score"]])
     writer.writerow(["Следующее действие риска", company["risk_next_action"]])
     writer.writerow(["Главный фактор риска", company["risk_main_factor"]])
+    writer.writerow(["Динамика риска", company["risk_trend_label"]])
     writer.writerow([
         "Инцидентов за 30 дней",
         company["risk_incidents"],

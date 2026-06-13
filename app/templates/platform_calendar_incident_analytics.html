@@ -196,6 +196,7 @@ tr:last-child td{border-bottom:0}
                             <th>Компания</th>
                             <th>Риск</th>
                             <th>Главный фактор</th>
+                            <th>Динамика</th>
                             <th>Инциденты</th>
                             <th>Активные</th>
                             <th>Эскалации</th>
@@ -223,6 +224,11 @@ tr:last-child td{border-bottom:0}
                             </td>
                             <td data-label="Главный фактор">
                                 {{ company["risk_main_factor"] }}
+                            </td>
+                            <td data-label="Динамика">
+                                <span class="pill {{ company['risk_trend_tone'] }}">
+                                    {{ company["risk_trend_label"] }}
+                                </span>
                             </td>
                             <td data-label="Инциденты">{{ company["incidents"] }}</td>
                             <td data-label="Активные">{{ company["active"] }}</td>

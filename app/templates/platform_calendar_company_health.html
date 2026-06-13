@@ -328,6 +328,12 @@ tr:last-child td{border-bottom:0}
             <div class="meta">
                 Причина: {{ company["risk_main_factor"] }}
             </div>
+            <div class="meta">
+                Динамика:
+                <span class="pill {{ company['risk_trend_tone'] }}">
+                    {{ company["risk_trend_label"] }}
+                </span>
+            </div>
         </div>
         <div class="overview-item">
             <div class="overview-label">Запусков</div>
