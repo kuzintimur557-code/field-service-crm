@@ -7655,8 +7655,12 @@ async def assert_platform_calendar_health():
         )
         export_csv = export_response.body.decode("utf-8")
         assert export_csv.startswith("\ufeff")
+        assert "Сводка" in export_csv
+        assert "Общий статус,Критично" in export_csv
+        assert "Старейший активный инцидент" in export_csv
+        assert "Компании" in export_csv
         assert "ID компании,Компания,Владелец,Приоритет" in export_csv
-        assert "Реакция просрочена" in export_csv.splitlines()[0]
+        assert "Реакция просрочена" in export_csv
         assert company_name in export_csv
         assert "Критический" in export_csv
         detail = crm.get_platform_calendar_company_detail(

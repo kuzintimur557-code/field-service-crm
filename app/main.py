@@ -5826,6 +5826,22 @@ async def platform_calendar_health_export(
     )
     output = io.StringIO()
     writer = csv.writer(output)
+    summary = health["summary"]
+    writer.writerow(["Сводка"])
+    writer.writerow(["Фильтр состояния", health["status_filter"]])
+    writer.writerow(["Фильтр ответственного", health["assignee_filter"]])
+    writer.writerow(["Общий статус", summary["overall_status_label"]])
+    writer.writerow([
+        "Старейший активный инцидент",
+        summary["oldest_active_incident_label"],
+    ])
+    writer.writerow(["Компаний", summary["total_companies"]])
+    writer.writerow(["Критические", summary["critical"]])
+    writer.writerow(["Не приняты", summary["unacknowledged"]])
+    writer.writerow(["Активные инциденты", summary["active_incidents"]])
+    writer.writerow(["Просрочено восстановление", summary["recovery_overdue"]])
+    writer.writerow([])
+    writer.writerow(["Компании"])
     writer.writerow([
         "ID компании",
         "Компания",
