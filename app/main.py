@@ -4627,6 +4627,7 @@ def get_platform_calendar_health(
             "waiting",
             "disabled",
             "unacknowledged",
+            "response_overdue",
             "recovery_overdue",
             "critical",
         }
@@ -5031,6 +5032,9 @@ def get_platform_calendar_health(
             for item in items
             if item["priority_code"] == "critical"
         ),
+        "response_overdue": sum(
+            1 for item in items if item["response_overdue"]
+        ),
         "escalated": sum(
             1 for item in items if item["is_escalated"]
         ),
@@ -5155,6 +5159,10 @@ def get_platform_calendar_health(
         filtered_items = [
             item for item in items if item["requires_response"]
         ]
+    elif status_filter == "response_overdue":
+        filtered_items = [
+            item for item in items if item["response_overdue"]
+        ]
     elif status_filter == "recovery_overdue":
         filtered_items = [
             item for item in items if item["recovery_overdue"]
@@ -5221,6 +5229,7 @@ def build_platform_calendar_health_queue_url(
         "waiting",
         "disabled",
         "unacknowledged",
+        "response_overdue",
         "recovery_overdue",
         "critical",
     }
@@ -6028,6 +6037,7 @@ async def platform_calendar_health_export(
     writer.writerow(["Компаний", summary["total_companies"]])
     writer.writerow(["Критические", summary["critical"]])
     writer.writerow(["Не приняты", summary["unacknowledged"]])
+    writer.writerow(["Просрочена реакция", summary["response_overdue"]])
     writer.writerow(["Активные инциденты", summary["active_incidents"]])
     writer.writerow(["Просрочено восстановление", summary["recovery_overdue"]])
     writer.writerow([])

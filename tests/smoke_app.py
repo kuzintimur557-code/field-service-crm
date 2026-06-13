@@ -7469,6 +7469,7 @@ async def assert_platform_calendar_health():
         assert health["summary"]["problems"] >= 1
         assert health["summary"]["critical"] >= 1
         assert health["summary"]["unacknowledged"] >= 1
+        assert health["summary"]["response_overdue"] >= 1
         assert health["summary"]["active_incidents"] >= 1
         assert health["summary"]["assigned"] == 0
         assert health["summary"]["unassigned"] >= 1
@@ -7510,6 +7511,21 @@ async def assert_platform_calendar_health():
         assert all(
             item["requires_response"]
             for item in unacknowledged_health["items"]
+        )
+        response_overdue_health = crm.get_platform_calendar_health(
+            now_dt=now_dt,
+            status_filter="response_overdue",
+        )
+        assert response_overdue_health["status_filter"] == (
+            "response_overdue"
+        )
+        assert any(
+            item["company_id"] == company_id
+            for item in response_overdue_health["items"]
+        )
+        assert all(
+            item["response_overdue"]
+            for item in response_overdue_health["items"]
         )
         unassigned_health = crm.get_platform_calendar_health(
             now_dt=now_dt,
@@ -7587,6 +7603,8 @@ async def assert_platform_calendar_health():
         assert "Старейший инцидент" in html
         assert "Критические" in html
         assert "Не приняты" in html
+        assert "Просрочена реакция" in html
+        assert "status=response_overdue" in html
         assert "Критический" in html
         assert "Реакция просрочена" in html
         assert "Следующее действие" in html
@@ -7665,6 +7683,7 @@ async def assert_platform_calendar_health():
         assert "Сводка" in export_csv
         assert "Общий статус,Критично" in export_csv
         assert "Старейший активный инцидент" in export_csv
+        assert "Просрочена реакция" in export_csv
         assert "Компании" in export_csv
         assert "ID компании,Компания,Владелец,Приоритет" in export_csv
         assert "Реакция просрочена" in export_csv
