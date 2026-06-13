@@ -20,6 +20,7 @@ h1{margin:6px 0 0;font-size:34px}
 button.button{border:0;cursor:pointer}
 .button.secondary{border:1px solid #d1d5db;background:white;color:#374151}
 .notice{margin-bottom:16px;padding:12px 14px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#065f46;font-size:13px;font-weight:900}
+.notice.error{border-color:#fecaca;background:#fff7f7;color:#991b1b}
 .summary{display:grid;grid-template-columns:180px repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .score{display:flex;min-height:150px;align-items:center;justify-content:center;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#047857;font-size:38px;font-weight:900}
 .score.warning{border-color:#fde68a;background:#fffbeb;color:#b45309}
@@ -76,6 +77,20 @@ button.button{border:0;cursor:pointer}
 .launch-item-title{font-size:12px;font-weight:900}
 .launch-item-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
 .launch-next{margin-top:12px}
+.signoff{margin-top:18px;padding:16px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.signoff-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+.signoff-title{font-size:18px;font-weight:900}
+.signoff-text{margin-top:5px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.signoff-form{display:grid;gap:8px}
+.signoff-form select,.signoff-form textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:9px;background:white;font:inherit;font-size:12px;font-weight:800}
+.signoff-form textarea{min-height:78px;resize:vertical}
+.signoff-history{display:grid;gap:8px;margin-top:12px}
+.signoff-item{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:10px;align-items:center;padding:10px;border:1px solid #e5e7eb;border-radius:9px;background:#f9fafb}
+.signoff-item.warning{background:#fffbeb;border-color:#fde68a}
+.signoff-item.critical{background:#fff7f7;border-color:#fecaca}
+.signoff-item.ok{background:#f0fdf4;border-color:#bbf7d0}
+.signoff-label{font-size:12px;font-weight:900}
+.signoff-meta{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.4}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -92,6 +107,7 @@ button.button{border:0;cursor:pointer}
 .action-title{font-size:13px;font-weight:900}
 .action-text{margin-top:4px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.45}
 .empty{padding:16px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#065f46;font-weight:900}
+.empty.offset{margin-top:12px}
 .history{display:grid;gap:8px}
 .history-item{display:grid;grid-template-columns:120px minmax(0,1fr) 90px 70px;gap:12px;align-items:center;padding:13px;border:1px solid #e5e7eb;border-radius:10px;background:white}
 .history-status{font-size:13px;font-weight:900}
@@ -124,6 +140,8 @@ button.button{border:0;cursor:pointer}
 .trend-bars{height:120px}
 .launch-head{grid-template-columns:1fr}
 .launch-phases{grid-template-columns:1fr}
+.signoff-grid{grid-template-columns:1fr}
+.signoff-item{grid-template-columns:1fr}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -160,6 +178,12 @@ button.button{border:0;cursor:pointer}
 
     {% if notice == "snapshot_saved" %}
     <div class="notice">Снимок готовности сохранён.</div>
+    {% endif %}
+    {% if notice == "signoff_saved" %}
+    <div class="notice">Решение по запуску сохранено.</div>
+    {% endif %}
+    {% if error == "launch_blocked" %}
+    <div class="notice error">Пилот или боевой запуск нельзя подтвердить, пока есть критичные блокеры.</div>
     {% endif %}
 
     <section class="summary">
@@ -308,6 +332,52 @@ button.button{border:0;cursor:pointer}
             {% endfor %}
         </div>
         {% endif %}
+    </section>
+
+    <section class="signoff">
+        <div class="signoff-grid">
+            <div>
+                <div class="signoff-title">Подтверждение запуска</div>
+                <div class="signoff-text">
+                    Зафиксируйте управленческое решение: отложить запуск,
+                    подтвердить пилот или разрешить боевой запуск. При подтверждении
+                    система автоматически сохранит новый снимок готовности.
+                </div>
+                {% if signoffs %}
+                <div class="signoff-history">
+                    {% for signoff in signoffs %}
+                    <div class="signoff-item {{ signoff['tone'] }}">
+                        <div>
+                            <div class="signoff-label">{{ signoff["decision_label"] }}</div>
+                            <div class="signoff-meta">
+                                {{ signoff["signed_at"] }} · {{ signoff["signed_by"] }} ·
+                                оценка {{ signoff["score"] }}%
+                                {% if signoff["comment"] %}
+                                <br>{{ signoff["comment"] }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="signoff-label">{{ signoff["recommended_mode"] }}</div>
+                        {% if signoff["snapshot_url"] %}
+                        <a class="check-link" href="{{ signoff['snapshot_url'] }}">Снимок</a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty offset">Подтверждений запуска пока нет.</div>
+                {% endif %}
+            </div>
+            <form class="signoff-form" method="post" action="/platform/readiness/signoff">
+                <select name="decision">
+                    <option value="blocked">Отложить запуск</option>
+                    <option value="pilot">Подтвердить пилот</option>
+                    <option value="production">Подтвердить боевой запуск</option>
+                </select>
+                <textarea name="comment" placeholder="Комментарий к решению"></textarea>
+                <button class="button" type="submit">Сохранить решение</button>
+            </form>
+        </div>
     </section>
 
     <section class="section">

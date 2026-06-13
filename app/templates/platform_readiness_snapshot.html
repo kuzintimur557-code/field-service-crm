@@ -62,6 +62,16 @@ h1{margin:6px 0 0;font-size:32px}
 .launch-item.critical{background:#fff7f7}
 .launch-item-title{font-size:12px;font-weight:900}
 .launch-item-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
+.signoff{margin-top:18px;padding:16px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.signoff-title{font-size:18px;font-weight:900}
+.signoff-text{margin-top:5px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.signoff-history{display:grid;gap:8px;margin-top:12px}
+.signoff-item{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:10px;align-items:center;padding:10px;border:1px solid #e5e7eb;border-radius:9px;background:#f9fafb}
+.signoff-item.warning{background:#fffbeb;border-color:#fde68a}
+.signoff-item.critical{background:#fff7f7;border-color:#fecaca}
+.signoff-item.ok{background:#f0fdf4;border-color:#bbf7d0}
+.signoff-label{font-size:12px;font-weight:900}
+.signoff-meta{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.4}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -94,6 +104,7 @@ h1{margin:6px 0 0;font-size:32px}
 .change-item{grid-template-columns:1fr}
 .launch-head{grid-template-columns:1fr}
 .launch-phases{grid-template-columns:1fr}
+.signoff-item{grid-template-columns:1fr}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -239,6 +250,34 @@ h1{margin:6px 0 0;font-size:32px}
             </div>
             {% endfor %}
         </div>
+    </section>
+
+    <section class="signoff">
+        <div class="signoff-title">Подтверждения по снимку</div>
+        <div class="signoff-text">
+            Решения администратора, которые были зафиксированы на базе этого снимка.
+        </div>
+        {% if snapshot_signoffs %}
+        <div class="signoff-history">
+            {% for signoff in snapshot_signoffs %}
+            <div class="signoff-item {{ signoff['tone'] }}">
+                <div>
+                    <div class="signoff-label">{{ signoff["decision_label"] }}</div>
+                    <div class="signoff-meta">
+                        {{ signoff["signed_at"] }} · {{ signoff["signed_by"] }} ·
+                        оценка {{ signoff["score"] }}%
+                        {% if signoff["comment"] %}
+                        <br>{{ signoff["comment"] }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="signoff-label">{{ signoff["recommended_mode"] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">По этому снимку подтверждений пока нет.</div>
+        {% endif %}
     </section>
 
     <section class="section">

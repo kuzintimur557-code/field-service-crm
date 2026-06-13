@@ -9634,6 +9634,7 @@ async def assert_platform_calendar_health():
         assert "Тренд снимков" in readiness_html
         assert "План запуска" in readiness_html
         assert "Решение по запуску" in readiness_html
+        assert "Подтверждение запуска" in readiness_html
         assert "Категории" in readiness_html
         assert "Следующие действия" in readiness_html
         assert "Все проверки" in readiness_html
@@ -9672,6 +9673,55 @@ async def assert_platform_calendar_health():
         assert second_saved_snapshot.headers["location"] == (
             "/platform/readiness?notice=snapshot_saved"
         )
+        anonymous_signoff = await crm.platform_readiness_signoff(
+            make_public_asgi_request("/platform/readiness/signoff"),
+        )
+        assert anonymous_signoff.status_code == 302
+        assert anonymous_signoff.headers["location"] == "/login"
+        boss_signoff = await crm.platform_readiness_signoff(
+            make_form_request(
+                "owner2",
+                "/platform/readiness/signoff",
+                {"decision": "blocked"},
+            ),
+        )
+        assert boss_signoff.status_code == 302
+        assert boss_signoff.headers["location"] == "/"
+        blocked_production_signoff = await crm.platform_readiness_signoff(
+            make_form_request(
+                backup_admin_username,
+                "/platform/readiness/signoff",
+                {
+                    "decision": "production",
+                    "comment": "Smoke production blocked",
+                },
+            ),
+        )
+        assert blocked_production_signoff.status_code == 302
+        assert blocked_production_signoff.headers["location"] == (
+            "/platform/readiness?error=launch_blocked"
+        )
+        signoff_response = await crm.platform_readiness_signoff(
+            make_form_request(
+                backup_admin_username,
+                "/platform/readiness/signoff",
+                {
+                    "decision": "blocked",
+                    "comment": "Smoke release sign-off",
+                },
+            ),
+        )
+        assert signoff_response.status_code == 302
+        assert signoff_response.headers["location"].startswith(
+            "/platform/readiness?notice=signoff_saved&signoff="
+        )
+        signoffs = crm.get_platform_release_signoff_history()
+        assert signoffs
+        assert signoffs[0]["decision_label"] == "Запуск отложен"
+        assert signoffs[0]["comment"] == "Smoke release sign-off"
+        assert signoffs[0]["snapshot_url"].startswith(
+            "/platform/readiness/snapshots/"
+        )
         readiness_history = crm.get_platform_release_readiness_history()
         assert readiness_history
         assert readiness_history[0]["created_by"] == backup_admin_username
@@ -9689,6 +9739,8 @@ async def assert_platform_calendar_health():
         assert "История снимков" in saved_readiness_html
         assert "Последний снимок:" in saved_readiness_html
         assert "Последняя оценка" in saved_readiness_html
+        assert "Запуск отложен" in saved_readiness_html
+        assert "Smoke release sign-off" in saved_readiness_html
         assert backup_admin_username in saved_readiness_html
         assert f"/platform/readiness/snapshots/{snapshot_id}" in (
             saved_readiness_html
@@ -9725,6 +9777,8 @@ async def assert_platform_calendar_health():
         assert "Сравнение с предыдущим снимком" in snapshot_html
         assert "Предыдущий снимок:" in snapshot_html
         assert "План запуска снимка" in snapshot_html
+        assert "Подтверждения по снимку" in snapshot_html
+        assert "Smoke release sign-off" in snapshot_html
         assert "Категории снимка" in snapshot_html
         assert "Следующие действия снимка" in snapshot_html
         assert "Все проверки снимка" in snapshot_html
@@ -9772,6 +9826,7 @@ async def assert_platform_calendar_health():
         assert "Тренд снимков" in readiness_csv
         assert "План запуска" in readiness_csv
         assert "Этапы запуска" in readiness_csv
+        assert "Подтверждения запуска" in readiness_csv
         assert "Категории" in readiness_csv
         assert "Следующие действия" in readiness_csv
         assert "Все проверки" in readiness_csv
@@ -9820,6 +9875,7 @@ async def assert_platform_calendar_health():
         assert "Изменения проверок" in snapshot_csv
         assert "План запуска снимка" in snapshot_csv
         assert "Этапы запуска" in snapshot_csv
+        assert "Подтверждения по снимку" in snapshot_csv
         assert "Категории" in snapshot_csv
         assert "Все проверки" in snapshot_csv
         assert backup_admin_username in snapshot_csv
@@ -9839,7 +9895,23 @@ async def assert_platform_calendar_health():
         assert readiness_api["comparison"]["has_snapshot"] is True
         assert readiness_api["trend"]["has_history"] is True
         assert readiness_api["launch_plan"]["phases"]
+        assert readiness_api["signoffs"]
         assert readiness_api["export_url"] == "/platform/readiness/export"
+        anonymous_signoffs_api = await crm.api_platform_readiness_signoffs(
+            make_public_asgi_request("/api/platform/readiness/signoffs"),
+        )
+        assert anonymous_signoffs_api.status_code == 401
+        boss_signoffs_api = await crm.api_platform_readiness_signoffs(
+            make_asgi_request("owner2", "/api/platform/readiness/signoffs"),
+        )
+        assert boss_signoffs_api.status_code == 403
+        signoffs_api = await crm.api_platform_readiness_signoffs(
+            make_asgi_request("super", "/api/platform/readiness/signoffs"),
+        )
+        assert signoffs_api["signoffs"]
+        assert signoffs_api["signoffs"][0]["decision_label"] == (
+            "Запуск отложен"
+        )
         anonymous_launch_plan_api = (
             await crm.api_platform_readiness_launch_plan(
                 make_public_asgi_request(
@@ -9971,6 +10043,10 @@ async def assert_platform_calendar_health():
         )
         c.execute(
             "DELETE FROM platform_release_readiness_snapshots WHERE created_by=?",
+            (backup_admin_username,),
+        )
+        c.execute(
+            "DELETE FROM platform_release_signoffs WHERE signed_by=?",
             (backup_admin_username,),
         )
         c.execute(

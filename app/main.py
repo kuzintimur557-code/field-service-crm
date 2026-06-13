@@ -6123,7 +6123,7 @@ def get_platform_release_readiness(
                 if default_secret
                 else "SECRET_KEY настроен."
             ),
-            "Перед production укажите сильный SECRET_KEY.",
+            "Перед боевым запуском укажите сильный SECRET_KEY.",
             "/system",
             14,
             "security",
@@ -6138,7 +6138,7 @@ def get_platform_release_readiness(
                 if COOKIE_SECURE
                 else "Secure cookie не включены в текущем окружении."
             ),
-            "Для production включите COOKIE_SECURE или Railway окружение.",
+            "Для боевого режима включите COOKIE_SECURE или Railway окружение.",
             "/system",
             8,
             "security",
@@ -6422,7 +6422,7 @@ def get_platform_release_launch_plan(readiness):
         decision = "blocked"
         label = "Запуск заблокирован"
         tone = "critical"
-        recommended_mode = "Не запускать production"
+        recommended_mode = "Не запускать боевой режим"
         summary = "Сначала нужно закрыть критичные блокеры."
     elif score < 80 or warning_count >= 4:
         decision = "pilot"
@@ -6434,7 +6434,7 @@ def get_platform_release_launch_plan(readiness):
         decision = "ready"
         label = "Можно запускать"
         tone = "ok"
-        recommended_mode = "Production запуск"
+        recommended_mode = "Боевой запуск"
         summary = "Ключевые проверки позволяют запускать платформу."
 
     gates = [
@@ -6606,6 +6606,126 @@ def get_platform_release_launch_plan(readiness):
         "next_items": next_items[:8],
         "blocked": decision == "blocked",
     }
+
+
+def get_platform_release_signoff_decision(decision):
+    decisions = {
+        "blocked": {
+            "decision": "blocked",
+            "label": "Запуск отложен",
+            "tone": "critical",
+        },
+        "pilot": {
+            "decision": "pilot",
+            "label": "Подтверждён пилот",
+            "tone": "warning",
+        },
+        "production": {
+            "decision": "production",
+            "label": "Подтверждён боевой запуск",
+            "tone": "ok",
+        },
+    }
+    return decisions.get(decision, decisions["blocked"])
+
+
+def get_platform_release_signoff_history(limit=6, snapshot_id=None):
+    conn = connect()
+    c = conn.cursor()
+
+    if snapshot_id:
+        rows = c.execute("""
+        SELECT *
+        FROM platform_release_signoffs
+        WHERE snapshot_id=?
+        ORDER BY id DESC
+        LIMIT ?
+        """, (snapshot_id, limit)).fetchall()
+    else:
+        rows = c.execute("""
+        SELECT *
+        FROM platform_release_signoffs
+        ORDER BY id DESC
+        LIMIT ?
+        """, (limit,)).fetchall()
+
+    conn.close()
+    history = [dict(row) for row in rows]
+
+    for item in history:
+        decision = get_platform_release_signoff_decision(item["decision"])
+        item["tone"] = decision["tone"]
+        item["snapshot_url"] = (
+            f"/platform/readiness/snapshots/{item['snapshot_id']}"
+            if item.get("snapshot_id")
+            else ""
+        )
+
+    return history
+
+
+def create_platform_release_signoff(username, decision, comment=""):
+    readiness = get_platform_release_readiness()
+    launch_plan = get_platform_release_launch_plan(readiness)
+    decision_data = get_platform_release_signoff_decision(decision)
+
+    if launch_plan["blocked"] and decision_data["decision"] != "blocked":
+        return None, "launch_blocked"
+
+    snapshot_id = create_platform_release_readiness_snapshot(
+        username,
+        readiness,
+    )
+    payload = {
+        "readiness": {
+            "score": readiness["score"],
+            "status": readiness["status"],
+            "status_label": readiness["status_label"],
+            "critical_count": readiness["critical_count"],
+            "warning_count": readiness["warning_count"],
+            "headline": readiness["headline"],
+            "generated_at": readiness["generated_at"],
+        },
+        "launch_plan": launch_plan,
+    }
+    normalized_comment = str(comment or "").strip()[:800]
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO platform_release_signoffs (
+        snapshot_id,
+        decision,
+        decision_label,
+        recommended_mode,
+        score,
+        critical_count,
+        warning_count,
+        comment,
+        signed_by,
+        signed_at,
+        payload_json
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        snapshot_id,
+        decision_data["decision"],
+        decision_data["label"],
+        launch_plan["recommended_mode"],
+        readiness["score"],
+        readiness["critical_count"],
+        readiness["warning_count"],
+        normalized_comment,
+        username,
+        now,
+        json.dumps(payload, ensure_ascii=False),
+    ))
+    signoff_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    return signoff_id, ""
 
 
 def create_platform_release_readiness_snapshot(username, readiness=None):
@@ -7112,6 +7232,7 @@ async def platform_dashboard(request: Request):
 async def platform_readiness_page(
     request: Request,
     notice: str = "",
+    error: str = "",
 ):
     username = get_user(request)
 
@@ -7130,6 +7251,7 @@ async def platform_readiness_page(
     )
     trend = get_platform_release_readiness_trend(history)
     launch_plan = get_platform_release_launch_plan(readiness)
+    signoffs = get_platform_release_signoff_history()
 
     return templates.TemplateResponse(
         request,
@@ -7143,7 +7265,9 @@ async def platform_readiness_page(
             "comparison": comparison,
             "trend": trend,
             "launch_plan": launch_plan,
+            "signoffs": signoffs,
             "notice": notice,
+            "error": error,
         },
     )
 
@@ -7167,6 +7291,39 @@ async def platform_readiness_snapshot(request: Request):
     )
 
 
+@app.post("/platform/readiness/signoff")
+async def platform_readiness_signoff(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    decision = str(form.get("decision") or "blocked").strip()
+    comment = str(form.get("comment") or "").strip()
+    signoff_id, error = create_platform_release_signoff(
+        username,
+        decision,
+        comment,
+    )
+
+    if error == "launch_blocked":
+        return RedirectResponse(
+            "/platform/readiness?error=launch_blocked",
+            status_code=302,
+        )
+
+    return RedirectResponse(
+        f"/platform/readiness?notice=signoff_saved&signoff={signoff_id}",
+        status_code=302,
+    )
+
+
 @app.get("/platform/readiness/export")
 async def platform_readiness_export(request: Request):
     username = get_user(request)
@@ -7186,6 +7343,7 @@ async def platform_readiness_export(request: Request):
     )
     trend = get_platform_release_readiness_trend(history)
     launch_plan = get_platform_release_launch_plan(readiness)
+    signoffs = get_platform_release_signoff_history()
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -7263,6 +7421,32 @@ async def platform_readiness_export(request: Request):
                 item["description"],
                 item["url"],
             ])
+    writer.writerow([])
+
+    writer.writerow(["Подтверждения запуска"])
+    writer.writerow([
+        "Дата",
+        "Автор",
+        "Решение",
+        "Режим",
+        "Оценка",
+        "Критично",
+        "Внимание",
+        "Комментарий",
+        "Снимок",
+    ])
+    for signoff in signoffs:
+        writer.writerow([
+            signoff["signed_at"],
+            signoff["signed_by"],
+            signoff["decision_label"],
+            signoff["recommended_mode"],
+            signoff["score"],
+            signoff["critical_count"],
+            signoff["warning_count"],
+            signoff["comment"],
+            signoff["snapshot_url"],
+        ])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -7398,6 +7582,9 @@ async def platform_readiness_snapshot_page(
     snapshot_comparison = compare_platform_release_readiness_snapshots(
         snapshot,
     )
+    snapshot_signoffs = get_platform_release_signoff_history(
+        snapshot_id=snapshot_id,
+    )
 
     return templates.TemplateResponse(
         request,
@@ -7409,6 +7596,7 @@ async def platform_readiness_snapshot_page(
             "snapshot": snapshot,
             "snapshot_comparison": snapshot_comparison,
             "launch_plan": snapshot["launch_plan"],
+            "snapshot_signoffs": snapshot_signoffs,
         },
     )
 
@@ -7440,6 +7628,9 @@ async def platform_readiness_snapshot_export(
         snapshot,
     )
     launch_plan = snapshot["launch_plan"]
+    snapshot_signoffs = get_platform_release_signoff_history(
+        snapshot_id=snapshot_id,
+    )
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -7531,6 +7722,30 @@ async def platform_readiness_snapshot_export(
                 item["description"],
                 item["url"],
             ])
+    writer.writerow([])
+
+    writer.writerow(["Подтверждения по снимку"])
+    writer.writerow([
+        "Дата",
+        "Автор",
+        "Решение",
+        "Режим",
+        "Оценка",
+        "Критично",
+        "Внимание",
+        "Комментарий",
+    ])
+    for signoff in snapshot_signoffs:
+        writer.writerow([
+            signoff["signed_at"],
+            signoff["signed_by"],
+            signoff["decision_label"],
+            signoff["recommended_mode"],
+            signoff["score"],
+            signoff["critical_count"],
+            signoff["warning_count"],
+            signoff["comment"],
+        ])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -7630,7 +7845,25 @@ async def api_platform_readiness(request: Request):
     )
     readiness["trend"] = get_platform_release_readiness_trend()
     readiness["launch_plan"] = get_platform_release_launch_plan(readiness)
+    readiness["signoffs"] = get_platform_release_signoff_history()
     return readiness
+
+
+@app.get("/api/platform/readiness/signoffs")
+async def api_platform_readiness_signoffs(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {
+        "signoffs": get_platform_release_signoff_history(),
+    }
 
 
 @app.get("/api/platform/readiness/launch-plan")
