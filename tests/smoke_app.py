@@ -7706,6 +7706,7 @@ async def assert_platform_calendar_health():
         }
         assert detail["company"]["risk_response_overdue"] >= 1
         assert detail["company"]["risk_response_overdue_percent"] >= 1
+        assert detail["company"]["risk_next_action"]
         assert detail["policy"] == health["policy"]
         assert "super" in detail["platform_admins"]
         assert backup_admin_username in detail["platform_admins"]
@@ -7788,6 +7789,7 @@ async def assert_platform_calendar_health():
         )
         assert "Сначала примите инцидент в работу." in detail_html
         assert "Риск 30 дней" in detail_html
+        assert "Действие:" in detail_html
         assert "Следующее действие" in detail_html
         assert "Принять в работу" in detail_html
         assert "Реакция просрочена" in detail_html
@@ -7844,6 +7846,7 @@ async def assert_platform_calendar_health():
         assert "SLA срок" in detail_export_csv
         assert "Риск 30 дней" in detail_export_csv
         assert "Оценка риска" in detail_export_csv
+        assert "Следующее действие риска" in detail_export_csv
         assert "Реакция просрочена %" in detail_export_csv
         assert "Реакция просрочена,да" in detail_export_csv
         assert "Реакция просрочена на" in detail_export_csv

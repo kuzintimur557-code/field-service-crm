@@ -5590,6 +5590,19 @@ def get_platform_calendar_company_detail(
             company_analytics["response_overdue_percent"]
         )
         company["risk_escalations"] = company_analytics["escalations"]
+        if company["risk_score"] >= 80:
+            company["risk_next_action"] = (
+                "Сначала разберите активные инциденты и просроченную "
+                "реакцию."
+            )
+        elif company["risk_score"] >= 40:
+            company["risk_next_action"] = (
+                "Проверьте причины просроченной реакции и эскалаций."
+            )
+        else:
+            company["risk_next_action"] = (
+                "Риск низкий. Достаточно наблюдать динамику."
+            )
     else:
         company["risk_score"] = 0
         company["risk_label"] = "Низкий"
@@ -5599,6 +5612,9 @@ def get_platform_calendar_company_detail(
         company["risk_response_overdue"] = 0
         company["risk_response_overdue_percent"] = 0
         company["risk_escalations"] = 0
+        company["risk_next_action"] = (
+            "Риск низкий. Достаточно наблюдать динамику."
+        )
     company["risk_analytics_url"] = (
         "/platform/calendar-health/analytics"
     )
@@ -6541,6 +6557,7 @@ async def platform_calendar_company_health_export(
     writer.writerow(["Приоритет", company["priority_label"]])
     writer.writerow(["Риск 30 дней", company["risk_label"]])
     writer.writerow(["Оценка риска", company["risk_score"]])
+    writer.writerow(["Следующее действие риска", company["risk_next_action"]])
     writer.writerow([
         "Инцидентов за 30 дней",
         company["risk_incidents"],

@@ -322,6 +322,9 @@ tr:last-child td{border-bottom:0}
                 · активно {{ company["risk_active"] }}
                 · эскалаций {{ company["risk_escalations"] }}
             </div>
+            <div class="meta">
+                Действие: {{ company["risk_next_action"] }}
+            </div>
         </div>
         <div class="overview-item">
             <div class="overview-label">Запусков</div>
