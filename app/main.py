@@ -98,6 +98,8 @@ import json
 
 
 APP_VERSION = "0.2.1"
+BACKUP_RETENTION_DAYS = 30
+BACKUP_RETENTION_KEEP = 3
 
 SESSION_COOKIE_NAME = "crm_session"
 TEAM_ACTIVITY_FILTERS = {
@@ -6051,25 +6053,45 @@ def format_backup_age(age_hours):
     return f"{int(age_hours // 24)} д"
 
 
+def list_database_backup_files():
+    backup_path = DATA_DIR / "backups"
+
+    if not backup_path.exists():
+        return []
+
+    files = [
+        file
+        for file in backup_path.iterdir()
+        if file.is_file()
+        and file.suffix.lower() in (".db", ".sqlite", ".sqlite3")
+    ]
+    files.sort(
+        key=lambda file: file.stat().st_mtime,
+        reverse=True,
+    )
+    return files
+
+
+def get_backup_cleanup_candidates(files, now=None):
+    now = now or datetime.now()
+    cutoff = now - timedelta(days=BACKUP_RETENTION_DAYS)
+    candidates = []
+
+    for file in files[BACKUP_RETENTION_KEEP:]:
+        file_at = datetime.fromtimestamp(file.stat().st_mtime)
+
+        if file_at < cutoff:
+            candidates.append(file)
+
+    return candidates
+
+
 def get_backup_status():
     db_path = DATA_DIR / "crm.db"
     backup_path = DATA_DIR / "backups"
     db_exists = db_path.exists()
     backup_path_exists = backup_path.exists()
-    files = []
-
-    if backup_path_exists:
-        files = [
-            file
-            for file in backup_path.iterdir()
-            if file.is_file()
-            and file.suffix.lower() in (".db", ".sqlite", ".sqlite3")
-        ]
-
-    files.sort(
-        key=lambda file: file.stat().st_mtime,
-        reverse=True,
-    )
+    files = list_database_backup_files()
     latest = files[0] if files else None
     now = datetime.now()
     latest_at = None
@@ -6111,12 +6133,15 @@ def get_backup_status():
         action = "Продолжайте регулярное резервное копирование."
 
     total_size = sum(file.stat().st_size for file in files)
+    cleanup_candidates = get_backup_cleanup_candidates(files, now)
+    cleanup_size = sum(file.stat().st_size for file in cleanup_candidates)
     recent_files = []
 
     for file in files[:8]:
         stat = file.stat()
         file_at = datetime.fromtimestamp(stat.st_mtime)
         file_age_hours = (now - file_at).total_seconds() / 3600
+        is_stale = file in cleanup_candidates
         recent_files.append({
             "name": file.name,
             "size": stat.st_size,
@@ -6124,6 +6149,8 @@ def get_backup_status():
             "created_at": file_at.strftime("%Y-%m-%d %H:%M"),
             "age_label": format_backup_age(file_age_hours),
             "download_url": f"/backup/download?file={file.name}",
+            "is_stale": is_stale,
+            "stale_label": "старая" if is_stale else "хранится",
         })
 
     return {
@@ -6151,6 +6178,12 @@ def get_backup_status():
         ),
         "latest_age_hours": int(latest_age_hours or 0),
         "latest_age_label": format_backup_age(latest_age_hours),
+        "retention_days": BACKUP_RETENTION_DAYS,
+        "retention_keep": BACKUP_RETENTION_KEEP,
+        "cleanup_count": len(cleanup_candidates),
+        "cleanup_size": cleanup_size,
+        "cleanup_size_label": format_file_size(cleanup_size),
+        "cleanup_url": "/backup/cleanup",
         "recent_files": recent_files,
         "url": "/backup",
         "export_url": "/backup/export",
@@ -6186,6 +6219,28 @@ def create_database_backup(username):
     destination = backup_path / f"crm_backup_{timestamp}.db"
     shutil.copy2(db_path, destination)
     return destination.name, ""
+
+
+def cleanup_old_database_backups():
+    files = list_database_backup_files()
+    candidates = get_backup_cleanup_candidates(files)
+    deleted = []
+    deleted_size = 0
+
+    for file in candidates:
+        try:
+            deleted_size += file.stat().st_size
+            deleted.append(file.name)
+            file.unlink()
+        except OSError:
+            continue
+
+    return {
+        "deleted_count": len(deleted),
+        "deleted_size": deleted_size,
+        "deleted_size_label": format_file_size(deleted_size),
+        "deleted_files": deleted,
+    }
 
 
 def make_release_readiness_check(
@@ -28922,6 +28977,8 @@ async def backup_page(
     notice: str = "",
     error: str = "",
     file: str = "",
+    deleted: str = "",
+    freed: str = "",
 ):
     username = get_user(request)
 
@@ -28946,6 +29003,8 @@ async def backup_page(
             "notice": notice,
             "error": error,
             "file": file,
+            "deleted": deleted,
+            "freed": freed,
         },
     )
 
@@ -28972,6 +29031,36 @@ async def backup_create(request: Request):
 
     return RedirectResponse(
         f"/backup?notice=backup_created&file={filename}",
+        status_code=302,
+    )
+
+
+@app.post("/backup/cleanup")
+async def backup_cleanup(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    result = cleanup_old_database_backups()
+    notice = (
+        "backup_cleanup_done"
+        if result["deleted_count"]
+        else "backup_cleanup_empty"
+    )
+    params = urlencode({
+        "notice": notice,
+        "deleted": result["deleted_count"],
+        "freed": result["deleted_size_label"],
+    })
+
+    return RedirectResponse(
+        f"/backup?{params}",
         status_code=302,
     )
 
@@ -29006,16 +29095,21 @@ async def backup_export(request: Request):
     writer.writerow(["Последняя копия", backup_status["latest_name"]])
     writer.writerow(["Дата последней", backup_status["latest_created_at"]])
     writer.writerow(["Возраст последней", backup_status["latest_age_label"]])
+    writer.writerow(["Хранить минимум копий", backup_status["retention_keep"]])
+    writer.writerow(["Срок хранения, дней", backup_status["retention_days"]])
+    writer.writerow(["К очистке", backup_status["cleanup_count"]])
+    writer.writerow(["Размер к очистке", backup_status["cleanup_size_label"]])
     writer.writerow([])
 
     writer.writerow(["Последние копии"])
-    writer.writerow(["Файл", "Дата", "Возраст", "Размер"])
+    writer.writerow(["Файл", "Дата", "Возраст", "Размер", "Хранение"])
     for item in backup_status["recent_files"]:
         writer.writerow([
             item["name"],
             item["created_at"],
             item["age_label"],
             item["size_label"],
+            item["stale_label"],
         ])
 
     return Response(

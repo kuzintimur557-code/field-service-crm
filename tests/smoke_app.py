@@ -9678,6 +9678,68 @@ async def assert_platform_calendar_health():
         assert backup_api["status_label"]
         assert "recent_files" in backup_api
         assert "latest_download_url" in backup_api
+        assert "cleanup_count" in backup_api
+        backup_dir = crm.DATA_DIR / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        retention_files = []
+
+        for index, days_old in enumerate((40, 41, 42, 43, 44), start=1):
+            backup_file = backup_dir / f"smoke_retention_{index}.db"
+            backup_file.write_bytes(b"backup")
+            backup_time = (
+                datetime.now() - timedelta(days=days_old)
+            ).timestamp()
+            os.utime(backup_file, (backup_time, backup_time))
+            retention_files.append(backup_file)
+
+        retention_status = crm.get_backup_status()
+        assert retention_status["retention_days"] == crm.BACKUP_RETENTION_DAYS
+        assert retention_status["retention_keep"] == crm.BACKUP_RETENTION_KEEP
+        assert retention_status["cleanup_count"] == 2
+        assert retention_status["cleanup_size"] == 12
+        assert any(
+            item["is_stale"] for item in retention_status["recent_files"]
+        )
+        retention_page = await crm.backup_page(
+            make_asgi_request("super", "/backup"),
+        )
+        retention_html = retention_page.body.decode("utf-8")
+        assert "Политика хранения" in retention_html
+        assert "Очистить старые" in retention_html
+        anonymous_backup_cleanup = await crm.backup_cleanup(
+            make_public_asgi_request("/backup/cleanup"),
+        )
+        assert anonymous_backup_cleanup.status_code == 302
+        assert anonymous_backup_cleanup.headers["location"] == "/login"
+        boss_backup_cleanup = await crm.backup_cleanup(
+            make_asgi_request("owner2", "/backup/cleanup"),
+        )
+        assert boss_backup_cleanup.status_code == 302
+        assert boss_backup_cleanup.headers["location"] == "/"
+        cleanup_response = await crm.backup_cleanup(
+            make_asgi_request("super", "/backup/cleanup"),
+        )
+        assert cleanup_response.status_code == 302
+        assert cleanup_response.headers["location"].startswith(
+            "/backup?notice=backup_cleanup_done"
+        )
+        assert not retention_files[3].exists()
+        assert not retention_files[4].exists()
+        assert retention_files[0].exists()
+        assert retention_files[1].exists()
+        assert retention_files[2].exists()
+        empty_cleanup_response = await crm.backup_cleanup(
+            make_asgi_request("super", "/backup/cleanup"),
+        )
+        assert empty_cleanup_response.status_code == 302
+        assert empty_cleanup_response.headers["location"].startswith(
+            "/backup?notice=backup_cleanup_empty"
+        )
+
+        for backup_file in retention_files:
+            if backup_file.exists():
+                backup_file.unlink()
+
         anonymous_backup_download = await crm.backup_download(
             make_public_asgi_request("/backup/download?file=crm.db"),
             "crm.db",

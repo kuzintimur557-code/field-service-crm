@@ -38,6 +38,12 @@ h1{margin:6px 0 0;font-size:34px}
 .file{display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 110px;gap:10px;align-items:center;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:white}
 .file-name{font-size:13px;font-weight:900}
 .file-meta{color:#6b7280;font-size:11px;font-weight:800}
+.file-tag{display:inline-flex;margin-top:6px;padding:4px 7px;border-radius:999px;background:#ecfdf5;color:#166534;font-size:10px;font-weight:900}
+.file-tag.stale{background:#fff7ed;color:#9a3412}
+.retention{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.retention-title{font-size:15px;font-weight:900}
+.retention-text{margin-top:5px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.retention form{margin:0}
 .empty{padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:900}
 @media(max-width:760px){
 .container{padding:16px}
@@ -49,6 +55,7 @@ h1{margin:6px 0 0;font-size:34px}
 .section-head{display:block}
 .section-note{margin-top:5px}
 .file{grid-template-columns:1fr}
+.retention{grid-template-columns:1fr}
 h1{font-size:28px}
 }
 </style>
@@ -79,6 +86,12 @@ h1{font-size:28px}
 
     {% if notice == "backup_created" %}
     <div class="notice">Резервная копия создана: {{ file }}.</div>
+    {% endif %}
+    {% if notice == "backup_cleanup_done" %}
+    <div class="notice">Старые копии удалены: {{ deleted }}. Освобождено: {{ freed }}.</div>
+    {% endif %}
+    {% if notice == "backup_cleanup_empty" %}
+    <div class="notice">Старых резервных копий для очистки нет.</div>
     {% endif %}
     {% if error == "db_missing" %}
     <div class="notice error">Файл базы данных не найден. Копию создать нельзя.</div>
@@ -122,6 +135,25 @@ h1{font-size:28px}
     </section>
 
     <section class="section">
+        <div class="retention">
+            <div>
+                <div class="retention-title">Политика хранения</div>
+                <div class="retention-text">
+                    Храним минимум {{ backup_status["retention_keep"] }} последние копии.
+                    Старые копии старше {{ backup_status["retention_days"] }} дней можно очистить.
+                    Сейчас к очистке: {{ backup_status["cleanup_count"] }},
+                    объём: {{ backup_status["cleanup_size_label"] }}.
+                </div>
+            </div>
+            {% if backup_status["cleanup_count"] %}
+            <form method="post" action="{{ backup_status['cleanup_url'] }}">
+                <button class="button secondary" type="submit">Очистить старые</button>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="section">
         <div class="section-head">
             <h2 class="section-title">Последние копии</h2>
             <div class="section-note">{{ backup_status["backup_path"] }}</div>
@@ -133,6 +165,7 @@ h1{font-size:28px}
                 <div>
                     <div class="file-name">{{ item["name"] }}</div>
                     <div class="file-meta">Создана: {{ item["created_at"] }}</div>
+                    <span class="file-tag {% if item['is_stale'] %}stale{% endif %}">{{ item["stale_label"] }}</span>
                 </div>
                 <div class="file-meta">Возраст: {{ item["age_label"] }}</div>
                 <div class="file-meta">{{ item["size_label"] }}</div>
