@@ -188,6 +188,13 @@ h1{font-size:28px}
                 <div class="retention-text">
                     Система копирует последнюю резервную копию во временную папку,
                     открывает её и проверяет структуру. Рабочая база не изменяется.
+                    Текущий статус: {{ backup_status["restore_check"]["status_label"] }}.
+                    {{ backup_status["restore_check"]["message"] }}
+                    {% if backup_status["restore_check"]["created_at"] %}
+                    Последняя проверка:
+                    {{ backup_status["restore_check"]["created_at"] }},
+                    {{ backup_status["restore_check"]["username"] }}.
+                    {% endif %}
                 </div>
             </div>
             {% if backup_status["latest_name"] %}

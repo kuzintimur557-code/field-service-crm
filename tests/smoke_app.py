@@ -9685,6 +9685,7 @@ async def assert_platform_calendar_health():
         assert "latest_download_url" in backup_api
         assert "cleanup_count" in backup_api
         assert "latest_verification" in backup_api
+        assert "restore_check" in backup_api
         anonymous_restore_check = await crm.backup_restore_check(
             make_public_asgi_request("/backup/restore-check"),
         )
@@ -9781,6 +9782,8 @@ async def assert_platform_calendar_health():
         verified_backup_status = crm.get_backup_status()
         assert verified_backup_status["latest_name"] == created_backup_name
         assert verified_backup_status["latest_verification"]["status"] == "ok"
+        assert verified_backup_status["restore_check"]["status"] == "warning"
+        assert verified_backup_status["status"] == "warning"
         assert verified_backup_status["verification_checked_count"] == 1
         assert verified_backup_status["verification_problem_count"] == 0
         verified_backup_page = await crm.backup_page(
@@ -9797,6 +9800,12 @@ async def assert_platform_calendar_health():
         assert restore_check_response.headers["location"].startswith(
             f"/backup?notice=restore_check_ok&file={created_backup_name}"
         )
+        restored_backup_status = crm.get_backup_status()
+        assert restored_backup_status["restore_check"]["status"] == "ok"
+        assert restored_backup_status["restore_check"]["file_name"] == (
+            created_backup_name
+        )
+        assert restored_backup_status["status"] == "ok"
         backup_events = crm.get_backup_event_history()
         backup_actions = [event["action"] for event in backup_events]
         assert "Создание копии" in backup_actions
@@ -9815,6 +9824,12 @@ async def assert_platform_calendar_health():
         assert "Копия успешно скопирована во временную папку" in (
             logged_backup_html
         )
+        readiness_after_restore = crm.get_platform_release_readiness()
+        restore_readiness = next(
+            item for item in readiness_after_restore["checks"]
+            if item["key"] == "backup_restore_check"
+        )
+        assert restore_readiness["status"] == "ok"
 
         anonymous_backup_download = await crm.backup_download(
             make_public_asgi_request("/backup/download?file=crm.db"),

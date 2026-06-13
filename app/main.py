@@ -6093,6 +6093,29 @@ def get_backup_event_history(limit=12):
     return events
 
 
+def get_latest_backup_event(action="", file_name=""):
+    conn = connect()
+    query = """
+    SELECT *
+    FROM backup_events
+    WHERE 1=1
+    """
+    params = []
+
+    if action:
+        query += " AND action=?"
+        params.append(action)
+
+    if file_name:
+        query += " AND file_name=?"
+        params.append(file_name)
+
+    query += " ORDER BY id DESC LIMIT 1"
+    event = conn.execute(query, params).fetchone()
+    conn.close()
+    return event
+
+
 def list_database_backup_files():
     backup_path = DATA_DIR / "backups"
 
@@ -6218,6 +6241,48 @@ def get_backup_status():
             "missing_tables": [],
         }
     )
+    latest_restore_event = (
+        get_latest_backup_event("Проверка восстановления", latest.name)
+        if latest
+        else None
+    )
+
+    if not latest:
+        restore_check = {
+            "status": "warning",
+            "status_label": "нет копии",
+            "message": "Проверку восстановления нельзя выполнить без backup.",
+            "created_at": "",
+            "username": "",
+            "file_name": "",
+        }
+    elif latest_restore_event and latest_restore_event["status"] == "Успешно":
+        restore_check = {
+            "status": "ok",
+            "status_label": "Проверено",
+            "message": latest_restore_event["details"],
+            "created_at": latest_restore_event["created_at"],
+            "username": latest_restore_event["username"],
+            "file_name": latest_restore_event["file_name"],
+        }
+    elif latest_restore_event:
+        restore_check = {
+            "status": "critical",
+            "status_label": "Ошибка",
+            "message": latest_restore_event["details"],
+            "created_at": latest_restore_event["created_at"],
+            "username": latest_restore_event["username"],
+            "file_name": latest_restore_event["file_name"],
+        }
+    else:
+        restore_check = {
+            "status": "warning",
+            "status_label": "не проверено",
+            "message": "Последняя копия ещё не проходила проверку восстановления.",
+            "created_at": "",
+            "username": "",
+            "file_name": latest.name,
+        }
 
     if not db_exists:
         status = "critical"
@@ -6244,6 +6309,16 @@ def get_backup_status():
         status_label = "Копия неполная"
         summary = "Последняя копия читается, но в ней нет части ключевых таблиц."
         action = "Проверьте миграции и создайте новую копию."
+    elif restore_check["status"] == "critical":
+        status = "critical"
+        status_label = "Восстановление не прошло"
+        summary = "Последняя копия не прошла проверку восстановления."
+        action = "Создайте новую копию и повторите проверку восстановления."
+    elif restore_check["status"] == "warning":
+        status = "warning"
+        status_label = "Нужна проверка восстановления"
+        summary = "Последняя копия ещё не проверялась на восстановление."
+        action = "Запустите проверку восстановления перед релизом."
     elif latest_age_hours > 168:
         status = "critical"
         status_label = "Копия устарела"
@@ -6315,6 +6390,7 @@ def get_backup_status():
         "latest_age_hours": int(latest_age_hours or 0),
         "latest_age_label": format_backup_age(latest_age_hours),
         "latest_verification": latest_verification,
+        "restore_check": restore_check,
         "verification_checked_count": len(verifications),
         "verification_problem_count": verification_problem_count,
         "retention_days": BACKUP_RETENTION_DAYS,
@@ -6680,6 +6756,17 @@ def get_platform_release_readiness(
                 f"Всего копий: {backup_status['count']}."
             ),
             backup_status["action"],
+            "/backup",
+            8,
+            "infrastructure",
+            "Инфраструктура",
+        ),
+        make_release_readiness_check(
+            "backup_restore_check",
+            "Проверка восстановления",
+            backup_status["restore_check"]["status"],
+            backup_status["restore_check"]["message"],
+            "Запустите проверку восстановления последней копии.",
             "/backup",
             8,
             "infrastructure",
@@ -29369,7 +29456,11 @@ async def backup_export(request: Request):
     ])
     writer.writerow([
         "Проверка восстановления",
-        "доступна" if backup_status["latest_name"] else "нет копий",
+        backup_status["restore_check"]["status_label"],
+    ])
+    writer.writerow([
+        "Результат проверки восстановления",
+        backup_status["restore_check"]["message"],
     ])
     writer.writerow(["Хранить минимум копий", backup_status["retention_keep"]])
     writer.writerow(["Срок хранения, дней", backup_status["retention_days"]])
