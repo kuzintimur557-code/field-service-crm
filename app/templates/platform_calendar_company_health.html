@@ -159,6 +159,9 @@ tr:last-child td{border-bottom:0}
             </div>
         </div>
         <div class="incident-actions">
+            {% if company["response_overdue"] %}
+            <span class="accepted overdue">Реакция просрочена</span>
+            {% endif %}
             {% if company["is_acknowledged"] %}
             <span class="accepted {% if company['recovery_overdue'] %}overdue{% endif %}">
                 {% if company["recovery_overdue"] %}

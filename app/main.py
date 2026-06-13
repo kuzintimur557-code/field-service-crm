@@ -6386,6 +6386,10 @@ async def platform_calendar_company_health_export(
     ])
     writer.writerow(["Ответственный", company["assignee_username"] or ""])
     writer.writerow([
+        "Реакция просрочена",
+        "да" if company["response_overdue"] else "нет",
+    ])
+    writer.writerow([
         "Восстановление просрочено",
         "да" if company["recovery_overdue"] else "нет",
     ])

@@ -7781,6 +7781,7 @@ async def assert_platform_calendar_health():
         assert "Сначала примите инцидент в работу." in detail_html
         assert "Следующее действие" in detail_html
         assert "Принять в работу" in detail_html
+        assert "Реакция просрочена" in detail_html
         assert "Реакция просрочена на" in detail_html
         assert (
             "Инцидент ещё не закреплён за администратором."
@@ -7832,6 +7833,7 @@ async def assert_platform_calendar_health():
             detail_export_csv
         )
         assert "SLA срок" in detail_export_csv
+        assert "Реакция просрочена,да" in detail_export_csv
         assert "Реакция просрочена на" in detail_export_csv
         assert "Подсказка действия" in detail_export_csv
         assert company_name in detail_export_csv
