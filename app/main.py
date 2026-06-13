@@ -89,6 +89,7 @@ import os
 import hmac
 import hashlib
 import bcrypt
+import sqlite3
 import base64
 import secrets
 import csv
@@ -100,6 +101,7 @@ import json
 APP_VERSION = "0.2.1"
 BACKUP_RETENTION_DAYS = 30
 BACKUP_RETENTION_KEEP = 3
+BACKUP_REQUIRED_TABLES = ("users", "tasks", "clients")
 
 SESSION_COOKIE_NAME = "crm_session"
 TEAM_ACTIVITY_FILTERS = {
@@ -6086,6 +6088,70 @@ def get_backup_cleanup_candidates(files, now=None):
     return candidates
 
 
+def verify_database_backup_file(file_path):
+    result = {
+        "status": "critical",
+        "status_label": "Проблема",
+        "message": "Копия не проверена.",
+        "quick_check": "",
+        "missing_tables": [],
+    }
+    conn = None
+
+    try:
+        backup_uri = f"file:{file_path.resolve()}?mode=ro"
+        conn = sqlite3.connect(backup_uri, uri=True)
+        quick_check_row = conn.execute("PRAGMA quick_check").fetchone()
+        quick_check = quick_check_row[0] if quick_check_row else ""
+        table_rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+        tables = {row[0] for row in table_rows}
+        missing_tables = [
+            table
+            for table in BACKUP_REQUIRED_TABLES
+            if table not in tables
+        ]
+
+        if quick_check != "ok":
+            result.update({
+                "status": "critical",
+                "status_label": "Ошибка проверки",
+                "message": "SQLite quick_check вернул ошибку.",
+                "quick_check": quick_check,
+                "missing_tables": missing_tables,
+            })
+        elif missing_tables:
+            result.update({
+                "status": "warning",
+                "status_label": "Неполная копия",
+                "message": "В копии нет части ключевых таблиц.",
+                "quick_check": quick_check,
+                "missing_tables": missing_tables,
+            })
+        else:
+            result.update({
+                "status": "ok",
+                "status_label": "Проверена",
+                "message": "Копия читается, ключевые таблицы на месте.",
+                "quick_check": quick_check,
+                "missing_tables": [],
+            })
+    except (OSError, sqlite3.Error):
+        result.update({
+            "status": "critical",
+            "status_label": "Не читается",
+            "message": "Файл не читается как SQLite база.",
+            "quick_check": "",
+            "missing_tables": list(BACKUP_REQUIRED_TABLES),
+        })
+    finally:
+        if conn:
+            conn.close()
+
+    return result
+
+
 def get_backup_status():
     db_path = DATA_DIR / "crm.db"
     backup_path = DATA_DIR / "backups"
@@ -6100,6 +6166,20 @@ def get_backup_status():
     if latest:
         latest_at = datetime.fromtimestamp(latest.stat().st_mtime)
         latest_age_hours = (now - latest_at).total_seconds() / 3600
+
+    verifications = {
+        file.name: verify_database_backup_file(file)
+        for file in files[:8]
+    }
+    latest_verification = (
+        verifications.get(latest.name) if latest else {
+            "status": "empty",
+            "status_label": "нет",
+            "message": "Резервных копий пока нет.",
+            "quick_check": "",
+            "missing_tables": [],
+        }
+    )
 
     if not db_exists:
         status = "critical"
@@ -6116,6 +6196,16 @@ def get_backup_status():
         status_label = "Копий нет"
         summary = "Резервных копий базы пока нет."
         action = "Создайте первую резервную копию перед релизом."
+    elif latest_verification["status"] == "critical":
+        status = "critical"
+        status_label = "Копия повреждена"
+        summary = "Последняя резервная копия не прошла проверку."
+        action = "Создайте новую копию и проверьте её перед запуском."
+    elif latest_verification["status"] == "warning":
+        status = "warning"
+        status_label = "Копия неполная"
+        summary = "Последняя копия читается, но в ней нет части ключевых таблиц."
+        action = "Проверьте миграции и создайте новую копию."
     elif latest_age_hours > 168:
         status = "critical"
         status_label = "Копия устарела"
@@ -6142,6 +6232,7 @@ def get_backup_status():
         file_at = datetime.fromtimestamp(stat.st_mtime)
         file_age_hours = (now - file_at).total_seconds() / 3600
         is_stale = file in cleanup_candidates
+        verification = verifications.get(file.name)
         recent_files.append({
             "name": file.name,
             "size": stat.st_size,
@@ -6151,7 +6242,14 @@ def get_backup_status():
             "download_url": f"/backup/download?file={file.name}",
             "is_stale": is_stale,
             "stale_label": "старая" if is_stale else "хранится",
+            "verification": verification,
         })
+
+    verification_problem_count = len([
+        item
+        for item in verifications.values()
+        if item["status"] in ("warning", "critical")
+    ])
 
     return {
         "status": status,
@@ -6178,6 +6276,9 @@ def get_backup_status():
         ),
         "latest_age_hours": int(latest_age_hours or 0),
         "latest_age_label": format_backup_age(latest_age_hours),
+        "latest_verification": latest_verification,
+        "verification_checked_count": len(verifications),
+        "verification_problem_count": verification_problem_count,
         "retention_days": BACKUP_RETENTION_DAYS,
         "retention_keep": BACKUP_RETENTION_KEEP,
         "cleanup_count": len(cleanup_candidates),
@@ -29095,6 +29196,14 @@ async def backup_export(request: Request):
     writer.writerow(["Последняя копия", backup_status["latest_name"]])
     writer.writerow(["Дата последней", backup_status["latest_created_at"]])
     writer.writerow(["Возраст последней", backup_status["latest_age_label"]])
+    writer.writerow([
+        "Проверка последней",
+        backup_status["latest_verification"]["status_label"],
+    ])
+    writer.writerow([
+        "Проблемных среди последних",
+        backup_status["verification_problem_count"],
+    ])
     writer.writerow(["Хранить минимум копий", backup_status["retention_keep"]])
     writer.writerow(["Срок хранения, дней", backup_status["retention_days"]])
     writer.writerow(["К очистке", backup_status["cleanup_count"]])
@@ -29102,7 +29211,7 @@ async def backup_export(request: Request):
     writer.writerow([])
 
     writer.writerow(["Последние копии"])
-    writer.writerow(["Файл", "Дата", "Возраст", "Размер", "Хранение"])
+    writer.writerow(["Файл", "Дата", "Возраст", "Размер", "Хранение", "Проверка"])
     for item in backup_status["recent_files"]:
         writer.writerow([
             item["name"],
@@ -29110,6 +29219,7 @@ async def backup_export(request: Request):
             item["age_label"],
             item["size_label"],
             item["stale_label"],
+            item["verification"]["status_label"],
         ])
 
     return Response(

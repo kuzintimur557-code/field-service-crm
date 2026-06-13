@@ -9664,6 +9664,7 @@ async def assert_platform_calendar_health():
         assert backup_csv.startswith("\ufeff")
         assert "Резервные копии" in backup_csv
         assert "Последние копии" in backup_csv
+        assert "Проверка последней" in backup_csv
         anonymous_backup_api = await crm.api_platform_backup_status(
             make_public_asgi_request("/api/platform/backup-status"),
         )
@@ -9679,6 +9680,7 @@ async def assert_platform_calendar_health():
         assert "recent_files" in backup_api
         assert "latest_download_url" in backup_api
         assert "cleanup_count" in backup_api
+        assert "latest_verification" in backup_api
         backup_dir = crm.DATA_DIR / "backups"
         backup_dir.mkdir(parents=True, exist_ok=True)
         retention_files = []
@@ -9697,6 +9699,8 @@ async def assert_platform_calendar_health():
         assert retention_status["retention_keep"] == crm.BACKUP_RETENTION_KEEP
         assert retention_status["cleanup_count"] == 2
         assert retention_status["cleanup_size"] == 12
+        assert retention_status["latest_verification"]["status"] == "critical"
+        assert retention_status["verification_problem_count"] == 5
         assert any(
             item["is_stale"] for item in retention_status["recent_files"]
         )
@@ -9705,6 +9709,8 @@ async def assert_platform_calendar_health():
         )
         retention_html = retention_page.body.decode("utf-8")
         assert "Политика хранения" in retention_html
+        assert "Проверка целостности" in retention_html
+        assert "Файл не читается как SQLite база." in retention_html
         assert "Очистить старые" in retention_html
         anonymous_backup_cleanup = await crm.backup_cleanup(
             make_public_asgi_request("/backup/cleanup"),
@@ -9739,6 +9745,23 @@ async def assert_platform_calendar_health():
         for backup_file in retention_files:
             if backup_file.exists():
                 backup_file.unlink()
+
+        created_backup_name, created_backup_error = (
+            crm.create_database_backup("super")
+        )
+        assert not created_backup_error
+        verified_backup_status = crm.get_backup_status()
+        assert verified_backup_status["latest_name"] == created_backup_name
+        assert verified_backup_status["latest_verification"]["status"] == "ok"
+        assert verified_backup_status["verification_checked_count"] == 1
+        assert verified_backup_status["verification_problem_count"] == 0
+        verified_backup_page = await crm.backup_page(
+            make_asgi_request("super", "/backup"),
+        )
+        verified_backup_html = verified_backup_page.body.decode("utf-8")
+        assert "Копия читается, ключевые таблицы на месте." in (
+            verified_backup_html
+        )
 
         anonymous_backup_download = await crm.backup_download(
             make_public_asgi_request("/backup/download?file=crm.db"),

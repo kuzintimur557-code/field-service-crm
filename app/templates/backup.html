@@ -40,10 +40,17 @@ h1{margin:6px 0 0;font-size:34px}
 .file-meta{color:#6b7280;font-size:11px;font-weight:800}
 .file-tag{display:inline-flex;margin-top:6px;padding:4px 7px;border-radius:999px;background:#ecfdf5;color:#166534;font-size:10px;font-weight:900}
 .file-tag.stale{background:#fff7ed;color:#9a3412}
+.file-tag.verify-warning{background:#fffbeb;color:#92400e}
+.file-tag.verify-critical{background:#fef2f2;color:#991b1b}
 .retention{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:white}
 .retention-title{font-size:15px;font-weight:900}
 .retention-text{margin-top:5px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
 .retention form{margin:0}
+.integrity{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.integrity-card{padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.integrity-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.integrity-value{margin-top:6px;font-size:18px;font-weight:900}
+.integrity-note{margin-top:6px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.45}
 .empty{padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:900}
 @media(max-width:760px){
 .container{padding:16px}
@@ -56,6 +63,7 @@ h1{margin:6px 0 0;font-size:34px}
 .section-note{margin-top:5px}
 .file{grid-template-columns:1fr}
 .retention{grid-template-columns:1fr}
+.integrity{grid-template-columns:1fr}
 h1{font-size:28px}
 }
 </style>
@@ -112,6 +120,7 @@ h1{font-size:28px}
             {{ backup_status["summary"] }}
             {{ backup_status["action"] }}
             Последняя копия: {{ backup_status["latest_age_label"] }}.
+            Проверка: {{ backup_status["latest_verification"]["status_label"] }}.
         </div>
     </section>
 
@@ -131,6 +140,30 @@ h1{font-size:28px}
         <div class="metric">
             <div class="metric-label">Общий размер</div>
             <div class="metric-value">{{ backup_status["total_size_label"] }}</div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Проверка целостности</h2>
+            <div class="section-note">SQLite quick_check и ключевые таблицы</div>
+        </div>
+        <div class="integrity">
+            <div class="integrity-card">
+                <div class="integrity-label">Последняя копия</div>
+                <div class="integrity-value">{{ backup_status["latest_verification"]["status_label"] }}</div>
+                <div class="integrity-note">{{ backup_status["latest_verification"]["message"] }}</div>
+            </div>
+            <div class="integrity-card">
+                <div class="integrity-label">Проверено</div>
+                <div class="integrity-value">{{ backup_status["verification_checked_count"] }}</div>
+                <div class="integrity-note">Проверяются последние резервные копии в списке.</div>
+            </div>
+            <div class="integrity-card">
+                <div class="integrity-label">Проблемы</div>
+                <div class="integrity-value">{{ backup_status["verification_problem_count"] }}</div>
+                <div class="integrity-note">Копии с ошибкой чтения или неполной структурой.</div>
+            </div>
         </div>
     </section>
 
@@ -166,6 +199,8 @@ h1{font-size:28px}
                     <div class="file-name">{{ item["name"] }}</div>
                     <div class="file-meta">Создана: {{ item["created_at"] }}</div>
                     <span class="file-tag {% if item['is_stale'] %}stale{% endif %}">{{ item["stale_label"] }}</span>
+                    <span class="file-tag verify-{{ item['verification']['status'] }}">{{ item["verification"]["status_label"] }}</span>
+                    <div class="file-meta">{{ item["verification"]["message"] }}</div>
                 </div>
                 <div class="file-meta">Возраст: {{ item["age_label"] }}</div>
                 <div class="file-meta">{{ item["size_label"] }}</div>
