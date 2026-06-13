@@ -7522,6 +7522,14 @@ async def assert_platform_calendar_health():
             status_filter="unknown",
         )
         assert normalized["status_filter"] == "all"
+        assert crm.build_platform_calendar_health_queue_url(
+            status="unknown",
+            assignee="",
+            notice="acknowledged",
+        ) == (
+            "/platform/calendar-health?"
+            "status=all&assignee=all&notice=acknowledged"
+        )
 
         anonymous = await crm.platform_calendar_health_page(
             make_public_asgi_request("/platform/calendar-health"),
@@ -7561,6 +7569,11 @@ async def assert_platform_calendar_health():
         assert "Нагрузка администраторов" in html
         assert "Мои инциденты" in html
         assert "Без ответственного" in html
+        assert "Принять себе" in html
+        assert (
+            "return_to=queue&amp;status=problem&amp;assignee=all"
+            in html
+        )
         assert backup_admin_username in html
         assert (
             f"реакция: {health['policy']['response_minutes']} мин."
@@ -7760,12 +7773,39 @@ async def assert_platform_calendar_health():
                     ),
                 ),
                 company_id,
+                return_to="queue",
+                status="unacknowledged",
+                assignee="unassigned",
             )
         )
         assert platform_acknowledge.status_code == 302
         assert platform_acknowledge.headers["location"] == (
-            f"/platform/calendar-health/{company_id}"
-            "?notice=acknowledged"
+            "/platform/calendar-health?"
+            "status=unacknowledged"
+            "&assignee=unassigned"
+            "&notice=acknowledged"
+        )
+        claimed_queue_page = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "super",
+                (
+                    "/platform/calendar-health"
+                    "?status=unacknowledged"
+                    "&assignee=unassigned"
+                    "&notice=acknowledged"
+                ),
+            ),
+            status="unacknowledged",
+            assignee="unassigned",
+            notice="acknowledged",
+        )
+        claimed_queue_html = claimed_queue_page.body.decode("utf-8")
+        assert "Инцидент принят в работу и назначен вам." in (
+            claimed_queue_html
+        )
+        assert all(
+            item["company_id"] != company_id
+            for item in claimed_queue_page.context["companies"]
         )
         repeated_platform_acknowledge = (
             await crm.platform_calendar_incident_acknowledge(
@@ -7805,6 +7845,11 @@ async def assert_platform_calendar_health():
         assert (
             f"/platform/calendar-health/{company_id}/assign"
             in acknowledged_html
+        )
+        assert (
+            f"/platform/calendar-health/{company_id}"
+            "/acknowledge?return_to=queue"
+            not in acknowledged_html
         )
         assert (
             f"/platform/calendar-health/{company_id}/recover"

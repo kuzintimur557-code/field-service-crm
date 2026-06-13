@@ -4994,6 +4994,44 @@ def get_platform_calendar_health(
     }
 
 
+def build_platform_calendar_health_queue_url(
+    status="all",
+    assignee="all",
+    notice="",
+    error="",
+):
+    allowed_statuses = {
+        "all",
+        "problem",
+        "healthy",
+        "waiting",
+        "disabled",
+        "unacknowledged",
+        "recovery_overdue",
+        "critical",
+    }
+    status = str(status or "all").strip()
+    assignee = str(assignee or "all").strip()[:100]
+
+    if status not in allowed_statuses:
+        status = "all"
+
+    if not assignee:
+        assignee = "all"
+
+    params = {
+        "status": status,
+        "assignee": assignee,
+    }
+
+    if notice:
+        params["notice"] = str(notice)
+    elif error:
+        params["error"] = str(error)
+
+    return "/platform/calendar-health?" + urlencode(params)
+
+
 def get_platform_calendar_company_detail(
     company_id,
     now_dt=None,
@@ -5343,6 +5381,8 @@ async def platform_calendar_health_page(
     request: Request,
     status: str = "all",
     assignee: str = "all",
+    notice: str = "",
+    error: str = "",
 ):
     username = get_user(request)
 
@@ -5359,6 +5399,25 @@ async def platform_calendar_health_page(
         assignee_filter=assignee,
         current_username=username,
     )
+    page_messages = {
+        "acknowledged": (
+            "Инцидент принят в работу и назначен вам.",
+            "success",
+        ),
+        "incident_not_found": (
+            "Активный инцидент уже закрыт или не найден.",
+            "error",
+        ),
+        "already_acknowledged": (
+            "Инцидент уже принял другой администратор.",
+            "error",
+        ),
+        "company_not_found": (
+            "Компания не найдена.",
+            "error",
+        ),
+    }
+    page_message = page_messages.get(notice or error)
 
     return templates.TemplateResponse(
         request,
@@ -5374,6 +5433,12 @@ async def platform_calendar_health_page(
             "selected_assignee": health["assignee_filter"],
             "platform_admins": health["platform_admins"],
             "admin_workload": health["admin_workload"],
+            "page_message": (
+                page_message[0] if page_message else ""
+            ),
+            "page_message_tone": (
+                page_message[1] if page_message else ""
+            ),
         },
     )
 
@@ -5555,6 +5620,9 @@ async def platform_calendar_company_health_page(
 async def platform_calendar_incident_acknowledge(
     request: Request,
     company_id: int,
+    return_to: str = "",
+    status: str = "all",
+    assignee: str = "all",
 ):
     username = get_user(request)
 
@@ -5572,6 +5640,17 @@ async def platform_calendar_incident_acknowledge(
     query_value = (
         "acknowledged" if result["ok"] else result["error"]
     )
+
+    if return_to == "queue":
+        return RedirectResponse(
+            build_platform_calendar_health_queue_url(
+                status=status,
+                assignee=assignee,
+                **{query_key: query_value},
+            ),
+            status_code=302,
+        )
+
     return RedirectResponse(
         (
             f"/platform/calendar-health/{company_id}"
