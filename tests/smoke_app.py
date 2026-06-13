@@ -7707,6 +7707,7 @@ async def assert_platform_calendar_health():
         assert detail["company"]["risk_response_overdue"] >= 1
         assert detail["company"]["risk_response_overdue_percent"] >= 1
         assert detail["company"]["risk_next_action"]
+        assert detail["company"]["risk_main_factor"]
         assert detail["policy"] == health["policy"]
         assert "super" in detail["platform_admins"]
         assert backup_admin_username in detail["platform_admins"]
@@ -7790,6 +7791,7 @@ async def assert_platform_calendar_health():
         assert "Сначала примите инцидент в работу." in detail_html
         assert "Риск 30 дней" in detail_html
         assert "Действие:" in detail_html
+        assert "Причина:" in detail_html
         assert "Следующее действие" in detail_html
         assert "Принять в работу" in detail_html
         assert "Реакция просрочена" in detail_html
@@ -7847,6 +7849,7 @@ async def assert_platform_calendar_health():
         assert "Риск 30 дней" in detail_export_csv
         assert "Оценка риска" in detail_export_csv
         assert "Следующее действие риска" in detail_export_csv
+        assert "Главный фактор риска" in detail_export_csv
         assert "Реакция просрочена %" in detail_export_csv
         assert "Реакция просрочена,да" in detail_export_csv
         assert "Реакция просрочена на" in detail_export_csv
@@ -9315,6 +9318,7 @@ async def assert_platform_calendar_health():
         assert analytics_company["response_overdue"] >= 1
         assert analytics_company["response_overdue_percent"] >= 1
         assert analytics_company["risk_score"] >= 1
+        assert analytics_company["risk_main_factor"]
         assert analytics_company["risk_label"] in {
             "Высокий",
             "Средний",
@@ -9420,6 +9424,7 @@ async def assert_platform_calendar_health():
         )
         assert "Среднее восстановление" in analytics_html
         assert "Риск" in analytics_html
+        assert "Главный фактор" in analytics_html
         assert "Высокий риск" in analytics_html
         assert "Риск по дням" in analytics_html
         assert "Сначала компании с нарушенной реакцией" in analytics_html
@@ -9478,6 +9483,7 @@ async def assert_platform_calendar_health():
         assert "Просрочена реакция" in analytics_export_csv
         assert "Реакция %" in analytics_export_csv
         assert "Оценка риска" in analytics_export_csv
+        assert "Главный фактор" in analytics_export_csv
         assert "Реакция просрочена" in analytics_export_csv
         assert "Рекомендации" in analytics_export_csv
         assert "Разберите активные инциденты" in analytics_export_csv

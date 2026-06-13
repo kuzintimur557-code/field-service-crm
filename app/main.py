@@ -4235,6 +4235,41 @@ def build_calendar_incident_sessions(
     return sessions
 
 
+def get_calendar_company_risk_main_factor(company):
+    factors = [
+        (
+            int(company.get("response_overdue_percent") or 0),
+            (
+                "Просроченная реакция: "
+                f"{company.get('response_overdue_percent') or 0}%"
+            ),
+        ),
+        (
+            int(company.get("recovery_overdue") or 0) * 25,
+            (
+                "Просроченное восстановление: "
+                f"{company.get('recovery_overdue') or 0}"
+            ),
+        ),
+        (
+            int(company.get("active") or 0) * 20,
+            f"Активные инциденты: {company.get('active') or 0}",
+        ),
+        (
+            int(company.get("escalations") or 0) * 15,
+            f"Эскалации: {company.get('escalations') or 0}",
+        ),
+    ]
+    active_factors = [
+        item for item in factors if item[0] > 0
+    ]
+
+    if not active_factors:
+        return "Серьёзных факторов риска не найдено."
+
+    return max(active_factors, key=lambda item: item[0])[1]
+
+
 def get_platform_calendar_incident_analytics(
     days=30,
     now_dt=None,
@@ -4477,6 +4512,9 @@ def get_platform_calendar_incident_analytics(
         else:
             company["risk_label"] = "Низкий"
             company["risk_tone"] = "healthy"
+        company["risk_main_factor"] = (
+            get_calendar_company_risk_main_factor(company)
+        )
         company["detail_url"] = (
             f"/platform/calendar-health/{company['company_id']}"
         )
@@ -5590,6 +5628,7 @@ def get_platform_calendar_company_detail(
             company_analytics["response_overdue_percent"]
         )
         company["risk_escalations"] = company_analytics["escalations"]
+        company["risk_main_factor"] = company_analytics["risk_main_factor"]
         if company["risk_score"] >= 80:
             company["risk_next_action"] = (
                 "Сначала разберите активные инциденты и просроченную "
@@ -5612,6 +5651,9 @@ def get_platform_calendar_company_detail(
         company["risk_response_overdue"] = 0
         company["risk_response_overdue_percent"] = 0
         company["risk_escalations"] = 0
+        company["risk_main_factor"] = (
+            "Серьёзных факторов риска не найдено."
+        )
         company["risk_next_action"] = (
             "Риск низкий. Достаточно наблюдать динамику."
         )
@@ -6417,6 +6459,7 @@ async def platform_calendar_incident_analytics_export(
         "Компания",
         "Риск",
         "Оценка риска",
+        "Главный фактор",
         "Инциденты",
         "Восстановлено",
         "Активные",
@@ -6434,6 +6477,7 @@ async def platform_calendar_incident_analytics_export(
             company["company_name"],
             company["risk_label"],
             company["risk_score"],
+            company["risk_main_factor"],
             company["incidents"],
             company["recovered"],
             company["active"],
@@ -6558,6 +6602,7 @@ async def platform_calendar_company_health_export(
     writer.writerow(["Риск 30 дней", company["risk_label"]])
     writer.writerow(["Оценка риска", company["risk_score"]])
     writer.writerow(["Следующее действие риска", company["risk_next_action"]])
+    writer.writerow(["Главный фактор риска", company["risk_main_factor"]])
     writer.writerow([
         "Инцидентов за 30 дней",
         company["risk_incidents"],
