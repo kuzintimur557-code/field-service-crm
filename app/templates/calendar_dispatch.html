@@ -412,6 +412,15 @@ h1{margin:0;font-size:32px}
                         · {{ calendar_scheduler_incident["acknowledged_at"] }}
                     </span>
                     {% endif %}
+                    {% if calendar_scheduler_incident["assigned_to"] %}
+                    <span>
+                        Ответственный:
+                        {{ calendar_scheduler_incident["assigned_to"] }}
+                        {% if calendar_scheduler_incident["assigned_at"] %}
+                        · {{ calendar_scheduler_incident["assigned_at"] }}
+                        {% endif %}
+                    </span>
+                    {% endif %}
                 </div>
             </div>
             {% if calendar_scheduler_incident["acknowledged_at"] %}

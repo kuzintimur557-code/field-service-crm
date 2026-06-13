@@ -4525,6 +4525,9 @@ def get_platform_calendar_health(
         scheduler.incident_message,
         scheduler.incident_acknowledged_at,
         scheduler.incident_acknowledged_by,
+        scheduler.incident_assigned_at,
+        scheduler.incident_assigned_to,
+        scheduler.incident_assigned_by,
         EXISTS(
             SELECT 1
             FROM calendar_scheduler_incident_events AS escalation
@@ -4707,7 +4710,19 @@ def get_platform_calendar_health(
             item["incident_acknowledged_at"]
         )
         item["assignee_username"] = str(
-            item["incident_acknowledged_by"] or ""
+            item["incident_assigned_to"]
+            or item["incident_acknowledged_by"]
+            or ""
+        )
+        item["assigned_at"] = str(
+            item["incident_assigned_at"]
+            or item["incident_acknowledged_at"]
+            or ""
+        )
+        item["assigned_by"] = str(
+            item["incident_assigned_by"]
+            or item["incident_acknowledged_by"]
+            or ""
         )
         item["is_mine"] = bool(
             active_incident
@@ -10494,6 +10509,8 @@ async def calendar_dispatch_page(
         "recovery_overdue": "Восстановление просрочено",
         "recovery_started": "Запущено восстановление",
         "recovery_failed": "Восстановление не выполнено",
+        "note": "Рабочая заметка",
+        "reassigned": "Ответственный изменён",
         "recovered": "Восстановлен",
     }
 
@@ -10524,6 +10541,9 @@ async def calendar_dispatch_page(
         "alerted_at": "",
         "acknowledged_at": "",
         "acknowledged_by": "",
+        "assigned_at": "",
+        "assigned_to": "",
+        "assigned_by": "",
     }
 
     if not automation_enabled:
@@ -10692,6 +10712,33 @@ async def calendar_dispatch_page(
                     scheduler_status_row[
                         "incident_acknowledged_by"
                     ] or ""
+                ),
+                "assigned_at": str(
+                    scheduler_status_row[
+                        "incident_assigned_at"
+                    ]
+                    or scheduler_status_row[
+                        "incident_acknowledged_at"
+                    ]
+                    or ""
+                ),
+                "assigned_to": str(
+                    scheduler_status_row[
+                        "incident_assigned_to"
+                    ]
+                    or scheduler_status_row[
+                        "incident_acknowledged_by"
+                    ]
+                    or ""
+                ),
+                "assigned_by": str(
+                    scheduler_status_row[
+                        "incident_assigned_by"
+                    ]
+                    or scheduler_status_row[
+                        "incident_acknowledged_by"
+                    ]
+                    or ""
                 ),
             }
             calendar_scheduler_status = {
@@ -11923,7 +11970,10 @@ def open_calendar_scheduler_incident(
         incident_message=?,
         last_alerted_at=?,
         incident_acknowledged_at=NULL,
-        incident_acknowledged_by=NULL
+        incident_acknowledged_by=NULL,
+        incident_assigned_at=NULL,
+        incident_assigned_to=NULL,
+        incident_assigned_by=NULL
     WHERE company_id=?
     """, (
         incident_type,
@@ -12026,7 +12076,10 @@ def close_calendar_scheduler_incident(
         incident_message=NULL,
         last_recovered_at=?,
         incident_acknowledged_at=NULL,
-        incident_acknowledged_by=NULL
+        incident_acknowledged_by=NULL,
+        incident_assigned_at=NULL,
+        incident_assigned_to=NULL,
+        incident_assigned_by=NULL
     WHERE company_id=?
     """, (
         now_value,
@@ -12095,12 +12148,18 @@ def acknowledge_calendar_scheduler_incident(
     c.execute("""
     UPDATE calendar_plan_scheduler_status
     SET incident_acknowledged_at=?,
-        incident_acknowledged_by=?
+        incident_acknowledged_by=?,
+        incident_assigned_at=?,
+        incident_assigned_to=?,
+        incident_assigned_by=?
     WHERE company_id=?
       AND active_incident!=''
       AND incident_acknowledged_at IS NULL
     """, (
         now_value,
+        actor_username,
+        now_value,
+        actor_username,
         actor_username,
         company_id,
     ))
@@ -12242,6 +12301,9 @@ def reassign_calendar_scheduler_incident(
         scheduler.active_incident,
         scheduler.incident_acknowledged_at,
         scheduler.incident_acknowledged_by,
+        scheduler.incident_assigned_at,
+        scheduler.incident_assigned_to,
+        scheduler.incident_assigned_by,
         COALESCE(
             companies.name,
             settings.company_name,
@@ -12288,7 +12350,9 @@ def reassign_calendar_scheduler_incident(
         }
 
     previous_assignee = str(
-        incident["incident_acknowledged_by"] or ""
+        incident["incident_assigned_to"]
+        or incident["incident_acknowledged_by"]
+        or ""
     )
 
     if previous_assignee == assignee_username:
@@ -12301,12 +12365,16 @@ def reassign_calendar_scheduler_incident(
 
     c.execute("""
     UPDATE calendar_plan_scheduler_status
-    SET incident_acknowledged_by=?
+    SET incident_assigned_at=?,
+        incident_assigned_to=?,
+        incident_assigned_by=?
     WHERE company_id=?
       AND active_incident!=''
       AND incident_acknowledged_at IS NOT NULL
     """, (
+        now_value,
         assignee_username,
+        actor_username,
         company_id,
     ))
 
@@ -12587,6 +12655,9 @@ def notify_overdue_calendar_recoveries(
         scheduler.incident_message,
         scheduler.incident_acknowledged_at,
         scheduler.incident_acknowledged_by,
+        scheduler.incident_assigned_at,
+        scheduler.incident_assigned_to,
+        scheduler.incident_assigned_by,
         COALESCE(
             companies.name,
             settings.company_name,
@@ -12651,12 +12722,16 @@ def notify_overdue_calendar_recoveries(
             recovery_age_minutes,
         )
         company_name = str(incident["company_name"] or "")
+        assigned_to = (
+            incident["incident_assigned_to"]
+            or incident["incident_acknowledged_by"]
+            or "не указан"
+        )
         title = "Просрочено восстановление календаря"
         message = (
             f"{company_name}: инцидент в работе "
             f"{recovery_age_label}, но не восстановлен. "
-            f"Ответственный: "
-            f"{incident['incident_acknowledged_by'] or 'не указан'}."
+            f"Ответственный: {assigned_to}."
         )
         log_calendar_scheduler_incident_event(
             c,
@@ -12710,6 +12785,10 @@ def notify_overdue_calendar_recoveries(
             "acknowledged_by": incident[
                 "incident_acknowledged_by"
             ],
+            "assigned_to": (
+                incident["incident_assigned_to"]
+                or incident["incident_acknowledged_by"]
+            ),
             "recovery_age_minutes": recovery_age_minutes,
             "recovery_age_label": recovery_age_label,
             "recipients": len(recipients),

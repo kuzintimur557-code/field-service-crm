@@ -121,6 +121,9 @@ tr:last-child td{border-bottom:0}
                 · принял {{ company["incident_acknowledged_by"] }}
                 {{ company["incident_acknowledged_at"] }}
                 {% endif %}
+                {% if company["assignee_username"] %}
+                · ответственный {{ company["assignee_username"] }}
+                {% endif %}
             </div>
             <div class="meta">
                 Регламент: реакция {{ detail["policy"]["response_minutes"] }} мин.
@@ -189,7 +192,11 @@ tr:last-child td{border-bottom:0}
             {% if company["is_acknowledged"] %}
             <p>
                 Сейчас отвечает:
-                {{ company["incident_acknowledged_by"] or "не назначен" }}.
+                {{ company["assignee_username"] or "не назначен" }}.
+                {% if company["assigned_by"] %}
+                Назначил: {{ company["assigned_by"] }}
+                {{ company["assigned_at"] }}.
+                {% endif %}
             </p>
             <form
                 class="incident-form"
@@ -206,7 +213,7 @@ tr:last-child td{border-bottom:0}
                         {% for admin_username in platform_admins %}
                         <option
                             value="{{ admin_username }}"
-                            {% if admin_username == company["incident_acknowledged_by"] %}selected{% endif %}
+                            {% if admin_username == company["assignee_username"] %}selected{% endif %}
                         >
                             {{ admin_username }}
                         </option>

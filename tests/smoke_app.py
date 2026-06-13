@@ -6166,6 +6166,12 @@ async def assert_dispatch_board():
     assert "Принят в работу" in (
         acknowledged_page.body.decode("utf-8")
     )
+    assert "Ответственный:" in (
+        acknowledged_page.body.decode("utf-8")
+    )
+    assert acknowledged_page.context[
+        "calendar_scheduler_incident"
+    ]["assigned_to"] == "owner2"
     stale_recovery = await crm.run_calendar_plan_scheduler(
         2,
         now_dt=scheduler_now,
@@ -6674,11 +6680,14 @@ async def assert_dispatch_board():
             incident_message, last_alerted_at,
             last_recovered_at,
             incident_acknowledged_at,
-            incident_acknowledged_by
+            incident_acknowledged_by,
+            incident_assigned_at,
+            incident_assigned_to,
+            incident_assigned_by
         )
         VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
         """, (
             original_scheduler_status["company_id"],
@@ -6698,6 +6707,9 @@ async def assert_dispatch_board():
             original_scheduler_status["last_recovered_at"],
             original_scheduler_status["incident_acknowledged_at"],
             original_scheduler_status["incident_acknowledged_by"],
+            original_scheduler_status["incident_assigned_at"],
+            original_scheduler_status["incident_assigned_to"],
+            original_scheduler_status["incident_assigned_by"],
         ))
     c.execute("""
     UPDATE company_settings
@@ -7150,6 +7162,19 @@ async def assert_platform_calendar_health():
         20,
         recovery_overdue=True,
     )["code"] == "critical"
+    conn = connect()
+    scheduler_status_columns = {
+        row["name"]
+        for row in conn.execute(
+            "PRAGMA table_info(calendar_plan_scheduler_status)"
+        ).fetchall()
+    }
+    conn.close()
+    assert {
+        "incident_assigned_at",
+        "incident_assigned_to",
+        "incident_assigned_by",
+    }.issubset(scheduler_status_columns)
 
     company_id = 901
     company_name = "Smoke Calendar Health"
@@ -7898,7 +7923,12 @@ async def assert_platform_calendar_health():
         conn = connect()
         c = conn.cursor()
         assigned_status = c.execute("""
-        SELECT incident_acknowledged_by
+        SELECT
+            incident_acknowledged_at,
+            incident_acknowledged_by,
+            incident_assigned_at,
+            incident_assigned_to,
+            incident_assigned_by
         FROM calendar_plan_scheduler_status
         WHERE company_id=?
         """, (company_id,)).fetchone()
@@ -7920,9 +7950,13 @@ async def assert_platform_calendar_health():
             f"/platform/calendar-health/{company_id}",
         )).fetchall()
         conn.close()
-        assert assigned_status["incident_acknowledged_by"] == (
+        assert assigned_status["incident_acknowledged_at"]
+        assert assigned_status["incident_acknowledged_by"] == "super"
+        assert assigned_status["incident_assigned_at"]
+        assert assigned_status["incident_assigned_to"] == (
             backup_admin_username
         )
+        assert assigned_status["incident_assigned_by"] == "super"
         assert [
             row["event_type"] for row in collaboration_events
         ] == ["note", "reassigned"]
@@ -7990,6 +8024,9 @@ async def assert_platform_calendar_health():
         assert "Ответственный за инцидент изменён." in assigned_html
         assert "Рабочая заметка" in assigned_html
         assert "Ответственный изменён" in assigned_html
+        assert "принял super" in assigned_html
+        assert "Сейчас отвечает:" in assigned_html
+        assert "Назначил: super" in assigned_html
         assert backup_admin_username in assigned_html
         acknowledged_health = crm.get_platform_calendar_health(
             now_dt=now_dt,
@@ -8216,7 +8253,14 @@ async def assert_platform_calendar_health():
         conn = connect()
         c = conn.cursor()
         recovered_status = c.execute("""
-        SELECT active_incident, last_recovered_at
+        SELECT
+            active_incident,
+            last_recovered_at,
+            incident_acknowledged_at,
+            incident_acknowledged_by,
+            incident_assigned_at,
+            incident_assigned_to,
+            incident_assigned_by
         FROM calendar_plan_scheduler_status
         WHERE company_id=?
         """, (company_id,)).fetchone()
@@ -8229,6 +8273,11 @@ async def assert_platform_calendar_health():
         conn.close()
         assert recovered_status["active_incident"] == ""
         assert recovered_status["last_recovered_at"]
+        assert recovered_status["incident_acknowledged_at"] is None
+        assert recovered_status["incident_acknowledged_by"] is None
+        assert recovered_status["incident_assigned_at"] is None
+        assert recovered_status["incident_assigned_to"] is None
+        assert recovered_status["incident_assigned_by"] is None
         assert [
             (row["event_type"], row["actor_username"])
             for row in recovery_events

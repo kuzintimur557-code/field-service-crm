@@ -309,7 +309,10 @@ def init_db():
         last_alerted_at TEXT,
         last_recovered_at TEXT,
         incident_acknowledged_at TEXT,
-        incident_acknowledged_by TEXT
+        incident_acknowledged_by TEXT,
+        incident_assigned_at TEXT,
+        incident_assigned_to TEXT,
+        incident_assigned_by TEXT
     )
     """)
 
@@ -702,6 +705,28 @@ def init_db():
     add_column_if_missing(c, "calendar_plan_scheduler_status", "last_recovered_at", "TEXT")
     add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_acknowledged_at", "TEXT")
     add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_acknowledged_by", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_assigned_at", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_assigned_to", "TEXT")
+    add_column_if_missing(c, "calendar_plan_scheduler_status", "incident_assigned_by", "TEXT")
+
+    c.execute("""
+    UPDATE calendar_plan_scheduler_status
+    SET incident_assigned_at=COALESCE(
+            incident_assigned_at,
+            incident_acknowledged_at
+        ),
+        incident_assigned_to=COALESCE(
+            NULLIF(incident_assigned_to, ''),
+            incident_acknowledged_by
+        ),
+        incident_assigned_by=COALESCE(
+            NULLIF(incident_assigned_by, ''),
+            incident_acknowledged_by
+        )
+    WHERE COALESCE(active_incident, '')!=''
+      AND COALESCE(incident_acknowledged_by, '')!=''
+      AND COALESCE(incident_assigned_to, '')=''
+    """)
 
     add_column_if_missing(c, "company_features", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "company_features", "feature_key", "TEXT")
@@ -967,6 +992,14 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_calendar_incidents_created
     ON calendar_scheduler_incident_events(created_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_calendar_scheduler_assigned
+    ON calendar_plan_scheduler_status(
+        incident_assigned_to,
+        active_incident
+    )
     """)
 
     if os.getenv("ENV") != "production":
