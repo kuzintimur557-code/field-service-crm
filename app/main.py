@@ -7256,6 +7256,254 @@ def get_platform_release_control_center(
     }
 
 
+def make_release_review_item(
+    title,
+    description,
+    value="",
+    status="warning",
+    url="/platform/readiness",
+):
+    labels = {
+        "ok": "Хорошо",
+        "warning": "Нужно проверить",
+        "critical": "Проблема",
+    }
+    normalized_status = status if status in labels else "warning"
+    return {
+        "title": title,
+        "description": description,
+        "value": value,
+        "status": normalized_status,
+        "status_label": labels[normalized_status],
+        "url": url,
+    }
+
+
+def get_platform_release_post_launch_review(
+    readiness=None,
+    comparison=None,
+    trend=None,
+    launch_plan=None,
+    timeline=None,
+    control_center=None,
+    history=None,
+    signoffs=None,
+):
+    readiness = readiness or get_platform_release_readiness()
+    comparison = comparison or compare_platform_release_readiness_to_snapshot(
+        readiness,
+    )
+    history = (
+        history
+        if history is not None
+        else get_platform_release_readiness_history()
+    )
+    trend = trend or get_platform_release_readiness_trend(history)
+    launch_plan = launch_plan or get_platform_release_launch_plan(readiness)
+    signoffs = (
+        signoffs
+        if signoffs is not None
+        else get_platform_release_signoff_history()
+    )
+    timeline = timeline or get_platform_release_timeline(history, signoffs)
+    control_center = control_center or get_platform_release_control_center(
+        readiness,
+        launch_plan,
+        timeline,
+    )
+    latest_signoff = signoffs[0] if signoffs else None
+    score = int(readiness["score"] or 0)
+    critical_count = int(readiness["critical_count"] or 0)
+    warning_count = int(readiness["warning_count"] or 0)
+    score_delta = int(comparison["score_delta"] or 0)
+    critical_delta = int(comparison["critical_delta"] or 0)
+
+    if not latest_signoff:
+        status = "warning"
+        label = "Разбор ещё рано проводить"
+        outcome = "Нет решения по запуску"
+        summary = "Сначала зафиксируйте решение по запуску и сохраните снимок."
+    elif critical_count or critical_delta > 0 or comparison["tone"] == "critical":
+        status = "critical"
+        label = "Нужен разбор проблем"
+        outcome = "Есть ухудшения"
+        summary = "После последнего снимка появились риски или критичные блокеры."
+    elif score >= 90 and trend["tone"] == "ok":
+        status = "ok"
+        label = "Запуск выглядит стабильным"
+        outcome = "Положительная динамика"
+        summary = "Готовность выросла, критичных сигналов для остановки нет."
+    elif warning_count:
+        status = "warning"
+        label = "Запуск под наблюдением"
+        outcome = "Есть предупреждения"
+        summary = "Критичных блокеров нет, но часть сигналов требует контроля."
+    else:
+        status = "ok"
+        label = "Разбор без критичных замечаний"
+        outcome = "Стабильно"
+        summary = "Ключевые показатели не показывают критичных проблем."
+
+    metrics = [
+        make_release_review_item(
+            "Текущая готовность",
+            "Оценка платформы на момент разбора.",
+            f"{score}%",
+            "ok" if score >= 90 else ("warning" if score >= 75 else "critical"),
+            "/platform/readiness",
+        ),
+        make_release_review_item(
+            "Динамика оценки",
+            "Изменение относительно последнего сохранённого снимка.",
+            str(score_delta),
+            "ok" if score_delta > 0 else ("critical" if score_delta < 0 else "warning"),
+            comparison["snapshot_url"] or "/platform/readiness",
+        ),
+        make_release_review_item(
+            "Динамика критичных",
+            "Изменение числа критичных блокеров после снимка.",
+            str(critical_delta),
+            "ok" if critical_delta < 0 else ("critical" if critical_delta > 0 else "warning"),
+            comparison["snapshot_url"] or "/platform/readiness",
+        ),
+        make_release_review_item(
+            "Последнее решение",
+            "Последнее управленческое решение по запуску.",
+            (
+                latest_signoff["decision_label"]
+                if latest_signoff
+                else "не зафиксировано"
+            ),
+            "ok" if latest_signoff else "warning",
+            (
+                latest_signoff["snapshot_url"]
+                if latest_signoff
+                else "/platform/readiness"
+            ),
+        ),
+        make_release_review_item(
+            "Журнал релиза",
+            "Количество событий в журнале релиза.",
+            str(timeline["total_events"]),
+            "ok" if timeline["total_events"] else "warning",
+            "/platform/readiness",
+        ),
+        make_release_review_item(
+            "Контроль запуска",
+            "Текущее состояние центра контроля.",
+            control_center["label"],
+            control_center["status"],
+            "/platform/readiness",
+        ),
+    ]
+
+    positives = []
+    if score >= 80:
+        positives.append(make_release_review_item(
+            "Готовность держится выше 80%",
+            "Платформа прошла базовый порог для пилота или запуска.",
+            f"{score}%",
+            "ok",
+            "/platform/readiness",
+        ))
+    if comparison["resolved_blockers"]:
+        positives.append(make_release_review_item(
+            "Закрыты блокеры",
+            "Часть критичных проблем ушла относительно прошлого снимка.",
+            str(len(comparison["resolved_blockers"])),
+            "ok",
+            comparison["snapshot_url"] or "/platform/readiness",
+        ))
+    if latest_signoff:
+        positives.append(make_release_review_item(
+            "Решение зафиксировано",
+            "Запуск имеет сохранённое управленческое решение.",
+            latest_signoff["decision_label"],
+            "ok",
+            latest_signoff["snapshot_url"] or "/platform/readiness",
+        ))
+
+    issues = [
+        make_release_review_item(
+            item["title"],
+            item["action"],
+            item["category_label"],
+            item["status"],
+            item["url"],
+        )
+        for item in readiness["next_actions"][:5]
+    ]
+    if comparison["new_blockers"]:
+        issues.extend([
+            make_release_review_item(
+                item["title"],
+                item["action"],
+                item["category_label"],
+                "critical",
+                item["url"],
+            )
+            for item in comparison["new_blockers"][:3]
+        ])
+    if not issues:
+        issues = [
+            make_release_review_item(
+                "Критичных замечаний нет",
+                "Продолжайте мониторинг первых клиентов и операционных сигналов.",
+                "Мониторинг",
+                "ok",
+                "/platform/readiness",
+            ),
+        ]
+
+    decisions = [
+        make_release_review_item(
+            "Сохранить новый снимок",
+            "Зафиксируйте состояние после текущего этапа запуска.",
+            "обязательно",
+            "warning",
+            "/platform/readiness",
+        ),
+        make_release_review_item(
+            "Сравнить с предыдущим снимком",
+            comparison["summary"],
+            comparison["label"],
+            comparison["tone"],
+            comparison["snapshot_url"] or "/platform/readiness",
+        ),
+        make_release_review_item(
+            "Проверить операционные инциденты",
+            "Убедитесь, что календарные и системные проблемы не растут.",
+            control_center["risk_level"],
+            control_center["status"],
+            "/platform/calendar-health",
+        ),
+    ]
+
+    return {
+        "status": status,
+        "label": label,
+        "outcome": outcome,
+        "summary": summary,
+        "score": score,
+        "score_delta": score_delta,
+        "critical_delta": critical_delta,
+        "latest_decision": (
+            latest_signoff["decision_label"]
+            if latest_signoff
+            else "Решения пока нет"
+        ),
+        "latest_decision_at": (
+            latest_signoff["signed_at"]
+            if latest_signoff
+            else ""
+        ),
+        "metrics": metrics,
+        "positives": positives[:4],
+        "issues": issues[:6],
+        "decisions": decisions,
+    }
+
+
 def create_platform_release_readiness_snapshot(username, readiness=None):
     readiness = readiness or get_platform_release_readiness()
     conn = connect()
@@ -7792,6 +8040,16 @@ async def platform_readiness_page(
         timeline,
         runbook,
     )
+    post_launch_review = get_platform_release_post_launch_review(
+        readiness,
+        comparison,
+        trend,
+        launch_plan,
+        timeline,
+        control_center,
+        history,
+        signoffs,
+    )
 
     return templates.TemplateResponse(
         request,
@@ -7809,6 +8067,7 @@ async def platform_readiness_page(
             "timeline": timeline,
             "runbook": runbook,
             "control_center": control_center,
+            "post_launch_review": post_launch_review,
             "notice": notice,
             "error": error,
         },
@@ -7898,6 +8157,16 @@ async def platform_readiness_export(request: Request):
         launch_plan,
         timeline,
         runbook,
+    )
+    post_launch_review = get_platform_release_post_launch_review(
+        readiness,
+        comparison,
+        trend,
+        launch_plan,
+        timeline,
+        control_center,
+        history,
+        signoffs,
     )
     output = io.StringIO()
     writer = csv.writer(output)
@@ -8106,6 +8375,70 @@ async def platform_readiness_export(request: Request):
     writer.writerow(["Условия остановки"])
     for condition in control_center["stop_conditions"]:
         writer.writerow([condition])
+    writer.writerow([])
+
+    writer.writerow(["Пострелизный разбор"])
+    writer.writerow(["Состояние", post_launch_review["label"]])
+    writer.writerow(["Итог", post_launch_review["outcome"]])
+    writer.writerow(["Резюме", post_launch_review["summary"]])
+    writer.writerow(["Оценка", post_launch_review["score"]])
+    writer.writerow(["Динамика оценки", post_launch_review["score_delta"]])
+    writer.writerow([
+        "Динамика критичных",
+        post_launch_review["critical_delta"],
+    ])
+    writer.writerow([
+        "Последнее решение",
+        post_launch_review["latest_decision"],
+        post_launch_review["latest_decision_at"],
+    ])
+    writer.writerow([])
+
+    writer.writerow(["Метрики разбора"])
+    writer.writerow(["Метрика", "Значение", "Статус", "Описание", "Ссылка"])
+    for metric in post_launch_review["metrics"]:
+        writer.writerow([
+            metric["title"],
+            metric["value"],
+            metric["status_label"],
+            metric["description"],
+            metric["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Что сработало"])
+    writer.writerow(["Пункт", "Значение", "Описание", "Ссылка"])
+    for item in post_launch_review["positives"]:
+        writer.writerow([
+            item["title"],
+            item["value"],
+            item["description"],
+            item["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Что проверить"])
+    writer.writerow(["Пункт", "Значение", "Статус", "Действие", "Ссылка"])
+    for item in post_launch_review["issues"]:
+        writer.writerow([
+            item["title"],
+            item["value"],
+            item["status_label"],
+            item["description"],
+            item["url"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Решения после запуска"])
+    writer.writerow(["Решение", "Значение", "Статус", "Описание", "Ссылка"])
+    for item in post_launch_review["decisions"]:
+        writer.writerow([
+            item["title"],
+            item["value"],
+            item["status_label"],
+            item["description"],
+            item["url"],
+        ])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -8521,7 +8854,55 @@ async def api_platform_readiness(request: Request):
         timeline,
         readiness["runbook"],
     )
+    readiness["post_launch_review"] = (
+        get_platform_release_post_launch_review(
+            readiness,
+            readiness["comparison"],
+            readiness["trend"],
+            readiness["launch_plan"],
+            timeline,
+            readiness["control_center"],
+            None,
+            signoffs,
+        )
+    )
     return readiness
+
+
+@app.get("/api/platform/readiness/post-launch-review")
+async def api_platform_readiness_post_launch_review(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    readiness = get_platform_release_readiness()
+    history = get_platform_release_readiness_history()
+    comparison = compare_platform_release_readiness_to_snapshot(readiness)
+    trend = get_platform_release_readiness_trend(history)
+    launch_plan = get_platform_release_launch_plan(readiness)
+    signoffs = get_platform_release_signoff_history()
+    timeline = get_platform_release_timeline(history, signoffs)
+    control_center = get_platform_release_control_center(
+        readiness,
+        launch_plan,
+        timeline,
+    )
+    return get_platform_release_post_launch_review(
+        readiness,
+        comparison,
+        trend,
+        launch_plan,
+        timeline,
+        control_center,
+        history,
+        signoffs,
+    )
 
 
 @app.get("/api/platform/readiness/control-center")

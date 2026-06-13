@@ -166,6 +166,32 @@ button.button{border:0;cursor:pointer}
 .control-item-title{font-size:12px;font-weight:900}
 .control-item-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
 .control-stops{display:grid;gap:6px;margin-top:12px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.4}
+.review{margin-top:18px;padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb}
+.review.ok{border-color:#bbf7d0;background:#f0fdf4}
+.review.critical{border-color:#fecaca;background:#fff7f7}
+.review-head{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px;align-items:start}
+.review-label{font-size:13px;font-weight:900}
+.review-value{margin-top:6px;font-size:26px;font-weight:900}
+.review-outcome{display:inline-flex;margin-top:8px;padding:7px 9px;border-radius:8px;background:white;font-size:11px;font-weight:900}
+.review-text{color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.review-card{display:block;padding:10px;border-radius:8px;background:white;color:#111827;text-decoration:none}
+.review-card.warning{background:#fffbeb}
+.review-card.critical{background:#fff7f7}
+.review-card.ok{background:#f0fdf4}
+.review-card-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.review-card-value{margin-top:5px;font-size:18px;font-weight:900}
+.review-card-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
+.review-panels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.review-panel{padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.review-panel-title{font-size:13px;font-weight:900}
+.review-list{display:grid;gap:7px;margin-top:10px}
+.review-item{display:block;padding:9px;border-radius:8px;background:#f9fafb;color:#111827;text-decoration:none}
+.review-item.warning{background:#fffbeb}
+.review-item.critical{background:#fff7f7}
+.review-item.ok{background:#f0fdf4}
+.review-item-title{font-size:12px;font-weight:900}
+.review-item-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -226,6 +252,9 @@ button.button{border:0;cursor:pointer}
 .control-head{grid-template-columns:1fr}
 .control-grid{grid-template-columns:1fr}
 .control-metrics{grid-template-columns:1fr}
+.review-head{grid-template-columns:1fr}
+.review-grid{grid-template-columns:1fr}
+.review-panels{grid-template-columns:1fr}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -646,6 +675,76 @@ button.button{border:0;cursor:pointer}
                 <div class="control-stops">
                     {% for condition in control_center["stop_conditions"] %}
                     <span>{{ condition }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="review {{ post_launch_review['status'] }}">
+        <div class="review-head">
+            <div>
+                <div class="review-label">Пострелизный разбор</div>
+                <div class="review-value">{{ post_launch_review["label"] }}</div>
+                <div class="review-outcome">{{ post_launch_review["outcome"] }}</div>
+            </div>
+            <div class="review-text">
+                {{ post_launch_review["summary"] }}
+                Последнее решение: {{ post_launch_review["latest_decision"] }}{% if post_launch_review["latest_decision_at"] %},
+                {{ post_launch_review["latest_decision_at"] }}{% endif %}.
+            </div>
+        </div>
+        <div class="review-grid">
+            {% for metric in post_launch_review["metrics"] %}
+            <a class="review-card {{ metric['status'] }}" href="{{ metric['url'] }}">
+                <div class="review-card-label">{{ metric["title"] }}</div>
+                <div class="review-card-value">{{ metric["value"] }}</div>
+                <div class="review-card-text">{{ metric["status_label"] }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        <div class="review-panels">
+            <div class="review-panel">
+                <div class="review-panel-title">Что сработало</div>
+                <div class="review-list">
+                    {% for item in post_launch_review["positives"] %}
+                    <a class="review-item {{ item['status'] }}" href="{{ item['url'] }}">
+                        <div class="review-item-title">
+                            {{ item["value"] }} · {{ item["title"] }}
+                        </div>
+                        <div class="review-item-text">{{ item["description"] }}</div>
+                    </a>
+                    {% else %}
+                    <div class="review-item warning">
+                        <div class="review-item-title">Пока нечего фиксировать</div>
+                        <div class="review-item-text">Сохраните решение и новый снимок после запуска.</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="review-panel">
+                <div class="review-panel-title">Что проверить</div>
+                <div class="review-list">
+                    {% for item in post_launch_review["issues"][:4] %}
+                    <a class="review-item {{ item['status'] }}" href="{{ item['url'] }}">
+                        <div class="review-item-title">
+                            {{ item["value"] }} · {{ item["title"] }}
+                        </div>
+                        <div class="review-item-text">{{ item["description"] }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="review-panel">
+                <div class="review-panel-title">Решения после запуска</div>
+                <div class="review-list">
+                    {% for item in post_launch_review["decisions"] %}
+                    <a class="review-item {{ item['status'] }}" href="{{ item['url'] }}">
+                        <div class="review-item-title">
+                            {{ item["value"] }} · {{ item["title"] }}
+                        </div>
+                        <div class="review-item-text">{{ item["description"] }}</div>
+                    </a>
                     {% endfor %}
                 </div>
             </div>
