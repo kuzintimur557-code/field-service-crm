@@ -9288,6 +9288,7 @@ async def assert_platform_calendar_health():
         assert analytics["summary"]["medium_risk_companies"] >= 0
         assert analytics["summary"]["top_risk_company_name"]
         assert analytics["summary"]["top_risk_company_score"] >= 1
+        assert analytics["summary"]["top_risk_company_url"]
         assert analytics_company["incidents"] == 2
         assert analytics_company["recovered"] == 1
         assert analytics_company["active"] == 1
@@ -9487,6 +9488,9 @@ async def assert_platform_calendar_health():
         assert "high_risk_companies" in (
             platform_page.context["calendar_incident_analytics_summary"]
         )
+        assert "top_risk_company_url" in (
+            platform_page.context["calendar_incident_analytics_summary"]
+        )
         assert platform_page.context["calendar_health_summary"][
             "oldest_active_incident_label"
         ]
@@ -9512,6 +9516,7 @@ async def assert_platform_calendar_health():
         assert "Старейший" in platform_html
         assert "Реакция" in platform_html
         assert "Высокий риск" in platform_html
+        assert "Топ:" in platform_html
         assert "status=response_overdue" in platform_html
         assert "/platform/calendar-health/analytics" in platform_html
         assert "Нагрузка администраторов" in platform_html

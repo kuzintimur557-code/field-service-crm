@@ -4577,6 +4577,11 @@ def get_platform_calendar_incident_analytics(
             if top_risk_company
             else 0
         ),
+        "top_risk_company_url": (
+            top_risk_company["detail_url"]
+            if top_risk_company
+            else ""
+        ),
     }
     recommendations = []
 

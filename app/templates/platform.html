@@ -36,6 +36,8 @@ h1{margin:0;font-size:38px}
 .ops-metric.warning{border-color:#fde68a;background:#fffbeb}
 .ops-metric-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
 .ops-metric-value{margin-top:4px;font-size:22px;font-weight:900}
+.ops-metric-meta{margin-top:4px;color:#6b7280;font-size:9px;font-weight:900;line-height:1.35}
+.ops-metric-meta a{color:#111827;text-decoration:none}
 .ops-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .ops-actions a{display:inline-flex;padding:10px 12px;border-radius:10px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
 .ops-actions a.secondary{border:1px solid #d1d5db;background:white;color:#374151}
@@ -160,6 +162,16 @@ h1{font-size:30px}
             <div class="ops-metric danger">
                 <div class="ops-metric-label">Высокий риск</div>
                 <div class="ops-metric-value">{{ calendar_incident_analytics_summary["high_risk_companies"] }}</div>
+                <div class="ops-metric-meta">
+                    {% if calendar_incident_analytics_summary["top_risk_company_url"] %}
+                    <a href="{{ calendar_incident_analytics_summary['top_risk_company_url'] }}">
+                        Топ: {{ calendar_incident_analytics_summary["top_risk_company_name"] }}
+                        · {{ calendar_incident_analytics_summary["top_risk_company_score"] }}/100
+                    </a>
+                    {% else %}
+                    Топ: нет
+                    {% endif %}
+                </div>
             </div>
             <div class="ops-metric">
                 <div class="ops-metric-label">Активные</div>
