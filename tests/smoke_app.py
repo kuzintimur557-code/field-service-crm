@@ -9665,6 +9665,7 @@ async def assert_platform_calendar_health():
         assert "Резервные копии" in backup_csv
         assert "Последние копии" in backup_csv
         assert "Проверка последней" in backup_csv
+        assert "Проверка восстановления" in backup_csv
         anonymous_backup_api = await crm.api_platform_backup_status(
             make_public_asgi_request("/api/platform/backup-status"),
         )
@@ -9681,6 +9682,23 @@ async def assert_platform_calendar_health():
         assert "latest_download_url" in backup_api
         assert "cleanup_count" in backup_api
         assert "latest_verification" in backup_api
+        anonymous_restore_check = await crm.backup_restore_check(
+            make_public_asgi_request("/backup/restore-check"),
+        )
+        assert anonymous_restore_check.status_code == 302
+        assert anonymous_restore_check.headers["location"] == "/login"
+        boss_restore_check = await crm.backup_restore_check(
+            make_asgi_request("owner2", "/backup/restore-check"),
+        )
+        assert boss_restore_check.status_code == 302
+        assert boss_restore_check.headers["location"] == "/"
+        missing_restore_check = await crm.backup_restore_check(
+            make_asgi_request("super", "/backup/restore-check"),
+        )
+        assert missing_restore_check.status_code == 302
+        assert missing_restore_check.headers["location"] == (
+            "/backup?error=backup_not_found&file="
+        )
         backup_dir = crm.DATA_DIR / "backups"
         backup_dir.mkdir(parents=True, exist_ok=True)
         retention_files = []
@@ -9710,6 +9728,7 @@ async def assert_platform_calendar_health():
         retention_html = retention_page.body.decode("utf-8")
         assert "Политика хранения" in retention_html
         assert "Проверка целостности" in retention_html
+        assert "Проверка восстановления" in retention_html
         assert "Файл не читается как SQLite база." in retention_html
         assert "Очистить старые" in retention_html
         anonymous_backup_cleanup = await crm.backup_cleanup(
@@ -9761,6 +9780,13 @@ async def assert_platform_calendar_health():
         verified_backup_html = verified_backup_page.body.decode("utf-8")
         assert "Копия читается, ключевые таблицы на месте." in (
             verified_backup_html
+        )
+        restore_check_response = await crm.backup_restore_check(
+            make_asgi_request("super", "/backup/restore-check"),
+        )
+        assert restore_check_response.status_code == 302
+        assert restore_check_response.headers["location"].startswith(
+            f"/backup?notice=restore_check_ok&file={created_backup_name}"
         )
 
         anonymous_backup_download = await crm.backup_download(

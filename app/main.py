@@ -96,6 +96,7 @@ import csv
 import io
 import calendar
 import json
+import tempfile
 
 
 APP_VERSION = "0.2.1"
@@ -6285,6 +6286,7 @@ def get_backup_status():
         "cleanup_size": cleanup_size,
         "cleanup_size_label": format_file_size(cleanup_size),
         "cleanup_url": "/backup/cleanup",
+        "restore_check_url": "/backup/restore-check",
         "recent_files": recent_files,
         "url": "/backup",
         "export_url": "/backup/export",
@@ -6341,6 +6343,61 @@ def cleanup_old_database_backups():
         "deleted_size": deleted_size,
         "deleted_size_label": format_file_size(deleted_size),
         "deleted_files": deleted,
+    }
+
+
+def run_backup_restore_drill(filename=""):
+    if filename:
+        source_path, error = get_backup_download_path(filename)
+    else:
+        files = list_database_backup_files()
+        source_path = files[0] if files else None
+        error = "" if source_path else "backup_not_found"
+
+    if error:
+        return {
+            "status": "critical",
+            "status_label": "Проверка не выполнена",
+            "message": "Резервная копия не найдена.",
+            "file": "",
+            "verification": None,
+            "error": error,
+        }
+
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir) / source_path.name
+            shutil.copy2(source_path, temp_path)
+            verification = verify_database_backup_file(temp_path)
+    except OSError:
+        return {
+            "status": "critical",
+            "status_label": "Ошибка копирования",
+            "message": "Не удалось скопировать backup во временную папку.",
+            "file": source_path.name,
+            "verification": None,
+            "error": "restore_check_failed",
+        }
+
+    if verification["status"] == "ok":
+        return {
+            "status": "ok",
+            "status_label": "Восстановление проверено",
+            "message": (
+                "Копия успешно скопирована во временную папку и открыта."
+            ),
+            "file": source_path.name,
+            "verification": verification,
+            "error": "",
+        }
+
+    return {
+        "status": "critical",
+        "status_label": "Проверка провалена",
+        "message": verification["message"],
+        "file": source_path.name,
+        "verification": verification,
+        "error": "restore_check_failed",
     }
 
 
@@ -29166,6 +29223,32 @@ async def backup_cleanup(request: Request):
     )
 
 
+@app.post("/backup/restore-check")
+async def backup_restore_check(request: Request, file: str = ""):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    result = run_backup_restore_drill(file)
+
+    if result["error"]:
+        return RedirectResponse(
+            f"/backup?error={result['error']}&file={result['file']}",
+            status_code=302,
+        )
+
+    return RedirectResponse(
+        f"/backup?notice=restore_check_ok&file={result['file']}",
+        status_code=302,
+    )
+
+
 @app.get("/backup/export")
 async def backup_export(request: Request):
     username = get_user(request)
@@ -29203,6 +29286,10 @@ async def backup_export(request: Request):
     writer.writerow([
         "Проблемных среди последних",
         backup_status["verification_problem_count"],
+    ])
+    writer.writerow([
+        "Проверка восстановления",
+        "доступна" if backup_status["latest_name"] else "нет копий",
     ])
     writer.writerow(["Хранить минимум копий", backup_status["retention_keep"]])
     writer.writerow(["Срок хранения, дней", backup_status["retention_days"]])

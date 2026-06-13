@@ -101,6 +101,9 @@ h1{font-size:28px}
     {% if notice == "backup_cleanup_empty" %}
     <div class="notice">Старых резервных копий для очистки нет.</div>
     {% endif %}
+    {% if notice == "restore_check_ok" %}
+    <div class="notice">Проверка восстановления пройдена: {{ file }}.</div>
+    {% endif %}
     {% if error == "db_missing" %}
     <div class="notice error">Файл базы данных не найден. Копию создать нельзя.</div>
     {% endif %}
@@ -109,6 +112,9 @@ h1{font-size:28px}
     {% endif %}
     {% if error == "backup_not_found" %}
     <div class="notice error">Резервная копия не найдена.</div>
+    {% endif %}
+    {% if error == "restore_check_failed" %}
+    <div class="notice error">Проверка восстановления не пройдена: {{ file }}.</div>
     {% endif %}
 
     <section class="status {{ backup_status['status'] }}">
@@ -164,6 +170,23 @@ h1{font-size:28px}
                 <div class="integrity-value">{{ backup_status["verification_problem_count"] }}</div>
                 <div class="integrity-note">Копии с ошибкой чтения или неполной структурой.</div>
             </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="retention">
+            <div>
+                <div class="retention-title">Проверка восстановления</div>
+                <div class="retention-text">
+                    Система копирует последнюю резервную копию во временную папку,
+                    открывает её и проверяет структуру. Рабочая база не изменяется.
+                </div>
+            </div>
+            {% if backup_status["latest_name"] %}
+            <form method="post" action="{{ backup_status['restore_check_url'] }}">
+                <button class="button secondary" type="submit">Проверить восстановление</button>
+            </form>
+            {% endif %}
         </div>
     </section>
 
