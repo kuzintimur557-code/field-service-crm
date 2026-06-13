@@ -26,6 +26,9 @@ body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
 .filters{display:flex;gap:7px;flex-wrap:wrap}
 .filter{padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;background:white;color:#374151;text-decoration:none;font-size:11px;font-weight:900}
 .filter.active{border-color:#2563eb;background:#2563eb;color:white}
+.queue-side{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.bulk-claim-form{margin:0}
+.bulk-claim-button{height:34px;border:0;border-radius:7px;background:#2563eb;padding:0 11px;color:white;font-size:11px;font-weight:900;cursor:pointer}
 .assignee-form{display:flex;gap:7px;align-items:center}
 .assignee-form label{color:#6b7280;font-size:10px;font-weight:900;white-space:nowrap}
 .assignee-form select{height:34px;min-width:180px;border:1px solid #d1d5db;border-radius:7px;background:white;padding:0 9px;color:#111827;font-size:11px;font-weight:800}
@@ -79,6 +82,8 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
     .header-actions,.back{width:100%;justify-content:center}
     .stats{grid-template-columns:1fr 1fr}
     .queue-tools{align-items:stretch;flex-direction:column}
+    .queue-side{align-items:stretch;flex-direction:column}
+    .bulk-claim-button{width:100%}
     .assignee-form{align-items:stretch;flex-direction:column}
     .assignee-form label{white-space:normal}
     .assignee-form select,.assignee-form button{width:100%}
@@ -180,25 +185,39 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
             <a class="filter {% if selected_status == 'waiting' %}active{% endif %}" href="/platform/calendar-health?status=waiting{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Ожидают · {{ summary["waiting"] }}</a>
             <a class="filter {% if selected_status == 'disabled' %}active{% endif %}" href="/platform/calendar-health?status=disabled{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Выключены · {{ summary["disabled"] }}</a>
         </nav>
-        <form class="assignee-form" method="get" action="/platform/calendar-health">
-            {% if selected_status != "all" %}
-            <input type="hidden" name="status" value="{{ selected_status }}">
+        <div class="queue-side">
+            {% if visible_claimable_count %}
+            <form
+                class="bulk-claim-form"
+                method="post"
+                action="/platform/calendar-health/claim-visible?status={{ selected_status|urlencode }}&amp;assignee={{ selected_assignee|urlencode }}"
+                onsubmit="return confirm('Принять видимые непринятые инциденты на себя? Максимум {{ bulk_claim_limit }} за один раз.');"
+            >
+                <button class="bulk-claim-button" type="submit">
+                    Принять видимые · {{ visible_claimable_count }}
+                </button>
+            </form>
             {% endif %}
-            <label for="assignee-filter">Ответственный</label>
-            <select id="assignee-filter" name="assignee">
-                <option value="all" {% if selected_assignee == "all" %}selected{% endif %}>Все администраторы</option>
-                <option value="me" {% if selected_assignee == "me" %}selected{% endif %}>Мои инциденты</option>
-                <option value="unassigned" {% if selected_assignee == "unassigned" %}selected{% endif %}>Без ответственного</option>
-                {% for admin_username in platform_admins %}
-                    {% if admin_username != username %}
-                    <option value="{{ admin_username }}" {% if selected_assignee == admin_username %}selected{% endif %}>
-                        {{ admin_username }}
-                    </option>
-                    {% endif %}
-                {% endfor %}
-            </select>
-            <button type="submit">Показать</button>
-        </form>
+            <form class="assignee-form" method="get" action="/platform/calendar-health">
+                {% if selected_status != "all" %}
+                <input type="hidden" name="status" value="{{ selected_status }}">
+                {% endif %}
+                <label for="assignee-filter">Ответственный</label>
+                <select id="assignee-filter" name="assignee">
+                    <option value="all" {% if selected_assignee == "all" %}selected{% endif %}>Все администраторы</option>
+                    <option value="me" {% if selected_assignee == "me" %}selected{% endif %}>Мои инциденты</option>
+                    <option value="unassigned" {% if selected_assignee == "unassigned" %}selected{% endif %}>Без ответственного</option>
+                    {% for admin_username in platform_admins %}
+                        {% if admin_username != username %}
+                        <option value="{{ admin_username }}" {% if selected_assignee == admin_username %}selected{% endif %}>
+                            {{ admin_username }}
+                        </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+                <button type="submit">Показать</button>
+            </form>
+        </div>
     </div>
 
     <section class="workload-section">

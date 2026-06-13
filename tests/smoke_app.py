@@ -7177,6 +7177,7 @@ async def assert_platform_calendar_health():
     }.issubset(scheduler_status_columns)
 
     company_id = 901
+    bulk_company_ids = [902, 903]
     company_name = "Smoke Calendar Health"
     owner_username = "smoke_health_owner"
     backup_admin_username = "smoke_platform_backup"
@@ -7807,6 +7808,188 @@ async def assert_platform_calendar_health():
             item["company_id"] != company_id
             for item in claimed_queue_page.context["companies"]
         )
+        conn = connect()
+        c = conn.cursor()
+        for bulk_company_id in bulk_company_ids:
+            c.execute("""
+            INSERT INTO companies (
+                id, name, owner_username, created_at
+            )
+            VALUES (?, ?, ?, ?)
+            """, (
+                bulk_company_id,
+                f"Bulk Calendar Health {bulk_company_id}",
+                f"bulk_owner_{bulk_company_id}",
+                old_value,
+            ))
+            c.execute("""
+            INSERT INTO company_settings (
+                company_id, company_name,
+                calendar_auto_publish, calendar_auto_remind,
+                calendar_auto_days_ahead,
+                calendar_auto_window_start,
+                calendar_auto_window_end,
+                updated_at
+            )
+            VALUES (?, ?, 1, 1, 5, '08:00', '20:00', ?)
+            """, (
+                bulk_company_id,
+                f"Bulk Calendar Health {bulk_company_id}",
+                old_value,
+            ))
+            c.execute("""
+            INSERT INTO calendar_plan_scheduler_status (
+                company_id, last_status, active_incident,
+                incident_started_at, incident_message
+            )
+            VALUES (?, 'error', 'error', ?, ?)
+            """, (
+                bulk_company_id,
+                incident_value,
+                "Массовая проверка очереди календаря.",
+            ))
+            c.execute("""
+            INSERT INTO calendar_scheduler_incident_events (
+                company_id, incident_type, event_type,
+                actor_username, message, created_at
+            )
+            VALUES (?, 'error', 'opened', '', ?, ?)
+            """, (
+                bulk_company_id,
+                "Массовая проверка очереди календаря.",
+                incident_value,
+            ))
+        conn.commit()
+        conn.close()
+        bulk_page = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "super",
+                (
+                    "/platform/calendar-health"
+                    "?status=unacknowledged"
+                    "&assignee=unassigned"
+                ),
+            ),
+            status="unacknowledged",
+            assignee="unassigned",
+        )
+        bulk_html = bulk_page.body.decode("utf-8")
+        assert bulk_page.context["visible_claimable_count"] == 2
+        assert "Принять видимые · 2" in bulk_html
+        assert (
+            "/platform/calendar-health/claim-visible"
+            in bulk_html
+        )
+        bulk_response = (
+            await crm.platform_calendar_claim_visible_incidents(
+                make_asgi_request(
+                    "super",
+                    "/platform/calendar-health/claim-visible",
+                ),
+                status="unacknowledged",
+                assignee="unassigned",
+            )
+        )
+        assert bulk_response.headers["location"] == (
+            "/platform/calendar-health?"
+            "status=unacknowledged"
+            "&assignee=unassigned"
+            "&notice=bulk_acknowledged"
+            "&claimed=2"
+        )
+        bulk_done_page = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "super",
+                (
+                    "/platform/calendar-health"
+                    "?status=unacknowledged"
+                    "&assignee=unassigned"
+                    "&notice=bulk_acknowledged"
+                    "&claimed=2"
+                ),
+            ),
+            status="unacknowledged",
+            assignee="unassigned",
+            notice="bulk_acknowledged",
+            claimed=2,
+        )
+        assert "Принято инцидентов: 2." in (
+            bulk_done_page.body.decode("utf-8")
+        )
+        assert bulk_done_page.context["visible_claimable_count"] == 0
+        repeated_bulk_response = (
+            await crm.platform_calendar_claim_visible_incidents(
+                make_asgi_request(
+                    "super",
+                    "/platform/calendar-health/claim-visible",
+                ),
+                status="unacknowledged",
+                assignee="unassigned",
+            )
+        )
+        assert repeated_bulk_response.headers["location"] == (
+            "/platform/calendar-health?"
+            "status=unacknowledged"
+            "&assignee=unassigned"
+            "&notice=bulk_empty"
+        )
+        conn = connect()
+        c = conn.cursor()
+        bulk_status_rows = c.execute(f"""
+        SELECT
+            company_id,
+            incident_acknowledged_by,
+            incident_assigned_to,
+            incident_assigned_by
+        FROM calendar_plan_scheduler_status
+        WHERE company_id IN ({','.join('?' for _ in bulk_company_ids)})
+        ORDER BY company_id
+        """, bulk_company_ids).fetchall()
+        bulk_events = c.execute(f"""
+        SELECT company_id, event_type, actor_username
+        FROM calendar_scheduler_incident_events
+        WHERE company_id IN ({','.join('?' for _ in bulk_company_ids)})
+          AND event_type='acknowledged'
+        ORDER BY company_id
+        """, bulk_company_ids).fetchall()
+        conn.close()
+        assert [row["company_id"] for row in bulk_status_rows] == (
+            bulk_company_ids
+        )
+        assert all(
+            row["incident_acknowledged_by"] == "super"
+            and row["incident_assigned_to"] == "super"
+            and row["incident_assigned_by"] == "super"
+            for row in bulk_status_rows
+        )
+        assert [
+            (row["company_id"], row["event_type"], row["actor_username"])
+            for row in bulk_events
+        ] == [
+            (bulk_company_ids[0], "acknowledged", "super"),
+            (bulk_company_ids[1], "acknowledged", "super"),
+        ]
+        conn = connect()
+        c = conn.cursor()
+        for bulk_company_id in bulk_company_ids:
+            c.execute(
+                "DELETE FROM calendar_plan_scheduler_status WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM calendar_scheduler_incident_events WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM company_settings WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM companies WHERE id=?",
+                (bulk_company_id,),
+            )
+        conn.commit()
+        conn.close()
         repeated_platform_acknowledge = (
             await crm.platform_calendar_incident_acknowledge(
                 make_asgi_request(
@@ -8776,6 +8959,39 @@ async def assert_platform_calendar_health():
     finally:
         conn = connect()
         c = conn.cursor()
+        for bulk_company_id in bulk_company_ids:
+            c.execute(
+                "DELETE FROM calendar_plan_scheduler_status WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM calendar_scheduler_incident_events WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM calendar_plan_scheduler_runs WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM calendar_plan_operation_runs WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM notifications WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM company_settings WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM users WHERE company_id=?",
+                (bulk_company_id,),
+            )
+            c.execute(
+                "DELETE FROM companies WHERE id=?",
+                (bulk_company_id,),
+            )
         c.execute(
             "DELETE FROM calendar_plan_scheduler_status WHERE company_id=?",
             (company_id,),

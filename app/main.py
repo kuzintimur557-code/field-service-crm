@@ -4999,6 +4999,8 @@ def build_platform_calendar_health_queue_url(
     assignee="all",
     notice="",
     error="",
+    claimed=0,
+    skipped=0,
 ):
     allowed_statuses = {
         "all",
@@ -5029,7 +5031,77 @@ def build_platform_calendar_health_queue_url(
     elif error:
         params["error"] = str(error)
 
+    if claimed:
+        params["claimed"] = int(claimed)
+
+    if skipped:
+        params["skipped"] = int(skipped)
+
     return "/platform/calendar-health?" + urlencode(params)
+
+
+def claim_visible_calendar_scheduler_incidents(
+    actor_username,
+    status_filter="unacknowledged",
+    assignee_filter="unassigned",
+    limit=25,
+):
+    actor_username = str(actor_username or "").strip()
+
+    if not actor_username:
+        return {
+            "ok": False,
+            "error": "actor_not_found",
+            "claimed_count": 0,
+            "skipped_count": 0,
+            "visible_count": 0,
+            "limit": 0,
+        }
+
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 25
+
+    limit = max(1, min(25, limit))
+    health = get_platform_calendar_health(
+        status_filter=status_filter,
+        assignee_filter=assignee_filter,
+        current_username=actor_username,
+    )
+    candidates = [
+        item for item in health["items"] if item["requires_response"]
+    ]
+    claimed = []
+    skipped = []
+
+    for item in candidates[:limit]:
+        result = acknowledge_calendar_scheduler_incident(
+            item["company_id"],
+            actor_username,
+        )
+
+        if result["ok"]:
+            claimed.append(item["company_id"])
+        else:
+            skipped.append({
+                "company_id": item["company_id"],
+                "error": result["error"],
+            })
+
+    return {
+        "ok": bool(claimed),
+        "error": "" if claimed else "nothing_claimed",
+        "claimed_company_ids": claimed,
+        "skipped": skipped,
+        "claimed_count": len(claimed),
+        "skipped_count": len(skipped),
+        "visible_count": len(candidates),
+        "limited": len(candidates) > limit,
+        "limit": limit,
+        "status_filter": health["status_filter"],
+        "assignee_filter": health["assignee_filter"],
+    }
 
 
 def get_platform_calendar_company_detail(
@@ -5383,6 +5455,8 @@ async def platform_calendar_health_page(
     assignee: str = "all",
     notice: str = "",
     error: str = "",
+    claimed: int = 0,
+    skipped: int = 0,
 ):
     username = get_user(request)
 
@@ -5416,8 +5490,32 @@ async def platform_calendar_health_page(
             "Компания не найдена.",
             "error",
         ),
+        "bulk_empty": (
+            "Видимых непринятых инцидентов нет.",
+            "success",
+        ),
+        "bulk_conflict": (
+            "Инциденты уже изменились. Обновите очередь.",
+            "error",
+        ),
     }
     page_message = page_messages.get(notice or error)
+
+    if notice == "bulk_acknowledged":
+        page_message = (
+            (
+                f"Принято инцидентов: {max(0, int(claimed or 0))}."
+                + (
+                    f" Пропущено: {max(0, int(skipped or 0))}."
+                    if skipped
+                    else ""
+                )
+            ),
+            "success",
+        )
+    visible_claimable_count = sum(
+        1 for item in health["items"] if item["requires_response"]
+    )
 
     return templates.TemplateResponse(
         request,
@@ -5433,6 +5531,8 @@ async def platform_calendar_health_page(
             "selected_assignee": health["assignee_filter"],
             "platform_admins": health["platform_admins"],
             "admin_workload": health["admin_workload"],
+            "visible_claimable_count": visible_claimable_count,
+            "bulk_claim_limit": 25,
             "page_message": (
                 page_message[0] if page_message else ""
             ),
@@ -5440,6 +5540,54 @@ async def platform_calendar_health_page(
                 page_message[1] if page_message else ""
             ),
         },
+    )
+
+
+@app.post("/platform/calendar-health/claim-visible")
+async def platform_calendar_claim_visible_incidents(
+    request: Request,
+    status: str = "unacknowledged",
+    assignee: str = "unassigned",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    result = claim_visible_calendar_scheduler_incidents(
+        username,
+        status_filter=status,
+        assignee_filter=assignee,
+    )
+
+    if result["claimed_count"]:
+        return RedirectResponse(
+            build_platform_calendar_health_queue_url(
+                status=result["status_filter"],
+                assignee=result["assignee_filter"],
+                notice="bulk_acknowledged",
+                claimed=result["claimed_count"],
+                skipped=result["skipped_count"],
+            ),
+            status_code=302,
+        )
+
+    error_code = (
+        "bulk_conflict"
+        if result["visible_count"]
+        else "bulk_empty"
+    )
+    return RedirectResponse(
+        build_platform_calendar_health_queue_url(
+            status=result.get("status_filter") or status,
+            assignee=result.get("assignee_filter") or assignee,
+            error=error_code if error_code == "bulk_conflict" else "",
+            notice=error_code if error_code == "bulk_empty" else "",
+        ),
+        status_code=302,
     )
 
 
