@@ -4414,11 +4414,13 @@ def get_platform_calendar_incident_analytics(
                     "incidents": 0,
                     "recovered": 0,
                     "active": 0,
+                    "response_overdue": 0,
                 },
             )
             day["incidents"] += 1
             day["recovered"] += int(session["is_recovered"])
             day["active"] += int(session["is_active"])
+            day["response_overdue"] += int(session["response_overdue"])
 
     companies = []
 
@@ -6285,13 +6287,20 @@ async def platform_calendar_incident_analytics_export(
     writer.writerow([])
 
     writer.writerow(["Динамика"])
-    writer.writerow(["Дата", "Инциденты", "Восстановлено", "Активные"])
+    writer.writerow([
+        "Дата",
+        "Инциденты",
+        "Восстановлено",
+        "Активные",
+        "Просрочена реакция",
+    ])
     for day in analytics["daily"]:
         writer.writerow([
             day["date"],
             day["incidents"],
             day["recovered"],
             day["active"],
+            day["response_overdue"],
         ])
     writer.writerow([])
 

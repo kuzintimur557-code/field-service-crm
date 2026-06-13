@@ -9298,6 +9298,10 @@ async def assert_platform_calendar_health():
             for item in analytics["types"]
         )
         assert analytics["daily"]
+        assert any(
+            item["response_overdue"] >= 1
+            for item in analytics["daily"]
+        )
         assert analytics["recent_sessions"][0][
             "status_label"
         ] == "Передан платформе"
@@ -9419,6 +9423,7 @@ async def assert_platform_calendar_health():
         assert "Компании" in analytics_export_csv
         assert "Причины" in analytics_export_csv
         assert "Динамика" in analytics_export_csv
+        assert "Просрочена реакция" in analytics_export_csv
         assert "Последние инциденты" in analytics_export_csv
         assert company_name in analytics_export_csv
         assert "Передан платформе" in analytics_export_csv
