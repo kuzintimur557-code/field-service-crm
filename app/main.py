@@ -6592,6 +6592,95 @@ def compare_platform_release_readiness_to_snapshot(
     }
 
 
+def get_platform_release_readiness_trend(history=None):
+    history = (
+        history
+        if history is not None
+        else get_platform_release_readiness_history()
+    )
+
+    if not history:
+        return {
+            "has_history": False,
+            "label": "Нет истории",
+            "tone": "warning",
+            "summary": "Сохраните несколько снимков, чтобы видеть динамику.",
+            "total_snapshots": 0,
+            "latest_score": 0,
+            "score_change": 0,
+            "critical_change": 0,
+            "warning_change": 0,
+            "best_score": 0,
+            "best_date": "",
+            "worst_score": 0,
+            "worst_date": "",
+            "bars": [],
+        }
+
+    ordered = list(reversed(history))
+    latest = history[0]
+    first = ordered[0]
+    latest_score = int(latest["score"] or 0)
+    first_score = int(first["score"] or 0)
+    score_change = latest_score - first_score
+    critical_change = (
+        int(latest["critical_count"] or 0)
+        - int(first["critical_count"] or 0)
+    )
+    warning_change = (
+        int(latest["warning_count"] or 0)
+        - int(first["warning_count"] or 0)
+    )
+    best = max(history, key=lambda item: int(item["score"] or 0))
+    worst = min(history, key=lambda item: int(item["score"] or 0))
+
+    if len(history) == 1:
+        label = "Нужна история"
+        tone = "warning"
+        summary = "Есть один снимок. Для тренда нужен ещё один."
+    elif score_change > 0 and critical_change <= 0:
+        label = "Тренд улучшается"
+        tone = "ok"
+        summary = "Оценка готовности выросла относительно первого снимка."
+    elif score_change < 0 or critical_change > 0:
+        label = "Тренд ухудшается"
+        tone = "critical"
+        summary = "Готовность снизилась или выросло число критичных блокеров."
+    else:
+        label = "Тренд стабильный"
+        tone = "warning"
+        summary = "Оценка готовности заметно не изменилась."
+
+    bars = []
+    for item in ordered[-8:]:
+        score = int(item["score"] or 0)
+        bars.append({
+            "id": item["id"],
+            "score": score,
+            "height": max(score, 4),
+            "created_at": item["created_at"],
+            "status": item["status"],
+            "detail_url": item["detail_url"],
+        })
+
+    return {
+        "has_history": True,
+        "label": label,
+        "tone": tone,
+        "summary": summary,
+        "total_snapshots": len(history),
+        "latest_score": latest_score,
+        "score_change": score_change,
+        "critical_change": critical_change,
+        "warning_change": warning_change,
+        "best_score": int(best["score"] or 0),
+        "best_date": best["created_at"],
+        "worst_score": int(worst["score"] or 0),
+        "worst_date": worst["created_at"],
+        "bars": bars,
+    }
+
+
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_dashboard(request: Request):
 
@@ -6687,6 +6776,7 @@ async def platform_readiness_page(
     comparison = compare_platform_release_readiness_to_snapshot(
         readiness,
     )
+    trend = get_platform_release_readiness_trend(history)
 
     return templates.TemplateResponse(
         request,
@@ -6698,6 +6788,7 @@ async def platform_readiness_page(
             "readiness": readiness,
             "history": history,
             "comparison": comparison,
+            "trend": trend,
             "notice": notice,
         },
     )
@@ -6739,6 +6830,7 @@ async def platform_readiness_export(request: Request):
     comparison = compare_platform_release_readiness_to_snapshot(
         readiness,
     )
+    trend = get_platform_release_readiness_trend(history)
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -6781,6 +6873,19 @@ async def platform_readiness_export(request: Request):
             check["title"],
             check["action"],
         ])
+    writer.writerow([])
+
+    writer.writerow(["Тренд снимков"])
+    writer.writerow(["Есть история", "да" if trend["has_history"] else "нет"])
+    writer.writerow(["Состояние", trend["label"]])
+    writer.writerow(["Резюме", trend["summary"]])
+    writer.writerow(["Снимков", trend["total_snapshots"]])
+    writer.writerow(["Последняя оценка", trend["latest_score"]])
+    writer.writerow(["Динамика оценки", trend["score_change"]])
+    writer.writerow(["Динамика критичных", trend["critical_change"]])
+    writer.writerow(["Динамика предупреждений", trend["warning_change"]])
+    writer.writerow(["Лучший снимок", trend["best_score"], trend["best_date"]])
+    writer.writerow(["Худший снимок", trend["worst_score"], trend["worst_date"]])
     writer.writerow([])
 
     writer.writerow(["Категории"])
@@ -7059,6 +7164,7 @@ async def api_platform_readiness(request: Request):
     readiness["comparison"] = (
         compare_platform_release_readiness_to_snapshot(readiness)
     )
+    readiness["trend"] = get_platform_release_readiness_trend()
     return readiness
 
 

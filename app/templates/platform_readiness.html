@@ -38,6 +38,22 @@ button.button{border:0;cursor:pointer}
 .compare-stat{padding:10px;border-radius:8px;background:white}
 .compare-stat-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
 .compare-stat-value{margin-top:5px;font-size:18px;font-weight:900}
+.trend{margin-top:18px;padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb}
+.trend.ok{border-color:#bbf7d0;background:#f0fdf4}
+.trend.critical{border-color:#fecaca;background:#fff7f7}
+.trend-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
+.trend-label{font-size:13px;font-weight:900}
+.trend-value{margin-top:5px;font-size:24px;font-weight:900}
+.trend-text{color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
+.trend-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.trend-stat{padding:10px;border-radius:8px;background:white}
+.trend-stat-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+.trend-stat-value{margin-top:5px;font-size:18px;font-weight:900}
+.trend-bars{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;align-items:end;height:140px;margin-top:12px}
+.trend-bar{display:flex;min-width:0;height:100%;align-items:end;justify-content:center;text-decoration:none}
+.trend-bar-fill{display:flex;width:100%;min-height:8px;align-items:flex-start;justify-content:center;border-radius:8px 8px 4px 4px;background:#d1fae5;color:#065f46;font-size:10px;font-weight:900;padding-top:5px}
+.trend-bar-fill.warning{background:#fef3c7;color:#92400e}
+.trend-bar-fill.critical{background:#fecaca;color:#991b1b}
 .section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
 .section-title{margin:0;font-size:20px}
 .section-note{color:#6b7280;font-size:12px;font-weight:800}
@@ -81,6 +97,9 @@ button.button{border:0;cursor:pointer}
 .summary{grid-template-columns:1fr}
 .compare{grid-template-columns:1fr}
 .compare-grid{grid-template-columns:1fr}
+.trend-head{grid-template-columns:1fr}
+.trend-grid{grid-template-columns:1fr}
+.trend-bars{height:120px}
 .categories{grid-template-columns:1fr}
 .section-head{display:block}
 .section-note{margin-top:5px}
@@ -181,6 +200,50 @@ button.button{border:0;cursor:pointer}
             </div>
             {% endif %}
         </div>
+    </section>
+
+    <section class="trend {{ trend['tone'] }}">
+        <div class="trend-head">
+            <div>
+                <div class="trend-label">Тренд снимков</div>
+                <div class="trend-value">{{ trend["label"] }}</div>
+            </div>
+            <div class="trend-text">
+                {{ trend["summary"] }}
+                {% if trend["has_history"] %}
+                Всего снимков: {{ trend["total_snapshots"] }}.
+                {% endif %}
+            </div>
+        </div>
+        <div class="trend-grid">
+            <div class="trend-stat">
+                <div class="trend-stat-label">Последняя оценка</div>
+                <div class="trend-stat-value">{{ trend["latest_score"] }}%</div>
+            </div>
+            <div class="trend-stat">
+                <div class="trend-stat-label">Динамика</div>
+                <div class="trend-stat-value">{{ trend["score_change"] }}</div>
+            </div>
+            <div class="trend-stat">
+                <div class="trend-stat-label">Лучший снимок</div>
+                <div class="trend-stat-value">{{ trend["best_score"] }}%</div>
+            </div>
+            <div class="trend-stat">
+                <div class="trend-stat-label">Худший снимок</div>
+                <div class="trend-stat-value">{{ trend["worst_score"] }}%</div>
+            </div>
+        </div>
+        {% if trend["bars"] %}
+        <div class="trend-bars">
+            {% for bar in trend["bars"] %}
+            <a class="trend-bar" href="{{ bar['detail_url'] }}" title="{{ bar['created_at'] }}">
+                <span class="trend-bar-fill {{ bar['status'] }}" style="height: {{ bar['height'] }}%;">
+                    {{ bar["score"] }}
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
     </section>
 
     <section class="section">
