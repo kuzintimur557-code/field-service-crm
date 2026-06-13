@@ -414,6 +414,18 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS backup_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        action TEXT,
+        status TEXT,
+        file_name TEXT,
+        details TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS task_comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER,
@@ -969,6 +981,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_team_activity_company_user_created
     ON team_activity(company_id, user_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_backup_events_created
+    ON backup_events(created_at, id)
     """)
 
     c.execute("""

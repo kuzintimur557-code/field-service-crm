@@ -51,6 +51,13 @@ h1{margin:6px 0 0;font-size:34px}
 .integrity-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
 .integrity-value{margin-top:6px;font-size:18px;font-weight:900}
 .integrity-note{margin-top:6px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.45}
+.events{display:grid;gap:8px}
+.event{display:grid;grid-template-columns:150px minmax(0,1fr) 100px 130px;gap:10px;align-items:start;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+.event-title{font-size:13px;font-weight:900}
+.event-meta{color:#6b7280;font-size:11px;font-weight:800;line-height:1.45}
+.event-status{display:inline-flex;width:max-content;padding:5px 8px;border-radius:999px;background:#ecfdf5;color:#166534;font-size:10px;font-weight:900}
+.event-status.error{background:#fef2f2;color:#991b1b}
+.event-status.idle{background:#f3f4f6;color:#4b5563}
 .empty{padding:16px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:900}
 @media(max-width:760px){
 .container{padding:16px}
@@ -64,6 +71,7 @@ h1{margin:6px 0 0;font-size:34px}
 .file{grid-template-columns:1fr}
 .retention{grid-template-columns:1fr}
 .integrity{grid-template-columns:1fr}
+.event{grid-template-columns:1fr}
 h1{font-size:28px}
 }
 </style>
@@ -235,6 +243,37 @@ h1{font-size:28px}
         <div class="empty">
             Резервных копий пока нет. Создайте первую копию перед релизом.
         </div>
+        {% endif %}
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Журнал операций</h2>
+            <div class="section-note">Последние действия с резервными копиями</div>
+        </div>
+        {% if backup_events %}
+        <div class="events">
+            {% for event in backup_events %}
+            <div class="event">
+                <div>
+                    <div class="event-title">{{ event["action"] }}</div>
+                    <div class="event-meta">{{ event["created_at"] }}</div>
+                </div>
+                <div>
+                    <div class="event-meta">{{ event["details"] }}</div>
+                    {% if event["file_name"] %}
+                    <div class="event-meta">Файл: {{ event["file_name"] }}</div>
+                    {% endif %}
+                </div>
+                <span class="event-status {% if event['status'] == 'Ошибка' %}error{% elif event['status'] == 'Без изменений' %}idle{% endif %}">
+                    {{ event["status"] }}
+                </span>
+                <div class="event-meta">{{ event["username"] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">Журнал операций пока пуст.</div>
         {% endif %}
     </section>
 </div>

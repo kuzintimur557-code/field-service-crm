@@ -9642,7 +9642,9 @@ async def assert_platform_calendar_health():
         assert "Резервные копии" in backup_html
         assert "Создать копию" in backup_html
         assert "Экспорт CSV" in backup_html
+        assert "Журнал операций" in backup_html
         assert backup_page.context["backup_status"]["status_label"]
+        assert "backup_events" in backup_page.context
         anonymous_backup_export = await crm.backup_export(
             make_public_asgi_request("/backup/export"),
         )
@@ -9666,6 +9668,7 @@ async def assert_platform_calendar_health():
         assert "Последние копии" in backup_csv
         assert "Проверка последней" in backup_csv
         assert "Проверка восстановления" in backup_csv
+        assert "Журнал операций" in backup_csv
         anonymous_backup_api = await crm.api_platform_backup_status(
             make_public_asgi_request("/api/platform/backup-status"),
         )
@@ -9765,10 +9768,16 @@ async def assert_platform_calendar_health():
             if backup_file.exists():
                 backup_file.unlink()
 
-        created_backup_name, created_backup_error = (
-            crm.create_database_backup("super")
+        create_backup_response = await crm.backup_create(
+            make_asgi_request("super", "/backup/create"),
         )
-        assert not created_backup_error
+        assert create_backup_response.status_code == 302
+        assert create_backup_response.headers["location"].startswith(
+            "/backup?notice=backup_created&file="
+        )
+        created_backup_name = create_backup_response.headers[
+            "location"
+        ].split("file=", 1)[1]
         verified_backup_status = crm.get_backup_status()
         assert verified_backup_status["latest_name"] == created_backup_name
         assert verified_backup_status["latest_verification"]["status"] == "ok"
@@ -9787,6 +9796,24 @@ async def assert_platform_calendar_health():
         assert restore_check_response.status_code == 302
         assert restore_check_response.headers["location"].startswith(
             f"/backup?notice=restore_check_ok&file={created_backup_name}"
+        )
+        backup_events = crm.get_backup_event_history()
+        backup_actions = [event["action"] for event in backup_events]
+        assert "Создание копии" in backup_actions
+        assert "Очистка старых копий" in backup_actions
+        assert "Проверка восстановления" in backup_actions
+        assert any(
+            event["status"] == "Успешно"
+            and event["file_name"] == created_backup_name
+            for event in backup_events
+        )
+        logged_backup_page = await crm.backup_page(
+            make_asgi_request("super", "/backup"),
+        )
+        logged_backup_html = logged_backup_page.body.decode("utf-8")
+        assert "Резервная копия базы создана." in logged_backup_html
+        assert "Копия успешно скопирована во временную папку" in (
+            logged_backup_html
         )
 
         anonymous_backup_download = await crm.backup_download(

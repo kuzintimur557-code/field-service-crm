@@ -6056,6 +6056,43 @@ def format_backup_age(age_hours):
     return f"{int(age_hours // 24)} д"
 
 
+def log_backup_event(username, action, status, file_name="", details=""):
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO backup_events (
+        username,
+        action,
+        status,
+        file_name,
+        details,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        username,
+        action,
+        status,
+        file_name,
+        details,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+    conn.close()
+
+
+def get_backup_event_history(limit=12):
+    conn = connect()
+    events = conn.execute("""
+    SELECT *
+    FROM backup_events
+    ORDER BY id DESC
+    LIMIT ?
+    """, (limit,)).fetchall()
+    conn.close()
+    return events
+
+
 def list_database_backup_files():
     backup_path = DATA_DIR / "backups"
 
@@ -29149,6 +29186,7 @@ async def backup_page(
         return RedirectResponse("/", status_code=302)
 
     backup_status = get_backup_status()
+    backup_events = get_backup_event_history()
 
     return templates.TemplateResponse(
         request,
@@ -29158,6 +29196,7 @@ async def backup_page(
             "username": username,
             "role": role,
             "backup_status": backup_status,
+            "backup_events": backup_events,
             "notice": notice,
             "error": error,
             "file": file,
@@ -29182,10 +29221,25 @@ async def backup_create(request: Request):
     filename, error = create_database_backup(username)
 
     if error:
+        log_backup_event(
+            username,
+            "Создание копии",
+            "Ошибка",
+            "",
+            "Файл базы данных не найден.",
+        )
         return RedirectResponse(
             f"/backup?error={error}",
             status_code=302,
         )
+
+    log_backup_event(
+        username,
+        "Создание копии",
+        "Успешно",
+        filename,
+        "Резервная копия базы создана.",
+    )
 
     return RedirectResponse(
         f"/backup?notice=backup_created&file={filename}",
@@ -29206,6 +29260,16 @@ async def backup_cleanup(request: Request):
         return RedirectResponse("/", status_code=302)
 
     result = cleanup_old_database_backups()
+    log_backup_event(
+        username,
+        "Очистка старых копий",
+        "Успешно" if result["deleted_count"] else "Без изменений",
+        "",
+        (
+            f"Удалено: {result['deleted_count']}. "
+            f"Освобождено: {result['deleted_size_label']}."
+        ),
+    )
     notice = (
         "backup_cleanup_done"
         if result["deleted_count"]
@@ -29238,10 +29302,25 @@ async def backup_restore_check(request: Request, file: str = ""):
     result = run_backup_restore_drill(file)
 
     if result["error"]:
+        log_backup_event(
+            username,
+            "Проверка восстановления",
+            "Ошибка",
+            result["file"],
+            result["message"],
+        )
         return RedirectResponse(
             f"/backup?error={result['error']}&file={result['file']}",
             status_code=302,
         )
+
+    log_backup_event(
+        username,
+        "Проверка восстановления",
+        "Успешно",
+        result["file"],
+        result["message"],
+    )
 
     return RedirectResponse(
         f"/backup?notice=restore_check_ok&file={result['file']}",
@@ -29262,6 +29341,7 @@ async def backup_export(request: Request):
         return RedirectResponse("/", status_code=302)
 
     backup_status = get_backup_status()
+    backup_events = get_backup_event_history()
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Резервные копии"])
@@ -29307,6 +29387,19 @@ async def backup_export(request: Request):
             item["size_label"],
             item["stale_label"],
             item["verification"]["status_label"],
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Журнал операций"])
+    writer.writerow(["Дата", "Пользователь", "Действие", "Статус", "Файл", "Детали"])
+    for event in backup_events:
+        writer.writerow([
+            event["created_at"],
+            event["username"],
+            event["action"],
+            event["status"],
+            event["file_name"],
+            event["details"],
         ])
 
     return Response(
