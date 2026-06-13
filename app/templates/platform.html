@@ -173,6 +173,14 @@ h1{font-size:30px}
                     {% endif %}
                 </div>
             </div>
+            <div class="ops-metric warning">
+                <div class="ops-metric-label">Риск дней</div>
+                <div class="ops-metric-value">{{ calendar_incident_analytics_summary["high_risk_days"] }}</div>
+                <div class="ops-metric-meta">
+                    Топ: {{ calendar_incident_analytics_summary["top_risk_day"] or "нет" }}
+                    · {{ calendar_incident_analytics_summary["top_risk_day_score"] }}/100
+                </div>
+            </div>
             <div class="ops-metric">
                 <div class="ops-metric-label">Активные</div>
                 <div class="ops-metric-value">{{ calendar_health_summary["active_incidents"] }}</div>

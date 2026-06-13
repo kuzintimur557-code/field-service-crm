@@ -9504,6 +9504,12 @@ async def assert_platform_calendar_health():
         assert "top_risk_company_url" in (
             platform_page.context["calendar_incident_analytics_summary"]
         )
+        assert "high_risk_days" in (
+            platform_page.context["calendar_incident_analytics_summary"]
+        )
+        assert "top_risk_day" in (
+            platform_page.context["calendar_incident_analytics_summary"]
+        )
         assert platform_page.context["calendar_health_summary"][
             "oldest_active_incident_label"
         ]
@@ -9529,6 +9535,7 @@ async def assert_platform_calendar_health():
         assert "Старейший" in platform_html
         assert "Реакция" in platform_html
         assert "Высокий риск" in platform_html
+        assert "Риск дней" in platform_html
         assert "Топ:" in platform_html
         assert "status=response_overdue" in platform_html
         assert "/platform/calendar-health/analytics" in platform_html
