@@ -9677,6 +9677,41 @@ async def assert_platform_calendar_health():
         )
         assert backup_api["status_label"]
         assert "recent_files" in backup_api
+        assert "latest_download_url" in backup_api
+        anonymous_backup_download = await crm.backup_download(
+            make_public_asgi_request("/backup/download?file=crm.db"),
+            "crm.db",
+        )
+        assert anonymous_backup_download.status_code == 302
+        assert anonymous_backup_download.headers["location"] == "/login"
+        boss_backup_download = await crm.backup_download(
+            make_asgi_request("owner2", "/backup/download?file=crm.db"),
+            "crm.db",
+        )
+        assert boss_backup_download.status_code == 302
+        assert boss_backup_download.headers["location"] == "/"
+        invalid_backup_download = await crm.backup_download(
+            make_asgi_request(
+                "super",
+                "/backup/download?file=../crm.db",
+            ),
+            "../crm.db",
+        )
+        assert invalid_backup_download.status_code == 302
+        assert invalid_backup_download.headers["location"] == (
+            "/backup?error=invalid_backup"
+        )
+        missing_backup_download = await crm.backup_download(
+            make_asgi_request(
+                "super",
+                "/backup/download?file=missing.db",
+            ),
+            "missing.db",
+        )
+        assert missing_backup_download.status_code == 302
+        assert missing_backup_download.headers["location"] == (
+            "/backup?error=backup_not_found"
+        )
         anonymous_readiness = await crm.platform_readiness_page(
             make_public_asgi_request("/platform/readiness"),
         )

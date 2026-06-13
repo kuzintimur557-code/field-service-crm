@@ -68,6 +68,9 @@ h1{font-size:28px}
             <a class="button secondary" href="/platform">Платформа</a>
             <a class="button secondary" href="/system">Система</a>
             <a class="button secondary" href="{{ backup_status['export_url'] }}">Экспорт CSV</a>
+            {% if backup_status["latest_download_url"] %}
+            <a class="button secondary" href="{{ backup_status['latest_download_url'] }}">Скачать последнюю</a>
+            {% endif %}
             <form method="post" action="/backup/create">
                 <button class="button" type="submit">Создать копию</button>
             </form>
@@ -79,6 +82,12 @@ h1{font-size:28px}
     {% endif %}
     {% if error == "db_missing" %}
     <div class="notice error">Файл базы данных не найден. Копию создать нельзя.</div>
+    {% endif %}
+    {% if error == "invalid_backup" %}
+    <div class="notice error">Некорректное имя резервной копии.</div>
+    {% endif %}
+    {% if error == "backup_not_found" %}
+    <div class="notice error">Резервная копия не найдена.</div>
     {% endif %}
 
     <section class="status {{ backup_status['status'] }}">
@@ -127,7 +136,7 @@ h1{font-size:28px}
                 </div>
                 <div class="file-meta">Возраст: {{ item["age_label"] }}</div>
                 <div class="file-meta">{{ item["size_label"] }}</div>
-                <div class="file-meta">SQLite</div>
+                <a class="button secondary" href="{{ item['download_url'] }}">Скачать</a>
             </div>
             {% endfor %}
         </div>

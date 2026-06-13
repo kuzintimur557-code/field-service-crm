@@ -6123,6 +6123,7 @@ def get_backup_status():
             "size_label": format_file_size(stat.st_size),
             "created_at": file_at.strftime("%Y-%m-%d %H:%M"),
             "age_label": format_backup_age(file_age_hours),
+            "download_url": f"/backup/download?file={file.name}",
         })
 
     return {
@@ -6142,6 +6143,9 @@ def get_backup_status():
         "total_size": total_size,
         "total_size_label": format_file_size(total_size),
         "latest_name": latest.name if latest else "",
+        "latest_download_url": (
+            f"/backup/download?file={latest.name}" if latest else ""
+        ),
         "latest_created_at": (
             latest_at.strftime("%Y-%m-%d %H:%M") if latest_at else ""
         ),
@@ -6151,6 +6155,23 @@ def get_backup_status():
         "url": "/backup",
         "export_url": "/backup/export",
     }
+
+
+def get_backup_download_path(filename):
+    filename = str(filename or "").strip()
+
+    if not filename or Path(filename).name != filename:
+        return None, "invalid_backup"
+
+    if Path(filename).suffix.lower() not in (".db", ".sqlite", ".sqlite3"):
+        return None, "invalid_backup"
+
+    file_path = DATA_DIR / "backups" / filename
+
+    if not file_path.exists() or not file_path.is_file():
+        return None, "backup_not_found"
+
+    return file_path, ""
 
 
 def create_database_backup(username):
@@ -29005,6 +29026,33 @@ async def backup_export(request: Request):
                 "attachment; filename=platform_backups.csv"
             ),
         },
+    )
+
+
+@app.get("/backup/download")
+async def backup_download(request: Request, file: str = ""):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    file_path, error = get_backup_download_path(file)
+
+    if error:
+        return RedirectResponse(
+            f"/backup?error={error}",
+            status_code=302,
+        )
+
+    return FileResponse(
+        file_path,
+        filename=file_path.name,
+        media_type="application/octet-stream",
     )
 
 
