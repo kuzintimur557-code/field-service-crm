@@ -5768,6 +5768,91 @@ async def platform_calendar_reassign_visible_incidents(
     )
 
 
+@app.get("/platform/calendar-health/export")
+async def platform_calendar_health_export(
+    request: Request,
+    status: str = "all",
+    assignee: str = "all",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    health = get_platform_calendar_health(
+        status_filter=status,
+        assignee_filter=assignee,
+        current_username=username,
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID компании",
+        "Компания",
+        "Владелец",
+        "Приоритет",
+        "Состояние",
+        "Автоматизация включена",
+        "Автопубликация",
+        "Автонаповещения",
+        "Последняя активность",
+        "Последний результат",
+        "Причина последнего результата",
+        "Тип инцидента",
+        "Сообщение инцидента",
+        "Возраст инцидента",
+        "Реакция просрочена",
+        "Восстановление просрочено",
+        "Передано платформе",
+        "Принят в работу",
+        "Ответственный",
+        "В работе",
+        "Ссылка",
+    ])
+
+    for item in health["items"]:
+        writer.writerow([
+            item["company_id"],
+            item["company_name"],
+            item["owner_username"],
+            item["priority_label"],
+            item["status_label"],
+            "да" if item["automation_enabled"] else "нет",
+            "да" if item["calendar_auto_publish"] else "нет",
+            "да" if item["calendar_auto_remind"] else "нет",
+            item["last_activity_at"] or "",
+            item["last_scheduler_run_status_label"] or "",
+            item["last_scheduler_run_reason"] or "",
+            item["incident_label"] if item["active_incident"] else "",
+            item["incident_message"] or "",
+            item["incident_age_label"] or "",
+            "да" if item["response_overdue"] else "нет",
+            "да" if item["recovery_overdue"] else "нет",
+            "да" if item["is_escalated"] else "нет",
+            "да" if item["is_acknowledged"] else "нет",
+            item["assignee_username"] or "",
+            item["recovery_age_label"] or "",
+            item["detail_url"],
+        ])
+
+    filename = (
+        "platform_calendar_health_"
+        f"{health['status_filter']}_{health['assignee_filter']}.csv"
+    )
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename={filename}"
+            ),
+        },
+    )
+
+
 @app.get(
     "/platform/calendar-health/analytics",
     response_class=HTMLResponse,

@@ -7603,9 +7603,55 @@ async def assert_platform_calendar_health():
         )
         assert "Возраст: 2 ч" in html
         assert "/platform/calendar-health/analytics" in html
+        assert (
+            "/platform/calendar-health/export?status=problem"
+            "&amp;assignee=all"
+            in html
+        )
         assert company_name in html
         assert "Планировщик не запускался более шести часов." in html
         assert f"/platform/calendar-health/{company_id}" in html
+        anonymous_export = (
+            await crm.platform_calendar_health_export(
+                make_public_asgi_request(
+                    "/platform/calendar-health/export"
+                ),
+            )
+        )
+        assert anonymous_export.status_code == 302
+        assert anonymous_export.headers["location"] == "/login"
+        boss_export = (
+            await crm.platform_calendar_health_export(
+                make_asgi_request(
+                    "owner2",
+                    "/platform/calendar-health/export",
+                ),
+            )
+        )
+        assert boss_export.status_code == 302
+        assert boss_export.headers["location"] == "/"
+        export_response = await crm.platform_calendar_health_export(
+            make_asgi_request(
+                "super",
+                (
+                    "/platform/calendar-health/export"
+                    "?status=problem&assignee=all"
+                ),
+            ),
+            status="problem",
+            assignee="all",
+        )
+        assert export_response.status_code == 200
+        assert export_response.headers["content-disposition"] == (
+            "attachment; filename="
+            "platform_calendar_health_problem_all.csv"
+        )
+        export_csv = export_response.body.decode("utf-8")
+        assert export_csv.startswith("\ufeff")
+        assert "ID компании,Компания,Владелец,Приоритет" in export_csv
+        assert "Реакция просрочена" in export_csv.splitlines()[0]
+        assert company_name in export_csv
+        assert "Критический" in export_csv
         detail = crm.get_platform_calendar_company_detail(
             company_id,
             now_dt=now_dt,
