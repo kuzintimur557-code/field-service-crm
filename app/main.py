@@ -5001,6 +5001,7 @@ def build_platform_calendar_health_queue_url(
     error="",
     claimed=0,
     skipped=0,
+    reassigned=0,
 ):
     allowed_statuses = {
         "all",
@@ -5036,6 +5037,9 @@ def build_platform_calendar_health_queue_url(
 
     if skipped:
         params["skipped"] = int(skipped)
+
+    if reassigned:
+        params["reassigned"] = int(reassigned)
 
     return "/platform/calendar-health?" + urlencode(params)
 
@@ -5101,6 +5105,88 @@ def claim_visible_calendar_scheduler_incidents(
         "limit": limit,
         "status_filter": health["status_filter"],
         "assignee_filter": health["assignee_filter"],
+    }
+
+
+def reassign_visible_calendar_scheduler_incidents(
+    actor_username,
+    assignee_username,
+    status_filter="all",
+    assignee_filter="all",
+    limit=25,
+):
+    actor_username = str(actor_username or "").strip()
+    assignee_username = str(assignee_username or "").strip()
+
+    if not actor_username:
+        return {
+            "ok": False,
+            "error": "actor_not_found",
+            "reassigned_count": 0,
+            "skipped_count": 0,
+            "visible_count": 0,
+            "limit": 0,
+        }
+
+    if not assignee_username:
+        return {
+            "ok": False,
+            "error": "assignee_not_found",
+            "reassigned_count": 0,
+            "skipped_count": 0,
+            "visible_count": 0,
+            "limit": 0,
+        }
+
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 25
+
+    limit = max(1, min(25, limit))
+    health = get_platform_calendar_health(
+        status_filter=status_filter,
+        assignee_filter=assignee_filter,
+        current_username=actor_username,
+    )
+    candidates = [
+        item
+        for item in health["items"]
+        if item["active_incident"]
+        and item["is_acknowledged"]
+        and item["assignee_username"] != assignee_username
+    ]
+    reassigned = []
+    skipped = []
+
+    for item in candidates[:limit]:
+        result = reassign_calendar_scheduler_incident(
+            item["company_id"],
+            actor_username,
+            assignee_username,
+        )
+
+        if result["ok"]:
+            reassigned.append(item["company_id"])
+        else:
+            skipped.append({
+                "company_id": item["company_id"],
+                "error": result["error"],
+            })
+
+    return {
+        "ok": bool(reassigned),
+        "error": "" if reassigned else "nothing_reassigned",
+        "reassigned_company_ids": reassigned,
+        "skipped": skipped,
+        "reassigned_count": len(reassigned),
+        "skipped_count": len(skipped),
+        "visible_count": len(candidates),
+        "limited": len(candidates) > limit,
+        "limit": limit,
+        "status_filter": health["status_filter"],
+        "assignee_filter": health["assignee_filter"],
+        "target_assignee": assignee_username,
     }
 
 
@@ -5457,6 +5543,7 @@ async def platform_calendar_health_page(
     error: str = "",
     claimed: int = 0,
     skipped: int = 0,
+    reassigned: int = 0,
 ):
     username = get_user(request)
 
@@ -5498,6 +5585,14 @@ async def platform_calendar_health_page(
             "Инциденты уже изменились. Обновите очередь.",
             "error",
         ),
+        "bulk_reassign_empty": (
+            "Видимых принятых инцидентов для передачи нет.",
+            "success",
+        ),
+        "bulk_reassign_conflict": (
+            "Инциденты уже изменились или ответственный недоступен.",
+            "error",
+        ),
     }
     page_message = page_messages.get(notice or error)
 
@@ -5513,9 +5608,31 @@ async def platform_calendar_health_page(
             ),
             "success",
         )
+    elif notice == "bulk_reassigned":
+        page_message = (
+            (
+                f"Передано инцидентов: {max(0, int(reassigned or 0))}."
+                + (
+                    f" Пропущено: {max(0, int(skipped or 0))}."
+                    if skipped
+                    else ""
+                )
+            ),
+            "success",
+        )
     visible_claimable_count = sum(
         1 for item in health["items"] if item["requires_response"]
     )
+    visible_reassignable_count = sum(
+        1
+        for item in health["items"]
+        if item["active_incident"] and item["is_acknowledged"]
+    )
+    reassign_admins = [
+        admin_username
+        for admin_username in health["platform_admins"]
+        if admin_username != username
+    ]
 
     return templates.TemplateResponse(
         request,
@@ -5532,6 +5649,8 @@ async def platform_calendar_health_page(
             "platform_admins": health["platform_admins"],
             "admin_workload": health["admin_workload"],
             "visible_claimable_count": visible_claimable_count,
+            "visible_reassignable_count": visible_reassignable_count,
+            "reassign_admins": reassign_admins,
             "bulk_claim_limit": 25,
             "page_message": (
                 page_message[0] if page_message else ""
@@ -5586,6 +5705,64 @@ async def platform_calendar_claim_visible_incidents(
             assignee=result.get("assignee_filter") or assignee,
             error=error_code if error_code == "bulk_conflict" else "",
             notice=error_code if error_code == "bulk_empty" else "",
+        ),
+        status_code=302,
+    )
+
+
+@app.post("/platform/calendar-health/reassign-visible")
+async def platform_calendar_reassign_visible_incidents(
+    request: Request,
+    status: str = "all",
+    assignee: str = "all",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = reassign_visible_calendar_scheduler_incidents(
+        username,
+        form.get("assignee_username"),
+        status_filter=status,
+        assignee_filter=assignee,
+    )
+
+    if result["reassigned_count"]:
+        return RedirectResponse(
+            build_platform_calendar_health_queue_url(
+                status=result["status_filter"],
+                assignee=result["assignee_filter"],
+                notice="bulk_reassigned",
+                reassigned=result["reassigned_count"],
+                skipped=result["skipped_count"],
+            ),
+            status_code=302,
+        )
+
+    error_code = (
+        "bulk_reassign_conflict"
+        if result["visible_count"]
+        else "bulk_reassign_empty"
+    )
+    return RedirectResponse(
+        build_platform_calendar_health_queue_url(
+            status=result.get("status_filter") or status,
+            assignee=result.get("assignee_filter") or assignee,
+            error=(
+                error_code
+                if error_code == "bulk_reassign_conflict"
+                else ""
+            ),
+            notice=(
+                error_code
+                if error_code == "bulk_reassign_empty"
+                else ""
+            ),
         ),
         status_code=302,
     )

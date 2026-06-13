@@ -29,6 +29,9 @@ body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
 .queue-side{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .bulk-claim-form{margin:0}
 .bulk-claim-button{height:34px;border:0;border-radius:7px;background:#2563eb;padding:0 11px;color:white;font-size:11px;font-weight:900;cursor:pointer}
+.bulk-reassign-form{display:flex;gap:6px;align-items:center;margin:0}
+.bulk-reassign-form select{height:34px;min-width:160px;border:1px solid #d1d5db;border-radius:7px;background:white;padding:0 9px;color:#111827;font-size:11px;font-weight:800}
+.bulk-reassign-button{height:34px;border:0;border-radius:7px;background:#111827;padding:0 11px;color:white;font-size:11px;font-weight:900;cursor:pointer}
 .assignee-form{display:flex;gap:7px;align-items:center}
 .assignee-form label{color:#6b7280;font-size:10px;font-weight:900;white-space:nowrap}
 .assignee-form select{height:34px;min-width:180px;border:1px solid #d1d5db;border-radius:7px;background:white;padding:0 9px;color:#111827;font-size:11px;font-weight:800}
@@ -84,6 +87,8 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
     .queue-tools{align-items:stretch;flex-direction:column}
     .queue-side{align-items:stretch;flex-direction:column}
     .bulk-claim-button{width:100%}
+    .bulk-reassign-form{align-items:stretch;flex-direction:column}
+    .bulk-reassign-form select,.bulk-reassign-button{width:100%}
     .assignee-form{align-items:stretch;flex-direction:column}
     .assignee-form label{white-space:normal}
     .assignee-form select,.assignee-form button{width:100%}
@@ -195,6 +200,25 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
             >
                 <button class="bulk-claim-button" type="submit">
                     Принять видимые · {{ visible_claimable_count }}
+                </button>
+            </form>
+            {% endif %}
+            {% if visible_reassignable_count and reassign_admins %}
+            <form
+                class="bulk-reassign-form"
+                method="post"
+                action="/platform/calendar-health/reassign-visible?status={{ selected_status|urlencode }}&amp;assignee={{ selected_assignee|urlencode }}"
+                onsubmit="return confirm('Передать видимые принятые инциденты выбранному администратору? Максимум {{ bulk_claim_limit }} за один раз.');"
+            >
+                <select name="assignee_username" aria-label="Новый ответственный">
+                    {% for admin_username in reassign_admins %}
+                    <option value="{{ admin_username }}">
+                        {{ admin_username }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <button class="bulk-reassign-button" type="submit">
+                    Передать видимые · {{ visible_reassignable_count }}
                 </button>
             </form>
             {% endif %}

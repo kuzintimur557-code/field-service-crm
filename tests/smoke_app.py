@@ -7178,9 +7178,11 @@ async def assert_platform_calendar_health():
 
     company_id = 901
     bulk_company_ids = [902, 903]
+    bulk_transfer_company_ids = [904, 905]
     company_name = "Smoke Calendar Health"
     owner_username = "smoke_health_owner"
     backup_admin_username = "smoke_platform_backup"
+    transfer_admin_username = "smoke_transfer_admin"
     now_dt = datetime.now()
     old_value = (
         now_dt - timedelta(hours=8)
@@ -7220,6 +7222,16 @@ async def assert_platform_calendar_health():
     VALUES (?, 'x', 'superadmin', 1, 1, ?)
     """, (
         backup_admin_username,
+        old_value,
+    ))
+    c.execute("""
+    INSERT INTO users (
+        username, password, role, company_id,
+        is_active, last_seen
+    )
+    VALUES (?, 'x', 'superadmin', 1, 1, ?)
+    """, (
+        transfer_admin_username,
         old_value,
     ))
     c.execute("""
@@ -7988,6 +8000,240 @@ async def assert_platform_calendar_health():
                 "DELETE FROM companies WHERE id=?",
                 (bulk_company_id,),
             )
+        conn.commit()
+        conn.close()
+        conn = connect()
+        c = conn.cursor()
+        for transfer_company_id in bulk_transfer_company_ids:
+            c.execute("""
+            INSERT INTO companies (
+                id, name, owner_username, created_at
+            )
+            VALUES (?, ?, ?, ?)
+            """, (
+                transfer_company_id,
+                f"Transfer Calendar Health {transfer_company_id}",
+                f"transfer_owner_{transfer_company_id}",
+                old_value,
+            ))
+            c.execute("""
+            INSERT INTO company_settings (
+                company_id, company_name,
+                calendar_auto_publish, calendar_auto_remind,
+                calendar_auto_days_ahead,
+                calendar_auto_window_start,
+                calendar_auto_window_end,
+                updated_at
+            )
+            VALUES (?, ?, 1, 1, 5, '08:00', '20:00', ?)
+            """, (
+                transfer_company_id,
+                f"Transfer Calendar Health {transfer_company_id}",
+                old_value,
+            ))
+            c.execute("""
+            INSERT INTO calendar_plan_scheduler_status (
+                company_id, last_status, active_incident,
+                incident_started_at, incident_message,
+                incident_acknowledged_at, incident_acknowledged_by,
+                incident_assigned_at, incident_assigned_to,
+                incident_assigned_by
+            )
+            VALUES (
+                ?, 'error', 'error', ?, ?,
+                ?, ?, ?, ?, ?
+            )
+            """, (
+                transfer_company_id,
+                incident_value,
+                "Массовая передача очереди календаря.",
+                old_value,
+                transfer_admin_username,
+                old_value,
+                transfer_admin_username,
+                transfer_admin_username,
+            ))
+            c.execute("""
+            INSERT INTO calendar_scheduler_incident_events (
+                company_id, incident_type, event_type,
+                actor_username, message, created_at
+            )
+            VALUES (?, 'error', 'opened', '', ?, ?)
+            """, (
+                transfer_company_id,
+                "Массовая передача очереди календаря.",
+                incident_value,
+            ))
+            c.execute("""
+            INSERT INTO calendar_scheduler_incident_events (
+                company_id, incident_type, event_type,
+                actor_username, message, created_at
+            )
+            VALUES (?, 'error', 'acknowledged', ?, ?, ?)
+            """, (
+                transfer_company_id,
+                transfer_admin_username,
+                "Инцидент принят для проверки передачи.",
+                old_value,
+            ))
+        conn.commit()
+        conn.close()
+        transfer_page = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "super",
+                (
+                    "/platform/calendar-health"
+                    "?status=problem"
+                    f"&assignee={transfer_admin_username}"
+                ),
+            ),
+            status="problem",
+            assignee=transfer_admin_username,
+        )
+        transfer_html = transfer_page.body.decode("utf-8")
+        assert transfer_page.context["visible_reassignable_count"] == 2
+        assert "Передать видимые · 2" in transfer_html
+        assert (
+            "/platform/calendar-health/reassign-visible"
+            in transfer_html
+        )
+        transfer_response = (
+            await crm.platform_calendar_reassign_visible_incidents(
+                make_form_request(
+                    "super",
+                    "/platform/calendar-health/reassign-visible",
+                    {
+                        "assignee_username": (
+                            backup_admin_username
+                        ),
+                    },
+                ),
+                status="problem",
+                assignee=transfer_admin_username,
+            )
+        )
+        assert transfer_response.headers["location"] == (
+            "/platform/calendar-health?"
+            "status=problem"
+            f"&assignee={transfer_admin_username}"
+            "&notice=bulk_reassigned"
+            "&reassigned=2"
+        )
+        transfer_done_page = await crm.platform_calendar_health_page(
+            make_asgi_request(
+                "super",
+                (
+                    "/platform/calendar-health"
+                    "?status=problem"
+                    f"&assignee={transfer_admin_username}"
+                    "&notice=bulk_reassigned"
+                    "&reassigned=2"
+                ),
+            ),
+            status="problem",
+            assignee=transfer_admin_username,
+            notice="bulk_reassigned",
+            reassigned=2,
+        )
+        assert "Передано инцидентов: 2." in (
+            transfer_done_page.body.decode("utf-8")
+        )
+        assert (
+            transfer_done_page.context["visible_reassignable_count"]
+            == 0
+        )
+        repeated_transfer_response = (
+            await crm.platform_calendar_reassign_visible_incidents(
+                make_form_request(
+                    "super",
+                    "/platform/calendar-health/reassign-visible",
+                    {
+                        "assignee_username": (
+                            backup_admin_username
+                        ),
+                    },
+                ),
+                status="problem",
+                assignee=transfer_admin_username,
+            )
+        )
+        assert repeated_transfer_response.headers["location"] == (
+            "/platform/calendar-health?"
+            "status=problem"
+            f"&assignee={transfer_admin_username}"
+            "&notice=bulk_reassign_empty"
+        )
+        conn = connect()
+        c = conn.cursor()
+        transfer_status_rows = c.execute(f"""
+        SELECT
+            company_id,
+            incident_acknowledged_by,
+            incident_assigned_to,
+            incident_assigned_by
+        FROM calendar_plan_scheduler_status
+        WHERE company_id IN (
+            {','.join('?' for _ in bulk_transfer_company_ids)}
+        )
+        ORDER BY company_id
+        """, bulk_transfer_company_ids).fetchall()
+        transfer_events = c.execute(f"""
+        SELECT company_id, event_type, actor_username
+        FROM calendar_scheduler_incident_events
+        WHERE company_id IN (
+            {','.join('?' for _ in bulk_transfer_company_ids)}
+        )
+          AND event_type='reassigned'
+        ORDER BY company_id
+        """, bulk_transfer_company_ids).fetchall()
+        conn.close()
+        assert [
+            row["company_id"] for row in transfer_status_rows
+        ] == bulk_transfer_company_ids
+        assert all(
+            row["incident_acknowledged_by"] == (
+                transfer_admin_username
+            )
+            and row["incident_assigned_to"] == backup_admin_username
+            and row["incident_assigned_by"] == "super"
+            for row in transfer_status_rows
+        )
+        assert [
+            (row["company_id"], row["event_type"], row["actor_username"])
+            for row in transfer_events
+        ] == [
+            (bulk_transfer_company_ids[0], "reassigned", "super"),
+            (bulk_transfer_company_ids[1], "reassigned", "super"),
+        ]
+        conn = connect()
+        c = conn.cursor()
+        for transfer_company_id in bulk_transfer_company_ids:
+            c.execute(
+                "DELETE FROM calendar_plan_scheduler_status WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM calendar_scheduler_incident_events WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM notifications WHERE link=?",
+                (
+                    f"/platform/calendar-health/{transfer_company_id}",
+                ),
+            )
+            c.execute(
+                "DELETE FROM company_settings WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM companies WHERE id=?",
+                (transfer_company_id,),
+            )
+        c.execute(
+            "DELETE FROM users WHERE username=?",
+            (transfer_admin_username,),
+        )
         conn.commit()
         conn.close()
         repeated_platform_acknowledge = (
@@ -8992,6 +9238,49 @@ async def assert_platform_calendar_health():
                 "DELETE FROM companies WHERE id=?",
                 (bulk_company_id,),
             )
+        for transfer_company_id in bulk_transfer_company_ids:
+            c.execute(
+                "DELETE FROM calendar_plan_scheduler_status WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM calendar_scheduler_incident_events WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM calendar_plan_scheduler_runs WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM calendar_plan_operation_runs WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM notifications WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM notifications WHERE link=?",
+                (
+                    f"/platform/calendar-health/{transfer_company_id}",
+                ),
+            )
+            c.execute(
+                "DELETE FROM company_settings WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM users WHERE company_id=?",
+                (transfer_company_id,),
+            )
+            c.execute(
+                "DELETE FROM companies WHERE id=?",
+                (transfer_company_id,),
+            )
+        c.execute(
+            "DELETE FROM users WHERE username=?",
+            (transfer_admin_username,),
+        )
         c.execute(
             "DELETE FROM calendar_plan_scheduler_status WHERE company_id=?",
             (company_id,),
