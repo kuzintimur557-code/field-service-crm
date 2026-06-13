@@ -4441,6 +4441,78 @@ def get_platform_calendar_incident_analytics(
             item["escalations"] for item in sessions
         ),
     }
+    recommendations = []
+
+    if summary["active"]:
+        recommendations.append({
+            "tone": "error",
+            "title": "Разберите активные инциденты",
+            "description": (
+                f"Сейчас открыто {summary['active']} инцидентов. "
+                "Начните с компаний в верхней части списка."
+            ),
+            "url": "/platform/calendar-health?status=problem",
+        })
+
+    if summary["recovery_overdue"]:
+        recommendations.append({
+            "tone": "error",
+            "title": "Ускорьте восстановление",
+            "description": (
+                "Есть инциденты, где срок восстановления уже превышен. "
+                "Передайте их ответственным администраторам."
+            ),
+            "url": "/platform/calendar-health?status=recovery_overdue",
+        })
+
+    if summary["response_sla_percent"] < 90:
+        recommendations.append({
+            "tone": "warning",
+            "title": "Проверьте скорость реакции",
+            "description": (
+                "SLA реакции ниже 90%. Непринятые инциденты нужно "
+                "быстрее брать в работу."
+            ),
+            "url": (
+                "/platform/calendar-health?"
+                "status=unacknowledged&assignee=unassigned"
+            ),
+        })
+
+    if summary["recovery_failures"]:
+        recommendations.append({
+            "tone": "warning",
+            "title": "Разберите ошибки восстановления",
+            "description": (
+                f"За период было ошибок восстановления: "
+                f"{summary['recovery_failures']}. Проверьте журналы "
+                "компаний с повторными сбоями."
+            ),
+            "url": "/platform/calendar-health/analytics",
+        })
+
+    if summary["escalations"]:
+        recommendations.append({
+            "tone": "warning",
+            "title": "Снизьте количество эскалаций",
+            "description": (
+                f"Эскалаций за период: {summary['escalations']}. "
+                "Это сигнал, что часть инцидентов слишком долго "
+                "остаётся без реакции."
+            ),
+            "url": "/platform/calendar-health?status=critical",
+        })
+
+    if not recommendations:
+        recommendations.append({
+            "tone": "healthy",
+            "title": "Календарные автоматизации стабильны",
+            "description": (
+                "Критичных сигналов за выбранный период нет. "
+                "Продолжайте следить за динамикой."
+            ),
+            "url": "/platform/calendar-health",
+        })
 
     return {
         "days": selected_days,
@@ -4452,6 +4524,7 @@ def get_platform_calendar_incident_analytics(
         "types": type_rows,
         "daily": daily,
         "recent_sessions": sessions[:20],
+        "recommendations": recommendations[:5],
         "policy": policy,
     }
 
@@ -5939,6 +6012,7 @@ async def platform_calendar_incident_analytics_page(
             "types": analytics["types"],
             "daily": analytics["daily"],
             "recent_sessions": analytics["recent_sessions"],
+            "recommendations": analytics["recommendations"],
             "selected_days": analytics["days"],
         },
     )
@@ -5984,6 +6058,16 @@ async def platform_calendar_incident_analytics_export(
     writer.writerow(["Попыток восстановления", summary["recovery_attempts"]])
     writer.writerow(["Ошибок восстановления", summary["recovery_failures"]])
     writer.writerow(["Эскалаций", summary["escalations"]])
+    writer.writerow([])
+
+    writer.writerow(["Рекомендации"])
+    writer.writerow(["Заголовок", "Описание", "Ссылка"])
+    for recommendation in analytics["recommendations"]:
+        writer.writerow([
+            recommendation["title"],
+            recommendation["description"],
+            recommendation["url"],
+        ])
     writer.writerow([])
 
     writer.writerow(["Компании"])

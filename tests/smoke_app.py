@@ -9248,6 +9248,11 @@ async def assert_platform_calendar_health():
         assert analytics["recent_sessions"][0][
             "status_label"
         ] == "Передан платформе"
+        assert analytics["recommendations"]
+        assert any(
+            item["title"] == "Разберите активные инциденты"
+            for item in analytics["recommendations"]
+        )
         normalized_analytics = (
             crm.get_platform_calendar_incident_analytics(
                 days=11,
@@ -9302,6 +9307,8 @@ async def assert_platform_calendar_health():
             in analytics_html
         )
         assert "Среднее восстановление" in analytics_html
+        assert "Рекомендации" in analytics_html
+        assert "Разберите активные инциденты" in analytics_html
         assert "Последние инциденты" in analytics_html
         assert "Динамика" in analytics_html
         assert company_name in analytics_html
@@ -9346,6 +9353,8 @@ async def assert_platform_calendar_health():
         )
         assert analytics_export_csv.startswith("\ufeff")
         assert "Сводка" in analytics_export_csv
+        assert "Рекомендации" in analytics_export_csv
+        assert "Разберите активные инциденты" in analytics_export_csv
         assert "Компании" in analytics_export_csv
         assert "Причины" in analytics_export_csv
         assert "Динамика" in analytics_export_csv
