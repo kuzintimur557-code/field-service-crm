@@ -9289,6 +9289,10 @@ async def assert_platform_calendar_health():
         assert analytics["summary"]["top_risk_company_name"]
         assert analytics["summary"]["top_risk_company_score"] >= 1
         assert analytics["summary"]["top_risk_company_url"]
+        assert analytics["summary"]["high_risk_days"] >= 0
+        assert analytics["summary"]["medium_risk_days"] >= 0
+        assert analytics["summary"]["top_risk_day"]
+        assert analytics["summary"]["top_risk_day_score"] >= 1
         assert analytics_company["incidents"] == 2
         assert analytics_company["recovered"] == 1
         assert analytics_company["active"] == 1
@@ -9402,6 +9406,7 @@ async def assert_platform_calendar_health():
         assert "Среднее восстановление" in analytics_html
         assert "Риск" in analytics_html
         assert "Высокий риск" in analytics_html
+        assert "Риск по дням" in analytics_html
         assert "Сначала компании с нарушенной реакцией" in analytics_html
         assert "Реакция просрочена" in analytics_html
         assert "Рекомендации" in analytics_html
@@ -9453,6 +9458,8 @@ async def assert_platform_calendar_health():
         assert "Сводка" in analytics_export_csv
         assert "Компаний высокого риска" in analytics_export_csv
         assert "Топ риск компания" in analytics_export_csv
+        assert "Дней высокого риска" in analytics_export_csv
+        assert "Топ риск день" in analytics_export_csv
         assert "Просрочена реакция" in analytics_export_csv
         assert "Реакция %" in analytics_export_csv
         assert "Оценка риска" in analytics_export_csv

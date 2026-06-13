@@ -135,6 +135,14 @@ tr:last-child td{border-bottom:0}
             </div>
         </div>
         <div class="metric">
+            <div class="metric-label">Риск по дням</div>
+            <div class="metric-value">{{ summary["high_risk_days"] }}</div>
+            <div class="metric-meta">
+                Топ: {{ summary["top_risk_day"] or "нет" }}
+                · {{ summary["top_risk_day_score"] }}/100
+            </div>
+        </div>
+        <div class="metric">
             <div class="metric-label">
                 Реакция до {{ analytics["policy"]["response_minutes"] }} минут
             </div>

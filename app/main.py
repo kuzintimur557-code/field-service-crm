@@ -4540,6 +4540,17 @@ def get_platform_calendar_incident_analytics(
         if 40 <= company["risk_score"] < 80
     ]
     top_risk_company = companies[0] if companies else None
+    high_risk_days = [
+        day for day in daily if day["risk_score"] >= 80
+    ]
+    medium_risk_days = [
+        day for day in daily if 40 <= day["risk_score"] < 80
+    ]
+    top_risk_day = max(
+        daily,
+        key=lambda day: day["risk_score"],
+        default=None,
+    )
     summary = {
         "incidents": len(sessions),
         "recovered": len(recovered),
@@ -4593,6 +4604,18 @@ def get_platform_calendar_incident_analytics(
             top_risk_company["detail_url"]
             if top_risk_company
             else ""
+        ),
+        "high_risk_days": len(high_risk_days),
+        "medium_risk_days": len(medium_risk_days),
+        "top_risk_day": (
+            top_risk_day["date"]
+            if top_risk_day
+            else ""
+        ),
+        "top_risk_day_score": (
+            top_risk_day["risk_score"]
+            if top_risk_day
+            else 0
         ),
     }
     recommendations = []
@@ -6296,6 +6319,10 @@ async def platform_calendar_incident_analytics_export(
     writer.writerow(["Компаний среднего риска", summary["medium_risk_companies"]])
     writer.writerow(["Топ риск компания", summary["top_risk_company_name"]])
     writer.writerow(["Топ риск оценка", summary["top_risk_company_score"]])
+    writer.writerow(["Дней высокого риска", summary["high_risk_days"]])
+    writer.writerow(["Дней среднего риска", summary["medium_risk_days"]])
+    writer.writerow(["Топ риск день", summary["top_risk_day"]])
+    writer.writerow(["Топ риск день оценка", summary["top_risk_day_score"]])
     writer.writerow(["Закрыто %", summary["recovery_rate"]])
     writer.writerow(["SLA реакции %", summary["response_sla_percent"]])
     writer.writerow([
