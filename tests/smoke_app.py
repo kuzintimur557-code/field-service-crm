@@ -9656,6 +9656,14 @@ async def assert_platform_calendar_health():
             security_response.headers["permissions-policy"]
         )
         assert "strict-transport-security" not in security_response.headers
+        finalized_response = crm.finalize_response_headers(
+            crm.JSONResponse({"ok": True}),
+            "smoke-finalized",
+            12,
+        )
+        assert finalized_response.headers["x-request-id"] == "smoke-finalized"
+        assert finalized_response.headers["x-response-time-ms"] == "12"
+        assert finalized_response.headers["x-frame-options"] == "DENY"
         assert crm.normalize_request_id("smoke-request-123") == (
             "smoke-request-123"
         )
@@ -10058,6 +10066,10 @@ async def assert_platform_calendar_health():
         assert "Код ошибки:" in runtime_error_html
         assert "Код запроса:" in runtime_error_html
         assert runtime_error_response.headers["x-request-id"]
+        assert runtime_error_response.headers["x-frame-options"] == "DENY"
+        assert runtime_error_response.headers["x-content-type-options"] == (
+            "nosniff"
+        )
         runtime_error_events = crm.get_system_event_history()
         assert any(
             event["event_type"] == "runtime_error"
@@ -10081,6 +10093,10 @@ async def assert_platform_calendar_health():
         assert api_runtime_error_payload["request_id"]
         assert api_runtime_error_response.headers["x-request-id"] == (
             api_runtime_error_payload["request_id"]
+        )
+        assert api_runtime_error_response.headers["x-frame-options"] == "DENY"
+        assert api_runtime_error_response.headers["x-content-type-options"] == (
+            "nosniff"
         )
         runtime_system_page = await crm.system_page(
             make_asgi_request("super", "/system"),

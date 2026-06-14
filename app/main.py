@@ -217,15 +217,23 @@ def apply_security_headers(response):
     return response
 
 
+def finalize_response_headers(response, request_id="", duration_ms=None):
+    apply_security_headers(response)
+
+    if duration_ms is not None:
+        apply_response_time_header(response, duration_ms)
+
+    apply_request_id_header(response, request_id)
+    return response
+
+
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
     request_id = get_request_id(request)
     started_at = monotonic()
     response = await call_next(request)
     duration_ms = int((monotonic() - started_at) * 1000)
-    apply_security_headers(response)
-    apply_response_time_header(response, duration_ms)
-    apply_request_id_header(response, request_id)
+    finalize_response_headers(response, request_id, duration_ms)
     log_http_request_event(request, response, request_id, duration_ms)
     return response
 
@@ -6715,7 +6723,7 @@ async def unhandled_exception_handler(request: Request, error: Exception):
             },
             status_code=500,
         )
-        return apply_request_id_header(response, request_id)
+        return finalize_response_headers(response, request_id)
 
     try:
         response = templates.TemplateResponse(
@@ -6728,7 +6736,7 @@ async def unhandled_exception_handler(request: Request, error: Exception):
             },
             status_code=500,
         )
-        return apply_request_id_header(response, request_id)
+        return finalize_response_headers(response, request_id)
     except Exception:
         response = Response(
             (
@@ -6739,7 +6747,7 @@ async def unhandled_exception_handler(request: Request, error: Exception):
             status_code=500,
             media_type="text/plain; charset=utf-8",
         )
-        return apply_request_id_header(response, request_id)
+        return finalize_response_headers(response, request_id)
 
 
 def backup_event_severity(status):
