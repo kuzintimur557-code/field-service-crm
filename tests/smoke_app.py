@@ -9817,6 +9817,10 @@ async def assert_platform_calendar_health():
         assert "Ошибки за 24 часа" in system_html
         assert "HTTP за 24 часа" in system_html
         assert "HTTP-запросы" in system_html
+        assert "Контроль деплоя" in system_html
+        assert "Готовность деплоя" in system_html
+        assert "GET /health" in system_html
+        assert "GET /ready" in system_html
         assert "Журнал системы" in system_html
         assert "/system/export" in system_html
         assert "/system/events/export" in system_html
@@ -9827,6 +9831,18 @@ async def assert_platform_calendar_health():
         assert "backup_status" in system_page.context
         assert "system_events" in system_page.context
         assert "production_config" in system_page.context
+        assert system_page.context["public_health_status"]["ok"] is True
+        assert system_page.context["public_readiness_status"]["ok"] is True
+        assert {
+            "/health",
+            "/ready",
+            "/system",
+            "/platform/readiness",
+            "/backup",
+        }.issubset({
+            item["url"]
+            for item in system_page.context["deployment_endpoints"]
+        })
         assert system_page.context["production_config"]["items"]
         assert "system_event_summary" in system_page.context
         assert system_page.context["system_event_summary"]["hours"] == (
@@ -9849,6 +9865,7 @@ async def assert_platform_calendar_health():
             "secure_cookie",
             "telegram",
             "automation_cron_secret",
+            "deploy_readiness",
             "runtime_errors",
             "http_observability",
             "backups",
@@ -9878,6 +9895,9 @@ async def assert_platform_calendar_health():
         assert "Системный отчёт" in system_export_csv
         assert "Конфигурация окружения" in system_export_csv
         assert "Проверки системы" in system_export_csv
+        assert "Контроль деплоя" in system_export_csv
+        assert "/health" in system_export_csv
+        assert "/ready" in system_export_csv
         assert "Резервные копии" in system_export_csv
         assert "Ошибки за 24 часа" in system_export_csv
         assert "HTTP событий" in system_export_csv
@@ -9901,6 +9921,12 @@ async def assert_platform_calendar_health():
         assert system_api["system_checks"]
         assert system_api["production_config"]["items"]
         assert system_api["backup_status"]["status_label"]
+        assert system_api["public_health_status"]["ok"] is True
+        assert system_api["public_readiness_status"]["ok"] is True
+        assert any(
+            item["url"] == "/ready"
+            for item in system_api["deployment_endpoints"]
+        )
         assert system_api["system_event_summary"]["hours"] == (
             crm.SYSTEM_EVENT_ALERT_HOURS
         )
@@ -9911,6 +9937,15 @@ async def assert_platform_calendar_health():
             system_api["system_event_summary"]["http_critical_count"] >= 1
         )
         assert isinstance(system_api["system_events"], list)
+        admin_page = await crm.admin_page(
+            make_asgi_request("super", "/admin"),
+        )
+        assert admin_page.status_code == 200
+        admin_html = admin_page.body.decode("utf-8")
+        assert "Админ-центр" in admin_html
+        assert 'href="/health"' in admin_html
+        assert 'href="/ready"' in admin_html
+        assert "Готовность" in admin_html
         anonymous_system_events_export = await crm.system_events_export(
             make_public_asgi_request("/system/events/export"),
         )

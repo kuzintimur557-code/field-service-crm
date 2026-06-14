@@ -29987,6 +29987,8 @@ def build_system_diagnostics(role=""):
         production_config["automation_cron_secret_configured"]
     )
     backup_status = get_backup_status()
+    public_health_status = get_public_health_status()
+    public_readiness_status = get_public_readiness_status()
     system_event_summary = get_recent_system_event_summary()
     system_generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -30025,6 +30027,21 @@ def build_system_diagnostics(role=""):
             ),
             "Проверьте DATA_DIR и права на uploads.",
             "/debug",
+        ),
+        make_system_check(
+            "deploy_readiness",
+            "Готовность деплоя",
+            public_readiness_status["status"],
+            public_readiness_status["status_label"],
+            (
+                "Публичный /ready проверяет SQLite, ключевые таблицы "
+                "и доступность uploads."
+            ),
+            (
+                "Подключите /health и /ready к Railway или внешнему "
+                "мониторингу."
+            ),
+            "/ready",
         ),
         make_system_check(
             "secret_key",
@@ -30186,6 +30203,60 @@ def build_system_diagnostics(role=""):
         system_status = "ok"
         system_status_label = "Стабильно"
 
+    deployment_endpoints = [
+        {
+            "title": "Живость",
+            "url": "/health",
+            "access_label": "публичный",
+            "status": public_health_status["status"],
+            "status_label": public_health_status["status_label"],
+            "summary": "Быстрая проверка, что приложение и база отвечают.",
+            "method": "GET",
+        },
+        {
+            "title": "Готовность",
+            "url": "/ready",
+            "access_label": "публичный",
+            "status": public_readiness_status["status"],
+            "status_label": public_readiness_status["status_label"],
+            "summary": (
+                "Готовность к трафику: SQLite, quick_check, таблицы, uploads."
+            ),
+            "method": "GET",
+        },
+        {
+            "title": "Система",
+            "url": "/system",
+            "access_label": "только админ",
+            "status": system_status,
+            "status_label": system_status_label,
+            "summary": "Техническая диагностика, события, backup и окружение.",
+            "method": "GET",
+        },
+        {
+            "title": "Готовность релиза",
+            "url": "/platform/readiness",
+            "access_label": "superadmin",
+            "status": "ok" if system_status != "critical" else "critical",
+            "status_label": (
+                "Проверить"
+                if system_status != "critical"
+                else "Есть блокеры"
+            ),
+            "summary": "Контроль релиза, runbook, signoff и снимки готовности.",
+            "method": "GET",
+        },
+        {
+            "title": "Резервные копии",
+            "url": "/backup",
+            "access_label": "superadmin",
+            "status": backup_status["status"],
+            "status_label": backup_status["status_label"],
+            "summary": "Резервные копии и проверка восстановления.",
+            "method": "GET",
+        },
+    ]
+
     system_events = get_system_event_history() if role == "superadmin" else []
     system_event_retention = (
         get_system_event_retention_status()
@@ -30209,6 +30280,9 @@ def build_system_diagnostics(role=""):
         "secret_is_default": default_secret,
         "telegram_configured": telegram_configured,
         "production_config": production_config,
+        "public_health_status": public_health_status,
+        "public_readiness_status": public_readiness_status,
+        "deployment_endpoints": deployment_endpoints,
         "backup_status": backup_status,
         "system_event_summary": system_event_summary,
         "system_checks": system_checks,
@@ -30449,6 +30523,24 @@ async def system_export(request: Request):
             check["value"],
             check["description"],
             check["action"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Контроль деплоя"])
+    writer.writerow([
+        "Проверка",
+        "URL",
+        "Доступ",
+        "Статус",
+        "Описание",
+    ])
+    for endpoint in diagnostics["deployment_endpoints"]:
+        writer.writerow([
+            endpoint["title"],
+            endpoint["url"],
+            endpoint["access_label"],
+            endpoint["status_label"],
+            endpoint["summary"],
         ])
     writer.writerow([])
 

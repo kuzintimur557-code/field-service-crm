@@ -57,6 +57,13 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
 .backup-box{border:1px solid #edf0f4;border-radius:8px;background:#fbfdff;padding:14px}
 .backup-box span{display:block;font-size:12px;color:#64748b;font-weight:900;margin-bottom:7px}
 .backup-box strong{display:block;font-size:16px;word-break:break-word}
+.endpoint-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.endpoint-card{border:1px solid #edf0f4;border-radius:8px;background:#fbfdff;padding:14px;min-width:0}
+.endpoint-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px}
+.endpoint-title{font-weight:900}
+.endpoint-url{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;font-weight:900;color:#2563eb;word-break:break-all;text-decoration:none}
+.endpoint-meta{margin-top:8px;font-size:12px;color:#64748b;font-weight:900}
+.endpoint-summary{margin-top:8px;font-size:13px;color:#475569;line-height:1.4;font-weight:700}
 .event-list{display:grid;gap:10px}
 .event-row{display:grid;grid-template-columns:150px 110px 1fr;gap:12px;align-items:flex-start;padding:12px;border:1px solid #edf0f4;border-radius:8px;background:#fbfdff}
 .event-time{font-size:12px;color:#64748b;font-weight:900}
@@ -72,7 +79,7 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
     .topbar{display:block}
     .actions{justify-content:flex-start;margin-top:14px}
     .status-panel{grid-template-columns:1fr}
-    .summary-card,.grid,.backup-grid,.retention-grid{grid-template-columns:1fr}
+    .summary-card,.grid,.backup-grid,.endpoint-grid,.retention-grid{grid-template-columns:1fr}
     .check{grid-template-columns:1fr}
     .event-row{grid-template-columns:1fr}
     .path-row{grid-template-columns:1fr}
@@ -175,6 +182,33 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             <div class="metric-value {{ 'critical' if system_event_summary.http_critical_count else ('warning' if system_event_summary.http_warning_count or system_event_summary.slow_request_count else 'ok') }}">
                 {{ system_event_summary.http_request_count }} / {{ system_event_summary.slow_request_count }}
             </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <div class="section-title">Контроль деплоя</div>
+                <div class="section-note">Endpoints для Railway, внешнего мониторинга и ручной проверки после релиза.</div>
+            </div>
+        </div>
+
+        <div class="endpoint-grid">
+            {% for endpoint in deployment_endpoints %}
+            <div class="endpoint-card">
+                <div class="endpoint-card-head">
+                    <div class="endpoint-title">{{ endpoint.title }}</div>
+                    <span class="pill {{ endpoint.status }}">{{ endpoint.status_label }}</span>
+                </div>
+                {% if role == "superadmin" or endpoint.url in ["/health", "/ready", "/system"] %}
+                <a class="endpoint-url" href="{{ endpoint.url }}" target="_blank">{{ endpoint.method }} {{ endpoint.url }}</a>
+                {% else %}
+                <div class="endpoint-url">{{ endpoint.method }} {{ endpoint.url }}</div>
+                {% endif %}
+                <div class="endpoint-meta">{{ endpoint.access_label }}</div>
+                <div class="endpoint-summary">{{ endpoint.summary }}</div>
+            </div>
+            {% endfor %}
         </div>
     </section>
 
