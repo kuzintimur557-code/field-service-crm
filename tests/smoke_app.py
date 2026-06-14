@@ -13723,6 +13723,22 @@ async def assert_finance_margin(task):
     assert updated_task["price"] == "2200.0"
 
 
+async def assert_finance_summary_page():
+    response = await crm.finance_summary_page(
+        make_asgi_request("owner2", "/finance/summary")
+    )
+    assert response.status_code == 200
+
+    html = response.body.decode("utf-8")
+    assert html.startswith("<!DOCTYPE html>")
+    assert "Финансовая сводка" in html
+    assert "Помесячная динамика" in html
+    assert "Прибыльные клиенты" in html
+    assert "Скачать CSV" in html
+    assert "534}" not in html[:80]
+    assert 'class="mobile-nav"' in html
+
+
 async def assert_notifications(task):
     crm.create_notification(
         2,
@@ -15646,6 +15662,7 @@ def main():
         asyncio.run(assert_archive_restore(task))
         asyncio.run(assert_catalog_create())
         asyncio.run(assert_finance_margin(task))
+        asyncio.run(assert_finance_summary_page())
         asyncio.run(assert_notifications(task))
         asyncio.run(assert_client_card(task))
         asyncio.run(assert_overdue_sla(task))

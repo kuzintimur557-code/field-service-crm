@@ -1,71 +1,244 @@
-534}
-.orange{color:#b45309}
-.blue{color:#1d4ed8}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Финансовая сводка</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
 
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1180px;margin:auto;padding:28px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px}
+.back{display:inline-flex;align-items:center;min-height:44px;color:#2563eb;text-decoration:none;font-weight:900}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 15px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900;border:0}
+.button.blue{background:#2563eb}
+.button.green{background:#16a34a}
+.card{background:white;border-radius:22px;box-shadow:0 10px 25px rgba(15,23,42,.08);padding:22px;margin-bottom:18px}
+h1{font-size:34px;margin:0}
+h2{font-size:22px;margin:0 0 16px}
+.meta{color:#6b7280;font-weight:800;margin-top:8px}
+.form{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-top:18px}
+.field{min-width:220px}
+.label{font-size:13px;color:#6b7280;font-weight:900;margin-bottom:7px}
+input,button{font:inherit}
+input{width:100%;padding:13px 14px;border:1px solid #d1d5db;border-radius:14px;background:white;font-size:16px}
+button{padding:13px 16px;border:0;border-radius:14px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.stat{background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:18px}
+.value{font-size:26px;font-weight:900;line-height:1.1}
+.green{color:#166534}.red{color:#991b1b}.orange{color:#b45309}.blue-text{color:#1d4ed8}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+th{font-size:12px;color:#6b7280;text-transform:uppercase}
+td{font-weight:800}
+.empty{padding:28px;text-align:center;color:#6b7280;font-weight:900;background:#f9fafb;border-radius:16px}
+.chart{display:grid;gap:12px}
+.chart-row{display:grid;grid-template-columns:92px 1fr;gap:12px;align-items:center}
+.chart-month{font-weight:900;color:#374151}
+.chart-bars{display:grid;gap:6px}
+.bar{height:9px;border-radius:999px;background:#e5e7eb;overflow:hidden}
+.bar span{display:block;height:100%;border-radius:999px}
+.bar.revenue span{background:#2563eb}
+.bar.expenses span{background:#b45309}
+.bar.payroll span{background:#7c3aed}
+.bar.net span{background:#16a34a}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;color:#6b7280;font-size:13px;font-weight:900}
+.legend span:before{content:"";display:inline-block;width:10px;height:10px;border-radius:999px;margin-right:6px}
+.legend .revenue:before{background:#2563eb}
+.legend .expenses:before{background:#b45309}
+.legend .payroll:before{background:#7c3aed}
+.legend .net:before{background:#16a34a}
 @media(max-width:900px){
-    .stats{grid-template-columns:1fr}
-    .container{padding:14px}
-    h1{font-size:28px}
+    .topbar{display:block}
+    .actions{margin-top:12px}
+    .stats,.grid{grid-template-columns:1fr}
+    .form{display:grid;grid-template-columns:1fr}
+    .field{min-width:0}
+    .button,button{width:100%}
 }
 </style>
 </head>
 
 <body>
-
 <div class="container">
 
-<a href="/finance?month={{ month }}" class="back">← Назад к финансам</a>
+<div class="topbar">
+    <div>
+        <a href="/finance?month={{ month }}" class="back">← Назад к финансам</a>
+        <h1>Финансовая сводка</h1>
+        <div class="meta">Главные показатели компании, динамика по месяцам и прибыльные клиенты</div>
+    </div>
+    <div class="actions">
+        <a class="button green" href="/finance/summary/export?month={{ month }}">Скачать CSV</a>
+        <a class="button blue" href="/owner/dashboard">Аналитика</a>
+    </div>
+</div>
 
 <div class="card">
-
-<h1>📊 Финансовая сводка</h1>
-
-<div class="meta">
-Главные финансовые показатели компании за месяц
-</div>
-
-<form class="form" method="get" action="/finance/summary">
-
-    <div>
-        <div class="label">Месяц</div>
-        <input type="month" name="month" value="{{ month }}">
-    </div>
-
-    <div style="display:flex;align-items:end">
+    <form class="form" method="get" action="/finance/summary">
+        <div class="field">
+            <div class="label">Месяц</div>
+            <input type="month" name="month" value="{{ month }}">
+        </div>
         <button type="submit">Показать</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="stats">
+        <div class="stat">
+            <div class="label">Выручка</div>
+            <div class="value blue-text">{{ revenue }} ₽</div>
+        </div>
+        <div class="stat">
+            <div class="label">Расходы</div>
+            <div class="value red">{{ expenses }} ₽</div>
+        </div>
+        <div class="stat">
+            <div class="label">Зарплаты</div>
+            <div class="value orange">{{ payroll_total }} ₽</div>
+        </div>
+        <div class="stat">
+            <div class="label">Прибыль</div>
+            <div class="value green">{{ profit }} ₽</div>
+        </div>
+        <div class="stat">
+            <div class="label">Чистая прибыль</div>
+            <div class="value green">{{ net_profit }} ₽</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h2>Помесячная динамика</h2>
+        {% if monthly_summary %}
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Месяц</th>
+                        <th>Выручка</th>
+                        <th>Расходы</th>
+                        <th>Зарплаты</th>
+                        <th>Прибыль</th>
+                        <th>Чистая прибыль</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in monthly_summary %}
+                    <tr>
+                        <td>{{ row.month }}</td>
+                        <td>{{ row.revenue }} ₽</td>
+                        <td>{{ row.expenses }} ₽</td>
+                        <td>{{ row.payroll_total }} ₽</td>
+                        <td>{{ row.profit }} ₽</td>
+                        <td>{{ row.net_profit }} ₽</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty">Пока нет данных по месяцам</div>
+        {% endif %}
     </div>
 
-</form>
-
+    <div class="card">
+        <h2>График по месяцам</h2>
+        {% if monthly_chart_data %}
+        {% set chart = namespace(max=1) %}
+        {% for row in monthly_chart_data %}
+            {% set row_max = [row.revenue, row.expenses, row.payroll_total, row.net_profit]|max %}
+            {% if row_max > chart.max %}
+                {% set chart.max = row_max %}
+            {% endif %}
+        {% endfor %}
+        <div class="legend">
+            <span class="revenue">Выручка</span>
+            <span class="expenses">Расходы</span>
+            <span class="payroll">Зарплаты</span>
+            <span class="net">Чистая прибыль</span>
+        </div>
+        <div class="chart">
+            {% for row in monthly_chart_data %}
+            <div class="chart-row">
+                <div class="chart-month">{{ row.month }}</div>
+                <div class="chart-bars">
+                    <div class="bar revenue"><span style="width:{{ (row.revenue / chart.max * 100)|round(0, 'floor') }}%"></span></div>
+                    <div class="bar expenses"><span style="width:{{ (row.expenses / chart.max * 100)|round(0, 'floor') }}%"></span></div>
+                    <div class="bar payroll"><span style="width:{{ (row.payroll_total / chart.max * 100)|round(0, 'floor') }}%"></span></div>
+                    <div class="bar net"><span style="width:{{ (0 if row.net_profit < 0 else row.net_profit / chart.max * 100)|round(0, 'floor') }}%"></span></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">График появится после накопления финансовых данных</div>
+        {% endif %}
+    </div>
 </div>
 
-<div class="stats">
+<div class="grid">
+    <div class="card">
+        <h2>Прибыльные клиенты</h2>
+        {% if top_profitable_clients %}
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Клиент</th>
+                        <th>Выручка</th>
+                        <th>Прибыль</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in top_profitable_clients %}
+                    <tr>
+                        <td>{{ row.client_name or "Без клиента" }}</td>
+                        <td>{{ row.revenue or 0 }} ₽</td>
+                        <td>{{ row.total_profit or 0 }} ₽</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty">За выбранный месяц пока нет прибыльных клиентов</div>
+        {% endif %}
+    </div>
 
-<div class="stat">
-    <div class="label">Выручка</div>
-    <div class="value blue">{{ revenue }} ₽</div>
-</div>
-
-<div class="stat">
-    <div class="label">Расходы</div>
-    <div class="value red">{{ expenses }} ₽</div>
-</div>
-
-<div class="stat">
-    <div class="label">Прибыль</div>
-    <div class="value green">{{ profit }} ₽</div>
-</div>
-
-<div class="stat">
-    <div class="label">Зарплаты</div>
-    <div class="value orange">{{ payroll_total }} ₽</div>
-</div>
-
-<div class="stat">
-    <div class="label">Чистая прибыль</div>
-    <div class="value green">{{ net_profit }} ₽</div>
-</div>
-
+    <div class="card">
+        <h2>Выплаты исполнителям</h2>
+        {% if top_profitable_workers %}
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Исполнитель</th>
+                        <th>Выплачено</th>
+                        <th>Выплат</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in top_profitable_workers %}
+                    <tr>
+                        <td>{{ row.worker_name }}</td>
+                        <td>{{ row.total_paid or 0 }} ₽</td>
+                        <td>{{ row.payouts_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty">За выбранный месяц выплат исполнителям пока нет</div>
+        {% endif %}
+    </div>
 </div>
 
 </div>
