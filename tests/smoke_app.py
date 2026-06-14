@@ -13342,6 +13342,9 @@ async def assert_finance_margin(task):
     assert "Не выплачено" in finance_html
     assert "worker2, helper2" in finance_html
     assert "/payroll?month=2026-05" in finance_html
+    assert "mobile-label" in finance_html
+    assert "action-link green" in finance_html
+    assert "action-link dark" in finance_html
 
     payroll_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll"),
@@ -13367,6 +13370,9 @@ async def assert_finance_margin(task):
     assert "payout_filter=paid" in payroll_html
     assert "payout_filter=partial" in payroll_html
     assert "payout_filter=unpaid" in payroll_html
+    assert "mobile-label" in payroll_html
+    assert "actions-row" in payroll_html
+    assert "action-link green" in payroll_html
     assert f"/workers/{helper['id']}?month=2026-05" in payroll_html
     assert "/finance?month=2026-05&worker=helper2" in payroll_html
 

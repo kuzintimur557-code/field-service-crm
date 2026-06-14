@@ -9,33 +9,39 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:1200px;margin:auto;padding:28px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:1200px;margin:auto;padding:28px;width:100%}
 .header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
 h1{margin:0;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
-.back{color:#2563eb;text-decoration:none;font-weight:900}
-.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
-.stats{display:grid;grid-template-columns:repeat(13,1fr);gap:14px}
-.stat{background:#f9fafb;border-radius:20px;padding:18px}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:24px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:14px}
+.stat{background:#f9fafb;border:1px solid #eef2f7;border-radius:18px;padding:18px}
 .label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
-.value{font-size:22px;font-weight:900}
-form{display:flex;gap:12px;align-items:end}
-input,select,button{padding:14px;border-radius:14px;font-size:16px}
+.value{font-size:22px;font-weight:900;overflow-wrap:anywhere}
+form{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+input,select,button{min-height:44px;padding:14px;border-radius:14px;font-size:16px}
 input,select{border:1px solid #d1d5db;background:white}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .table{display:grid;gap:10px}
-.row{display:grid;grid-template-columns:.6fr 1.4fr 1fr 1fr 1fr 1fr .7fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px}
-.worker-row{display:grid;grid-template-columns:1.1fr .5fr .9fr .9fr .9fr .8fr .9fr 1fr 1fr;gap:12px;align-items:center;background:#f9fafb;border-radius:18px;padding:14px}
+.row{display:grid;grid-template-columns:minmax(52px,.6fr) minmax(130px,1.4fr) minmax(96px,1fr) minmax(110px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(88px,.7fr);gap:12px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:14px}
+.worker-row{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(64px,.5fr) repeat(4,minmax(90px,.9fr)) minmax(96px,.9fr) minmax(110px,1fr) minmax(96px,1fr);gap:12px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:14px}
+.row>div,.worker-row>div{overflow-wrap:anywhere}
 .head{background:#e5e7eb;font-weight:900}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;font-weight:900}
 .paid{background:#dcfce7;color:#166534}
 .partial{background:#fef3c7;color:#92400e}
 .unpaid{background:#fee2e2;color:#991b1b}
-.btn{display:inline-block;padding:10px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900;text-align:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900;text-align:center}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
-.filters a{padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filters a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
 .filters a.active{background:#111827;color:white}
+.actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.action-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:14px 18px;border-radius:14px;color:white;text-decoration:none;font-weight:900}
+.action-link.green{background:#16a34a}
+.action-link.dark{background:#111827}
+.mobile-label{display:none;color:#6b7280;font-size:12px;font-weight:900;margin-bottom:4px}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:26px}
 @media(max-width:950px){
 .container{padding:16px}
@@ -47,6 +53,13 @@ input,select,button{width:100%;margin-top:8px}
 .row{grid-template-columns:1fr}
 .worker-row{grid-template-columns:1fr}
 .head{display:none}
+.card{padding:18px;border-radius:18px}
+.filters{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+.filters a{flex:0 0 auto}
+.actions-row{display:grid;grid-template-columns:1fr}
+.action-link{width:100%}
+.mobile-label{display:block}
+.btn{width:100%}
 }
 </style>
 </head>
@@ -106,12 +119,14 @@ input,select,button{width:100%;margin-top:8px}
     <a href="/finance?month={{ month }}&profit_filter=loss{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}" class="{% if selected_profit_filter == 'loss' %}active{% endif %}">Убыточные</a>
 </div>
 
-<a href="/finance/export?month={{ month }}{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_profit_filter %}&profit_filter={{ selected_profit_filter }}{% endif %}" style="display:inline-block;margin-top:14px;padding:14px 18px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
+<div class="actions-row">
+<a href="/finance/export?month={{ month }}{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_profit_filter %}&profit_filter={{ selected_profit_filter }}{% endif %}" class="action-link green">
 ⬇️ Скачать CSV
 </a>
-<a href="/payroll?month={{ month }}" style="display:inline-block;margin-top:14px;margin-left:8px;padding:14px 18px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900">
+<a href="/payroll?month={{ month }}" class="action-link dark">
 Зарплаты за месяц
 </a>
+</div>
 </div>
 
 <div class="card">
@@ -203,25 +218,27 @@ input,select,button{width:100%;margin-top:8px}
     {% for row in worker_finance_stats %}
     <div class="worker-row">
         <div>
+            <span class="mobile-label">{{ settings["worker_label"] or "Исполнитель" }}</span>
             {% if row.worker_id %}
             <a href="/workers/{{ row.worker_id }}?month={{ month }}" style="color:#111827;text-decoration:none;font-weight:900">{{ row.worker }}</a>
             {% else %}
             <b>{{ row.worker }}</b>
             {% endif %}
         </div>
-        <div>{{ row.tasks }}</div>
-        <div>{{ row.total }} ₽</div>
-        <div>{{ row.expenses }} ₽</div>
-        <div>{{ row.profit }} ₽</div>
-        <div>{{ row.margin }}%</div>
-        <div>{{ row.payout }} ₽ / {{ row.commission_percent }}%</div>
+        <div><span class="mobile-label">{{ settings["task_label"] or "Заявки" }}</span>{{ row.tasks }}</div>
+        <div><span class="mobile-label">Выручка</span>{{ row.total }} ₽</div>
+        <div><span class="mobile-label">Расходы</span>{{ row.expenses }} ₽</div>
+        <div><span class="mobile-label">Прибыль</span>{{ row.profit }} ₽</div>
+        <div><span class="mobile-label">Маржа</span>{{ row.margin }}%</div>
+        <div><span class="mobile-label">Выплата</span>{{ row.payout }} ₽ / {{ row.commission_percent }}%</div>
         <div>
+            <span class="mobile-label">Зарплаты</span>
             <span class="badge {% if row.payout_status == 'Выплачено' %}paid{% elif row.payout_status == 'Частично' %}partial{% else %}unpaid{% endif %}">
                 {{ row.payout_status }}
             </span>
             <div class="label">{{ row.paid_amount }} ₽</div>
         </div>
-        <div>{{ row.due_amount }} ₽</div>
+        <div><span class="mobile-label">Остаток</span>{{ row.due_amount }} ₽</div>
     </div>
     {% endfor %}
 </div>
@@ -247,11 +264,12 @@ input,select,button{width:100%;margin-top:8px}
 
     {% for row in rows %}
     <div class="row">
-        <div>#{{ row.id }}</div>
-        <div><b>{{ row.client }}</b></div>
-        <div>{{ row.task_date }}</div>
-        <div>{{ row.worker }}</div>
+        <div><span class="mobile-label">Номер</span>#{{ row.id }}</div>
+        <div><span class="mobile-label">{{ settings["client_label"] or "Клиент" }}</span><b>{{ row.client }}</b></div>
+        <div><span class="mobile-label">Дата</span>{{ row.task_date }}</div>
+        <div><span class="mobile-label">{{ settings["worker_label"] or "Исполнитель" }}</span>{{ row.worker }}</div>
         <div>
+            <span class="mobile-label">Оплата</span>
             {% if row.payment_status == "Оплачено" %}
             <span class="badge paid">Оплачено</span>
             {% elif row.payment_status == "Частично оплачено" %}
@@ -261,6 +279,7 @@ input,select,button{width:100%;margin-top:8px}
             {% endif %}
         </div>
         <div>
+            <span class="mobile-label">Сумма / прибыль</span>
             <b>{{ row.total }} ₽</b>
             <div style="color:#6b7280;font-size:13px">Скидка: {{ row.discount }} ₽</div>
             <div style="color:#6b7280;font-size:13px">Расходы: {{ row.expenses }} ₽</div>
