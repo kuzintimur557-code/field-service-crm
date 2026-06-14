@@ -9640,6 +9640,34 @@ async def assert_platform_calendar_health():
         assert "/platform/calendar-health?assignee=me" in platform_html
         assert "/platform/readiness/export" in platform_html
         assert "/backup" in platform_html
+        security_response = crm.apply_security_headers(
+            crm.JSONResponse({"ok": True}),
+        )
+        assert security_response.headers["x-content-type-options"] == "nosniff"
+        assert security_response.headers["x-frame-options"] == "DENY"
+        assert security_response.headers["referrer-policy"] == (
+            "strict-origin-when-cross-origin"
+        )
+        assert "camera=()" in security_response.headers["permissions-policy"]
+        assert "microphone=()" in (
+            security_response.headers["permissions-policy"]
+        )
+        assert "geolocation=()" in (
+            security_response.headers["permissions-policy"]
+        )
+        assert "strict-transport-security" not in security_response.headers
+
+        async def smoke_call_next(request):
+            return crm.JSONResponse({"ok": True})
+
+        middleware_response = await crm.security_headers_middleware(
+            make_public_asgi_request("/health"),
+            smoke_call_next,
+        )
+        assert middleware_response.headers["x-frame-options"] == "DENY"
+        assert middleware_response.headers["x-content-type-options"] == (
+            "nosniff"
+        )
         health_response = await crm.public_health()
         assert health_response.status_code == 200
         health_payload = json.loads(health_response.body)
