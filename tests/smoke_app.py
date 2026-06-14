@@ -9728,6 +9728,26 @@ async def assert_platform_calendar_health():
         assert "Резервные копии" in system_export_csv
         assert "Ошибки за 24 часа" in system_export_csv
         assert "Журнал системы" in system_export_csv
+        anonymous_system_api = await crm.api_system_diagnostics(
+            make_public_asgi_request("/api/system/diagnostics"),
+        )
+        assert anonymous_system_api.status_code == 401
+        boss_system_api = await crm.api_system_diagnostics(
+            make_asgi_request("owner2", "/api/system/diagnostics"),
+        )
+        assert boss_system_api.status_code == 403
+        system_api = await crm.api_system_diagnostics(
+            make_asgi_request("super", "/api/system/diagnostics"),
+        )
+        assert system_api["ok"] is True
+        assert system_api["export_url"] == "/system/export"
+        assert system_api["system_checks"]
+        assert system_api["production_config"]["items"]
+        assert system_api["backup_status"]["status_label"]
+        assert system_api["system_event_summary"]["hours"] == (
+            crm.SYSTEM_EVENT_ALERT_HOURS
+        )
+        assert isinstance(system_api["system_events"], list)
         anonymous_system_events_export = await crm.system_events_export(
             make_public_asgi_request("/system/events/export"),
         )

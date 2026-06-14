@@ -30126,6 +30126,25 @@ async def system_export(request: Request):
     )
 
 
+@app.get("/api/system/diagnostics")
+async def api_system_diagnostics(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    diagnostics = build_system_diagnostics(role)
+    diagnostics["ok"] = True
+    diagnostics["export_url"] = "/system/export"
+
+    return diagnostics
+
+
 @app.get("/system/events/export")
 async def system_events_export(request: Request):
     username = get_user(request)
