@@ -8,71 +8,227 @@
 <link rel="stylesheet" href="/static/app.css">
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:900px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
-.top-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
-.top-actions a{display:inline-flex;padding:10px 12px;border-radius:10px;background:white;color:#111827;text-decoration:none;font-size:12px;font-weight:900;border:1px solid #d1d5db}
-.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
-h1{margin:0 0 14px;font-size:34px}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-.box{background:#f9fafb;border-radius:18px;padding:18px}
-.label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
-.value{font-size:24px;font-weight:900}
-.ok{color:#166534}.bad{color:#991b1b}
-@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}.top-actions a{width:100%;justify-content:center}h1{font-size:28px}}
+body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb;color:#111827}
+.page{max-width:1120px;margin:0 auto;padding:28px}
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.eyebrow{font-size:12px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.08em}
+h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
+.subtitle{margin:0;color:#64748b;font-size:15px;line-height:1.5;font-weight:700}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:8px;border:1px solid #dbe3ef;background:#fff;color:#111827;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
+.button.primary{background:#111827;color:#fff;border-color:#111827}
+.status-panel{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:stretch;margin-bottom:16px}
+.score-card,.summary-card,.section{background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 8px 22px rgba(15,23,42,.05)}
+.score-card{padding:22px}
+.score-label{font-size:13px;font-weight:900;color:#64748b;margin-bottom:8px}
+.score-value{font-size:52px;line-height:1;font-weight:900}
+.score-status{display:inline-flex;margin-top:14px;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
+.summary-card{padding:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.summary-item{border-left:3px solid #e5e7eb;padding-left:12px}
+.summary-item strong{display:block;font-size:24px;margin-bottom:4px}
+.summary-item span{font-size:12px;color:#64748b;font-weight:900}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.metric{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;min-width:0}
+.metric-label{font-size:12px;color:#64748b;font-weight:900;margin-bottom:8px}
+.metric-value{font-size:20px;font-weight:900;word-break:break-word}
+.section{padding:20px;margin-bottom:16px}
+.section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.section-title{font-size:20px;font-weight:900}
+.section-note{font-size:13px;color:#64748b;font-weight:700;line-height:1.45}
+.check-list{display:grid;gap:10px}
+.check{display:grid;grid-template-columns:170px 110px 1fr auto;gap:12px;align-items:center;padding:14px;border:1px solid #edf0f4;border-radius:8px;background:#fbfdff}
+.check-title{font-weight:900}
+.check-value{color:#475569;font-weight:900;font-size:13px;word-break:break-word}
+.check-text{color:#475569;font-size:13px;line-height:1.45}
+.check-action{color:#2563eb;font-weight:900;text-decoration:none;font-size:13px;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:900}
+.ok{color:#166534}.warning{color:#92400e}.critical{color:#991b1b}
+.pill.ok,.score-status.ok{background:#dcfce7;color:#166534}
+.pill.warning,.score-status.warning{background:#fef3c7;color:#92400e}
+.pill.critical,.score-status.critical{background:#fee2e2;color:#991b1b}
+.path-list{display:grid;gap:10px}
+.path-row{display:grid;grid-template-columns:170px 1fr;gap:12px;padding:12px;border-radius:8px;background:#f8fafc;border:1px solid #edf0f4}
+.path-label{font-size:12px;color:#64748b;font-weight:900}
+.path-value{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:#111827;word-break:break-all}
+.backup-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.backup-box{border:1px solid #edf0f4;border-radius:8px;background:#fbfdff;padding:14px}
+.backup-box span{display:block;font-size:12px;color:#64748b;font-weight:900;margin-bottom:7px}
+.backup-box strong{display:block;font-size:16px;word-break:break-word}
+@media(max-width:900px){
+    .page{padding:18px}
+    .topbar{display:block}
+    .actions{justify-content:flex-start;margin-top:14px}
+    .status-panel{grid-template-columns:1fr}
+    .summary-card,.grid,.backup-grid{grid-template-columns:1fr}
+    .check{grid-template-columns:1fr}
+    .path-row{grid-template-columns:1fr}
+    h1{font-size:28px}
+}
 </style>
 </head>
 <body>
-<div class="container">
-<div class="top-actions">
-    <a href="/admin">Назад</a>
-    <a href="/backup">Резервные копии</a>
-</div>
-
-<div class="card">
-<h1>🟢 Статус системы</h1>
-<div style="color:#6b7280;font-weight:800">Техническая проверка платформы.</div>
-</div>
-
-<div class="card">
-<div class="grid">
-    <div class="box">
-        <div class="label">Приложение</div>
-        <div class="value ok">ОК</div>
-    </div>
-
-    <div class="box">
-        <div class="label">База данных</div>
-        <div class="value {% if db_exists %}ok{% else %}bad{% endif %}">
-            {% if db_exists %}ОК{% else %}Нет{% endif %}
+<main class="page">
+    <div class="topbar">
+        <div>
+            <div class="eyebrow">Диагностика</div>
+            <h1>Система</h1>
+            <p class="subtitle">
+                Техническое состояние платформы, окружения, файлов и резервных копий.
+                Обновлено: {{ system_generated_at }}.
+            </p>
+        </div>
+        <div class="actions">
+            <a class="button" href="/admin">Админ-панель</a>
+            {% if role == "superadmin" %}
+            <a class="button" href="/platform/readiness">Готовность</a>
+            <a class="button primary" href="/backup">Резервные копии</a>
+            {% endif %}
         </div>
     </div>
 
-    <div class="box">
-        <div class="label">Размер базы</div>
-        <div class="value">{{ db_size }} байт</div>
-    </div>
-
-    <div class="box">
-        <div class="label">Загруженные файлы</div>
-        <div class="value {% if uploads_exists %}ok{% else %}bad{% endif %}">
-            {% if uploads_exists %}ОК{% else %}Нет{% endif %}
+    <section class="status-panel">
+        <div class="score-card">
+            <div class="score-label">Общий балл</div>
+            <div class="score-value {{ system_status }}">{{ system_score }}%</div>
+            <div class="score-status {{ system_status }}">{{ system_status_label }}</div>
         </div>
-    </div>
 
-    <div class="box">
-        <div class="label">Загруженных файлов</div>
-        <div class="value">{{ uploads_files }}</div>
-    </div>
+        <div class="summary-card">
+            <div class="summary-item">
+                <strong>{{ system_checks|length }}</strong>
+                <span>проверок</span>
+            </div>
+            <div class="summary-item">
+                <strong class="warning">{{ system_warning_count }}</strong>
+                <span>предупреждений</span>
+            </div>
+            <div class="summary-item">
+                <strong class="critical">{{ system_critical_count }}</strong>
+                <span>критичных проблем</span>
+            </div>
+        </div>
+    </section>
 
-    <div class="box">
-        <div class="label">Версия приложения</div>
-        <div class="value">{{ app_version }}</div>
-    </div>
-</div>
-</div>
-</div>
+    <section class="grid">
+        <div class="metric">
+            <div class="metric-label">Окружение</div>
+            <div class="metric-value">{{ env_name }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Railway</div>
+            <div class="metric-value {{ 'ok' if railway_environment else 'warning' }}">
+                {{ "активно" if railway_environment else "локально" }}
+            </div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Secure cookie</div>
+            <div class="metric-value {{ 'ok' if cookie_secure else 'warning' }}">
+                {{ "включены" if cookie_secure else "выключены" }}
+            </div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Секрет приложения</div>
+            <div class="metric-value {{ 'critical' if secret_is_default else 'ok' }}">
+                {{ "dev" if secret_is_default else "настроен" }}
+            </div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Telegram</div>
+            <div class="metric-value {{ 'ok' if telegram_configured else 'warning' }}">
+                {{ "настроен" if telegram_configured else "не полностью" }}
+            </div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Версия приложения</div>
+            <div class="metric-value">{{ app_version }}</div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <div class="section-title">Проверки системы</div>
+                <div class="section-note">Каждая строка показывает проблему, текущее значение и следующий шаг.</div>
+            </div>
+        </div>
+
+        <div class="check-list">
+            {% for check in system_checks %}
+            <div class="check">
+                <div class="check-title">{{ check.title }}</div>
+                <div><span class="pill {{ check.status }}">{{ check.status_label }}</span></div>
+                <div class="check-text">
+                    <div class="check-value">{{ check.value }}</div>
+                    {{ check.description }}
+                    <br>{{ check.action }}
+                </div>
+                {% if check.url %}
+                    {% if role == "superadmin" or check.url not in ["/debug", "/platform/readiness", "/backup"] %}
+                    <a class="check-action" href="{{ check.url }}">Открыть</a>
+                    {% endif %}
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <div class="section-title">Резервные копии</div>
+                <div class="section-note">{{ backup_status["summary"] }} {{ backup_status["action"] }}</div>
+            </div>
+            <span class="pill {{ backup_status['status'] }}">{{ backup_status["status_label"] }}</span>
+        </div>
+
+        <div class="backup-grid">
+            <div class="backup-box">
+                <span>Копий</span>
+                <strong>{{ backup_status["count"] }}</strong>
+            </div>
+            <div class="backup-box">
+                <span>Последняя копия</span>
+                <strong>{{ backup_status["latest_age_label"] }}</strong>
+            </div>
+            <div class="backup-box">
+                <span>Проверка файла</span>
+                <strong>{{ backup_status["latest_verification"]["status_label"] }}</strong>
+            </div>
+            <div class="backup-box">
+                <span>Проверка восстановления</span>
+                <strong>{{ backup_status["restore_check"]["status_label"] }}</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <div class="section-title">Пути и файлы</div>
+                <div class="section-note">Базовые директории, которые должны быть доступны приложению.</div>
+            </div>
+        </div>
+
+        <div class="path-list">
+            <div class="path-row">
+                <div class="path-label">DATA_DIR</div>
+                <div class="path-value">{{ data_dir }}</div>
+            </div>
+            <div class="path-row">
+                <div class="path-label">База данных</div>
+                <div class="path-value">{{ db_path }} · {{ db_size_label }}</div>
+            </div>
+            <div class="path-row">
+                <div class="path-label">Uploads</div>
+                <div class="path-value">{{ uploads_path }} · {{ uploads_files }} файлов</div>
+            </div>
+            <div class="path-row">
+                <div class="path-label">Backups</div>
+                <div class="path-value">{{ backup_status["backup_path"] }} · {{ backup_status["total_size_label"] }}</div>
+            </div>
+        </div>
+    </section>
+</main>
 {% include 'mobile_nav.html' %}
 </body>
 </html>

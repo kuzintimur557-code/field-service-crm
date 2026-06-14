@@ -6554,6 +6554,34 @@ def make_release_readiness_check(
     }
 
 
+def make_system_check(
+    key,
+    title,
+    status,
+    value,
+    description,
+    action,
+    url,
+):
+    labels = {
+        "ok": "ОК",
+        "warning": "Внимание",
+        "critical": "Критично",
+    }
+    normalized_status = status if status in labels else "warning"
+
+    return {
+        "key": key,
+        "title": title,
+        "status": normalized_status,
+        "status_label": labels[normalized_status],
+        "value": value,
+        "description": description,
+        "action": action,
+        "url": url,
+    }
+
+
 def get_platform_release_readiness(
     counts=None,
     calendar_health_summary=None,
@@ -29235,7 +29263,140 @@ async def system_page(request: Request):
     db_exists = db_path.exists()
     db_size = db_path.stat().st_size if db_exists else 0
     uploads_exists = uploads_path.exists()
-    uploads_files = len([f for f in uploads_path.rglob("*") if f.is_file()]) if uploads_exists else 0
+    uploads_files = (
+        len([f for f in uploads_path.rglob("*") if f.is_file()])
+        if uploads_exists
+        else 0
+    )
+    env_name = (os.getenv("ENV") or "development").strip()
+    railway_environment = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+    default_secret = SECRET_KEY == "dev-secret-change-me"
+    bot_token_configured = bool((os.getenv("BOT_TOKEN") or "").strip())
+    chat_id_configured = bool((os.getenv("CHAT_ID") or "").strip())
+    telegram_configured = bot_token_configured and chat_id_configured
+    backup_status = get_backup_status()
+    system_generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    system_checks = [
+        make_system_check(
+            "app_runtime",
+            "Приложение",
+            "ok",
+            APP_VERSION,
+            "FastAPI приложение отвечает и отдаёт системную страницу.",
+            "Продолжайте контролировать релизные проверки.",
+            "/platform/readiness",
+        ),
+        make_system_check(
+            "database",
+            "База данных",
+            "ok" if db_exists else "critical",
+            format_file_size(db_size) if db_exists else "нет файла",
+            (
+                "SQLite база доступна."
+                if db_exists
+                else "Файл SQLite базы не найден."
+            ),
+            "Проверьте DATA_DIR и запуск init_db.",
+            "/debug",
+        ),
+        make_system_check(
+            "uploads",
+            "Загруженные файлы",
+            "ok" if uploads_exists else "critical",
+            f"{uploads_files} файлов" if uploads_exists else "папки нет",
+            (
+                "Папка uploads доступна."
+                if uploads_exists
+                else "Папка uploads недоступна."
+            ),
+            "Проверьте DATA_DIR и права на uploads.",
+            "/debug",
+        ),
+        make_system_check(
+            "secret_key",
+            "Секрет приложения",
+            "critical" if default_secret else "ok",
+            "dev" if default_secret else "настроен",
+            (
+                "Используется dev SECRET_KEY."
+                if default_secret
+                else "SECRET_KEY задан через окружение."
+            ),
+            "Перед боевым запуском укажите сильный SECRET_KEY.",
+            "/platform/readiness",
+        ),
+        make_system_check(
+            "secure_cookie",
+            "Secure cookie",
+            "ok" if COOKIE_SECURE else "warning",
+            "включены" if COOKIE_SECURE else "выключены",
+            (
+                "Cookie сессии отправляются только по HTTPS."
+                if COOKIE_SECURE
+                else "В текущем окружении secure cookie не включены."
+            ),
+            "Для production включите COOKIE_SECURE или Railway окружение.",
+            "/platform/readiness",
+        ),
+        make_system_check(
+            "telegram",
+            "Telegram",
+            "ok" if telegram_configured else "warning",
+            "настроен" if telegram_configured else "не полностью",
+            (
+                "BOT_TOKEN и CHAT_ID настроены."
+                if telegram_configured
+                else "BOT_TOKEN или CHAT_ID не настроены."
+            ),
+            "Добавьте Telegram переменные окружения.",
+            "/debug",
+        ),
+        make_system_check(
+            "backups",
+            "Резервные копии",
+            backup_status["status"],
+            backup_status["status_label"],
+            backup_status["summary"],
+            backup_status["action"],
+            "/backup",
+        ),
+        make_system_check(
+            "backup_restore_check",
+            "Проверка восстановления",
+            backup_status["restore_check"]["status"],
+            backup_status["restore_check"]["status_label"],
+            backup_status["restore_check"]["message"],
+            "Запустите проверку восстановления последней копии.",
+            "/backup",
+        ),
+    ]
+    status_points = {
+        "ok": 1,
+        "warning": 0.5,
+        "critical": 0,
+    }
+    system_score = round(
+        sum(status_points[item["status"]] for item in system_checks)
+        * 100
+        / (len(system_checks) or 1)
+    )
+    critical_count = sum(
+        1 for item in system_checks if item["status"] == "critical"
+    )
+    warning_count = sum(
+        1 for item in system_checks if item["status"] == "warning"
+    )
+
+    if critical_count:
+        system_status = "critical"
+        system_status_label = "Критично"
+    elif warning_count:
+        system_status = "warning"
+        system_status_label = "Есть предупреждения"
+    else:
+        system_status = "ok"
+        system_status_label = "Стабильно"
 
     return templates.TemplateResponse(
         request,
@@ -29246,9 +29407,26 @@ async def system_page(request: Request):
             "role": role,
             "db_exists": db_exists,
             "db_size": db_size,
+            "db_size_label": format_file_size(db_size),
+            "db_path": str(db_path),
+            "data_dir": str(DATA_DIR),
             "uploads_exists": uploads_exists,
             "uploads_files": uploads_files,
-            "app_version": APP_VERSION
+            "uploads_path": str(uploads_path),
+            "app_version": APP_VERSION,
+            "env_name": env_name,
+            "railway_environment": railway_environment,
+            "cookie_secure": COOKIE_SECURE,
+            "secret_is_default": default_secret,
+            "telegram_configured": telegram_configured,
+            "backup_status": backup_status,
+            "system_checks": system_checks,
+            "system_score": system_score,
+            "system_status": system_status,
+            "system_status_label": system_status_label,
+            "system_warning_count": warning_count,
+            "system_critical_count": critical_count,
+            "system_generated_at": system_generated_at,
         }
     )
 

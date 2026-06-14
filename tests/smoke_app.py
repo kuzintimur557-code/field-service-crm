@@ -4676,9 +4676,21 @@ async def assert_calendar_access():
         for cell in helper_week["cells"]
         if cell["status"] == "unavailable"
     ]
-    assert len(unavailable_cells) == 2
-    assert helper_week["total_capacity"] == 5
-    assert helper_week["unavailable_days"] == 2
+    expected_unavailable_dates = {
+        today_value.strftime("%Y-%m-%d"),
+        unavailable_end.strftime("%Y-%m-%d"),
+    }
+    expected_unavailable_cell_count = sum(
+        1
+        for cell in helper_week["cells"]
+        if cell["date"] in expected_unavailable_dates
+    )
+    assert len(unavailable_cells) == expected_unavailable_cell_count
+    assert helper_week["total_capacity"] == (
+        helper_week["daily_capacity"]
+        * (7 - expected_unavailable_cell_count)
+    )
+    assert helper_week["unavailable_days"] == expected_unavailable_cell_count
     assert (
         unavailable_calendar.context["smart_schedule_items"][0]["date"]
         == (today_value + timedelta(days=2)).strftime("%Y-%m-%d")
@@ -9624,6 +9636,51 @@ async def assert_platform_calendar_health():
         assert "/platform/calendar-health?assignee=me" in platform_html
         assert "/platform/readiness/export" in platform_html
         assert "/backup" in platform_html
+        anonymous_system_page = await crm.system_page(
+            make_public_asgi_request("/system"),
+        )
+        assert anonymous_system_page.status_code == 302
+        assert anonymous_system_page.headers["location"] == "/login"
+        worker_system_page = await crm.system_page(
+            make_asgi_request("worker2", "/system"),
+        )
+        assert worker_system_page.status_code == 302
+        assert worker_system_page.headers["location"] == "/"
+        boss_system_page = await crm.system_page(
+            make_asgi_request("owner2", "/system"),
+        )
+        assert boss_system_page.status_code == 200
+        boss_system_html = boss_system_page.body.decode("utf-8")
+        assert "Система" in boss_system_html
+        assert "Проверки системы" in boss_system_html
+        assert "Резервные копии" in boss_system_html
+        assert 'href="/backup"' not in boss_system_html
+        system_page = await crm.system_page(
+            make_asgi_request("super", "/system"),
+        )
+        assert system_page.status_code == 200
+        system_html = system_page.body.decode("utf-8")
+        assert "Проверки системы" in system_html
+        assert "Секрет приложения" in system_html
+        assert "Secure cookie" in system_html
+        assert "Telegram" in system_html
+        assert "Резервные копии" in system_html
+        assert "Пути и файлы" in system_html
+        assert "/platform/readiness" in system_html
+        assert "/backup" in system_html
+        assert system_page.context["system_checks"]
+        assert system_page.context["system_score"] >= 0
+        assert "backup_status" in system_page.context
+        assert system_page.context["db_size_label"]
+        assert {
+            "secret_key",
+            "secure_cookie",
+            "telegram",
+            "backups",
+            "backup_restore_check",
+        }.issubset({
+            item["key"] for item in system_page.context["system_checks"]
+        })
         anonymous_backup_page = await crm.backup_page(
             make_public_asgi_request("/backup"),
         )
