@@ -9763,8 +9763,11 @@ async def assert_platform_calendar_health():
         assert health_payload["ok"] is True
         assert health_payload["app"] == "field-service-crm"
         assert health_payload["version"] == crm.APP_VERSION
+        assert health_payload["build"]["version"] == crm.APP_VERSION
+        assert "commit" in health_payload["build"]
         assert health_payload["database"]["ok"] is True
         assert "db_path" not in health_payload
+        assert "branch" not in health_payload["build"]
         assert "system_events" not in health_payload
         assert "production_config" not in health_payload
         readiness_status = crm.get_public_readiness_status()
@@ -9782,6 +9785,7 @@ async def assert_platform_calendar_health():
         assert readiness_payload["ok"] is True
         assert readiness_payload["app"] == "field-service-crm"
         assert readiness_payload["version"] == crm.APP_VERSION
+        assert readiness_payload["build"]["version"] == crm.APP_VERSION
         assert readiness_payload["status_label"] == "Готово"
         assert all(item["ok"] for item in readiness_payload["checks"])
         assert "db_path" not in readiness_payload
@@ -9827,6 +9831,8 @@ async def assert_platform_calendar_health():
         assert "HTTP-запросы" in system_html
         assert "Контроль деплоя" in system_html
         assert "Готовность деплоя" in system_html
+        assert "Коммит" in system_html
+        assert "Сервис" in system_html
         assert "GET /health" in system_html
         assert "GET /ready" in system_html
         assert "Журнал системы" in system_html
@@ -9839,6 +9845,10 @@ async def assert_platform_calendar_health():
         assert "backup_status" in system_page.context
         assert "system_events" in system_page.context
         assert "production_config" in system_page.context
+        assert system_page.context["build_metadata"]["version"] == (
+            crm.APP_VERSION
+        )
+        assert "commit" in system_page.context["build_metadata"]
         assert system_page.context["public_health_status"]["ok"] is True
         assert system_page.context["public_readiness_status"]["ok"] is True
         assert {
@@ -9901,6 +9911,9 @@ async def assert_platform_calendar_health():
         system_export_csv = system_export.body.decode("utf-8")
         assert system_export_csv.startswith("\ufeff")
         assert "Системный отчёт" in system_export_csv
+        assert "Коммит" in system_export_csv
+        assert "Ветка" in system_export_csv
+        assert "Деплой" in system_export_csv
         assert "Конфигурация окружения" in system_export_csv
         assert "Проверки системы" in system_export_csv
         assert "Контроль деплоя" in system_export_csv
@@ -9929,6 +9942,7 @@ async def assert_platform_calendar_health():
         assert system_api["system_checks"]
         assert system_api["production_config"]["items"]
         assert system_api["backup_status"]["status_label"]
+        assert system_api["build_metadata"]["version"] == crm.APP_VERSION
         assert system_api["public_health_status"]["ok"] is True
         assert system_api["public_readiness_status"]["ok"] is True
         assert any(

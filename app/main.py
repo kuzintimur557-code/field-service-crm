@@ -30051,6 +30051,59 @@ async def admin_page(request: Request):
     )
 
 
+def clean_build_metadata_value(value, fallback="не задан", max_length=120):
+    text = str(value or "").strip()
+    return text[:max_length] if text else fallback
+
+
+def get_build_metadata():
+    commit_full = clean_build_metadata_value(
+        os.getenv("RAILWAY_GIT_COMMIT_SHA")
+        or os.getenv("GIT_COMMIT")
+        or os.getenv("SOURCE_VERSION"),
+        "",
+        80,
+    )
+    commit = commit_full[:12] if commit_full else "не задан"
+    railway_enabled = bool((os.getenv("RAILWAY_ENVIRONMENT") or "").strip())
+    environment = clean_build_metadata_value(
+        os.getenv("RAILWAY_ENVIRONMENT_NAME")
+        or os.getenv("ENV")
+        or ("railway" if railway_enabled else "local"),
+        "local",
+        80,
+    )
+
+    return {
+        "version": APP_VERSION,
+        "commit": commit,
+        "branch": clean_build_metadata_value(
+            os.getenv("RAILWAY_GIT_BRANCH")
+            or os.getenv("GIT_BRANCH"),
+            max_length=80,
+        ),
+        "deployment_id": clean_build_metadata_value(
+            os.getenv("RAILWAY_DEPLOYMENT_ID"),
+            max_length=80,
+        ),
+        "service_name": clean_build_metadata_value(
+            os.getenv("RAILWAY_SERVICE_NAME"),
+            max_length=80,
+        ),
+        "environment": environment,
+        "railway": railway_enabled,
+    }
+
+
+def get_public_build_metadata():
+    build = get_build_metadata()
+
+    return {
+        "version": build["version"],
+        "commit": build["commit"],
+    }
+
+
 def build_system_diagnostics(role=""):
     db_path = DATA_DIR / "crm.db"
     uploads_path = UPLOAD_DIR
@@ -30074,6 +30127,7 @@ def build_system_diagnostics(role=""):
     backup_status = get_backup_status()
     public_health_status = get_public_health_status()
     public_readiness_status = get_public_readiness_status()
+    build_metadata = get_build_metadata()
     system_event_summary = get_recent_system_event_summary()
     system_generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -30359,6 +30413,7 @@ def build_system_diagnostics(role=""):
         "uploads_files": uploads_files,
         "uploads_path": str(uploads_path),
         "app_version": APP_VERSION,
+        "build_metadata": build_metadata,
         "env_name": env_name,
         "railway_environment": railway_environment,
         "cookie_secure": COOKIE_SECURE,
@@ -30403,6 +30458,7 @@ def get_public_health_status():
         "ok": database_ok,
         "app": "field-service-crm",
         "version": APP_VERSION,
+        "build": get_public_build_metadata(),
         "status": status,
         "status_label": "Работает" if database_ok else "Проблема",
         "database": {
@@ -30495,6 +30551,7 @@ def get_public_readiness_status():
         "ok": ready,
         "app": "field-service-crm",
         "version": APP_VERSION,
+        "build": get_public_build_metadata(),
         "status": "ok" if ready else "critical",
         "status_label": "Готово" if ready else "Не готово",
         "checks": checks,
@@ -30578,6 +30635,13 @@ async def system_export(request: Request):
     writer.writerow(["Системный отчёт"])
     writer.writerow(["Сгенерировано", diagnostics["system_generated_at"]])
     writer.writerow(["Версия приложения", diagnostics["app_version"]])
+    writer.writerow(["Коммит", diagnostics["build_metadata"]["commit"]])
+    writer.writerow(["Ветка", diagnostics["build_metadata"]["branch"]])
+    writer.writerow(["Сервис", diagnostics["build_metadata"]["service_name"]])
+    writer.writerow([
+        "Деплой",
+        diagnostics["build_metadata"]["deployment_id"],
+    ])
     writer.writerow(["Окружение", diagnostics["env_name"]])
     writer.writerow(["Статус", diagnostics["system_status_label"]])
     writer.writerow(["Оценка", diagnostics["system_score"]])

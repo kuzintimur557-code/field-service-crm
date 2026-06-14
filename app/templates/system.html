@@ -172,6 +172,14 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             <div class="metric-value">{{ app_version }}</div>
         </div>
         <div class="metric">
+            <div class="metric-label">Коммит</div>
+            <div class="metric-value">{{ build_metadata.commit }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Сервис</div>
+            <div class="metric-value">{{ build_metadata.service_name }}</div>
+        </div>
+        <div class="metric">
             <div class="metric-label">Ошибки за 24 часа</div>
             <div class="metric-value {{ 'critical' if system_event_summary.runtime_error_count else ('warning' if system_event_summary.critical_count else 'ok') }}">
                 {{ system_event_summary.critical_count }} / {{ system_event_summary.runtime_error_count }}
