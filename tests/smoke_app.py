@@ -9667,6 +9667,8 @@ async def assert_platform_calendar_health():
         assert "Telegram" in system_html
         assert "Резервные копии" in system_html
         assert "Пути и файлы" in system_html
+        assert "Ошибки приложения" in system_html
+        assert "Ошибки за 24 часа" in system_html
         assert "Журнал системы" in system_html
         assert "/system/events/export" in system_html
         assert "/platform/readiness" in system_html
@@ -9675,11 +9677,16 @@ async def assert_platform_calendar_health():
         assert system_page.context["system_score"] >= 0
         assert "backup_status" in system_page.context
         assert "system_events" in system_page.context
+        assert "system_event_summary" in system_page.context
+        assert system_page.context["system_event_summary"]["hours"] == (
+            crm.SYSTEM_EVENT_ALERT_HOURS
+        )
         assert system_page.context["db_size_label"]
         assert {
             "secret_key",
             "secure_cookie",
             "telegram",
+            "runtime_errors",
             "backups",
             "backup_restore_check",
         }.issubset({
@@ -9814,6 +9821,22 @@ async def assert_platform_calendar_health():
         assert api_runtime_error_payload["ok"] is False
         assert api_runtime_error_payload["error"] == "internal_error"
         assert api_runtime_error_payload["error_id"]
+        runtime_system_page = await crm.system_page(
+            make_asgi_request("super", "/system"),
+        )
+        runtime_system_html = runtime_system_page.body.decode("utf-8")
+        runtime_check = next(
+            item for item in runtime_system_page.context["system_checks"]
+            if item["key"] == "runtime_errors"
+        )
+        assert runtime_check["status"] == "critical"
+        assert runtime_system_page.context["system_event_summary"][
+            "runtime_error_count"
+        ] >= 2
+        assert "Ошибки приложения" in runtime_system_html
+        assert "За последние 24 часа есть критичные события" in (
+            runtime_system_html
+        )
         anonymous_backup_page = await crm.backup_page(
             make_public_asgi_request("/backup"),
         )

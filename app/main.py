@@ -105,6 +105,7 @@ BACKUP_RETENTION_KEEP = 3
 BACKUP_REQUIRED_TABLES = ("users", "tasks", "clients")
 SYSTEM_EVENT_RETENTION_DAYS = 90
 SYSTEM_EVENT_RETENTION_KEEP = 200
+SYSTEM_EVENT_ALERT_HOURS = 24
 
 SESSION_COOKIE_NAME = "crm_session"
 TEAM_ACTIVITY_FILTERS = {
@@ -6190,6 +6191,53 @@ def get_system_event_retention_status():
         "retention_keep": SYSTEM_EVENT_RETENTION_KEEP,
         "cleanup_count": len(candidates),
         "cleanup_url": "/system/events/cleanup",
+    }
+
+
+def get_recent_system_event_summary(hours=SYSTEM_EVENT_ALERT_HOURS):
+    cutoff = (
+        datetime.now() - timedelta(hours=hours)
+    ).strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    summary = conn.execute("""
+    SELECT
+        COUNT(*) AS total_count,
+        SUM(CASE WHEN severity='critical' THEN 1 ELSE 0 END)
+            AS critical_count,
+        SUM(
+            CASE
+                WHEN event_type='runtime_error'
+                     OR source='runtime'
+                THEN 1
+                ELSE 0
+            END
+        ) AS runtime_error_count
+    FROM system_events
+    WHERE created_at >= ?
+    """, (cutoff,)).fetchone()
+    latest_critical = conn.execute("""
+    SELECT *
+    FROM system_events
+    WHERE created_at >= ?
+      AND severity='critical'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (cutoff,)).fetchone()
+    conn.close()
+
+    latest_event = dict(latest_critical) if latest_critical else {}
+
+    if latest_event:
+        latest_event["severity_label"] = system_event_severity_label(
+            latest_event.get("severity"),
+        )
+
+    return {
+        "hours": hours,
+        "total_count": summary["total_count"] or 0,
+        "critical_count": summary["critical_count"] or 0,
+        "runtime_error_count": summary["runtime_error_count"] or 0,
+        "latest_critical": latest_event,
     }
 
 
@@ -29557,6 +29605,7 @@ async def system_page(
     chat_id_configured = bool((os.getenv("CHAT_ID") or "").strip())
     telegram_configured = bot_token_configured and chat_id_configured
     backup_status = get_backup_status()
+    system_event_summary = get_recent_system_event_summary()
     system_generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     system_checks = [
@@ -29635,6 +29684,33 @@ async def system_page(
             "/debug",
         ),
         make_system_check(
+            "runtime_errors",
+            "Ошибки приложения",
+            (
+                "critical"
+                if system_event_summary["runtime_error_count"]
+                else (
+                    "warning"
+                    if system_event_summary["critical_count"]
+                    else "ok"
+                )
+            ),
+            (
+                f"{system_event_summary['critical_count']} критичных"
+                f" / {system_event_summary['runtime_error_count']} runtime"
+            ),
+            (
+                "За последние 24 часа критичных ошибок не было."
+                if not system_event_summary["critical_count"]
+                else (
+                    "За последние 24 часа есть критичные события "
+                    "в системном журнале."
+                )
+            ),
+            "Откройте журнал системы и разберите последние критичные события.",
+            "/system",
+        ),
+        make_system_check(
             "backups",
             "Резервные копии",
             backup_status["status"],
@@ -29709,6 +29785,7 @@ async def system_page(
             "secret_is_default": default_secret,
             "telegram_configured": telegram_configured,
             "backup_status": backup_status,
+            "system_event_summary": system_event_summary,
             "system_checks": system_checks,
             "system_score": system_score,
             "system_status": system_status,
