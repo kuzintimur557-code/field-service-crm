@@ -426,6 +426,19 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS system_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_type TEXT,
+        severity TEXT,
+        username TEXT,
+        source TEXT,
+        message TEXT,
+        details TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS task_comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER,
@@ -932,6 +945,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_system_health_snapshots_company_created
     ON system_health_snapshots(company_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_system_events_created
+    ON system_events(created_at, id)
     """)
 
     c.execute("""

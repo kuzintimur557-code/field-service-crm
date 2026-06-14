@@ -9655,6 +9655,7 @@ async def assert_platform_calendar_health():
         assert "Проверки системы" in boss_system_html
         assert "Резервные копии" in boss_system_html
         assert 'href="/backup"' not in boss_system_html
+        assert "Журнал системы" not in boss_system_html
         system_page = await crm.system_page(
             make_asgi_request("super", "/system"),
         )
@@ -9666,11 +9667,14 @@ async def assert_platform_calendar_health():
         assert "Telegram" in system_html
         assert "Резервные копии" in system_html
         assert "Пути и файлы" in system_html
+        assert "Журнал системы" in system_html
+        assert "/system/events/export" in system_html
         assert "/platform/readiness" in system_html
         assert "/backup" in system_html
         assert system_page.context["system_checks"]
         assert system_page.context["system_score"] >= 0
         assert "backup_status" in system_page.context
+        assert "system_events" in system_page.context
         assert system_page.context["db_size_label"]
         assert {
             "secret_key",
@@ -9681,6 +9685,26 @@ async def assert_platform_calendar_health():
         }.issubset({
             item["key"] for item in system_page.context["system_checks"]
         })
+        anonymous_system_events_export = await crm.system_events_export(
+            make_public_asgi_request("/system/events/export"),
+        )
+        assert anonymous_system_events_export.status_code == 302
+        assert anonymous_system_events_export.headers["location"] == "/login"
+        boss_system_events_export = await crm.system_events_export(
+            make_asgi_request("owner2", "/system/events/export"),
+        )
+        assert boss_system_events_export.status_code == 302
+        assert boss_system_events_export.headers["location"] == "/"
+        system_events_export = await crm.system_events_export(
+            make_asgi_request("super", "/system/events/export"),
+        )
+        assert system_events_export.status_code == 200
+        assert system_events_export.headers["content-disposition"] == (
+            "attachment; filename=system_events.csv"
+        )
+        system_events_csv = system_events_export.body.decode("utf-8")
+        assert system_events_csv.startswith("\ufeff")
+        assert "Журнал системы" in system_events_csv
         anonymous_backup_page = await crm.backup_page(
             make_public_asgi_request("/backup"),
         )
@@ -9873,6 +9897,13 @@ async def assert_platform_calendar_health():
             and event["file_name"] == created_backup_name
             for event in backup_events
         )
+        system_events = crm.get_system_event_history()
+        assert any(
+            event["source"] == "backup"
+            and "Создание копии" in event["message"]
+            and event["severity"] == "ok"
+            for event in system_events
+        )
         logged_backup_page = await crm.backup_page(
             make_asgi_request("super", "/backup"),
         )
@@ -9881,6 +9912,13 @@ async def assert_platform_calendar_health():
         assert "Копия успешно скопирована во временную папку" in (
             logged_backup_html
         )
+        logged_system_page = await crm.system_page(
+            make_asgi_request("super", "/system"),
+        )
+        logged_system_html = logged_system_page.body.decode("utf-8")
+        assert "Журнал системы" in logged_system_html
+        assert "Создание копии" in logged_system_html
+        assert "Проверка восстановления" in logged_system_html
         readiness_after_restore = crm.get_platform_release_readiness()
         restore_readiness = next(
             item for item in readiness_after_restore["checks"]

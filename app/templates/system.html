@@ -54,6 +54,12 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
 .backup-box{border:1px solid #edf0f4;border-radius:8px;background:#fbfdff;padding:14px}
 .backup-box span{display:block;font-size:12px;color:#64748b;font-weight:900;margin-bottom:7px}
 .backup-box strong{display:block;font-size:16px;word-break:break-word}
+.event-list{display:grid;gap:10px}
+.event-row{display:grid;grid-template-columns:150px 110px 1fr;gap:12px;align-items:flex-start;padding:12px;border:1px solid #edf0f4;border-radius:8px;background:#fbfdff}
+.event-time{font-size:12px;color:#64748b;font-weight:900}
+.event-message{font-weight:900;margin-bottom:4px}
+.event-details{font-size:13px;color:#475569;line-height:1.45;word-break:break-word}
+.empty-state{padding:14px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;font-size:13px;font-weight:800;background:#f8fafc}
 @media(max-width:900px){
     .page{padding:18px}
     .topbar{display:block}
@@ -61,6 +67,7 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
     .status-panel{grid-template-columns:1fr}
     .summary-card,.grid,.backup-grid{grid-template-columns:1fr}
     .check{grid-template-columns:1fr}
+    .event-row{grid-template-columns:1fr}
     .path-row{grid-template-columns:1fr}
     h1{font-size:28px}
 }
@@ -81,6 +88,7 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             <a class="button" href="/admin">Админ-панель</a>
             {% if role == "superadmin" %}
             <a class="button" href="/platform/readiness">Готовность</a>
+            <a class="button" href="/system/events/export">Экспорт событий</a>
             <a class="button primary" href="/backup">Резервные копии</a>
             {% endif %}
         </div>
@@ -228,6 +236,39 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             </div>
         </div>
     </section>
+
+    {% if role == "superadmin" %}
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <div class="section-title">Журнал системы</div>
+                <div class="section-note">Последние технические события платформы: backup, проверки и служебные операции.</div>
+            </div>
+            <a class="button" href="/system/events/export">CSV</a>
+        </div>
+
+        {% if system_events %}
+        <div class="event-list">
+            {% for event in system_events %}
+            <div class="event-row">
+                <div class="event-time">{{ event.created_at }}</div>
+                <div><span class="pill {{ event.severity }}">{{ event.severity_label }}</span></div>
+                <div>
+                    <div class="event-message">{{ event.message }}</div>
+                    <div class="event-details">
+                        {{ event.source }}
+                        {% if event.username %} · {{ event.username }}{% endif %}
+                        {% if event.details %}<br>{{ event.details }}{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">Системных событий пока нет.</div>
+        {% endif %}
+    </section>
+    {% endif %}
 </main>
 {% include 'mobile_nav.html' %}
 </body>

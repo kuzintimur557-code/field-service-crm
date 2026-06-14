@@ -6056,6 +6056,100 @@ def format_backup_age(age_hours):
     return f"{int(age_hours // 24)} д"
 
 
+def system_event_severity_label(severity):
+    labels = {
+        "ok": "Успешно",
+        "info": "Инфо",
+        "warning": "Внимание",
+        "critical": "Критично",
+    }
+    return labels.get(severity, "Инфо")
+
+
+def normalize_system_event_severity(severity):
+    return severity if severity in (
+        "ok",
+        "info",
+        "warning",
+        "critical",
+    ) else "info"
+
+
+def log_system_event(
+    event_type,
+    severity,
+    username="",
+    source="",
+    message="",
+    details="",
+):
+    conn = None
+    normalized_severity = normalize_system_event_severity(severity)
+
+    try:
+        conn = connect()
+        conn.execute("""
+        INSERT INTO system_events (
+            event_type,
+            severity,
+            username,
+            source,
+            message,
+            details,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(event_type or "system")[:80],
+            normalized_severity,
+            str(username or "")[:120],
+            str(source or "")[:120],
+            str(message or "")[:300],
+            str(details or "")[:1000],
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+        conn.commit()
+    except sqlite3.Error as error:
+        print("System event log error:", error)
+    finally:
+        if conn:
+            conn.close()
+
+
+def get_system_event_history(limit=20):
+    conn = connect()
+    rows = conn.execute("""
+    SELECT *
+    FROM system_events
+    ORDER BY id DESC
+    LIMIT ?
+    """, (limit,)).fetchall()
+    conn.close()
+    events = []
+
+    for row in rows:
+        event = dict(row)
+        event["severity"] = normalize_system_event_severity(
+            event.get("severity"),
+        )
+        event["severity_label"] = system_event_severity_label(
+            event["severity"],
+        )
+        events.append(event)
+
+    return events
+
+
+def backup_event_severity(status):
+    if status == "Успешно":
+        return "ok"
+
+    if status == "Ошибка":
+        return "critical"
+
+    return "warning"
+
+
 def log_backup_event(username, action, status, file_name="", details=""):
     conn = connect()
     c = conn.cursor()
@@ -6079,6 +6173,14 @@ def log_backup_event(username, action, status, file_name="", details=""):
     ))
     conn.commit()
     conn.close()
+    log_system_event(
+        "backup",
+        backup_event_severity(status),
+        username,
+        "backup",
+        f"{action}: {status}",
+        details or file_name,
+    )
 
 
 def get_backup_event_history(limit=12):
@@ -29398,6 +29500,8 @@ async def system_page(request: Request):
         system_status = "ok"
         system_status_label = "Стабильно"
 
+    system_events = get_system_event_history() if role == "superadmin" else []
+
     return templates.TemplateResponse(
         request,
         "system.html",
@@ -29427,7 +29531,47 @@ async def system_page(request: Request):
             "system_warning_count": warning_count,
             "system_critical_count": critical_count,
             "system_generated_at": system_generated_at,
+            "system_events": system_events,
         }
+    )
+
+
+@app.get("/system/events/export")
+async def system_events_export(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    events = get_system_event_history(200)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Журнал системы"])
+    writer.writerow(["Дата", "Уровень", "Источник", "Пользователь", "Событие", "Детали"])
+
+    for event in events:
+        writer.writerow([
+            event["created_at"],
+            event["severity_label"],
+            event["source"],
+            event["username"],
+            event["message"],
+            event["details"],
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=system_events.csv"
+            ),
+        },
     )
 
 
