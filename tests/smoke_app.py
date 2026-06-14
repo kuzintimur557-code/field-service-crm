@@ -13032,6 +13032,8 @@ async def assert_finance_margin(task):
     assert "Умный перенос" in task_detail_html
     assert "Подбор даты для текущей команды:" in task_detail_html
     assert "Загрузка команды после переноса:" in task_detail_html
+    assert "max-height:90vh" in task_detail_html
+    assert "grid-template-columns:30px minmax(0,1fr) 48px" in task_detail_html
     assert task_detail_response.context["smart_reschedule_items"]
     assert len(task_detail_response.context["smart_reschedule_items"]) <= 5
     assert all(
@@ -14650,6 +14652,9 @@ async def assert_client_custom_fields():
     assert "client_filter=overdue" in page_html
     assert "client_filter=empty" in page_html
     assert 'name="client_sort"' in page_html
+    assert 'placeholder="+7 900 000-00-00"' in page_html
+    assert 'placeholder="client@example.ru"' in page_html
+    assert 'class="client-open"' in page_html
 
     search_response = await crm.clients_page(
         make_asgi_request("owner2", "/clients"),

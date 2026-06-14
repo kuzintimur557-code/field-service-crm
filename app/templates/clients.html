@@ -9,31 +9,33 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:1100px;margin:auto;padding:28px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:1100px;margin:auto;padding:28px;width:100%}
 .header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
 h1{margin:0;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
-.back{color:#2563eb;text-decoration:none;font-weight:900}
-.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:24px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 label{display:block;margin-top:12px;font-weight:900;color:#374151}
-input,textarea,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
-input,textarea{border:1px solid #d1d5db;background:white}
+input,textarea,select,button{width:100%;min-height:44px;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
+input,textarea,select{border:1px solid #d1d5db;background:white}
 textarea{height:110px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
-.client{display:grid;grid-template-columns:1.2fr 1fr 1.5fr;gap:14px;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
-.name{font-size:18px;font-weight:900}
-.meta{font-size:14px;color:#4b5563;font-weight:700;margin-top:5px;word-break:break-word}
+.client{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.5fr);gap:14px;padding:16px;border:1px solid #e5e7eb;border-radius:18px;background:#f9fafb;margin-bottom:10px}
+.name{font-size:18px;font-weight:900;overflow-wrap:anywhere}
+.meta{font-size:14px;color:#4b5563;font-weight:700;margin-top:5px;overflow-wrap:anywhere}
+.meta a{color:#2563eb;text-decoration:none;font-weight:900}
 .client-stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .client-stat{padding:7px 10px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:12px;font-weight:900}
 .client-stat.warn{background:#fee2e2;color:#991b1b}
 .search-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
 .search-row div{flex:1;min-width:220px}
 .search-row button{width:auto}
-.reset-link{display:inline-block;padding:13px 15px;border-radius:14px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-weight:900}
+.reset-link,.client-open{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:13px 15px;border-radius:14px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-weight:900}
+.client-open{background:#2563eb;color:white}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.filters a{padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filters a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
 .filters a.active{background:#111827;color:white}
 .empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
 .notice{margin-top:16px;padding:14px;border-radius:16px;font-weight:900}
@@ -44,6 +46,11 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .header{display:block}
 h1{font-size:28px;margin-bottom:12px}
 .grid,.client{grid-template-columns:1fr}
+.search-row{display:grid;grid-template-columns:1fr}
+.search-row div{min-width:0}
+.search-row button,.reset-link{width:100%}
+.filters{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+.filters a{flex:0 0 auto}
 }
 </style>
 </head>
@@ -86,14 +93,14 @@ h1{font-size:28px;margin-bottom:12px}
 
     <div>
         <label>Телефон</label>
-        <input type="text" name="phone" placeholder="+31...">
+        <input type="text" name="phone" placeholder="+7 900 000-00-00">
     </div>
 </div>
 
 <div class="grid">
     <div>
         <label>Электронная почта</label>
-        <input type="email" name="email" placeholder="client@example.com">
+        <input type="email" name="email" placeholder="client@example.ru">
     </div>
 
     <div>
@@ -178,8 +185,8 @@ h1{font-size:28px;margin-bottom:12px}
     </div>
 
     <div>
-        <div class="meta">📞 {{ client["phone"] or "телефон не указан" }}</div>
-        <div class="meta">✉️ {{ client["email"] or "email не указан" }}</div>
+        <div class="meta">📞 {% if client["phone"] %}<a href="tel:{{ client['phone'] }}">{{ client["phone"] }}</a>{% else %}телефон не указан{% endif %}</div>
+        <div class="meta">✉️ {% if client["email"] %}<a href="mailto:{{ client['email'] }}">{{ client["email"] }}</a>{% else %}email не указан{% endif %}</div>
     </div>
 
     <div>
@@ -197,7 +204,7 @@ h1{font-size:28px;margin-bottom:12px}
         <div class="meta">Последняя заявка: {{ client["last_task_date"] or "нет" }}</div>
         <div class="meta">Выручка: {{ "%.0f"|format(client["completed_revenue"] or 0) }} ₽</div>
         <div style="margin-top:10px">
-            <a href="/clients/{{ client['id'] }}" style="display:inline-block;padding:10px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900">Открыть клиента</a>
+            <a href="/clients/{{ client['id'] }}" class="client-open">Открыть клиента</a>
         </div>
     </div>
 </div>
