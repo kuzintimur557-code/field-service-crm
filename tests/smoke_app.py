@@ -9640,6 +9640,16 @@ async def assert_platform_calendar_health():
         assert "/platform/calendar-health?assignee=me" in platform_html
         assert "/platform/readiness/export" in platform_html
         assert "/backup" in platform_html
+        health_response = await crm.public_health()
+        assert health_response.status_code == 200
+        health_payload = json.loads(health_response.body)
+        assert health_payload["ok"] is True
+        assert health_payload["app"] == "field-service-crm"
+        assert health_payload["version"] == crm.APP_VERSION
+        assert health_payload["database"]["ok"] is True
+        assert "db_path" not in health_payload
+        assert "system_events" not in health_payload
+        assert "production_config" not in health_payload
         anonymous_system_page = await crm.system_page(
             make_public_asgi_request("/system"),
         )

@@ -29966,6 +29966,49 @@ def build_system_diagnostics(role=""):
     }
 
 
+def get_public_health_status():
+    database_ok = False
+    database_error = ""
+    conn = None
+
+    try:
+        conn = connect()
+        conn.execute("SELECT 1").fetchone()
+        database_ok = True
+    except (OSError, sqlite3.Error) as error:
+        database_error = error.__class__.__name__
+    finally:
+        if conn:
+            conn.close()
+
+    status = "ok" if database_ok else "critical"
+
+    return {
+        "ok": database_ok,
+        "app": "field-service-crm",
+        "version": APP_VERSION,
+        "status": status,
+        "status_label": "Работает" if database_ok else "Проблема",
+        "database": {
+            "ok": database_ok,
+            "status": status,
+            "status_label": "Доступна" if database_ok else "Недоступна",
+            "error": database_error,
+        },
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+
+@app.get("/health")
+async def public_health():
+    health = get_public_health_status()
+
+    return JSONResponse(
+        health,
+        status_code=200 if health["ok"] else 503,
+    )
+
+
 @app.get("/system", response_class=HTMLResponse)
 async def system_page(
     request: Request,
