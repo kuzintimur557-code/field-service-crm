@@ -9787,6 +9787,33 @@ async def assert_platform_calendar_health():
         cleaned_system_html = cleaned_system_page.body.decode("utf-8")
         assert "Старые события журнала удалены: 5." in cleaned_system_html
         assert "Очистка журнала: выполнено" in cleaned_system_html
+        runtime_error_response = await crm.unhandled_exception_handler(
+            make_asgi_request("super", "/smoke-runtime-error"),
+            RuntimeError("Smoke runtime failure"),
+        )
+        assert runtime_error_response.status_code == 500
+        runtime_error_html = runtime_error_response.body.decode("utf-8")
+        assert "Что-то пошло не так" in runtime_error_html
+        assert "Код ошибки:" in runtime_error_html
+        runtime_error_events = crm.get_system_event_history()
+        assert any(
+            event["event_type"] == "runtime_error"
+            and event["source"] == "runtime"
+            and event["severity"] == "critical"
+            and "Smoke runtime failure" in event["details"]
+            for event in runtime_error_events
+        )
+        api_runtime_error_response = await crm.unhandled_exception_handler(
+            make_public_asgi_request("/api/smoke-runtime-error"),
+            ValueError("Smoke API failure"),
+        )
+        assert api_runtime_error_response.status_code == 500
+        api_runtime_error_payload = json.loads(
+            api_runtime_error_response.body,
+        )
+        assert api_runtime_error_payload["ok"] is False
+        assert api_runtime_error_payload["error"] == "internal_error"
+        assert api_runtime_error_payload["error_id"]
         anonymous_backup_page = await crm.backup_page(
             make_public_asgi_request("/backup"),
         )

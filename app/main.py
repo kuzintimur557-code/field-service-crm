@@ -6232,6 +6232,90 @@ def cleanup_system_events(username):
     }
 
 
+def request_prefers_json(request):
+    path = getattr(request.url, "path", "") if request else ""
+    accept = ""
+
+    try:
+        accept = request.headers.get("accept", "")
+    except Exception:
+        accept = ""
+
+    return path.startswith("/api/") or "application/json" in accept
+
+
+def log_runtime_exception(request, error):
+    error_id = uuid4().hex[:12]
+    username = ""
+
+    try:
+        username = get_user(request) or ""
+    except Exception:
+        username = ""
+
+    try:
+        path = request.url.path
+    except Exception:
+        path = ""
+
+    try:
+        method = request.method
+    except Exception:
+        method = ""
+
+    error_type = type(error).__name__
+    error_message = str(error or "")[:500]
+    details = (
+        f"id={error_id}; method={method}; path={path}; "
+        f"type={error_type}; message={error_message}"
+    )
+    log_system_event(
+        "runtime_error",
+        "critical",
+        username,
+        "runtime",
+        f"Ошибка приложения {error_id}",
+        details,
+    )
+
+    return error_id
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, error: Exception):
+    error_id = log_runtime_exception(request, error)
+
+    if request_prefers_json(request):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "internal_error",
+                "error_id": error_id,
+            },
+            status_code=500,
+        )
+
+    try:
+        return templates.TemplateResponse(
+            request,
+            "error.html",
+            {
+                "request": request,
+                "error_id": error_id,
+            },
+            status_code=500,
+        )
+    except Exception:
+        return Response(
+            (
+                "Внутренняя ошибка приложения. "
+                f"Код ошибки: {error_id}."
+            ),
+            status_code=500,
+            media_type="text/plain; charset=utf-8",
+        )
+
+
 def backup_event_severity(status):
     if status == "Успешно":
         return "ok"
