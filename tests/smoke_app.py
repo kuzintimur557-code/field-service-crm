@@ -10056,6 +10056,39 @@ async def assert_platform_calendar_health():
         cleaned_system_html = cleaned_system_page.body.decode("utf-8")
         assert "Старые события журнала удалены: 5." in cleaned_system_html
         assert "Очистка журнала: выполнено" in cleaned_system_html
+        assert crm.get_http_error_meta(404)["code"] == "not_found"
+        assert crm.get_http_error_meta(405)["code"] == "method_not_allowed"
+        not_found_response = await crm.http_exception_handler(
+            make_public_asgi_request(
+                "/missing-page",
+                headers=[(b"x-request-id", b"smoke-http-404")],
+            ),
+            crm.StarletteHTTPException(status_code=404),
+        )
+        assert not_found_response.status_code == 404
+        not_found_html = not_found_response.body.decode("utf-8")
+        assert "Страница не найдена" in not_found_html
+        assert "Код запроса: smoke-http-404" in not_found_html
+        assert not_found_response.headers["x-request-id"] == "smoke-http-404"
+        assert not_found_response.headers["x-frame-options"] == "DENY"
+        api_method_response = await crm.http_exception_handler(
+            make_public_asgi_request(
+                "/api/smoke-method",
+                headers=[
+                    (b"accept", b"application/json"),
+                    (b"x-request-id", b"smoke-http-405"),
+                ],
+            ),
+            crm.StarletteHTTPException(status_code=405),
+        )
+        assert api_method_response.status_code == 405
+        api_method_payload = json.loads(api_method_response.body)
+        assert api_method_payload["ok"] is False
+        assert api_method_payload["error"] == "method_not_allowed"
+        assert api_method_payload["status_code"] == 405
+        assert api_method_payload["request_id"] == "smoke-http-405"
+        assert api_method_response.headers["x-request-id"] == "smoke-http-405"
+        assert api_method_response.headers["x-frame-options"] == "DENY"
         runtime_error_response = await crm.unhandled_exception_handler(
             make_asgi_request("super", "/smoke-runtime-error"),
             RuntimeError("Smoke runtime failure"),

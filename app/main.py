@@ -70,6 +70,7 @@ from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.database import connect, init_db
 from app.telegram_utils import send_message, send_photo, send_message_to_chat
@@ -6668,6 +6669,82 @@ def request_prefers_json(request):
         accept = ""
 
     return path.startswith("/api/") or "application/json" in accept
+
+
+def get_http_error_meta(status_code):
+    labels = {
+        404: {
+            "code": "not_found",
+            "title": "Страница не найдена",
+            "message": (
+                "Такой страницы нет или адрес был изменён. "
+                "Проверьте ссылку или вернитесь на главную."
+            ),
+        },
+        405: {
+            "code": "method_not_allowed",
+            "title": "Метод не поддерживается",
+            "message": (
+                "Этот адрес не принимает такой способ запроса. "
+                "Вернитесь назад и повторите действие через интерфейс."
+            ),
+        },
+    }
+
+    return labels.get(status_code, {
+        "code": "http_error",
+        "title": "Запрос не выполнен",
+        "message": "Сервер не смог выполнить этот запрос.",
+    })
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(
+    request: Request,
+    error: StarletteHTTPException,
+):
+    status_code = int(getattr(error, "status_code", 500) or 500)
+    request_id = get_request_id(request)
+    meta = get_http_error_meta(status_code)
+
+    if request_prefers_json(request):
+        response = JSONResponse(
+            {
+                "ok": False,
+                "error": meta["code"],
+                "status_code": status_code,
+                "message": meta["message"],
+                "request_id": request_id,
+            },
+            status_code=status_code,
+        )
+        return finalize_response_headers(response, request_id)
+
+    try:
+        response = templates.TemplateResponse(
+            request,
+            "http_error.html",
+            {
+                "request": request,
+                "status_code": status_code,
+                "title": meta["title"],
+                "message": meta["message"],
+                "request_id": request_id,
+            },
+            status_code=status_code,
+        )
+        return finalize_response_headers(response, request_id)
+    except Exception:
+        response = Response(
+            (
+                f"{meta['title']}. "
+                f"{meta['message']} "
+                f"Код запроса: {request_id}."
+            ),
+            status_code=status_code,
+            media_type="text/plain; charset=utf-8",
+        )
+        return finalize_response_headers(response, request_id)
 
 
 def log_runtime_exception(request, error, request_id=""):

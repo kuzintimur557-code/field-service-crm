@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb;color:#111827}
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.panel{width:100%;max-width:560px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:28px;box-shadow:0 8px 22px rgba(15,23,42,.06)}
+.eyebrow{font-size:12px;font-weight:900;color:#475569;text-transform:uppercase;letter-spacing:.08em}
+h1{margin:8px 0 10px;font-size:30px;letter-spacing:0}
+p{margin:0;color:#475569;line-height:1.55;font-weight:700}
+.code{margin-top:16px;padding:12px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;color:#111827;word-break:break-all}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:8px;border:1px solid #dbe3ef;background:#111827;color:#fff;text-decoration:none;font-size:13px;font-weight:900}
+.button.secondary{background:#fff;color:#111827}
+@media(max-width:640px){.panel{padding:22px}h1{font-size:26px}.button{width:100%}}
+</style>
+</head>
+<body>
+<main class="page">
+    <section class="panel">
+        <div class="eyebrow">HTTP {{ status_code }}</div>
+        <h1>{{ title }}</h1>
+        <p>{{ message }}</p>
+        <div class="code">Код запроса: {{ request_id }}</div>
+        <div class="actions">
+            <a class="button" href="/">На главную</a>
+            <a class="button secondary" href="/admin">Админ-центр</a>
+        </div>
+    </section>
+</main>
+{% include 'mobile_nav.html' %}
+</body>
+</html>
