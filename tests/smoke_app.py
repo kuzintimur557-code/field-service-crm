@@ -9749,6 +9749,26 @@ async def assert_platform_calendar_health():
         assert "db_path" not in health_payload
         assert "system_events" not in health_payload
         assert "production_config" not in health_payload
+        readiness_status = crm.get_public_readiness_status()
+        assert readiness_status["ok"] is True
+        assert readiness_status["status"] == "ok"
+        assert {
+            "database",
+            "sqlite_quick_check",
+            "required_tables",
+            "uploads",
+        }.issubset({item["key"] for item in readiness_status["checks"]})
+        readiness_response = await crm.public_ready()
+        assert readiness_response.status_code == 200
+        readiness_payload = json.loads(readiness_response.body)
+        assert readiness_payload["ok"] is True
+        assert readiness_payload["app"] == "field-service-crm"
+        assert readiness_payload["version"] == crm.APP_VERSION
+        assert readiness_payload["status_label"] == "Готово"
+        assert all(item["ok"] for item in readiness_payload["checks"])
+        assert "db_path" not in readiness_payload
+        assert "data_dir" not in readiness_payload
+        assert "production_config" not in readiness_payload
         anonymous_system_page = await crm.system_page(
             make_public_asgi_request("/system"),
         )

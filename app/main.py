@@ -30256,6 +30256,93 @@ def get_public_health_status():
     }
 
 
+def get_public_readiness_status():
+    conn = None
+    database_ok = False
+    quick_check_ok = False
+    quick_check = ""
+    database_error = ""
+    missing_tables = list(BACKUP_REQUIRED_TABLES)
+    uploads_ok = UPLOAD_DIR.exists() and os.access(UPLOAD_DIR, os.W_OK)
+
+    try:
+        conn = connect()
+        conn.execute("SELECT 1").fetchone()
+        database_ok = True
+        quick_check_row = conn.execute("PRAGMA quick_check").fetchone()
+        quick_check = quick_check_row[0] if quick_check_row else ""
+        quick_check_ok = quick_check == "ok"
+        table_rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+        tables = {row["name"] for row in table_rows}
+        missing_tables = [
+            table
+            for table in BACKUP_REQUIRED_TABLES
+            if table not in tables
+        ]
+    except (OSError, sqlite3.Error) as error:
+        database_error = error.__class__.__name__
+    finally:
+        if conn:
+            conn.close()
+
+    tables_ok = database_ok and not missing_tables
+    ready = database_ok and quick_check_ok and tables_ok and uploads_ok
+    checks = [
+        {
+            "key": "database",
+            "ok": database_ok,
+            "status": "ok" if database_ok else "critical",
+            "status_label": "Доступна" if database_ok else "Недоступна",
+            "error": database_error,
+        },
+        {
+            "key": "sqlite_quick_check",
+            "ok": quick_check_ok,
+            "status": "ok" if quick_check_ok else "critical",
+            "status_label": (
+                "Проверка пройдена"
+                if quick_check_ok
+                else "Проверка не пройдена"
+            ),
+            "value": quick_check,
+        },
+        {
+            "key": "required_tables",
+            "ok": tables_ok,
+            "status": "ok" if tables_ok else "critical",
+            "status_label": (
+                "Таблицы на месте"
+                if tables_ok
+                else "Не хватает таблиц"
+            ),
+            "required": list(BACKUP_REQUIRED_TABLES),
+            "missing": missing_tables,
+        },
+        {
+            "key": "uploads",
+            "ok": uploads_ok,
+            "status": "ok" if uploads_ok else "critical",
+            "status_label": (
+                "Доступны для записи"
+                if uploads_ok
+                else "Недоступны для записи"
+            ),
+        },
+    ]
+
+    return {
+        "ok": ready,
+        "app": "field-service-crm",
+        "version": APP_VERSION,
+        "status": "ok" if ready else "critical",
+        "status_label": "Готово" if ready else "Не готово",
+        "checks": checks,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+
 @app.get("/health")
 async def public_health():
     health = get_public_health_status()
@@ -30263,6 +30350,16 @@ async def public_health():
     return JSONResponse(
         health,
         status_code=200 if health["ok"] else 503,
+    )
+
+
+@app.get("/ready")
+async def public_ready():
+    readiness = get_public_readiness_status()
+
+    return JSONResponse(
+        readiness,
+        status_code=200 if readiness["ok"] else 503,
     )
 
 
