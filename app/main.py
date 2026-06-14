@@ -101,7 +101,7 @@ import json
 import tempfile
 
 
-APP_VERSION = "0.2.1"
+APP_VERSION = "0.2.2"
 BACKUP_RETENTION_DAYS = 30
 BACKUP_RETENTION_KEEP = 3
 BACKUP_REQUIRED_TABLES = ("users", "tasks", "clients")
