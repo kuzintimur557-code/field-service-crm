@@ -108,6 +108,7 @@ SYSTEM_EVENT_RETENTION_KEEP = 200
 SYSTEM_EVENT_ALERT_HOURS = 24
 
 SESSION_COOKIE_NAME = "crm_session"
+REQUEST_ID_HEADER = "X-Request-ID"
 TEAM_ACTIVITY_FILTERS = {
     "all": None,
     "membership": ("Пользователь создан", "Пользователь удалён"),
@@ -135,6 +136,57 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 
+def normalize_request_id(value=""):
+    request_id = str(value or "").strip()
+    allowed_extra_chars = {"-", "_", "."}
+
+    if (
+        8 <= len(request_id) <= 64
+        and all(
+            char.isalnum() or char in allowed_extra_chars
+            for char in request_id
+        )
+    ):
+        return request_id
+
+    return uuid4().hex
+
+
+def get_request_id(request=None):
+    existing = ""
+
+    try:
+        existing = getattr(request.state, "request_id", "")
+    except Exception:
+        existing = ""
+
+    if existing:
+        return existing
+
+    header_value = ""
+
+    try:
+        header_value = request.headers.get(REQUEST_ID_HEADER, "")
+    except Exception:
+        header_value = ""
+
+    request_id = normalize_request_id(header_value)
+
+    try:
+        request.state.request_id = request_id
+    except Exception:
+        pass
+
+    return request_id
+
+
+def apply_request_id_header(response, request_id):
+    if request_id:
+        response.headers.setdefault(REQUEST_ID_HEADER, request_id)
+
+    return response
+
+
 def apply_security_headers(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
@@ -158,8 +210,10 @@ def apply_security_headers(response):
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
+    request_id = get_request_id(request)
     response = await call_next(request)
-    return apply_security_headers(response)
+    apply_security_headers(response)
+    return apply_request_id_header(response, request_id)
 
 
 def role_label(role):
@@ -6474,8 +6528,9 @@ def request_prefers_json(request):
     return path.startswith("/api/") or "application/json" in accept
 
 
-def log_runtime_exception(request, error):
+def log_runtime_exception(request, error, request_id=""):
     error_id = uuid4().hex[:12]
+    request_id = request_id or get_request_id(request)
     username = ""
 
     try:
@@ -6496,7 +6551,7 @@ def log_runtime_exception(request, error):
     error_type = type(error).__name__
     error_message = str(error or "")[:500]
     details = (
-        f"id={error_id}; method={method}; path={path}; "
+        f"id={error_id}; request_id={request_id}; method={method}; path={path}; "
         f"type={error_type}; message={error_message}"
     )
     log_system_event(
@@ -6513,37 +6568,44 @@ def log_runtime_exception(request, error):
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, error: Exception):
-    error_id = log_runtime_exception(request, error)
+    request_id = get_request_id(request)
+    error_id = log_runtime_exception(request, error, request_id)
 
     if request_prefers_json(request):
-        return JSONResponse(
+        response = JSONResponse(
             {
                 "ok": False,
                 "error": "internal_error",
                 "error_id": error_id,
+                "request_id": request_id,
             },
             status_code=500,
         )
+        return apply_request_id_header(response, request_id)
 
     try:
-        return templates.TemplateResponse(
+        response = templates.TemplateResponse(
             request,
             "error.html",
             {
                 "request": request,
                 "error_id": error_id,
+                "request_id": request_id,
             },
             status_code=500,
         )
+        return apply_request_id_header(response, request_id)
     except Exception:
-        return Response(
+        response = Response(
             (
                 "Внутренняя ошибка приложения. "
-                f"Код ошибки: {error_id}."
+                f"Код ошибки: {error_id}. "
+                f"Код запроса: {request_id}."
             ),
             status_code=500,
             media_type="text/plain; charset=utf-8",
         )
+        return apply_request_id_header(response, request_id)
 
 
 def backup_event_severity(status):

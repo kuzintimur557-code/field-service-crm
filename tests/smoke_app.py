@@ -9656,6 +9656,10 @@ async def assert_platform_calendar_health():
             security_response.headers["permissions-policy"]
         )
         assert "strict-transport-security" not in security_response.headers
+        assert crm.normalize_request_id("smoke-request-123") == (
+            "smoke-request-123"
+        )
+        assert crm.normalize_request_id("bad id!") != "bad id!"
 
         async def smoke_call_next(request):
             return crm.JSONResponse({"ok": True})
@@ -9668,6 +9672,27 @@ async def assert_platform_calendar_health():
         assert middleware_response.headers["x-content-type-options"] == (
             "nosniff"
         )
+        request_id_response = await crm.security_headers_middleware(
+            make_public_asgi_request(
+                "/health",
+                headers=[(b"x-request-id", b"smoke-request-123")],
+            ),
+            smoke_call_next,
+        )
+        assert request_id_response.headers["x-request-id"] == (
+            "smoke-request-123"
+        )
+        generated_request_id_response = await crm.security_headers_middleware(
+            make_public_asgi_request(
+                "/health",
+                headers=[(b"x-request-id", b"bad id!")],
+            ),
+            smoke_call_next,
+        )
+        assert generated_request_id_response.headers["x-request-id"] != (
+            "bad id!"
+        )
+        assert len(generated_request_id_response.headers["x-request-id"]) == 32
         health_response = await crm.public_health()
         assert health_response.status_code == 200
         health_payload = json.loads(health_response.body)
@@ -9896,12 +9921,15 @@ async def assert_platform_calendar_health():
         runtime_error_html = runtime_error_response.body.decode("utf-8")
         assert "Что-то пошло не так" in runtime_error_html
         assert "Код ошибки:" in runtime_error_html
+        assert "Код запроса:" in runtime_error_html
+        assert runtime_error_response.headers["x-request-id"]
         runtime_error_events = crm.get_system_event_history()
         assert any(
             event["event_type"] == "runtime_error"
             and event["source"] == "runtime"
             and event["severity"] == "critical"
             and "Smoke runtime failure" in event["details"]
+            and "request_id=" in event["details"]
             for event in runtime_error_events
         )
         api_runtime_error_response = await crm.unhandled_exception_handler(
@@ -9915,6 +9943,10 @@ async def assert_platform_calendar_health():
         assert api_runtime_error_payload["ok"] is False
         assert api_runtime_error_payload["error"] == "internal_error"
         assert api_runtime_error_payload["error_id"]
+        assert api_runtime_error_payload["request_id"]
+        assert api_runtime_error_response.headers["x-request-id"] == (
+            api_runtime_error_payload["request_id"]
+        )
         runtime_system_page = await crm.system_page(
             make_asgi_request("super", "/system"),
         )
