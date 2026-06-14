@@ -9739,6 +9739,16 @@ async def assert_platform_calendar_health():
             and "status=503" in event["details"]
             for event in http_request_events
         )
+        assert sum(
+            1
+            for route in crm.app.routes
+            if getattr(route, "path", "") == "/health"
+        ) == 1
+        assert sum(
+            1
+            for route in crm.app.routes
+            if getattr(route, "path", "") == "/ready"
+        ) == 1
         health_response = await crm.public_health()
         assert health_response.status_code == 200
         health_payload = json.loads(health_response.body)

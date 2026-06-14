@@ -30985,14 +30985,6 @@ async def favicon():
     return FileResponse("app/static/favicon.svg", media_type="image/svg+xml")
 
 
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "ok",
-        "app": "Бизнес CRM"
-    }
-
-
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
 

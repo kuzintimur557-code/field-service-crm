@@ -13,4 +13,10 @@ if [ "${SECURITY:-0}" = "1" ]; then
     python3 tests/smoke_security.py
 fi
 
+if [ -n "${BASE:-}" ]; then
+    echo "Checking HTTP health at $BASE..."
+    curl -fsS --max-time 3 "$BASE/health" >/dev/null
+    curl -fsS --max-time 3 "$BASE/ready" >/dev/null
+fi
+
 echo "OK"

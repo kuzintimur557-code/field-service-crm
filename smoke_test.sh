@@ -16,9 +16,10 @@ python3 tests/smoke_security.py
 echo "Checking HTTP server at $BASE..."
 if curl -fsS --max-time 2 "$BASE/health" >/dev/null 2>&1; then
     curl -s -o /dev/null -w "/health: %{http_code}\n" "$BASE/health"
+    curl -s -o /dev/null -w "/ready: %{http_code}\n" "$BASE/ready"
     curl -s -o /dev/null -w "/login: %{http_code}\n" "$BASE/login"
 else
-    echo "HTTP server not running; skipped /health and /login."
+    echo "HTTP server not running; skipped /health, /ready and /login."
 fi
 
 echo "Done."
