@@ -9705,6 +9705,88 @@ async def assert_platform_calendar_health():
         system_events_csv = system_events_export.body.decode("utf-8")
         assert system_events_csv.startswith("\ufeff")
         assert "Журнал системы" in system_events_csv
+        anonymous_system_events_cleanup = await crm.system_events_cleanup(
+            make_public_asgi_request("/system/events/cleanup"),
+        )
+        assert anonymous_system_events_cleanup.status_code == 302
+        assert anonymous_system_events_cleanup.headers["location"] == "/login"
+        boss_system_events_cleanup = await crm.system_events_cleanup(
+            make_asgi_request("owner2", "/system/events/cleanup"),
+        )
+        assert boss_system_events_cleanup.status_code == 302
+        assert boss_system_events_cleanup.headers["location"] == "/"
+        conn = connect()
+        c = conn.cursor()
+        old_event_time = (
+            datetime.now()
+            - timedelta(days=crm.SYSTEM_EVENT_RETENTION_DAYS + 10)
+        ).strftime("%Y-%m-%d %H:%M")
+        c.executemany("""
+        INSERT INTO system_events (
+            event_type,
+            severity,
+            username,
+            source,
+            message,
+            details,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, [
+            (
+                "smoke",
+                "info",
+                "super",
+                "smoke",
+                f"Smoke old system event {index}",
+                "retention check",
+                old_event_time,
+            )
+            for index in range(crm.SYSTEM_EVENT_RETENTION_KEEP + 5)
+        ])
+        conn.commit()
+        old_events_before = c.execute("""
+        SELECT COUNT(*)
+        FROM system_events
+        WHERE message LIKE 'Smoke old system event %'
+        """).fetchone()[0]
+        conn.close()
+        assert old_events_before == crm.SYSTEM_EVENT_RETENTION_KEEP + 5
+        system_retention_status = crm.get_system_event_retention_status()
+        assert system_retention_status["retention_days"] == (
+            crm.SYSTEM_EVENT_RETENTION_DAYS
+        )
+        assert system_retention_status["retention_keep"] == (
+            crm.SYSTEM_EVENT_RETENTION_KEEP
+        )
+        assert system_retention_status["cleanup_count"] >= 5
+        cleanup_system_events_response = await crm.system_events_cleanup(
+            make_asgi_request("super", "/system/events/cleanup"),
+        )
+        assert cleanup_system_events_response.status_code == 302
+        assert cleanup_system_events_response.headers["location"].startswith(
+            "/system?notice=system_events_cleanup_done"
+        )
+        conn = connect()
+        old_events_after = conn.execute("""
+        SELECT COUNT(*)
+        FROM system_events
+        WHERE message LIKE 'Smoke old system event %'
+        """).fetchone()[0]
+        conn.close()
+        assert old_events_after == crm.SYSTEM_EVENT_RETENTION_KEEP
+        cleaned_system_page = await crm.system_page(
+            make_asgi_request(
+                "super",
+                "/system",
+                "notice=system_events_cleanup_done&deleted=5",
+            ),
+            notice="system_events_cleanup_done",
+            deleted=5,
+        )
+        cleaned_system_html = cleaned_system_page.body.decode("utf-8")
+        assert "Старые события журнала удалены: 5." in cleaned_system_html
+        assert "Очистка журнала: выполнено" in cleaned_system_html
         anonymous_backup_page = await crm.backup_page(
             make_public_asgi_request("/backup"),
         )

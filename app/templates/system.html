@@ -17,6 +17,9 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
 .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:8px;border:1px solid #dbe3ef;background:#fff;color:#111827;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
 .button.primary{background:#111827;color:#fff;border-color:#111827}
+.button.warning{background:#92400e;color:#fff;border-color:#92400e}
+.inline-form{margin:0}
+.notice{margin-bottom:16px;padding:12px 14px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:900}
 .status-panel{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:stretch;margin-bottom:16px}
 .score-card,.summary-card,.section{background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 8px 22px rgba(15,23,42,.05)}
 .score-card{padding:22px}
@@ -60,12 +63,16 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
 .event-message{font-weight:900;margin-bottom:4px}
 .event-details{font-size:13px;color:#475569;line-height:1.45;word-break:break-word}
 .empty-state{padding:14px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;font-size:13px;font-weight:800;background:#f8fafc}
+.retention-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.retention-box{border:1px solid #edf0f4;border-radius:8px;background:#fbfdff;padding:14px}
+.retention-box span{display:block;font-size:12px;color:#64748b;font-weight:900;margin-bottom:7px}
+.retention-box strong{display:block;font-size:16px;word-break:break-word}
 @media(max-width:900px){
     .page{padding:18px}
     .topbar{display:block}
     .actions{justify-content:flex-start;margin-top:14px}
     .status-panel{grid-template-columns:1fr}
-    .summary-card,.grid,.backup-grid{grid-template-columns:1fr}
+    .summary-card,.grid,.backup-grid,.retention-grid{grid-template-columns:1fr}
     .check{grid-template-columns:1fr}
     .event-row{grid-template-columns:1fr}
     .path-row{grid-template-columns:1fr}
@@ -93,6 +100,12 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             {% endif %}
         </div>
     </div>
+
+    {% if notice == "system_events_cleanup_done" %}
+    <div class="notice">Старые события журнала удалены: {{ deleted }}.</div>
+    {% elif notice == "system_events_cleanup_empty" %}
+    <div class="notice">Старых системных событий для очистки нет.</div>
+    {% endif %}
 
     <section class="status-panel">
         <div class="score-card">
@@ -244,7 +257,33 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
                 <div class="section-title">Журнал системы</div>
                 <div class="section-note">Последние технические события платформы: backup, проверки и служебные операции.</div>
             </div>
-            <a class="button" href="/system/events/export">CSV</a>
+            <div class="actions">
+                <a class="button" href="/system/events/export">CSV</a>
+                {% if system_event_retention.cleanup_count %}
+                <form class="inline-form" method="post" action="{{ system_event_retention.cleanup_url }}">
+                    <button class="button warning" type="submit">Очистить старые</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="retention-grid">
+            <div class="retention-box">
+                <span>Всего событий</span>
+                <strong>{{ system_event_retention.count }}</strong>
+            </div>
+            <div class="retention-box">
+                <span>Хранение</span>
+                <strong>{{ system_event_retention.retention_days }} дней</strong>
+            </div>
+            <div class="retention-box">
+                <span>Минимум записей</span>
+                <strong>{{ system_event_retention.retention_keep }}</strong>
+            </div>
+            <div class="retention-box">
+                <span>К очистке</span>
+                <strong>{{ system_event_retention.cleanup_count }}</strong>
+            </div>
         </div>
 
         {% if system_events %}

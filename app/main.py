@@ -103,6 +103,8 @@ APP_VERSION = "0.2.1"
 BACKUP_RETENTION_DAYS = 30
 BACKUP_RETENTION_KEEP = 3
 BACKUP_REQUIRED_TABLES = ("users", "tasks", "clients")
+SYSTEM_EVENT_RETENTION_DAYS = 90
+SYSTEM_EVENT_RETENTION_KEEP = 200
 
 SESSION_COOKIE_NAME = "crm_session"
 TEAM_ACTIVITY_FILTERS = {
@@ -6138,6 +6140,96 @@ def get_system_event_history(limit=20):
         events.append(event)
 
     return events
+
+
+def get_system_event_cleanup_candidates(now=None):
+    now = now or datetime.now()
+    cutoff = (
+        now - timedelta(days=SYSTEM_EVENT_RETENTION_DAYS)
+    ).strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    keep_rows = conn.execute("""
+    SELECT id
+    FROM system_events
+    ORDER BY id DESC
+    LIMIT ?
+    """, (SYSTEM_EVENT_RETENTION_KEEP,)).fetchall()
+    keep_ids = {row["id"] for row in keep_rows}
+    rows = conn.execute("""
+    SELECT id, created_at
+    FROM system_events
+    WHERE created_at < ?
+    ORDER BY id ASC
+    """, (cutoff,)).fetchall()
+    conn.close()
+
+    return [
+        row
+        for row in rows
+        if row["id"] not in keep_ids
+    ]
+
+
+def get_system_event_retention_status():
+    conn = connect()
+    summary = conn.execute("""
+    SELECT
+        COUNT(*) AS count,
+        MIN(created_at) AS oldest_created_at,
+        MAX(created_at) AS latest_created_at
+    FROM system_events
+    """).fetchone()
+    conn.close()
+    candidates = get_system_event_cleanup_candidates()
+
+    return {
+        "count": summary["count"] or 0,
+        "oldest_created_at": summary["oldest_created_at"] or "",
+        "latest_created_at": summary["latest_created_at"] or "",
+        "retention_days": SYSTEM_EVENT_RETENTION_DAYS,
+        "retention_keep": SYSTEM_EVENT_RETENTION_KEEP,
+        "cleanup_count": len(candidates),
+        "cleanup_url": "/system/events/cleanup",
+    }
+
+
+def cleanup_system_events(username):
+    candidates = get_system_event_cleanup_candidates()
+    candidate_ids = [row["id"] for row in candidates]
+
+    if not candidate_ids:
+        log_system_event(
+            "system_events",
+            "info",
+            username,
+            "system",
+            "Очистка журнала: без изменений",
+            "Нет старых системных событий для удаления.",
+        )
+        return {
+            "deleted_count": 0,
+        }
+
+    placeholders = ",".join("?" for _ in candidate_ids)
+    conn = connect()
+    conn.execute(
+        f"DELETE FROM system_events WHERE id IN ({placeholders})",
+        candidate_ids,
+    )
+    conn.commit()
+    conn.close()
+    log_system_event(
+        "system_events",
+        "ok",
+        username,
+        "system",
+        "Очистка журнала: выполнено",
+        f"Удалено старых событий: {len(candidate_ids)}.",
+    )
+
+    return {
+        "deleted_count": len(candidate_ids),
+    }
 
 
 def backup_event_severity(status):
@@ -29347,7 +29439,11 @@ async def admin_page(request: Request):
 
 
 @app.get("/system", response_class=HTMLResponse)
-async def system_page(request: Request):
+async def system_page(
+    request: Request,
+    notice: str = "",
+    deleted: int = 0,
+):
 
     username = get_user(request)
 
@@ -29501,6 +29597,11 @@ async def system_page(request: Request):
         system_status_label = "Стабильно"
 
     system_events = get_system_event_history() if role == "superadmin" else []
+    system_event_retention = (
+        get_system_event_retention_status()
+        if role == "superadmin"
+        else {}
+    )
 
     return templates.TemplateResponse(
         request,
@@ -29532,6 +29633,9 @@ async def system_page(request: Request):
             "system_critical_count": critical_count,
             "system_generated_at": system_generated_at,
             "system_events": system_events,
+            "system_event_retention": system_event_retention,
+            "notice": notice,
+            "deleted": deleted,
         }
     )
 
@@ -29572,6 +29676,34 @@ async def system_events_export(request: Request):
                 "attachment; filename=system_events.csv"
             ),
         },
+    )
+
+
+@app.post("/system/events/cleanup")
+async def system_events_cleanup(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    result = cleanup_system_events(username)
+    notice = (
+        "system_events_cleanup_done"
+        if result["deleted_count"]
+        else "system_events_cleanup_empty"
+    )
+
+    return RedirectResponse(
+        "/system?" + urlencode({
+            "notice": notice,
+            "deleted": result["deleted_count"],
+        }),
+        status_code=302,
     )
 
 
