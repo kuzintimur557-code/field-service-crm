@@ -19,7 +19,7 @@ if [ -z "$(git status --short)" ]; then
     exit 0
 fi
 
-git add app tests requirements.txt smoke_test.sh quick_check.sh dev_step.sh Procfile CHANGELOG.md
+git add app tests .github docs .gitignore requirements.txt smoke_test.sh quick_check.sh dev_step.sh Procfile CHANGELOG.md
 git commit -m "$MESSAGE"
 git push
 
