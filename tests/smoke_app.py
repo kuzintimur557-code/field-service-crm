@@ -13008,6 +13008,9 @@ async def assert_finance_margin(task):
     assert "Включить пользователя" in workers_html
     assert "Активные" in workers_html
     assert "Отключённые" in workers_html
+    assert 'placeholder="+7 900 000-00-00"' in workers_html
+    assert 'placeholder="user@example.ru"' in workers_html
+    assert ".contact-link" in workers_html
     assert workers_response.context["status"] == "inactive"
     assert workers_response.context["team_counts"]["inactive_count"] >= 1
 
@@ -13022,6 +13025,15 @@ async def assert_finance_margin(task):
     assert "История управления командой" in (
         active_workers_response.body.decode("utf-8")
     )
+
+    workload_response = await crm.workload_page(
+        make_asgi_request("owner2", "/workload")
+    )
+    assert workload_response.status_code == 200
+    workload_html = workload_response.body.decode("utf-8")
+    assert "Загрузка исполнителей" in workload_html
+    assert "load-card" in workload_html
+    assert "Кто свободен, кто занят, кто перегружен" in workload_html
 
     task_detail_response = await crm.task_detail(
         make_asgi_request("owner2", f"/task/{task['id']}"),

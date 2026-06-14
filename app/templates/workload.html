@@ -9,22 +9,28 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:1100px;margin:auto;padding:24px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
-.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:1100px;margin:auto;padding:24px;width:100%}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:24px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
 h1{margin:0 0 8px;font-size:34px}
-.meta{color:#6b7280;font-weight:800}
-.worker{display:grid;grid-template-columns:1.4fr repeat(4,.7fr) 1fr;gap:12px;align-items:center;background:#f9fafb;padding:16px;border-radius:20px;margin-bottom:12px}
-.name{font-size:20px;font-weight:900}
-.box{background:white;padding:12px;border-radius:14px;text-align:center}
+.meta{color:#6b7280;font-weight:800;overflow-wrap:anywhere}
+.worker{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(4,minmax(86px,.7fr)) minmax(110px,1fr);gap:12px;align-items:center;background:#f9fafb;padding:16px;border:1px solid #e5e7eb;border-radius:18px;margin-bottom:12px}
+.name{font-size:20px;font-weight:900;overflow-wrap:anywhere}
+.box{background:white;padding:12px;border:1px solid #eef2f7;border-radius:14px;text-align:center}
 .label{font-size:12px;color:#6b7280;font-weight:900;margin-bottom:4px}
 .value{font-size:22px;font-weight:900}
-.badge{padding:9px 12px;border-radius:999px;font-weight:900;text-align:center}
+.badge{display:flex;align-items:center;justify-content:center;min-height:44px;padding:9px 12px;border-radius:999px;font-weight:900;text-align:center}
 .free{background:#dcfce7;color:#166534}
 .normal{background:#dbeafe;color:#1d4ed8}
 .busy{background:#fee2e2;color:#991b1b}
-@media(max-width:850px){.container{padding:14px}.worker{grid-template-columns:1fr}.box{text-align:left}h1{font-size:28px}}
+@media(max-width:850px){
+    .container{padding:14px}
+    .card{padding:18px;border-radius:18px}
+    .worker{grid-template-columns:1fr}
+    .box{text-align:left}
+    h1{font-size:28px}
+}
 </style>
 </head>
 
@@ -41,7 +47,7 @@ h1{margin:0 0 8px;font-size:34px}
 <div class="card">
 {% if stats %}
 {% for item in stats %}
-<div class="worker">
+<div class="worker load-card">
     <div>
         <div class="name">{{ item.worker["full_name"] or item.worker["username"] }}</div>
         <div class="meta">{{ item.worker["position"] or "Исполнитель" }}</div>

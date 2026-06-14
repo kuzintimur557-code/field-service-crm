@@ -9,24 +9,25 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:950px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
-.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:950px;margin:auto;padding:28px;width:100%}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border:1px solid #e5e7eb;border-radius:22px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
 h1{margin:0 0 22px;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
-.user{background:#f9fafb;padding:18px;border-radius:20px;margin-bottom:14px}
+.user{background:#f9fafb;padding:18px;border:1px solid #e5e7eb;border-radius:18px;margin-bottom:14px}
 .user-top{display:flex;justify-content:space-between;gap:14px;align-items:center}
-.name{font-size:20px;font-weight:900}
-.meta{font-size:14px;color:#6b7280;font-weight:800;margin-top:6px}
+.name{font-size:20px;font-weight:900;overflow-wrap:anywhere}
+.meta{font-size:14px;color:#6b7280;font-weight:800;margin-top:6px;overflow-wrap:anywhere}
+.contact-link{color:#2563eb;text-decoration:none;font-weight:900}
 .badge{padding:8px 14px;border-radius:999px;font-weight:900}
 .manager{background:#dbeafe;color:#1d4ed8}
 .worker{background:#dcfce7;color:#166534}
 .status-active{background:#dcfce7;color:#166534}
 .status-disabled{background:#fee2e2;color:#991b1b}
 .badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-input,button{width:100%;padding:13px;border-radius:14px;font-size:15px;margin-top:10px}
-input{border:1px solid #d1d5db;background:white}
+input,select,button{width:100%;min-height:44px;padding:13px;border-radius:14px;font-size:15px;margin-top:10px}
+input,select{border:1px solid #d1d5db;background:white}
 button{border:0;color:white;font-weight:900;cursor:pointer}
 .btn-dark{background:#111827}
 .btn-toggle{background:#92400e}
@@ -39,9 +40,18 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 .team-stat{background:#f9fafb;padding:14px;border-radius:14px}
 .team-stat strong{display:block;font-size:22px;margin-top:4px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
-.filters a{padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filters a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
 .filters a.active{background:#111827;color:white}
-@media(max-width:700px){.container{padding:16px}.user-top{display:block}.badge{display:inline-block;margin-top:12px}h1{font-size:28px}.team-stats{grid-template-columns:1fr}.filters a{flex:1;text-align:center}}
+@media(max-width:700px){
+    .container{padding:16px}
+    .card{padding:20px;border-radius:18px}
+    .user-top{display:block}
+    .badge{display:inline-block;margin-top:12px}
+    h1{font-size:28px}
+    .team-stats{grid-template-columns:1fr}
+    .filters{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+    .filters a{flex:0 0 auto}
+}
 </style>
 </head>
 
@@ -101,12 +111,12 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     <input type="text" name="password" placeholder="Пароль" required>
     <input type="text" name="full_name" placeholder="ФИО">
     <input type="text" name="position" placeholder="Должность">
-    <input type="text" name="phone" placeholder="Телефон">
-    <input type="email" name="email" placeholder="Электронная почта">
+    <input type="text" name="phone" placeholder="+7 900 000-00-00">
+    <input type="email" name="email" placeholder="user@example.ru">
     <input type="text" name="telegram_chat_id" placeholder="ID чата Telegram">
     <input type="number" name="commission_percent" min="0" step="0.1" placeholder="Процент с прибыли">
 
-    <select name="role" style="width:100%;padding:13px;border-radius:14px;border:1px solid #d1d5db">
+    <select name="role">
         <option value="worker">Исполнитель</option>
         <option value="manager">Менеджер</option>
     </select>
@@ -151,8 +161,8 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
             </a>
             <div class="meta">Логин: {{ worker["username"] }}</div>
             <div class="meta">Должность: {{ worker["position"] or "—" }}</div>
-            <div class="meta">Телефон: {{ worker["phone"] or "—" }}</div>
-            <div class="meta">Электронная почта: {{ worker["email"] or "—" }}</div>
+            <div class="meta">Телефон: {% if worker["phone"] %}<a class="contact-link" href="tel:{{ worker['phone'] }}">{{ worker["phone"] }}</a>{% else %}—{% endif %}</div>
+            <div class="meta">Электронная почта: {% if worker["email"] %}<a class="contact-link" href="mailto:{{ worker['email'] }}">{{ worker["email"] }}</a>{% else %}—{% endif %}</div>
             <div class="meta">ID чата Telegram: {{ worker["telegram_chat_id"] or "—" }}</div>
             <div class="meta">Процент с прибыли: {{ worker["commission_percent"] or 0 }}%</div>
             <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
