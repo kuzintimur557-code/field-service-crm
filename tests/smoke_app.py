@@ -9573,6 +9573,10 @@ async def assert_platform_calendar_health():
             item["key"]
             for item in platform_page.context["release_readiness"]["checks"]
         }
+        assert "automation_cron_secret" in {
+            item["key"]
+            for item in platform_page.context["release_readiness"]["checks"]
+        }
         assert platform_page.context["calendar_health_summary"][
             "critical"
         ] >= 1
@@ -9653,6 +9657,7 @@ async def assert_platform_calendar_health():
         boss_system_html = boss_system_page.body.decode("utf-8")
         assert "Система" in boss_system_html
         assert "Проверки системы" in boss_system_html
+        assert "Конфигурация окружения" in boss_system_html
         assert "Резервные копии" in boss_system_html
         assert 'href="/backup"' not in boss_system_html
         assert "Журнал системы" not in boss_system_html
@@ -9663,7 +9668,9 @@ async def assert_platform_calendar_health():
         system_html = system_page.body.decode("utf-8")
         assert "Проверки системы" in system_html
         assert "Секрет приложения" in system_html
-        assert "Secure cookie" in system_html
+        assert "Защита cookie" in system_html
+        assert "Конфигурация окружения" in system_html
+        assert "Фоновые запуски" in system_html
         assert "Telegram" in system_html
         assert "Резервные копии" in system_html
         assert "Пути и файлы" in system_html
@@ -9677,6 +9684,8 @@ async def assert_platform_calendar_health():
         assert system_page.context["system_score"] >= 0
         assert "backup_status" in system_page.context
         assert "system_events" in system_page.context
+        assert "production_config" in system_page.context
+        assert system_page.context["production_config"]["items"]
         assert "system_event_summary" in system_page.context
         assert system_page.context["system_event_summary"]["hours"] == (
             crm.SYSTEM_EVENT_ALERT_HOURS
@@ -9686,6 +9695,7 @@ async def assert_platform_calendar_health():
             "secret_key",
             "secure_cookie",
             "telegram",
+            "automation_cron_secret",
             "runtime_errors",
             "backups",
             "backup_restore_check",
@@ -10126,6 +10136,7 @@ async def assert_platform_calendar_health():
         assert "Все проверки" in readiness_html
         assert "Секрет приложения" in readiness_html
         assert "Telegram уведомления" in readiness_html
+        assert "Фоновые запуски" in readiness_html
         assert "Операционный контроль" in readiness_html
         assert "/platform/readiness/export" in readiness_html
         assert "/platform/calendar-health" in readiness_html

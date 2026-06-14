@@ -142,9 +142,9 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             </div>
         </div>
         <div class="metric">
-            <div class="metric-label">Secure cookie</div>
+            <div class="metric-label">Защита cookie</div>
             <div class="metric-value {{ 'ok' if cookie_secure else 'warning' }}">
-                {{ "включены" if cookie_secure else "выключены" }}
+                {{ "включена" if cookie_secure else "выключена" }}
             </div>
         </div>
         <div class="metric">
@@ -168,6 +168,31 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             <div class="metric-value {{ 'critical' if system_event_summary.runtime_error_count else ('warning' if system_event_summary.critical_count else 'ok') }}">
                 {{ system_event_summary.critical_count }} / {{ system_event_summary.runtime_error_count }}
             </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <div class="section-title">Конфигурация окружения</div>
+                <div class="section-note">{{ production_config.summary }}</div>
+            </div>
+            <span class="pill {{ production_config.status }}">{{ production_config.status_label }}</span>
+        </div>
+
+        <div class="check-list">
+            {% for item in production_config["items"] %}
+            <div class="check">
+                <div class="check-title">{{ item.title }}</div>
+                <div><span class="pill {{ item.status }}">{{ item.status_label }}</span></div>
+                <div class="check-text">
+                    <div class="check-value">{{ item.value }}</div>
+                    {{ item.description }}
+                    <br>{{ item.action }}
+                </div>
+                <div></div>
+            </div>
+            {% endfor %}
         </div>
     </section>
 

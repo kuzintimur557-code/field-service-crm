@@ -3837,6 +3837,161 @@ def get_bounded_environment_int(
     return max(minimum, min(value, maximum))
 
 
+def make_production_config_item(
+    key,
+    title,
+    status,
+    value,
+    description,
+    action,
+):
+    labels = {
+        "ok": "Готово",
+        "warning": "Внимание",
+        "critical": "Критично",
+    }
+    normalized_status = status if status in labels else "warning"
+
+    return {
+        "key": key,
+        "title": title,
+        "status": normalized_status,
+        "status_label": labels[normalized_status],
+        "value": value,
+        "description": description,
+        "action": action,
+    }
+
+
+def get_production_config_status():
+    env_name = (os.getenv("ENV") or "development").strip()
+    railway_environment = bool((os.getenv("RAILWAY_ENVIRONMENT") or "").strip())
+    production_mode = env_name == "production" or railway_environment
+    bot_token_configured = bool((os.getenv("BOT_TOKEN") or "").strip())
+    chat_id_configured = bool((os.getenv("CHAT_ID") or "").strip())
+    telegram_configured = bot_token_configured and chat_id_configured
+    cron_secret_configured = bool(
+        (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+    )
+    secret_is_default = SECRET_KEY == "dev-secret-change-me"
+    data_dir_exists = DATA_DIR.exists()
+    uploads_exists = UPLOAD_DIR.exists()
+    data_dir_writable = data_dir_exists and os.access(DATA_DIR, os.W_OK)
+    uploads_writable = uploads_exists and os.access(UPLOAD_DIR, os.W_OK)
+    storage_ready = data_dir_writable and uploads_writable
+
+    items = [
+        make_production_config_item(
+            "environment",
+            "Режим приложения",
+            "ok" if production_mode else "warning",
+            "боевой" if production_mode else env_name,
+            (
+                "Приложение запущено в боевом окружении."
+                if production_mode
+                else "Сейчас приложение работает не в боевом режиме."
+            ),
+            "Для релиза используйте ENV=production или Railway окружение.",
+        ),
+        make_production_config_item(
+            "secret_key",
+            "Секрет приложения",
+            "critical" if secret_is_default else "ok",
+            "dev" if secret_is_default else "задан",
+            (
+                "Используется dev SECRET_KEY."
+                if secret_is_default
+                else "Секрет приложения задан через окружение."
+            ),
+            "Перед боевым запуском укажите сильный SECRET_KEY.",
+        ),
+        make_production_config_item(
+            "secure_cookie",
+            "Защита cookie",
+            "ok" if COOKIE_SECURE else "warning",
+            "включена" if COOKIE_SECURE else "выключена",
+            (
+                "Cookie сессии защищены для HTTPS."
+                if COOKIE_SECURE
+                else "Cookie сессии не ограничены HTTPS."
+            ),
+            "Для боевого режима включите COOKIE_SECURE или Railway окружение.",
+        ),
+        make_production_config_item(
+            "telegram",
+            "Telegram уведомления",
+            "ok" if telegram_configured else "warning",
+            "настроены" if telegram_configured else "не настроены",
+            (
+                "BOT_TOKEN и CHAT_ID заданы."
+                if telegram_configured
+                else "BOT_TOKEN или CHAT_ID не заданы."
+            ),
+            "Добавьте Telegram переменные окружения.",
+        ),
+        make_production_config_item(
+            "automation_cron_secret",
+            "Фоновые запуски",
+            "ok" if cron_secret_configured else "warning",
+            "секрет задан" if cron_secret_configured else "секрет не задан",
+            (
+                "Фоновые автоматизации защищены отдельным секретом."
+                if cron_secret_configured
+                else "Фоновые автоматизации нельзя безопасно запускать извне."
+            ),
+            "Укажите AUTOMATION_CRON_SECRET для расписаний и дайджестов.",
+        ),
+        make_production_config_item(
+            "storage",
+            "Файловое хранилище",
+            "ok" if storage_ready else "critical",
+            "готово" if storage_ready else "нужна проверка",
+            (
+                "DATA_DIR и uploads доступны для записи."
+                if storage_ready
+                else "DATA_DIR или uploads недоступны для записи."
+            ),
+            "Проверьте DATA_DIR и права на папку uploads.",
+        ),
+    ]
+    critical_count = sum(1 for item in items if item["status"] == "critical")
+    warning_count = sum(1 for item in items if item["status"] == "warning")
+
+    if critical_count:
+        status = "critical"
+        status_label = "Есть критичные настройки"
+        summary = "Перед релизом нужно закрыть критичные настройки окружения."
+    elif warning_count:
+        status = "warning"
+        status_label = "Нужна настройка"
+        summary = "Критичных проблем нет, но часть настроек стоит добить."
+    else:
+        status = "ok"
+        status_label = "Готово"
+        summary = "Ключевые настройки окружения готовы к работе."
+
+    return {
+        "environment": env_name,
+        "railway_environment": railway_environment,
+        "production_mode": production_mode,
+        "cookie_secure": COOKIE_SECURE,
+        "secret_is_default": secret_is_default,
+        "bot_token_configured": bot_token_configured,
+        "chat_id_configured": chat_id_configured,
+        "telegram_configured": telegram_configured,
+        "automation_cron_secret_configured": cron_secret_configured,
+        "data_dir_writable": data_dir_writable,
+        "uploads_writable": uploads_writable,
+        "storage_ready": storage_ready,
+        "items": items,
+        "status": status,
+        "status_label": status_label,
+        "summary": summary,
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+    }
+
+
 def get_calendar_incident_policy(
     response_minutes=None,
     escalation_minutes=None,
@@ -6951,10 +7106,13 @@ def get_platform_release_readiness(
             "summary"
         ]
 
-    env_name = (os.getenv("ENV") or "development").strip()
-    bot_token_configured = bool((os.getenv("BOT_TOKEN") or "").strip())
-    chat_id_configured = bool((os.getenv("CHAT_ID") or "").strip())
-    default_secret = SECRET_KEY == "dev-secret-change-me"
+    production_config = get_production_config_status()
+    env_name = production_config["environment"]
+    telegram_configured = production_config["telegram_configured"]
+    default_secret = production_config["secret_is_default"]
+    cron_secret_configured = (
+        production_config["automation_cron_secret_configured"]
+    )
     db_path = DATA_DIR / "crm.db"
     backup_status = get_backup_status()
 
@@ -6979,9 +7137,9 @@ def get_platform_release_readiness(
             "Безопасные cookie",
             "ok" if COOKIE_SECURE else "warning",
             (
-                "Secure cookie включены."
+                "Защита cookie включена."
                 if COOKIE_SECURE
-                else "Secure cookie не включены в текущем окружении."
+                else "Защита cookie не включена в текущем окружении."
             ),
             "Для боевого режима включите COOKIE_SECURE или Railway окружение.",
             "/system",
@@ -7050,10 +7208,10 @@ def get_platform_release_readiness(
         make_release_readiness_check(
             "telegram",
             "Telegram уведомления",
-            "ok" if bot_token_configured and chat_id_configured else "warning",
+            "ok" if telegram_configured else "warning",
             (
                 "BOT_TOKEN и CHAT_ID настроены."
-                if bot_token_configured and chat_id_configured
+                if telegram_configured
                 else "BOT_TOKEN или CHAT_ID не настроены."
             ),
             "Добавьте Telegram переменные окружения.",
@@ -7061,6 +7219,21 @@ def get_platform_release_readiness(
             8,
             "integrations",
             "Интеграции",
+        ),
+        make_release_readiness_check(
+            "automation_cron_secret",
+            "Фоновые запуски",
+            "ok" if cron_secret_configured else "warning",
+            (
+                "Секрет фоновых запусков настроен."
+                if cron_secret_configured
+                else "Секрет фоновых запусков не настроен."
+            ),
+            "Укажите AUTOMATION_CRON_SECRET для расписаний и дайджестов.",
+            "/system",
+            7,
+            "operations",
+            "Операции",
         ),
         make_release_readiness_check(
             "uploads",
@@ -29598,12 +29771,14 @@ async def system_page(
         if uploads_exists
         else 0
     )
-    env_name = (os.getenv("ENV") or "development").strip()
-    railway_environment = bool(os.getenv("RAILWAY_ENVIRONMENT"))
-    default_secret = SECRET_KEY == "dev-secret-change-me"
-    bot_token_configured = bool((os.getenv("BOT_TOKEN") or "").strip())
-    chat_id_configured = bool((os.getenv("CHAT_ID") or "").strip())
-    telegram_configured = bot_token_configured and chat_id_configured
+    production_config = get_production_config_status()
+    env_name = production_config["environment"]
+    railway_environment = production_config["railway_environment"]
+    default_secret = production_config["secret_is_default"]
+    telegram_configured = production_config["telegram_configured"]
+    cron_secret_configured = (
+        production_config["automation_cron_secret_configured"]
+    )
     backup_status = get_backup_status()
     system_event_summary = get_recent_system_event_summary()
     system_generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -29659,15 +29834,15 @@ async def system_page(
         ),
         make_system_check(
             "secure_cookie",
-            "Secure cookie",
+            "Защита cookie",
             "ok" if COOKIE_SECURE else "warning",
-            "включены" if COOKIE_SECURE else "выключены",
+            "включена" if COOKIE_SECURE else "выключена",
             (
                 "Cookie сессии отправляются только по HTTPS."
                 if COOKIE_SECURE
-                else "В текущем окружении secure cookie не включены."
+                else "В текущем окружении защита cookie не включена."
             ),
-            "Для production включите COOKIE_SECURE или Railway окружение.",
+            "Для боевого режима включите COOKIE_SECURE или Railway окружение.",
             "/platform/readiness",
         ),
         make_system_check(
@@ -29684,6 +29859,19 @@ async def system_page(
             "/debug",
         ),
         make_system_check(
+            "automation_cron_secret",
+            "Фоновые запуски",
+            "ok" if cron_secret_configured else "warning",
+            "секрет задан" if cron_secret_configured else "секрет не задан",
+            (
+                "Фоновые автоматизации защищены отдельным секретом."
+                if cron_secret_configured
+                else "Секрет фоновых запусков не настроен."
+            ),
+            "Укажите AUTOMATION_CRON_SECRET для расписаний и дайджестов.",
+            "/platform/readiness",
+        ),
+        make_system_check(
             "runtime_errors",
             "Ошибки приложения",
             (
@@ -29697,7 +29885,8 @@ async def system_page(
             ),
             (
                 f"{system_event_summary['critical_count']} критичных"
-                f" / {system_event_summary['runtime_error_count']} runtime"
+                " / "
+                f"{system_event_summary['runtime_error_count']} ошибок"
             ),
             (
                 "За последние 24 часа критичных ошибок не было."
@@ -29784,6 +29973,7 @@ async def system_page(
             "cookie_secure": COOKIE_SECURE,
             "secret_is_default": default_secret,
             "telegram_configured": telegram_configured,
+            "production_config": production_config,
             "backup_status": backup_status,
             "system_event_summary": system_event_summary,
             "system_checks": system_checks,
