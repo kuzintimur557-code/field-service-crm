@@ -9677,6 +9677,7 @@ async def assert_platform_calendar_health():
         assert "Ошибки приложения" in system_html
         assert "Ошибки за 24 часа" in system_html
         assert "Журнал системы" in system_html
+        assert "/system/export" in system_html
         assert "/system/events/export" in system_html
         assert "/platform/readiness" in system_html
         assert "/backup" in system_html
@@ -9702,6 +9703,31 @@ async def assert_platform_calendar_health():
         }.issubset({
             item["key"] for item in system_page.context["system_checks"]
         })
+        anonymous_system_export = await crm.system_export(
+            make_public_asgi_request("/system/export"),
+        )
+        assert anonymous_system_export.status_code == 302
+        assert anonymous_system_export.headers["location"] == "/login"
+        boss_system_export = await crm.system_export(
+            make_asgi_request("owner2", "/system/export"),
+        )
+        assert boss_system_export.status_code == 302
+        assert boss_system_export.headers["location"] == "/"
+        system_export = await crm.system_export(
+            make_asgi_request("super", "/system/export"),
+        )
+        assert system_export.status_code == 200
+        assert system_export.headers["content-disposition"] == (
+            "attachment; filename=system_report.csv"
+        )
+        system_export_csv = system_export.body.decode("utf-8")
+        assert system_export_csv.startswith("\ufeff")
+        assert "Системный отчёт" in system_export_csv
+        assert "Конфигурация окружения" in system_export_csv
+        assert "Проверки системы" in system_export_csv
+        assert "Резервные копии" in system_export_csv
+        assert "Ошибки за 24 часа" in system_export_csv
+        assert "Журнал системы" in system_export_csv
         anonymous_system_events_export = await crm.system_events_export(
             make_public_asgi_request("/system/events/export"),
         )

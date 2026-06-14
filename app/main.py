@@ -29743,23 +29743,7 @@ async def admin_page(request: Request):
     )
 
 
-@app.get("/system", response_class=HTMLResponse)
-async def system_page(
-    request: Request,
-    notice: str = "",
-    deleted: int = 0,
-):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "superadmin"):
-        return RedirectResponse("/", status_code=302)
-
+def build_system_diagnostics(role=""):
     db_path = DATA_DIR / "crm.db"
     uploads_path = UPLOAD_DIR
 
@@ -29952,42 +29936,193 @@ async def system_page(
         else {}
     )
 
+    return {
+        "db_exists": db_exists,
+        "db_size": db_size,
+        "db_size_label": format_file_size(db_size),
+        "db_path": str(db_path),
+        "data_dir": str(DATA_DIR),
+        "uploads_exists": uploads_exists,
+        "uploads_files": uploads_files,
+        "uploads_path": str(uploads_path),
+        "app_version": APP_VERSION,
+        "env_name": env_name,
+        "railway_environment": railway_environment,
+        "cookie_secure": COOKIE_SECURE,
+        "secret_is_default": default_secret,
+        "telegram_configured": telegram_configured,
+        "production_config": production_config,
+        "backup_status": backup_status,
+        "system_event_summary": system_event_summary,
+        "system_checks": system_checks,
+        "system_score": system_score,
+        "system_status": system_status,
+        "system_status_label": system_status_label,
+        "system_warning_count": warning_count,
+        "system_critical_count": critical_count,
+        "system_generated_at": system_generated_at,
+        "system_events": system_events,
+        "system_event_retention": system_event_retention,
+    }
+
+
+@app.get("/system", response_class=HTMLResponse)
+async def system_page(
+    request: Request,
+    notice: str = "",
+    deleted: int = 0,
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    context = {
+        "request": request,
+        "username": username,
+        "role": role,
+        "notice": notice,
+        "deleted": deleted,
+    }
+    context.update(build_system_diagnostics(role))
+
     return templates.TemplateResponse(
         request,
         "system.html",
-        {
-            "request": request,
-            "username": username,
-            "role": role,
-            "db_exists": db_exists,
-            "db_size": db_size,
-            "db_size_label": format_file_size(db_size),
-            "db_path": str(db_path),
-            "data_dir": str(DATA_DIR),
-            "uploads_exists": uploads_exists,
-            "uploads_files": uploads_files,
-            "uploads_path": str(uploads_path),
-            "app_version": APP_VERSION,
-            "env_name": env_name,
-            "railway_environment": railway_environment,
-            "cookie_secure": COOKIE_SECURE,
-            "secret_is_default": default_secret,
-            "telegram_configured": telegram_configured,
-            "production_config": production_config,
-            "backup_status": backup_status,
-            "system_event_summary": system_event_summary,
-            "system_checks": system_checks,
-            "system_score": system_score,
-            "system_status": system_status,
-            "system_status_label": system_status_label,
-            "system_warning_count": warning_count,
-            "system_critical_count": critical_count,
-            "system_generated_at": system_generated_at,
-            "system_events": system_events,
-            "system_event_retention": system_event_retention,
-            "notice": notice,
-            "deleted": deleted,
-        }
+        context,
+    )
+
+
+@app.get("/system/export")
+async def system_export(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    diagnostics = build_system_diagnostics(role)
+    production_config = diagnostics["production_config"]
+    backup_status = diagnostics["backup_status"]
+    event_summary = diagnostics["system_event_summary"]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["Системный отчёт"])
+    writer.writerow(["Сгенерировано", diagnostics["system_generated_at"]])
+    writer.writerow(["Версия приложения", diagnostics["app_version"]])
+    writer.writerow(["Окружение", diagnostics["env_name"]])
+    writer.writerow(["Статус", diagnostics["system_status_label"]])
+    writer.writerow(["Оценка", diagnostics["system_score"]])
+    writer.writerow(["Предупреждений", diagnostics["system_warning_count"]])
+    writer.writerow(["Критичных проблем", diagnostics["system_critical_count"]])
+    writer.writerow([])
+
+    writer.writerow(["Конфигурация окружения"])
+    writer.writerow(["Статус", production_config["status_label"]])
+    writer.writerow(["Резюме", production_config["summary"]])
+    writer.writerow(["Проверка", "Статус", "Значение", "Описание", "Действие"])
+    for item in production_config["items"]:
+        writer.writerow([
+            item["title"],
+            item["status_label"],
+            item["value"],
+            item["description"],
+            item["action"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Проверки системы"])
+    writer.writerow(["Проверка", "Статус", "Значение", "Описание", "Действие"])
+    for check in diagnostics["system_checks"]:
+        writer.writerow([
+            check["title"],
+            check["status_label"],
+            check["value"],
+            check["description"],
+            check["action"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Пути и файлы"])
+    writer.writerow(["DATA_DIR", diagnostics["data_dir"]])
+    writer.writerow([
+        "База данных",
+        diagnostics["db_path"],
+        diagnostics["db_size_label"],
+    ])
+    writer.writerow([
+        "Uploads",
+        diagnostics["uploads_path"],
+        f"{diagnostics['uploads_files']} файлов",
+    ])
+    writer.writerow([
+        "Backups",
+        backup_status["backup_path"],
+        backup_status["total_size_label"],
+    ])
+    writer.writerow([])
+
+    writer.writerow(["Резервные копии"])
+    writer.writerow(["Статус", backup_status["status_label"]])
+    writer.writerow(["Резюме", backup_status["summary"]])
+    writer.writerow(["Действие", backup_status["action"]])
+    writer.writerow(["Копий", backup_status["count"]])
+    writer.writerow(["Последняя копия", backup_status["latest_name"]])
+    writer.writerow(["Возраст последней", backup_status["latest_age_label"]])
+    writer.writerow([
+        "Проверка восстановления",
+        backup_status["restore_check"]["status_label"],
+        backup_status["restore_check"]["message"],
+    ])
+    writer.writerow([])
+
+    writer.writerow(["Ошибки за 24 часа"])
+    writer.writerow(["Критичных", event_summary["critical_count"]])
+    writer.writerow(["Ошибок приложения", event_summary["runtime_error_count"]])
+    if event_summary["latest_critical"]:
+        latest = event_summary["latest_critical"]
+        writer.writerow(["Последняя критичная", latest["created_at"]])
+        writer.writerow(["Событие", latest["message"]])
+        writer.writerow(["Детали", latest["details"]])
+    writer.writerow([])
+
+    writer.writerow(["Журнал системы"])
+    writer.writerow([
+        "Дата",
+        "Уровень",
+        "Источник",
+        "Пользователь",
+        "Событие",
+        "Детали",
+    ])
+    for event in diagnostics["system_events"]:
+        writer.writerow([
+            event["created_at"],
+            event["severity_label"],
+            event["source"],
+            event["username"],
+            event["message"],
+            event["details"],
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=system_report.csv",
+        },
     )
 
 
