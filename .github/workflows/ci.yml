@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke and security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      ENV: test
+      SECRET_KEY: ci-smoke-secret
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile Python files
+        run: |
+          python -m py_compile app/main.py app/database.py
+          python -m py_compile tests/smoke_app.py tests/smoke_security.py
+
+      - name: Run smoke checks
+        run: python tests/smoke_app.py
+
+      - name: Run security smoke checks
+        run: python tests/smoke_security.py
