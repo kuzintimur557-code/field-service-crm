@@ -1,5 +1,19 @@
 # Field Service CRM Changelog
 
+## 0.2.2
+- Public `/health` endpoint
+- Public `/ready` endpoint
+- Request id observability
+- HTTP error logging
+- System deployment diagnostics
+- Localized 404/405 pages
+- Safe build metadata
+- GitHub Actions CI
+- Expanded `.gitignore`
+- Production environment example
+- Production launch checklist
+- README
+
 ## 0.2.1
 - Admin Center
 - Production checklist
