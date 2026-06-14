@@ -6526,6 +6526,37 @@ def get_recent_system_event_summary(hours=SYSTEM_EVENT_ALERT_HOURS):
             AS critical_count,
         SUM(
             CASE
+                WHEN event_type='http_request'
+                THEN 1
+                ELSE 0
+            END
+        ) AS http_request_count,
+        SUM(
+            CASE
+                WHEN event_type='http_request'
+                     AND severity='critical'
+                THEN 1
+                ELSE 0
+            END
+        ) AS http_critical_count,
+        SUM(
+            CASE
+                WHEN event_type='http_request'
+                     AND severity='warning'
+                THEN 1
+                ELSE 0
+            END
+        ) AS http_warning_count,
+        SUM(
+            CASE
+                WHEN event_type='http_request'
+                     AND message='Медленный HTTP запрос'
+                THEN 1
+                ELSE 0
+            END
+        ) AS slow_request_count,
+        SUM(
+            CASE
                 WHEN event_type='runtime_error'
                      OR source='runtime'
                 THEN 1
@@ -6543,21 +6574,40 @@ def get_recent_system_event_summary(hours=SYSTEM_EVENT_ALERT_HOURS):
     ORDER BY id DESC
     LIMIT 1
     """, (cutoff,)).fetchone()
+    latest_http_request = conn.execute("""
+    SELECT *
+    FROM system_events
+    WHERE created_at >= ?
+      AND event_type='http_request'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (cutoff,)).fetchone()
     conn.close()
 
     latest_event = dict(latest_critical) if latest_critical else {}
+    latest_http = dict(latest_http_request) if latest_http_request else {}
 
     if latest_event:
         latest_event["severity_label"] = system_event_severity_label(
             latest_event.get("severity"),
         )
 
+    if latest_http:
+        latest_http["severity_label"] = system_event_severity_label(
+            latest_http.get("severity"),
+        )
+
     return {
         "hours": hours,
         "total_count": summary["total_count"] or 0,
         "critical_count": summary["critical_count"] or 0,
+        "http_request_count": summary["http_request_count"] or 0,
+        "http_critical_count": summary["http_critical_count"] or 0,
+        "http_warning_count": summary["http_warning_count"] or 0,
+        "slow_request_count": summary["slow_request_count"] or 0,
         "runtime_error_count": summary["runtime_error_count"] or 0,
         "latest_critical": latest_event,
+        "latest_http_request": latest_http,
     }
 
 
@@ -30057,6 +30107,40 @@ def build_system_diagnostics(role=""):
             "/system",
         ),
         make_system_check(
+            "http_observability",
+            "HTTP-запросы",
+            (
+                "critical"
+                if system_event_summary["http_critical_count"]
+                else (
+                    "warning"
+                    if (
+                        system_event_summary["http_warning_count"]
+                        or system_event_summary["slow_request_count"]
+                    )
+                    else "ok"
+                )
+            ),
+            (
+                f"{system_event_summary['http_request_count']} событий"
+                " / "
+                f"{system_event_summary['slow_request_count']} медленных"
+            ),
+            (
+                "За последние 24 часа HTTP-проблем не было."
+                if not system_event_summary["http_request_count"]
+                else (
+                    "За последние 24 часа есть HTTP-ошибки или "
+                    "медленные ответы."
+                )
+            ),
+            (
+                "Проверьте request_id, путь, статус и время ответа "
+                "в журнале системы."
+            ),
+            "/system",
+        ),
+        make_system_check(
             "backups",
             "Резервные копии",
             backup_status["status"],
@@ -30307,6 +30391,15 @@ async def system_export(request: Request):
     writer.writerow(["Ошибки за 24 часа"])
     writer.writerow(["Критичных", event_summary["critical_count"]])
     writer.writerow(["Ошибок приложения", event_summary["runtime_error_count"]])
+    writer.writerow(["HTTP событий", event_summary["http_request_count"]])
+    writer.writerow(["HTTP 5xx", event_summary["http_critical_count"]])
+    writer.writerow(["HTTP предупреждений", event_summary["http_warning_count"]])
+    writer.writerow(["Медленных HTTP", event_summary["slow_request_count"]])
+    if event_summary["latest_http_request"]:
+        latest_http = event_summary["latest_http_request"]
+        writer.writerow(["Последний HTTP", latest_http["created_at"]])
+        writer.writerow(["HTTP событие", latest_http["message"]])
+        writer.writerow(["HTTP детали", latest_http["details"]])
     if event_summary["latest_critical"]:
         latest = event_summary["latest_critical"]
         writer.writerow(["Последняя критичная", latest["created_at"]])

@@ -170,6 +170,12 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
                 {{ system_event_summary.critical_count }} / {{ system_event_summary.runtime_error_count }}
             </div>
         </div>
+        <div class="metric">
+            <div class="metric-label">HTTP за 24 часа</div>
+            <div class="metric-value {{ 'critical' if system_event_summary.http_critical_count else ('warning' if system_event_summary.http_warning_count or system_event_summary.slow_request_count else 'ok') }}">
+                {{ system_event_summary.http_request_count }} / {{ system_event_summary.slow_request_count }}
+            </div>
+        </div>
     </section>
 
     <section class="section">

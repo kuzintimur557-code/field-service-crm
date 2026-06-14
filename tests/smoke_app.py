@@ -9785,6 +9785,8 @@ async def assert_platform_calendar_health():
         assert "Пути и файлы" in system_html
         assert "Ошибки приложения" in system_html
         assert "Ошибки за 24 часа" in system_html
+        assert "HTTP за 24 часа" in system_html
+        assert "HTTP-запросы" in system_html
         assert "Журнал системы" in system_html
         assert "/system/export" in system_html
         assert "/system/events/export" in system_html
@@ -9800,6 +9802,17 @@ async def assert_platform_calendar_health():
         assert system_page.context["system_event_summary"]["hours"] == (
             crm.SYSTEM_EVENT_ALERT_HOURS
         )
+        assert (
+            system_page.context["system_event_summary"]["http_request_count"]
+            >= 1
+        )
+        assert (
+            system_page.context["system_event_summary"]["http_critical_count"]
+            >= 1
+        )
+        assert "latest_http_request" in (
+            system_page.context["system_event_summary"]
+        )
         assert system_page.context["db_size_label"]
         assert {
             "secret_key",
@@ -9807,6 +9820,7 @@ async def assert_platform_calendar_health():
             "telegram",
             "automation_cron_secret",
             "runtime_errors",
+            "http_observability",
             "backups",
             "backup_restore_check",
         }.issubset({
@@ -9836,6 +9850,10 @@ async def assert_platform_calendar_health():
         assert "Проверки системы" in system_export_csv
         assert "Резервные копии" in system_export_csv
         assert "Ошибки за 24 часа" in system_export_csv
+        assert "HTTP событий" in system_export_csv
+        assert "HTTP 5xx" in system_export_csv
+        assert "Медленных HTTP" in system_export_csv
+        assert http_request_id in system_export_csv
         assert "Журнал системы" in system_export_csv
         anonymous_system_api = await crm.api_system_diagnostics(
             make_public_asgi_request("/api/system/diagnostics"),
@@ -9855,6 +9873,12 @@ async def assert_platform_calendar_health():
         assert system_api["backup_status"]["status_label"]
         assert system_api["system_event_summary"]["hours"] == (
             crm.SYSTEM_EVENT_ALERT_HOURS
+        )
+        assert (
+            system_api["system_event_summary"]["http_request_count"] >= 1
+        )
+        assert (
+            system_api["system_event_summary"]["http_critical_count"] >= 1
         )
         assert isinstance(system_api["system_events"], list)
         anonymous_system_events_export = await crm.system_events_export(
