@@ -9,33 +9,48 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:980px;margin:auto;padding:22px}
-.header{background:white;padding:24px;border-radius:26px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:980px;margin:auto;padding:22px;width:100%}
+.header{background:white;padding:24px;border-radius:22px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
 h1{margin:0 0 8px;font-size:34px}
 .meta{color:#6b7280;font-weight:800}
-.nav{display:flex;gap:10px;margin-top:16px}
-.nav a{padding:12px 16px;border-radius:14px;text-decoration:none;background:#111827;color:white;font-weight:900}
+.nav{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 16px;border-radius:14px;text-decoration:none;background:#111827;color:white;font-weight:900}
 .nav a.red{background:#991b1b}
 .tasks{display:grid;gap:14px}
-.task{background:white;padding:18px;border-radius:22px;box-shadow:0 8px 20px rgba(0,0,0,.06)}
+.task{background:white;padding:18px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 8px 20px rgba(0,0,0,.06)}
 .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-.title{font-size:22px;font-weight:900}
+.top .meta{overflow-wrap:anywhere}
+.title{font-size:22px;font-weight:900;overflow-wrap:anywhere}
 .badge{padding:8px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;white-space:nowrap}
+.badge.work{background:#fef3c7;color:#92400e}
+.badge.done{background:#dcfce7;color:#166534}
+.badge.cancelled{background:#fee2e2;color:#991b1b}
+.badge.new{background:#dbeafe;color:#1d4ed8}
 .info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .item{background:#f9fafb;border-radius:14px;padding:12px}
 .label{font-size:12px;color:#6b7280;font-weight:900;margin-bottom:4px}
-.value{font-weight:900}
+.value{font-weight:900;overflow-wrap:anywhere}
+.description{margin-top:14px;padding:12px;border-radius:14px;background:#f9fafb;color:#374151;font-weight:800;line-height:1.45;overflow-wrap:anywhere}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-button,.btn{display:block;width:100%;padding:13px;border-radius:14px;border:0;text-align:center;text-decoration:none;font-weight:900;color:white;background:#2563eb;cursor:pointer}
+button,.btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;padding:13px;border-radius:14px;border:0;text-align:center;text-decoration:none;font-weight:900;color:white;background:#2563eb;cursor:pointer}
 .green{background:#16a34a}
 .dark{background:#111827}
 .empty{background:white;padding:24px;border-radius:22px;box-shadow:0 8px 20px rgba(0,0,0,.06);font-weight:900;color:#6b7280}
 textarea,input{width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5db;margin-top:10px}
 .filter-tabs{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}
-.filter-tabs a{padding:11px 14px;border-radius:999px;background:white;color:#374151;text-decoration:none;font-weight:900;box-shadow:0 6px 16px rgba(0,0,0,.05)}
+.filter-tabs a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 14px;border-radius:999px;background:white;color:#374151;text-decoration:none;font-weight:900;box-shadow:0 6px 16px rgba(0,0,0,.05);white-space:nowrap}
 .filter-tabs a.active{background:#2563eb;color:white}
-@media(max-width:700px){.container{padding:14px}h1{font-size:28px}.info,.actions{grid-template-columns:1fr}.top{flex-direction:column}.filter-tabs a{flex:1;text-align:center}}
+@media(max-width:700px){
+    .container{padding:14px}
+    .header,.task,.empty{border-radius:18px}
+    h1{font-size:28px}
+    .info,.actions{grid-template-columns:1fr}
+    .top{flex-direction:column}
+    .nav a{flex:1}
+    .filter-tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+    .filter-tabs a{flex:0 0 auto}
+}
 </style>
 </head>
 
@@ -52,7 +67,7 @@ textarea,input{width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5
 </div>
 
 <div class="filter-tabs">
-<a href="/my-tasks" class="{% if not selected_status %}active{% endif %}">Все</a>
+<a href="/my-tasks" class="{% if not selected_status %}active{% endif %}">Активные</a>
 <a href="/my-tasks?status=Новая" class="{% if selected_status == 'Новая' %}active{% endif %}">Новые</a>
 <a href="/my-tasks?status=В работе" class="{% if selected_status == 'В работе' %}active{% endif %}">В работе</a>
 <a href="/my-tasks?status=Завершено" class="{% if selected_status == 'Завершено' %}active{% endif %}">Завершённые</a>
@@ -74,7 +89,7 @@ textarea,input{width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5
         <div class="title">#{{ task["id"] }} — {{ task["client"] }}</div>
         <div class="meta">{{ task["address"] }}</div>
     </div>
-    <div class="badge">{{ task["status"] }}</div>
+    <div class="badge {% if task['status'] == 'В работе' %}work{% elif task['status'] == 'Завершено' %}done{% elif task['status'] == 'Отменено' %}cancelled{% else %}new{% endif %}">{{ task["status"] }}</div>
 </div>
 
 <div class="info">
@@ -99,6 +114,10 @@ textarea,input{width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5
     </div>
 </div>
 
+{% if task["description"] %}
+<div class="description">{{ task["description"] }}</div>
+{% endif %}
+
 {% if task["status"] == "Новая" %}
 <form method="post" action="/task/{{ task['id'] }}/start" class="actions">
     <button class="green" type="submit">▶️ Взять в работу</button>
@@ -107,7 +126,7 @@ textarea,input{width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5
 {% elif task["status"] == "В работе" %}
 <form method="post" action="/task/{{ task['id'] }}/complete" enctype="multipart/form-data">
     <textarea name="report" placeholder="Краткий отчёт по работе" required></textarea>
-    <input type="file" name="after_photo" accept="image/*">
+    <input type="file" name="after_photo" accept="image/*" capture="environment">
     <div class="actions">
         <button class="green" type="submit">✅ Завершить</button>
         <a class="btn dark" href="/task/{{ task['id'] }}">Открыть</a>
@@ -122,7 +141,7 @@ textarea,input{width:100%;padding:12px;border-radius:12px;border:1px solid #d1d5
 </div>
 {% endfor %}
 {% else %}
-<div class="empty">У вас пока нет заявок.</div>
+<div class="empty">{% if selected_status %}Заявок с таким статусом пока нет.{% else %}Активных заявок пока нет.{% endif %}</div>
 {% endif %}
 </div>
 

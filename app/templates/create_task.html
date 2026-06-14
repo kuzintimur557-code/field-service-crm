@@ -9,18 +9,24 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:900px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
-.card{background:white;padding:30px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08)}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:900px;margin:auto;padding:28px;width:100%}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:30px;border:1px solid #e5e7eb;border-radius:22px;box-shadow:0 12px 30px rgba(0,0,0,.08)}
 h1{margin:0 0 24px;font-size:32px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 label{display:block;font-weight:800;margin:14px 0 7px}
 input,textarea,select{width:100%;padding:15px;border:1px solid #d1d5db;border-radius:14px;font-size:16px;background:white}
 textarea{height:140px;resize:vertical}
-button{width:100%;margin-top:24px;padding:16px;border:0;border-radius:16px;background:#2563eb;color:white;font-size:18px;font-weight:900;cursor:pointer}
+button{width:100%;min-height:48px;margin-top:24px;padding:16px;border:0;border-radius:16px;background:#2563eb;color:white;font-size:18px;font-weight:900;cursor:pointer}
 button:hover{background:#1d4ed8}
 .note{background:#eff6ff;color:#1d4ed8;padding:14px;border-radius:16px;margin-bottom:20px;font-weight:700}
+.section-title{margin:22px 0 10px;font-size:15px;font-weight:900;color:#374151;text-transform:uppercase;letter-spacing:0}
+.field-hint{margin-top:6px;color:#6b7280;font-size:13px;font-weight:700;line-height:1.35}
+.worker-picker{background:white;border:1px solid #d1d5db;border-radius:14px;padding:12px}
+.worker-picker summary{cursor:pointer;font-weight:900;min-height:28px}
+.worker-list{display:grid;gap:10px;margin-top:12px}
+.worker-summary{margin-top:10px;padding:10px 12px;border-radius:12px;background:#f9fafb;color:#374151;font-weight:800;line-height:1.35;overflow-wrap:anywhere}
 .capacity-confirm{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:12px;border-radius:14px;background:white;border:1px solid #fecaca;color:#991b1b}
 .capacity-confirm[hidden]{display:none}
 .capacity-confirm input{width:auto;margin-top:3px}
@@ -35,10 +41,12 @@ button:hover{background:#1d4ed8}
 .worker-option.unavailable .worker-load{color:#4b5563}
 @media(max-width:700px){
     .container{padding:16px}
+    .card{padding:20px;border-radius:18px}
     .grid{grid-template-columns:1fr}
     h1{font-size:26px}
     .worker-option{align-items:flex-start;flex-direction:column}
     .worker-load{padding-left:30px;text-align:left}
+    .note{font-size:14px}
 }
 </style>
 </head>
@@ -53,7 +61,7 @@ button:hover{background:#1d4ed8}
 <h1>➕ Новая заявка</h1>
 
 	<div class="note">
-	После создания заявка появится в CRM и уйдет уведомление в Telegram.
+	После создания заявка появится в CRM, а уведомление отправится в Telegram.
 	</div>
 
 	{% if request.query_params.get("error") == "custom_required" %}
@@ -138,7 +146,7 @@ button:hover{background:#1d4ed8}
 <div class="grid">
 <div>
 <label>Телефон</label>
-<input name="phone" placeholder="+1 555 000 0000" value="{{ selected_client['phone'] if selected_client else '' }}">
+<input name="phone" placeholder="+7 900 000-00-00" value="{{ selected_client['phone'] if selected_client else '' }}">
 </div>
 
 <div>
@@ -167,10 +175,10 @@ button:hover{background:#1d4ed8}
 <div class="grid">
 <div>
 <label>{{ settings["worker_label"] or "Исполнитель" }}</label>
-<details style="background:white;border:1px solid #d1d5db;border-radius:14px;padding:12px">
-    <summary style="cursor:pointer;font-weight:900">Выбрать {{ (settings["worker_label"] or "исполнителей")|lower }}</summary>
+<details class="worker-picker">
+    <summary>Выбрать {{ (settings["worker_label"] or "исполнителей")|lower }}</summary>
 
-    <div style="display:grid;gap:10px;margin-top:12px">
+    <div class="worker-list">
         {% for worker in worker_options %}
         <label class="worker-option {% if worker['is_unavailable'] %}unavailable{% elif worker['is_at_capacity'] %}at-capacity{% endif %}">
             <span class="worker-option-main">
@@ -194,6 +202,8 @@ button:hover{background:#1d4ed8}
         {% endfor %}
     </div>
 </details>
+<div id="worker-summary" class="worker-summary">Исполнители не выбраны</div>
+<div class="field-hint">Можно назначить одного или нескольких исполнителей.</div>
 <div id="capacity-confirm" class="capacity-confirm" {% if not selected_worker_at_capacity %}hidden{% endif %}>
     <input id="allow-capacity-override" type="checkbox" name="allow_capacity_override" value="1" {% if selected_worker_at_capacity %}required{% endif %}>
     <label for="allow-capacity-override">Назначить выбранных исполнителей сверх дневного лимита</label>
@@ -240,8 +250,8 @@ button:hover{background:#1d4ed8}
 	</div>
 		{% endif %}
 
-		<label>Фото / документ</label>
-<input name="photo" type="file">
+	<label>Фото / документ</label>
+<input name="photo" type="file" accept="image/*,application/pdf">
 
 <button type="submit">🚀 Создать заявку</button>
 
@@ -256,6 +266,7 @@ const capacityOverride = document.getElementById("allow-capacity-override");
 const workerCheckboxes = Array.from(
     document.querySelectorAll('input[name="workers"]')
 );
+const workerSummary = document.getElementById("worker-summary");
 
 function syncCapacityConfirmation() {
     const hasOverloadedWorker = workerCheckboxes.some(
@@ -270,11 +281,36 @@ function syncCapacityConfirmation() {
     }
 }
 
+function syncWorkerSummary() {
+    const selectedWorkers = workerCheckboxes
+        .filter((checkbox) => checkbox.checked)
+        .map((checkbox) => {
+            const label = checkbox.closest(".worker-option");
+            const name = label ? label.querySelector(".worker-option-main span:last-child") : null;
+            return name ? name.textContent.trim() : checkbox.value;
+        });
+
+    if (!workerSummary) {
+        return;
+    }
+
+    if (!selectedWorkers.length) {
+        workerSummary.textContent = "Исполнители не выбраны";
+        return;
+    }
+
+    workerSummary.textContent = "Выбрано: " + selectedWorkers.join(", ");
+}
+
 workerCheckboxes.forEach((checkbox) => {
-    checkbox.addEventListener("change", syncCapacityConfirmation);
+    checkbox.addEventListener("change", () => {
+        syncCapacityConfirmation();
+        syncWorkerSummary();
+    });
 });
 
 syncCapacityConfirmation();
+syncWorkerSummary();
 </script>
 </body>
 </html>

@@ -13908,6 +13908,16 @@ async def assert_client_card(task):
     assert f"/create-task?client_id={task['client_id']}&source_task_id={task['id']}&return_to=client" in html
     assert f"#{task['id']}" in html
 
+    worker_tasks_response = await crm.my_tasks_page(
+        make_asgi_request("worker2", "/my-tasks")
+    )
+    assert worker_tasks_response.status_code == 200
+    worker_tasks_html = worker_tasks_response.body.decode("utf-8")
+    assert "Мои заявки" in worker_tasks_html
+    assert ">Активные</a>" in worker_tasks_html
+    assert ">Завершённые</a>" in worker_tasks_html
+    assert "badge " in worker_tasks_html
+
     create_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),
         client_id=task["client_id"],
@@ -13919,9 +13929,11 @@ async def assert_client_card(task):
     assert 'name="return_to" value="client"' in create_html
     assert 'name="client" placeholder="' in create_html
     assert 'value="Client 2"' in create_html
-    assert 'name="phone" placeholder="+1 555 000 0000" value="+70000000000"' in create_html
+    assert 'name="phone" placeholder="+7 900 000-00-00" value="+70000000000"' in create_html
     assert 'name="address" placeholder="Адрес"' in create_html
     assert 'value="Company 2 address"' in create_html
+    assert "Исполнители не выбраны" in create_html
+    assert "syncWorkerSummary" in create_html
 
     repeat_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),
@@ -14838,6 +14850,8 @@ async def assert_task_custom_fields():
     assert 'name="allow_capacity_override" value="1"' in page_html
     assert "Назначить выбранных исполнителей сверх дневного лимита" in page_html
     assert "syncCapacityConfirmation" in page_html
+    assert "syncWorkerSummary" in page_html
+    assert "Выбрано: " in page_html
     assert "worker-option at-capacity" in page_html
     assert "Лимит 1/1" in page_html
     assert "Свободно 3 · 0/3" in page_html
