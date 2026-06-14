@@ -13430,6 +13430,18 @@ async def assert_finance_margin(task):
     assert "аванс на карту" in paid_payroll_html
     assert "Отменить" in paid_payroll_html
 
+    payroll_history_response = await crm.payroll_history_page(
+        make_asgi_request("owner2", "/payroll/history"),
+        month="2026-05",
+    )
+    assert payroll_history_response.status_code == 200
+    payroll_history_html = payroll_history_response.body.decode("utf-8")
+    assert "Журнал выплат" in payroll_history_html
+    assert "filter-actions" in payroll_history_html
+    assert "mobile-label" in payroll_history_html
+    assert "top-worker-row" in payroll_history_html
+    assert "аванс на карту" in payroll_history_html
+
     note_response = await crm.update_payroll_payout_note(
         make_form_request(
             "owner2",
@@ -13755,6 +13767,8 @@ async def assert_finance_summary_page():
     assert "Помесячная динамика" in html
     assert "Прибыльные клиенты" in html
     assert "Скачать CSV" in html
+    assert "mobile-label" in html
+    assert "table-scroll" in html
     assert "534}" not in html[:80]
     assert 'class="mobile-nav"' in html
 

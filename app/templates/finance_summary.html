@@ -8,15 +8,16 @@
 <link rel="stylesheet" href="/static/app.css">
 
 <style>
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:1180px;margin:auto;padding:28px}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:1180px;width:100%;margin:auto;padding:28px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px}
 .back{display:inline-flex;align-items:center;min-height:44px;color:#2563eb;text-decoration:none;font-weight:900}
 .actions{display:flex;gap:10px;flex-wrap:wrap}
 .button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 15px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900;border:0}
 .button.blue{background:#2563eb}
 .button.green{background:#16a34a}
-.card{background:white;border-radius:22px;box-shadow:0 10px 25px rgba(15,23,42,.08);padding:22px;margin-bottom:18px}
+.card{background:white;border:1px solid #e5e7eb;border-radius:22px;box-shadow:0 10px 25px rgba(15,23,42,.08);padding:22px;margin-bottom:18px}
 h1{font-size:34px;margin:0}
 h2{font-size:22px;margin:0 0 16px}
 .meta{color:#6b7280;font-weight:800;margin-top:8px}
@@ -24,17 +25,19 @@ h2{font-size:22px;margin:0 0 16px}
 .field{min-width:220px}
 .label{font-size:13px;color:#6b7280;font-weight:900;margin-bottom:7px}
 input,button{font:inherit}
-input{width:100%;padding:13px 14px;border:1px solid #d1d5db;border-radius:14px;background:white;font-size:16px}
-button{padding:13px 16px;border:0;border-radius:14px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
-.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+input{width:100%;min-height:46px;padding:13px 14px;border:1px solid #d1d5db;border-radius:14px;background:white;font-size:16px}
+button{min-height:46px;padding:13px 16px;border:0;border-radius:14px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
 .stat{background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:18px}
 .value{font-size:26px;font-weight:900;line-height:1.1}
 .green{color:#166534}.red{color:#991b1b}.orange{color:#b45309}.blue-text{color:#1d4ed8}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.table-scroll{width:100%;overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;vertical-align:top}
 th{font-size:12px;color:#6b7280;text-transform:uppercase}
 td{font-weight:800}
+.mobile-label{display:none}
 .empty{padding:28px;text-align:center;color:#6b7280;font-weight:900;background:#f9fafb;border-radius:16px}
 .chart{display:grid;gap:12px}
 .chart-row{display:grid;grid-template-columns:92px 1fr;gap:12px;align-items:center}
@@ -53,12 +56,27 @@ td{font-weight:800}
 .legend .payroll:before{background:#7c3aed}
 .legend .net:before{background:#16a34a}
 @media(max-width:900px){
+    .container{padding:18px 14px 92px}
     .topbar{display:block}
-    .actions{margin-top:12px}
+    .actions{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}
     .stats,.grid{grid-template-columns:1fr}
     .form{display:grid;grid-template-columns:1fr}
     .field{min-width:0}
+    .card{padding:16px;border-radius:18px}
+    h1{font-size:28px}
+    h2{font-size:20px}
     .button,button{width:100%}
+}
+@media(max-width:760px){
+    .table-scroll{overflow:visible}
+    table,thead,tbody,tr,th,td{display:block;width:100%}
+    thead{display:none}
+    tr{border:1px solid #e5e7eb;border-radius:16px;padding:4px 12px;margin-bottom:10px;background:#fff}
+    td{display:flex;justify-content:space-between;gap:12px;text-align:right;padding:10px 0;border-bottom:1px solid #eef2f7;overflow-wrap:anywhere}
+    td:last-child{border-bottom:0}
+    .mobile-label{display:block;color:#6b7280;font-size:12px;font-weight:900;text-align:left}
+    .chart-row{grid-template-columns:1fr;gap:8px;padding:10px 0;border-bottom:1px solid #eef2f7}
+    .chart-row:last-child{border-bottom:0}
 }
 </style>
 </head>
@@ -132,12 +150,12 @@ td{font-weight:800}
                 <tbody>
                     {% for row in monthly_summary %}
                     <tr>
-                        <td>{{ row.month }}</td>
-                        <td>{{ row.revenue }} ₽</td>
-                        <td>{{ row.expenses }} ₽</td>
-                        <td>{{ row.payroll_total }} ₽</td>
-                        <td>{{ row.profit }} ₽</td>
-                        <td>{{ row.net_profit }} ₽</td>
+                        <td><span class="mobile-label">Месяц</span>{{ row.month }}</td>
+                        <td><span class="mobile-label">Выручка</span>{{ row.revenue }} ₽</td>
+                        <td><span class="mobile-label">Расходы</span>{{ row.expenses }} ₽</td>
+                        <td><span class="mobile-label">Зарплаты</span>{{ row.payroll_total }} ₽</td>
+                        <td><span class="mobile-label">Прибыль</span>{{ row.profit }} ₽</td>
+                        <td><span class="mobile-label">Чистая прибыль</span>{{ row.net_profit }} ₽</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -199,9 +217,9 @@ td{font-weight:800}
                 <tbody>
                     {% for row in top_profitable_clients %}
                     <tr>
-                        <td>{{ row.client_name or "Без клиента" }}</td>
-                        <td>{{ row.revenue or 0 }} ₽</td>
-                        <td>{{ row.total_profit or 0 }} ₽</td>
+                        <td><span class="mobile-label">Клиент</span>{{ row.client_name or "Без клиента" }}</td>
+                        <td><span class="mobile-label">Выручка</span>{{ row.revenue or 0 }} ₽</td>
+                        <td><span class="mobile-label">Прибыль</span>{{ row.total_profit or 0 }} ₽</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -227,9 +245,9 @@ td{font-weight:800}
                 <tbody>
                     {% for row in top_profitable_workers %}
                     <tr>
-                        <td>{{ row.worker_name }}</td>
-                        <td>{{ row.total_paid or 0 }} ₽</td>
-                        <td>{{ row.payouts_count }}</td>
+                        <td><span class="mobile-label">Исполнитель</span>{{ row.worker_name }}</td>
+                        <td><span class="mobile-label">Выплачено</span>{{ row.total_paid or 0 }} ₽</td>
+                        <td><span class="mobile-label">Выплат</span>{{ row.payouts_count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
