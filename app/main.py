@@ -76,6 +76,7 @@ from app.telegram_utils import send_message, send_photo, send_message_to_chat
 
 from datetime import datetime, timedelta
 from pathlib import Path
+from time import monotonic
 from uuid import uuid4
 from urllib.parse import urlencode
 from reportlab.lib.pagesizes import A4
@@ -109,6 +110,9 @@ SYSTEM_EVENT_ALERT_HOURS = 24
 
 SESSION_COOKIE_NAME = "crm_session"
 REQUEST_ID_HEADER = "X-Request-ID"
+RESPONSE_TIME_HEADER = "X-Response-Time-ms"
+HTTP_SLOW_REQUEST_THRESHOLD_MS = 1500
+HTTP_OBSERVABILITY_IGNORED_PATH_PREFIXES = ("/static",)
 TEAM_ACTIVITY_FILTERS = {
     "all": None,
     "membership": ("Пользователь создан", "Пользователь удалён"),
@@ -187,6 +191,11 @@ def apply_request_id_header(response, request_id):
     return response
 
 
+def apply_response_time_header(response, duration_ms):
+    response.headers.setdefault(RESPONSE_TIME_HEADER, str(max(0, duration_ms)))
+    return response
+
+
 def apply_security_headers(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
@@ -211,9 +220,14 @@ def apply_security_headers(response):
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
     request_id = get_request_id(request)
+    started_at = monotonic()
     response = await call_next(request)
+    duration_ms = int((monotonic() - started_at) * 1000)
     apply_security_headers(response)
-    return apply_request_id_header(response, request_id)
+    apply_response_time_header(response, duration_ms)
+    apply_request_id_header(response, request_id)
+    log_http_request_event(request, response, request_id, duration_ms)
+    return response
 
 
 def role_label(role):
@@ -6353,6 +6367,76 @@ def log_system_event(
     finally:
         if conn:
             conn.close()
+
+
+def should_log_http_request(path, status_code, duration_ms):
+    normalized_path = str(path or "")
+
+    if normalized_path.startswith(HTTP_OBSERVABILITY_IGNORED_PATH_PREFIXES):
+        return False
+
+    try:
+        status_code = int(status_code or 0)
+    except (TypeError, ValueError):
+        status_code = 0
+
+    try:
+        duration_ms = int(duration_ms or 0)
+    except (TypeError, ValueError):
+        duration_ms = 0
+
+    return status_code >= 400 or duration_ms >= HTTP_SLOW_REQUEST_THRESHOLD_MS
+
+
+def log_http_request_event(request, response, request_id="", duration_ms=0):
+    status_code = getattr(response, "status_code", 0)
+
+    try:
+        path = request.url.path
+    except Exception:
+        path = ""
+
+    if not should_log_http_request(path, status_code, duration_ms):
+        return
+
+    username = ""
+
+    try:
+        username = get_user(request) or ""
+    except Exception:
+        username = ""
+
+    try:
+        method = request.method
+    except Exception:
+        method = ""
+
+    try:
+        status_code = int(status_code or 0)
+    except (TypeError, ValueError):
+        status_code = 0
+
+    severity = "critical" if status_code >= 500 else "warning"
+
+    if status_code >= 500:
+        message = f"HTTP ошибка {status_code}"
+    elif status_code >= 400:
+        message = f"HTTP предупреждение {status_code}"
+    else:
+        message = "Медленный HTTP запрос"
+
+    details = (
+        f"request_id={request_id}; method={method}; path={path}; "
+        f"status={status_code}; duration_ms={max(0, int(duration_ms or 0))}"
+    )
+    log_system_event(
+        "http_request",
+        severity,
+        username,
+        "http",
+        message,
+        details,
+    )
 
 
 def get_system_event_history(limit=20):

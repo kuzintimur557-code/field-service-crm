@@ -9693,6 +9693,52 @@ async def assert_platform_calendar_health():
             "bad id!"
         )
         assert len(generated_request_id_response.headers["x-request-id"]) == 32
+        assert generated_request_id_response.headers["x-response-time-ms"]
+        assert crm.should_log_http_request(
+            "/health",
+            200,
+            crm.HTTP_SLOW_REQUEST_THRESHOLD_MS - 1,
+        ) is False
+        assert crm.should_log_http_request(
+            "/health",
+            200,
+            crm.HTTP_SLOW_REQUEST_THRESHOLD_MS + 1,
+        ) is True
+        assert crm.should_log_http_request("/missing", 404, 1) is True
+        assert crm.should_log_http_request("/error", 500, 1) is True
+        assert crm.should_log_http_request("/static/app.css", 500, 9999) is (
+            False
+        )
+
+        async def smoke_error_call_next(request):
+            return crm.JSONResponse({"ok": False}, status_code=503)
+
+        http_request_id = (
+            f"smoke-http-503-{datetime.now().strftime('%H%M%S%f')}"
+        )
+        http_error_response = await crm.security_headers_middleware(
+            make_public_asgi_request(
+                "/api/smoke-http-503",
+                headers=[(
+                    b"x-request-id",
+                    http_request_id.encode("utf-8"),
+                )],
+            ),
+            smoke_error_call_next,
+        )
+        assert http_error_response.status_code == 503
+        assert http_error_response.headers["x-request-id"] == http_request_id
+        assert http_error_response.headers["x-response-time-ms"]
+        http_request_events = crm.get_system_event_history(30)
+        assert any(
+            event["event_type"] == "http_request"
+            and event["source"] == "http"
+            and event["severity"] == "critical"
+            and "HTTP ошибка 503" in event["message"]
+            and f"request_id={http_request_id}" in event["details"]
+            and "status=503" in event["details"]
+            for event in http_request_events
+        )
         health_response = await crm.public_health()
         assert health_response.status_code == 200
         health_payload = json.loads(health_response.body)
