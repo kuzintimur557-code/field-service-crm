@@ -13769,6 +13769,7 @@ async def assert_finance_summary_page():
     assert "Скачать CSV" in html
     assert "mobile-label" in html
     assert "table-scroll" in html
+    assert ".table-scroll table{min-width:0}" in html
     assert "534}" not in html[:80]
     assert 'class="mobile-nav"' in html
 
