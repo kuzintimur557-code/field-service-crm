@@ -13130,10 +13130,15 @@ async def assert_finance_margin(task):
     recurring_response = await crm.recurring_jobs_page(
         make_asgi_request("owner2", "/recurring")
     )
+    recurring_html = recurring_response.body.decode("utf-8")
     assert all(
         worker["username"] != "inactive_candidate2"
         for worker in recurring_response.context["workers"]
     )
+    assert 'class="mobile-nav"' in recurring_html
+    assert ".container{padding:16px 14px 92px}" in recurring_html
+    assert "Повторяющиеся работы" in recurring_html
+    assert "🔁 Повторяющиеся работы" not in recurring_html
 
     calendar_response = await crm.calendar_page(
         make_asgi_request("owner2", "/calendar")
@@ -14433,6 +14438,7 @@ async def assert_recurring_generate(task):
     page_html = page_response.body.decode("utf-8")
     assert f"/recurring/{job_id}/generate" in page_html
     assert f"/recurring/{job_id}/toggle" in page_html
+    assert "job-actions" in page_html
 
     conn = connect()
     c = conn.cursor()
