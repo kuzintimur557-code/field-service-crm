@@ -23,6 +23,7 @@ h2{margin:0 0 16px;font-size:22px}
 form{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
 input,button{min-height:44px;padding:14px;border-radius:14px;font-size:16px}
 input{border:1px solid #d1d5db;background:white}
+input[type="hidden"]{display:none}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .filters a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
@@ -49,7 +50,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .mobile-label{display:none;color:#6b7280;font-size:12px;font-weight:900;margin-bottom:4px}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:26px}
 @media(max-width:800px){
-    .container{padding:16px}
+    .container{padding:16px 14px 92px}
     .header{display:block}
     .stats,.row,.history-row{grid-template-columns:1fr}
     form{display:block}

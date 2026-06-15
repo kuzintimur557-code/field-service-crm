@@ -18,6 +18,7 @@ h1{margin:0 0 8px;font-size:34px}
 .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;align-items:end;margin-top:16px}
 input,select,button{width:100%;min-height:46px;padding:13px;border-radius:14px;font-size:16px}
 input,select{border:1px solid #d1d5db;background:white}
+input[type="hidden"]{display:none}
 button,.btn{border:0;background:#2563eb;color:white;font-weight:900;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .btn{min-height:46px;padding:13px;border-radius:14px}
 .filter-actions{grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;align-items:end;gap:10px}
@@ -48,12 +49,13 @@ button,.btn{border:0;background:#2563eb;color:white;font-weight:900;text-decorat
 
 <body>
 <div class="container">
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
 
 <a href="/payroll?month={{ month }}" class="back">← Назад к зарплатам</a>
 
 <div class="card">
-<h1>💸 Журнал выплат</h1>
-<div class="meta">Фактические выплаты сотрудникам за месяц</div>
+<h1>Журнал выплат</h1>
+<div class="meta">Фактические выплаты за месяц</div>
 
 <form class="form" method="get" action="/payroll/history">
 
@@ -63,8 +65,8 @@ button,.btn{border:0;background:#2563eb;color:white;font-weight:900;text-decorat
     </div>
 
     <div>
-        <div class="label">Исполнитель</div>
-        <input type="text" name="worker" value="{{ worker or '' }}" placeholder="Поиск исполнителя">
+        <div class="label">{{ worker_label }}</div>
+        <input type="text" name="worker" value="{{ worker or '' }}" placeholder="Поиск">
     </div>
 
     <div>
@@ -89,7 +91,7 @@ button,.btn{border:0;background:#2563eb;color:white;font-weight:900;text-decorat
             <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Дата: старые сверху</option>
             <option value="amount_desc" {% if sort == "amount_desc" %}selected{% endif %}>Сумма: больше сначала</option>
             <option value="amount_asc" {% if sort == "amount_asc" %}selected{% endif %}>Сумма: меньше сначала</option>
-            <option value="worker" {% if sort == "worker" %}selected{% endif %}>Исполнитель A-Z</option>
+            <option value="worker" {% if sort == "worker" %}selected{% endif %}>По исполнителю</option>
         </select>
     </div>
 
@@ -121,7 +123,7 @@ button,.btn{border:0;background:#2563eb;color:white;font-weight:900;text-decorat
     </div>
 
     <div class="stat">
-        <div class="label">Сотрудников получили</div>
+        <div class="label">Получили выплату</div>
         <div class="value">{{ workers_count }}</div>
     </div>
 
@@ -133,11 +135,12 @@ button,.btn{border:0;background:#2563eb;color:white;font-weight:900;text-decorat
 
 {% if top_workers %}
 <div class="card">
-<h2 style="margin:0 0 14px">🏆 Топ получателей выплат</h2>
+<h2 style="margin:0 0 14px">Топ получателей выплат</h2>
 
 {% for item in top_workers %}
 <div class="row top-worker-row">
     <div>
+        <span class="mobile-label">{{ worker_label }}</span>
         <a href="/workers/{{ item.worker_id }}?month={{ month }}" style="color:#111827;text-decoration:none;font-weight:900">
             {{ item.worker_name }}
         </a>
@@ -152,7 +155,7 @@ button,.btn{border:0;background:#2563eb;color:white;font-weight:900;text-decorat
 <div class="card">
 {% if payout_history %}
 <div class="row head">
-    <div>Исполнитель</div>
+    <div>{{ worker_label }}</div>
     <div>Сумма</div>
     <div>Дата</div>
     <div>Кем</div>
@@ -162,6 +165,7 @@ button,.btn{border:0;background:#2563eb;color:white;font-weight:900;text-decorat
 {% for payout in payout_history %}
 <div class="row">
     <div>
+        <span class="mobile-label">{{ worker_label }}</span>
         <a href="/workers/{{ payout.worker_id }}?month={{ month }}" style="color:#111827;text-decoration:none;font-weight:900">
             {{ payout.worker_name }}
         </a>

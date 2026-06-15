@@ -25438,6 +25438,7 @@ async def payroll_history_page(request: Request, month: str = "", worker: str = 
         item["amount"] = round(item["amount"], 1)
 
     conn.close()
+    settings = get_company_settings(company_id)
 
     return templates.TemplateResponse(
         request,
@@ -25457,7 +25458,8 @@ async def payroll_history_page(request: Request, month: str = "", worker: str = 
             "payouts_count": payouts_count,
             "workers_count": workers_count,
             "average_payout": average_payout,
-            "top_workers": top_workers
+            "top_workers": top_workers,
+            "settings": settings
         }
     )
 

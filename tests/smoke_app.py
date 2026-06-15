@@ -13373,6 +13373,8 @@ async def assert_finance_margin(task):
     assert "mobile-label" in payroll_html
     assert "actions-row" in payroll_html
     assert "action-link green" in payroll_html
+    assert 'class="mobile-nav"' in payroll_html
+    assert 'input[type="hidden"]{display:none}' in payroll_html
     assert f"/workers/{helper['id']}?month=2026-05" in payroll_html
     assert "/finance?month=2026-05&worker=helper2" in payroll_html
 
@@ -13440,6 +13442,11 @@ async def assert_finance_margin(task):
     assert "filter-actions" in payroll_history_html
     assert "mobile-label" in payroll_history_html
     assert "top-worker-row" in payroll_history_html
+    assert "Получили выплату" in payroll_history_html
+    assert "По исполнителю" in payroll_history_html
+    assert 'class="mobile-nav"' in payroll_history_html
+    assert "💸" not in payroll_history_html
+    assert "🏆" not in payroll_history_html
     assert "аванс на карту" in payroll_history_html
 
     note_response = await crm.update_payroll_payout_note(
