@@ -12,10 +12,10 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:1000px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
-.card{background:white;padding:26px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:1000px;width:100%;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
 h1{margin:0 0 20px;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
 	.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -34,7 +34,7 @@ h2{margin:0 0 16px;font-size:22px}
 .next-action{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#f8fafc;border:1px solid #cbd5e1;border-radius:18px;padding:16px;margin-top:18px}
 .task{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
 .task-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.btn{display:inline-block;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
 .task-search{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
 .task-search div{flex:1;min-width:220px}
 .task-search input{margin-top:6px}
@@ -68,11 +68,27 @@ h2{margin:0 0 16px;font-size:22px}
 .notice.ok{background:#dcfce7;color:#166534}
 .notice.err{background:#fee2e2;color:#991b1b}
 label{display:block;margin-top:12px;font-weight:900;color:#374151}
-input,textarea,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
-input,textarea{border:1px solid #d1d5db;background:white}
+input,textarea,select,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
+input,textarea,select{border:1px solid #d1d5db;background:white}
+input[type="hidden"]{display:none}
 textarea{height:110px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
-@media(max-width:800px){.container{padding:16px}.grid,.task,.timeline-item,.latest-task,.file-item,.next-action{grid-template-columns:1fr}.task-actions{justify-content:stretch}.task-actions .btn{flex:1}h1{font-size:28px}.btn{display:block;text-align:center}}
+@media(max-width:800px){
+.container{padding:16px 14px 92px}
+.grid,.task,.timeline-item,.latest-task,.file-item,.next-action{grid-template-columns:1fr}
+.card{padding:18px;border-radius:18px}
+.task-search{display:grid;grid-template-columns:1fr}
+.task-search div{min-width:0}
+.task-search button,.task-search .reset-link{width:100%;text-align:center}
+.task-filters{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+.task-filters a{flex:0 0 auto}
+.task-actions,.file-actions{justify-content:stretch}
+.task-actions .btn,.file-actions .btn,.file-actions form{flex:1 1 100%}
+.contact-actions{display:grid;grid-template-columns:1fr}
+.note-head{display:grid;grid-template-columns:1fr;gap:4px}
+h1{font-size:28px}
+.btn{text-align:center}
+}
 </style>
 </head>
 
@@ -82,18 +98,18 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <a href="/clients" class="back">← Назад к разделу {{ client_label }}</a>
 
 <div class="card">
-<h1>👤 {{ client["name"] }}</h1>
+<h1>{{ client["name"] }}</h1>
 
 {% if request.query_params.get("updated") == "1" %}
-<div class="notice ok">✅ Карточка обновлена: {{ client_label }}</div>
+<div class="notice ok">Карточка обновлена: {{ client_label }}</div>
 {% endif %}
 
 	{% if request.query_params.get("error") == "empty" %}
-	<div class="notice err">❌ Имя обязательно: {{ client_label }}</div>
+	<div class="notice err">Имя обязательно: {{ client_label }}</div>
 	{% endif %}
 
 	{% if request.query_params.get("error") == "custom_required" %}
-	<div class="notice err">❌ Заполните обязательные дополнительные поля</div>
+	<div class="notice err">Заполните обязательные дополнительные поля</div>
 	{% endif %}
 
 	<div class="grid">
@@ -294,7 +310,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	</div>
 	{% endif %}
 
-	<button type="submit">💾 Сохранить изменения</button>
+	<button type="submit">Сохранить изменения</button>
 
 </form>
 </div>
@@ -303,17 +319,17 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <h2>История: {{ client_label }}</h2>
 
 {% if request.query_params.get("note_created") == "1" %}
-<div class="notice ok">✅ Заметка добавлена</div>
+<div class="notice ok">Заметка добавлена</div>
 {% endif %}
 
 {% if request.query_params.get("note_error") == "empty" %}
-<div class="notice err">❌ Нельзя добавить пустую заметку</div>
+<div class="notice err">Нельзя добавить пустую заметку</div>
 {% endif %}
 
 <form method="post" action="/clients/{{ client['id'] }}/notes">
 <label>Новая заметка</label>
 <textarea name="note" placeholder="Например: клиент просит звонить после 18:00..."></textarea>
-<button type="submit">📝 Добавить заметку</button>
+<button type="submit">Добавить заметку</button>
 </form>
 
 <form class="task-search" method="get" action="/clients/{{ client['id'] }}" style="margin-top:16px">
@@ -351,15 +367,15 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <h2>Файлы: {{ client_label }}</h2>
 
 {% if request.query_params.get("file_uploaded") == "1" %}
-<div class="notice ok">✅ Файл добавлен</div>
+<div class="notice ok">Файл добавлен</div>
 {% endif %}
 
 {% if request.query_params.get("file_error") == "empty" %}
-<div class="notice err">❌ Выберите файл для загрузки</div>
+<div class="notice err">Выберите файл для загрузки</div>
 {% endif %}
 
 {% if request.query_params.get("file_deleted") == "1" %}
-<div class="notice ok">✅ Файл удалён</div>
+<div class="notice ok">Файл удалён</div>
 {% endif %}
 
 <form method="post" action="/clients/{{ client['id'] }}/files" enctype="multipart/form-data">

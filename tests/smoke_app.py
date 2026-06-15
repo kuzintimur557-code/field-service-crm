@@ -13974,6 +13974,11 @@ async def assert_client_card(task):
     assert f"/create-task?client_id={task['client_id']}&return_to=client" in html
     assert f"/create-task?client_id={task['client_id']}&source_task_id={task['id']}&return_to=client" in html
     assert f"#{task['id']}" in html
+    assert 'class="mobile-nav"' in html
+    assert "overflow-x:hidden" in html
+    assert 'input[type="hidden"]{display:none}' in html
+    assert "💾 Сохранить изменения" not in html
+    assert "📝 Добавить заметку" not in html
 
     worker_tasks_response = await crm.my_tasks_page(
         make_asgi_request("worker2", "/my-tasks")
@@ -14732,6 +14737,12 @@ async def assert_client_custom_fields():
     assert 'placeholder="+7 900 000-00-00"' in page_html
     assert 'placeholder="client@example.ru"' in page_html
     assert 'class="client-open"' in page_html
+    assert 'class="mobile-nav"' in page_html
+    assert 'input[type="hidden"]{display:none}' in page_html
+    assert "👤 Клиенты" not in page_html
+    assert "➕ Создать клиента" not in page_html
+    assert "Телефон:" in page_html
+    assert "Email:" in page_html
 
     search_response = await crm.clients_page(
         make_asgi_request("owner2", "/clients"),

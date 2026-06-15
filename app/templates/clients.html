@@ -20,6 +20,7 @@ h2{margin:0 0 16px;font-size:22px}
 label{display:block;margin-top:12px;font-weight:900;color:#374151}
 input,textarea,select,button{width:100%;min-height:44px;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
 input,textarea,select{border:1px solid #d1d5db;background:white}
+input[type="hidden"]{display:none}
 textarea{height:110px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .client{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.5fr);gap:14px;padding:16px;border:1px solid #e5e7eb;border-radius:18px;background:#f9fafb;margin-bottom:10px}
@@ -42,7 +43,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .notice.ok{background:#dcfce7;color:#166534}
 .notice.err{background:#fee2e2;color:#991b1b}
 @media(max-width:800px){
-.container{padding:16px}
+.container{padding:16px 14px 92px}
 .header{display:block}
 h1{font-size:28px;margin-bottom:12px}
 .grid,.client{grid-template-columns:1fr}
@@ -60,7 +61,7 @@ h1{font-size:28px;margin-bottom:12px}
 
 <div class="header">
     <div>
-        <h1>👤 Клиенты</h1>
+        <h1>Клиенты</h1>
         <div style="color:#6b7280;font-weight:800;margin-top:6px">
             База клиентов платформы
         </div>
@@ -72,15 +73,15 @@ h1{font-size:28px;margin-bottom:12px}
 <h2>Добавить клиента</h2>
 
 {% if request.query_params.get("created") == "1" %}
-<div class="notice ok">✅ Клиент создан</div>
+<div class="notice ok">Клиент создан</div>
 {% endif %}
 
 	{% if request.query_params.get("error") == "empty" %}
-	<div class="notice err">❌ Имя клиента обязательно</div>
+	<div class="notice err">Имя клиента обязательно</div>
 	{% endif %}
 
 	{% if request.query_params.get("error") == "custom_required" %}
-	<div class="notice err">❌ Заполните обязательные дополнительные поля</div>
+	<div class="notice err">Заполните обязательные дополнительные поля</div>
 	{% endif %}
 
 	<form method="post" action="/clients">
@@ -139,7 +140,7 @@ h1{font-size:28px;margin-bottom:12px}
 	</div>
 	{% endif %}
 
-	<button type="submit">➕ Создать клиента</button>
+	<button type="submit">Создать клиента</button>
 
 </form>
 </div>
@@ -185,14 +186,14 @@ h1{font-size:28px;margin-bottom:12px}
     </div>
 
     <div>
-        <div class="meta">📞 {% if client["phone"] %}<a href="tel:{{ client['phone'] }}">{{ client["phone"] }}</a>{% else %}телефон не указан{% endif %}</div>
-        <div class="meta">✉️ {% if client["email"] %}<a href="mailto:{{ client['email'] }}">{{ client["email"] }}</a>{% else %}email не указан{% endif %}</div>
+        <div class="meta">Телефон: {% if client["phone"] %}<a href="tel:{{ client['phone'] }}">{{ client["phone"] }}</a>{% else %}не указан{% endif %}</div>
+        <div class="meta">Email: {% if client["email"] %}<a href="mailto:{{ client['email'] }}">{{ client["email"] }}</a>{% else %}не указан{% endif %}</div>
     </div>
 
     <div>
-        <div class="meta">📍 {{ client["address"] or "адрес не указан" }}</div>
+        <div class="meta">Адрес: {{ client["address"] or "не указан" }}</div>
         {% if client["notes"] %}
-        <div class="meta">📝 {{ client["notes"] }}</div>
+        <div class="meta">Заметки: {{ client["notes"] }}</div>
         {% endif %}
         <div class="client-stats">
             <span class="client-stat">Заявок: {{ client["task_count"] or 0 }}</span>
