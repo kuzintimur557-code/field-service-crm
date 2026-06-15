@@ -9,14 +9,19 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:800px;margin:auto;padding:22px}
-.card{background:white;padding:24px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:800px;width:100%;margin:auto;padding:22px}
+.card{background:white;padding:24px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
 h1{margin:0 0 8px;font-size:32px}
 .meta{color:#6b7280;font-weight:800}
 .menu{display:grid;gap:12px}
-.menu a{display:block;background:#f9fafb;padding:18px;border-radius:18px;text-decoration:none;color:#111827;font-weight:900;border:1px solid #e5e7eb}
+.menu a{display:flex;align-items:center;min-height:52px;background:#f9fafb;padding:15px 18px;border-radius:16px;text-decoration:none;color:#111827;font-weight:900;border:1px solid #e5e7eb}
 .menu a.red{background:#fee2e2;color:#991b1b}
+@media(max-width:700px){
+    .container{padding:16px 14px 92px}
+    .card{padding:20px;border-radius:18px}
+    h1{font-size:28px}
+}
 </style>
 </head>
 
@@ -24,7 +29,7 @@ h1{margin:0 0 8px;font-size:32px}
 <div class="container">
 
 <div class="card">
-<h1>☰ Ещё</h1>
+<h1>Ещё</h1>
 <div class="meta">{{ username }} / {{ role_label(role) }}</div>
 </div>
 
@@ -32,53 +37,53 @@ h1{margin:0 0 8px;font-size:32px}
 <div class="menu">
 {% set f = features if features is defined else {} %}
 
-<a href="/">🏠 Главная</a>
-<a href="/profile">👤 Мой профиль</a>
+<a href="/">Главная</a>
+<a href="/profile">Мой профиль</a>
 {% if f.get("calendar", True) %}
-<a href="/calendar">📅 Календарь</a>
+<a href="/calendar">Календарь</a>
 {% endif %}
 
 {% if role in ["boss", "manager"] %}
 {% if f.get("clients", True) %}
-<a href="/clients">👤 Клиенты</a>
+<a href="/clients">Клиенты</a>
 {% endif %}
 {% if f.get("finance", True) %}
-<a href="/finance">💰 Финансы</a>
+<a href="/finance">Финансы</a>
 {% endif %}
 {% if f.get("payroll", True) %}
-<a href="/payroll">💵 Зарплаты</a>
+<a href="/payroll">Зарплаты</a>
 {% endif %}
 {% if f.get("catalog", True) %}
-<a href="/catalog">📦 Каталог</a>
+<a href="/catalog">Каталог</a>
 {% endif %}
 {% if f.get("custom_fields", True) %}
-<a href="/custom-fields">🧩 Поля компании</a>
+<a href="/custom-fields">Поля компании</a>
 {% endif %}
 {% if f.get("recurring", True) %}
-<a href="/recurring">🔁 Регулярные работы</a>
+<a href="/recurring">Регулярные работы</a>
 {% endif %}
-<a href="/workers">👥 Команда</a>
+<a href="/workers">Команда</a>
 {% if f.get("archive", True) %}
-<a href="/archive">🗄 Архив</a>
+<a href="/archive">Архив</a>
 {% endif %}
 {% if f.get("calls", True) %}
-<a href="/calls">☎️ Звонки</a>
+<a href="/calls">Звонки</a>
 {% endif %}
 {% if f.get("automation", True) %}
-<a href="/automation">⚙️ Автоматизация</a>
+<a href="/automation">Автоматизация</a>
 {% endif %}
 {% if f.get("ai_insights", True) %}
-<a href="/ai/insights">🤖 AI-инсайты</a>
-<a href="/ai/assistant">🧠 AI-помощник</a>
+<a href="/ai/insights">AI-инсайты</a>
+<a href="/ai/assistant">AI-помощник</a>
 {% endif %}
 {% endif %}
 
 {% if role == "boss" %}
-<a href="/admin">🛠 Админ-центр</a>
-<a href="/settings">⚙️ Настройки</a>
+<a href="/admin">Админ-центр</a>
+<a href="/settings">Настройки</a>
 {% endif %}
 
-<a class="red" href="/logout">🚪 Выйти</a>
+<a class="red" href="/logout">Выйти</a>
 
 </div>
 </div>
