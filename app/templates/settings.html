@@ -9,26 +9,41 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:900px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
-.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
-h1{margin:0 0 22px;font-size:34px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{width:100%;max-width:900px;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
+h1{margin:0 0 22px;font-size:34px;line-height:1.12}
 h2{margin:0 0 16px;font-size:22px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 label{display:block;margin-top:12px;font-weight:900;color:#374151}
-input,textarea,button{width:100%;padding:15px;border-radius:14px;font-size:16px;margin-top:8px}
+input,textarea,select,button{width:100%;min-height:44px;padding:14px 15px;border-radius:14px;font-size:16px;margin-top:8px}
 input,textarea,select{border:1px solid #d1d5db;background:white}
 textarea{height:130px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .notice{margin-bottom:16px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900}
 .small{color:#6b7280;font-weight:800;line-height:1.45}
+.quick-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.quick-links a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 16px;border-radius:14px;color:white;text-decoration:none;font-weight:900}
+.quick-links .dark{background:#111827}
+.quick-links .blue{background:#2563eb}
+.quick-links .green{background:#16a34a}
 .module-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
 .module-card{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e5e7eb;border-radius:16px;background:#f9fafb}
 .module-card input{width:auto;margin:4px 0 0;padding:0}
 .module-title{font-weight:900;color:#111827}
 .module-desc{font-size:13px;color:#6b7280;font-weight:800;line-height:1.35;margin-top:4px}
-@media(max-width:700px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}.card{padding:22px}}
+.plan-status{margin-top:14px;padding:14px;border-radius:16px;background:#f9fafb;color:#374151;font-weight:800;line-height:1.5}
+.status-on{color:#166534;font-weight:900}
+.status-off{color:#991b1b;font-weight:900}
+@media(max-width:700px){
+    .container{padding:16px 14px 92px}
+    .grid,.module-grid{grid-template-columns:1fr}
+    h1{font-size:28px}
+    .card{padding:20px;border-radius:18px}
+    .quick-links{display:grid;grid-template-columns:1fr}
+    .quick-links a{width:100%}
+}
 </style>
 </head>
 
@@ -38,29 +53,23 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
-<h1>⚙️ Настройки компании</h1>
+<h1>Настройки компании</h1>
 <div class="small">
 Эти реквизиты будут использоваться в счетах, актах и будущей интеграции с 1С.
 </div>
 
-<a href="/debug" style="display:inline-block;margin-top:16px;padding:12px 16px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900">
-🧪 Диагностика / проверка системы
-</a>
-
-	<a href="/billing" style="display:inline-block;margin-top:16px;margin-left:8px;padding:12px 16px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900">
-	💳 Тарифы
-	</a>
-
-	<a href="/custom-fields" style="display:inline-block;margin-top:16px;margin-left:8px;padding:12px 16px;border-radius:14px;background:#16a34a;color:white;text-decoration:none;font-weight:900">
-	🧩 Поля компании
-	</a>
+<div class="quick-links">
+    <a href="/debug" class="dark">Диагностика системы</a>
+    <a href="/billing" class="blue">Тарифы</a>
+    <a href="/custom-fields" class="green">Поля компании</a>
+</div>
 	</div>
 
 <div class="card">
 <h2>Реквизиты</h2>
 
 {% if request.query_params.get("updated") == "1" %}
-<div class="notice">✅ Настройки сохранены</div>
+<div class="notice">Настройки сохранены</div>
 {% endif %}
 
 <form method="post" action="/settings">
@@ -166,13 +175,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <option value="enterprise_1c" {% if settings["plan"] == "enterprise_1c" %}selected{% endif %}>Корпоративный + 1С + AI-звонки</option>
 </select>
 
-<div style="margin-top:14px;padding:14px;border-radius:16px;background:#f9fafb;color:#374151;font-weight:800;line-height:1.5">
-    1С: {% if settings["one_c_enabled"] %}✅ включено{% else %}❌ выключено{% endif %}<br>
-    Звонки: {% if settings["calls_enabled"] %}✅ включено{% else %}❌ выключено{% endif %}<br>
-    AI-анализ звонков: {% if settings["ai_calls_enabled"] %}✅ включено{% else %}❌ выключено{% endif %}
+<div class="plan-status">
+    1С: {% if settings["one_c_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}<br>
+    Звонки: {% if settings["calls_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}<br>
+    AI-анализ звонков: {% if settings["ai_calls_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}
 </div>
 
-<button type="submit">💾 Сохранить настройки</button>
+<button type="submit">Сохранить настройки</button>
 
 </form>
 </div>

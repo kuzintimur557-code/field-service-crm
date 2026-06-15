@@ -4369,6 +4369,28 @@ async def assert_profile_page():
     assert "💾 Сменить пароль" not in html
 
 
+async def assert_settings_page():
+    response = await crm.settings_page(make_asgi_request("owner2", "/settings"))
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "Настройки компании" in html
+    assert "Диагностика системы" in html
+    assert "Тарифы" in html
+    assert "Поля компании" in html
+    assert "Сохранить настройки" in html
+    assert "status-on" in html
+    assert "status-off" in html
+    assert 'class="mobile-nav"' in html
+    assert ".container{padding:16px 14px 92px}" in html
+    assert "⚙️ Настройки компании" not in html
+    assert "🧪 Диагностика" not in html
+    assert "💳 Тарифы" not in html
+    assert "🧩 Поля компании" not in html
+    assert "✅" not in html
+    assert "❌" not in html
+    assert "💾 Сохранить настройки" not in html
+
+
 async def assert_billing_page():
     response = await crm.billing_page(make_asgi_request("owner2", "/billing"))
     assert response.status_code == 200
@@ -15826,6 +15848,7 @@ def main():
         asyncio.run(assert_ai_assistant_page())
         asyncio.run(assert_more_page())
         asyncio.run(assert_profile_page())
+        asyncio.run(assert_settings_page())
         asyncio.run(assert_billing_page())
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
