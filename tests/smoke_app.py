@@ -4353,6 +4353,25 @@ async def assert_more_page():
     assert "🚪 Выйти" not in html
 
 
+async def assert_billing_page():
+    response = await crm.billing_page(make_asgi_request("owner2", "/billing"))
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "Тарифы" in html
+    assert "Текущий тариф" in html
+    assert "Доступные тарифы" in html
+    assert "Включено" in html
+    assert "Настройка 1С" in html
+    assert "feature-state yes" in html
+    assert "feature-state no" in html
+    assert 'class="mobile-nav"' in html
+    assert ".container{padding:16px 14px 92px}" in html
+    assert "💳 Тарифы" not in html
+    assert "✅" not in html
+    assert "❌" not in html
+    assert "🔗 Настройка 1С" not in html
+
+
 async def assert_upload_access():
     anonymous = await crm.uploaded_file(make_request(), "before.png")
     assert anonymous.status_code == 404
@@ -15790,6 +15809,7 @@ def main():
         asyncio.run(assert_automation_delete())
         asyncio.run(assert_ai_assistant_page())
         asyncio.run(assert_more_page())
+        asyncio.run(assert_billing_page())
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_schedule_conflicts())
