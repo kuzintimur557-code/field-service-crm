@@ -13954,6 +13954,10 @@ async def assert_notifications(task):
     notifications_html = notifications_response.body.decode("utf-8")
     assert f"/notifications/{notification['id']}/open" in notifications_html
     assert "Отметить все прочитанными" in notifications_html
+    assert "Уведомления" in notifications_html
+    assert 'class="mobile-nav"' in notifications_html
+    assert ".container{padding:14px 14px 92px}" in notifications_html
+    assert "🔔 Уведомления" not in notifications_html
 
     open_response = await crm.open_notification(
         make_request("owner2"),
