@@ -4353,6 +4353,42 @@ async def assert_more_page():
     assert "🚪 Выйти" not in html
 
 
+async def assert_login_page():
+    response = await crm.login_page(make_public_asgi_request("/login"))
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "Бизнес CRM" in html
+    assert "CRM система для исполнителей" in html
+    assert 'name="username"' in html
+    assert 'name="password"' in html
+    assert "Войти" in html
+    assert ".logo{display:flex" in html
+    assert "body{align-items:flex-start;padding:18px 14px 92px}" in html
+    assert 'class="mobile-nav"' not in html
+    assert "🚀" not in html
+
+    invalid_response = await crm.login_page(
+        make_public_asgi_request("/login", "error=invalid")
+    )
+    invalid_html = invalid_response.body.decode("utf-8")
+    assert "Неверный логин или пароль" in invalid_html
+    assert "❌ Неверный логин" not in invalid_html
+
+    blocked_response = await crm.login_page(
+        make_public_asgi_request("/login", "error=blocked")
+    )
+    blocked_html = blocked_response.body.decode("utf-8")
+    assert "Слишком много попыток входа" in blocked_html
+    assert "🔒" not in blocked_html
+
+    changed_response = await crm.login_page(
+        make_public_asgi_request("/login", "password_changed=1")
+    )
+    changed_html = changed_response.body.decode("utf-8")
+    assert "Пароль изменён. Войдите снова." in changed_html
+    assert "✅ Пароль изменён" not in changed_html
+
+
 async def assert_profile_page():
     response = await crm.profile_page(make_asgi_request("owner2", "/profile"))
     assert response.status_code == 200
@@ -15853,6 +15889,7 @@ def main():
         asyncio.run(assert_automation_runner(task))
         asyncio.run(assert_automation_delete())
         asyncio.run(assert_ai_assistant_page())
+        asyncio.run(assert_login_page())
         asyncio.run(assert_more_page())
         asyncio.run(assert_profile_page())
         asyncio.run(assert_settings_page())

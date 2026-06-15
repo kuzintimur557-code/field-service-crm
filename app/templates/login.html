@@ -15,17 +15,22 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#2563eb,#1e293b);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{width:100%;max-width:420px;background:white;border-radius:30px;padding:40px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
-.logo{font-size:48px;text-align:center;margin-bottom:12px}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#2563eb,#1e293b);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;overflow-x:hidden}
+.card{width:100%;max-width:420px;background:white;border:1px solid rgba(255,255,255,.45);border-radius:22px;padding:40px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.logo{display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin:0 auto 14px;border-radius:16px;background:#2563eb;color:white;font-size:18px;font-weight:900;letter-spacing:0}
 h1{margin:0;text-align:center;font-size:34px;color:#111827}
 .subtitle{text-align:center;color:#6b7280;margin-top:10px;margin-bottom:30px;line-height:1.5}
 label{display:block;margin-bottom:8px;font-weight:800;color:#111827}
-input{width:100%;padding:16px;border-radius:16px;border:1px solid #d1d5db;margin-bottom:20px;font-size:16px}
-button{width:100%;padding:17px;border:0;border-radius:18px;background:#2563eb;color:white;font-size:18px;font-weight:900;cursor:pointer}
+input{width:100%;min-height:48px;padding:15px 16px;border-radius:14px;border:1px solid #d1d5db;margin-bottom:20px;font-size:16px}
+button{width:100%;min-height:48px;padding:15px 17px;border:0;border-radius:14px;background:#2563eb;color:white;font-size:18px;font-weight:900;cursor:pointer}
 .demo{margin-top:24px;padding:18px;border-radius:18px;background:#f3f4f6;color:#374151;font-size:14px;line-height:1.6}
 .demo b{color:#111827}
 .footer{margin-top:24px;text-align:center;color:#9ca3af;font-size:13px}
+@media(max-width:520px){
+    body{align-items:flex-start;padding:18px 14px 92px}
+    .card{padding:28px 20px;border-radius:18px}
+    h1{font-size:30px}
+}
 </style>
 </head>
 
@@ -33,7 +38,7 @@ button{width:100%;padding:17px;border:0;border-radius:18px;background:#2563eb;co
 
 <div class="card">
 
-<div class="logo">🚀</div>
+<div class="logo">CRM</div>
 
 <h1>Бизнес CRM</h1>
 
@@ -44,19 +49,19 @@ CRM система для исполнителей,<br>
 
 {% if request.query_params.get("password_changed") == "1" %}
 <div style="margin-bottom:16px;padding:14px;border-radius:14px;background:#dcfce7;color:#166534;font-weight:900">
-✅ Пароль изменён. Войдите снова.
+Пароль изменён. Войдите снова.
 </div>
 {% endif %}
 
 {% if request.query_params.get("error") == "invalid" %}
 <div style="margin-bottom:16px;padding:14px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
-❌ Неверный логин или пароль
+Неверный логин или пароль
 </div>
 {% endif %}
 
 {% if request.query_params.get("error") == "blocked" %}
 <div style="margin-bottom:16px;padding:14px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
-🔒 Слишком много попыток входа. Попробуйте позже.
+Слишком много попыток входа. Попробуйте позже.
 </div>
 {% endif %}
 
@@ -101,7 +106,5 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/static/sw.js");
 }
 </script>
-
-{% include 'mobile_nav.html' %}
 </body>
 </html>
