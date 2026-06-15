@@ -12793,6 +12793,8 @@ async def assert_finance_margin(task):
     assert "Учебный отпуск" in history_worker_html
     assert "Добавлен период недоступности" in history_worker_html
     assert "0% → 7.5%" in history_worker_html
+    assert 'class="mobile-nav"' in history_worker_html
+    assert "overflow-x:hidden" in history_worker_html
 
     delete_absence_response = await crm.delete_worker_unavailability(
         make_form_request(
@@ -13011,6 +13013,10 @@ async def assert_finance_margin(task):
     assert 'placeholder="+7 900 000-00-00"' in workers_html
     assert 'placeholder="user@example.ru"' in workers_html
     assert ".contact-link" in workers_html
+    assert 'class="mobile-nav"' in workers_html
+    assert ".container{padding:16px 14px 92px}" in workers_html
+    assert "👥 Команда" not in workers_html
+    assert "➕ Добавить пользователя" not in workers_html
     assert workers_response.context["status"] == "inactive"
     assert workers_response.context["team_counts"]["inactive_count"] >= 1
 
@@ -13709,6 +13715,8 @@ async def assert_finance_margin(task):
     assert "Финансы за месяц" in worker_detail_html
     assert "/finance?month=2026-05&worker=helper2" in worker_detail_html
     assert "/payroll?month=2026-05&payout_filter=unpaid" in worker_detail_html
+    assert "finance-actions" in worker_detail_html
+    assert 'class="mobile-nav"' in worker_detail_html
     assert "Статус выплаты" in worker_detail_html
     assert "Не выплачено" in worker_detail_html
     assert "700.0 ₽" in worker_detail_html

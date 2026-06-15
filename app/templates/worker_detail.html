@@ -9,10 +9,10 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:900px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
-.card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:20px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:900px;width:100%;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:28px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:20px}
 h1{margin:0 0 10px;font-size:34px}
 .meta{color:#6b7280;font-weight:800;margin:6px 0}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -40,8 +40,12 @@ h1{margin:0 0 10px;font-size:34px}
 .task-date{color:#2563eb;font-weight:900}
 .task-date.overdue{color:#b91c1c}
 .quick-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
-.quick-actions a{padding:11px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
+.quick-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 14px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
 .quick-actions a.secondary{background:#111827}
+.finance-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.finance-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 16px;border-radius:14px;color:white;text-decoration:none;font-weight:900}
+.finance-actions .dark{background:#111827}
+.finance-actions .blue{background:#2563eb}
 .week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:14px}
 .day{padding:12px 8px;border-radius:12px;background:#f9fafb;text-align:center}
 .day-name{font-size:12px;color:#6b7280;font-weight:900}
@@ -64,8 +68,9 @@ h1{margin:0 0 10px;font-size:34px}
 .absence-dates{font-weight:900}
 .absence-reason{margin-top:4px;color:#6b7280;font-size:13px;font-weight:800}
 .absence-item button{padding:8px 10px;border:0;border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:900;cursor:pointer}
-@media(max-width:700px){.container{padding:16px}.grid,.edit-form{grid-template-columns:1fr}h1{font-size:28px}}
-@media(max-width:700px){.week{grid-template-columns:repeat(2,1fr)}.absence-form{grid-template-columns:1fr}.quick-actions a{width:100%;text-align:center}.absence-item{align-items:flex-start}.absence-form .wide{grid-column:auto}}
+@media(max-width:700px){.container{padding:16px 14px 92px}.card{padding:20px;border-radius:18px}.grid,.edit-form{grid-template-columns:1fr}h1{font-size:28px}}
+@media(max-width:700px){.week{grid-template-columns:repeat(2,1fr)}.absence-form{grid-template-columns:1fr}.quick-actions{display:grid;grid-template-columns:1fr}.quick-actions a{width:100%;text-align:center}.finance-actions{display:grid;grid-template-columns:1fr}.absence-item{display:grid;grid-template-columns:1fr;align-items:flex-start}.absence-form .wide{grid-column:auto}}
+@media(max-width:460px){.week{grid-template-columns:1fr}}
 </style>
 </head>
 
@@ -306,12 +311,14 @@ h1{margin:0 0 10px;font-size:34px}
     <button type="submit" style="margin-top:10px;width:100%;padding:13px;border:0;border-radius:14px;background:#2563eb;color:white;font-weight:900">Показать</button>
 </form>
 
-<a href="/finance?month={{ month }}&worker={{ worker['username'] }}" style="display:inline-block;margin-bottom:16px;padding:12px 16px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900">
+<div class="finance-actions">
+<a href="/finance?month={{ month }}&worker={{ worker['username'] }}" class="dark">
     Открыть в финансах
 </a>
-<a href="/payroll?month={{ month }}&payout_filter={% if payroll_status == 'Выплачено' %}paid{% elif payroll_status == 'Частично' %}partial{% else %}unpaid{% endif %}" style="display:inline-block;margin-bottom:16px;margin-left:8px;padding:12px 16px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900">
+<a href="/payroll?month={{ month }}&payout_filter={% if payroll_status == 'Выплачено' %}paid{% elif payroll_status == 'Частично' %}partial{% else %}unpaid{% endif %}" class="blue">
     Открыть в зарплатах
 </a>
+</div>
 
 <div class="grid">
     <div class="stat">

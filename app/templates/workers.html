@@ -43,7 +43,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 .filters a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
 .filters a.active{background:#111827;color:white}
 @media(max-width:700px){
-    .container{padding:16px}
+    .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
     .user-top{display:block}
     .badge{display:inline-block;margin-top:12px}
@@ -61,15 +61,15 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
-<h1>👥 Команда</h1>
+<h1>Команда</h1>
 <div class="meta">Управление менеджерами и исполнителями платформы</div>
 
 {% if request.query_params.get("password_changed") == "1" %}
-<div class="notice ok">✅ Пароль обновлён</div>
+<div class="notice ok">Пароль обновлён</div>
 {% endif %}
 
 {% if request.query_params.get("commission_updated") == "1" %}
-<div class="notice ok">✅ Процент исполнителя обновлён</div>
+<div class="notice ok">Процент исполнителя обновлён</div>
 {% endif %}
 
 {% if request.query_params.get("status_updated") == "1" %}
@@ -77,7 +77,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 {% endif %}
 
 {% if request.query_params.get("deleted") == "1" %}
-<div class="notice ok">✅ Пользователь удалён</div>
+<div class="notice ok">Пользователь удалён</div>
 {% endif %}
 
 {% if request.query_params.get("created") == "1" %}
@@ -85,7 +85,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 {% endif %}
 
 {% if request.query_params.get("error") == "weak_password" %}
-<div class="notice err">❌ Пароль должен быть минимум 6 символов</div>
+<div class="notice err">Пароль должен быть минимум 6 символов</div>
 {% elif request.query_params.get("error") == "empty_credentials" %}
 <div class="notice err">Укажите логин и пароль</div>
 {% elif request.query_params.get("error") == "invalid_role" %}
@@ -99,12 +99,12 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 {% elif request.query_params.get("error") == "user_has_history" %}
 <div class="notice err">Удаление запрещено: с пользователем связано записей — {{ request.query_params.get("count") or "1" }}. Отключите пользователя, чтобы сохранить историю и расчёты.</div>
 {% elif request.query_params.get("error") %}
-<div class="notice err">❌ Ошибка: {{ request.query_params.get("error") }}</div>
+<div class="notice err">Ошибка: {{ request.query_params.get("error") }}</div>
 {% endif %}
 </div>
 
 <div class="card">
-<h2>➕ Добавить пользователя</h2>
+<h2>Добавить пользователя</h2>
 
 <form method="post" action="/workers" style="display:grid;gap:12px;margin-bottom:20px">
     <input type="text" name="username" placeholder="Логин" required>
