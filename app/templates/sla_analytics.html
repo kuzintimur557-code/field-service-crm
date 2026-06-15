@@ -4,35 +4,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SLA-аналитика</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/app.css">
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: Arial, sans-serif;
             background: #f3f4f6;
             margin: 0;
             padding: 24px;
             color: #111827;
+            overflow-x: hidden;
         }
 
         .container {
             max-width: 1200px;
+            width: 100%;
             margin: 0 auto;
         }
 
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
             margin-bottom: 24px;
         }
 
         .back {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
             padding: 12px 16px;
             background: #111827;
             color: white;
             border-radius: 12px;
             text-decoration: none;
             font-weight: 800;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .grid {
@@ -43,9 +63,14 @@
 
         .card {
             background: white;
+            border: 1px solid #e5e7eb;
             border-radius: 18px;
             padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+
+        .card .card {
+            box-shadow: none;
         }
 
         .label {
@@ -71,6 +96,132 @@
         .warning {
             color: #d97706;
         }
+
+        .section {
+            margin-top: 24px;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            min-width: 0;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .table-scroll table {
+            min-width: 0;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+        }
+
+        th {
+            color: #6b7280;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .empty-cell {
+            padding: 16px;
+            text-align: center;
+            color: #6b7280;
+            font-weight: 800;
+        }
+
+        @media (max-width: 820px) {
+            body {
+                padding: 16px 14px 92px;
+            }
+
+            .header,
+            .actions {
+                display: grid;
+                grid-template-columns: 1fr;
+                align-items: stretch;
+            }
+
+            .back {
+                width: 100%;
+            }
+
+            .card {
+                padding: 16px;
+                border-radius: 16px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .table-scroll {
+                overflow: visible;
+            }
+
+            table,
+            thead,
+            tbody,
+            tr,
+            th,
+            td {
+                display: block;
+                width: 100%;
+                min-width: 0;
+            }
+
+            thead {
+                display: none;
+            }
+
+            tbody tr {
+                border: 1px solid #e5e7eb;
+                border-radius: 16px;
+                padding: 4px 12px;
+                margin-bottom: 10px;
+                background: #fff;
+            }
+
+            td {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                text-align: right;
+                padding: 10px 0;
+                border-bottom: 1px solid #eef2f7;
+            }
+
+            td:last-child {
+                border-bottom: 0;
+            }
+
+            td::before {
+                content: attr(data-label);
+                color: #6b7280;
+                font-size: 12px;
+                font-weight: 900;
+                text-align: left;
+            }
+
+            td[colspan] {
+                display: block;
+                text-align: center;
+            }
+
+            td[colspan]::before {
+                content: "";
+            }
+        }
     </style>
 </head>
 <body>
@@ -86,8 +237,8 @@
             <p>Контроль сроков, просрочек и качества выполнения: {{ task_label }}</p>
         </div>
 
-        <div>
-            <a href="/sla/analytics/export" class="back" style="background:#16a34a;margin-right:8px;">
+        <div class="actions">
+            <a href="/sla/analytics/export" class="back" style="background:#16a34a;">
                 Экспорт CSV
             </a>
 
@@ -129,47 +280,47 @@
 
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card section">
         <h2>SLA по месяцам</h2>
 
-        <div style="overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+        <div class="table-scroll">
+            <table>
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Месяц</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Всего</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Завершено</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочено</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Доля просрочек</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA-рейтинг</th>
+                        <th>Месяц</th>
+                        <th>Всего</th>
+                        <th>Завершено</th>
+                        <th>Просрочено</th>
+                        <th>Доля просрочек</th>
+                        <th>SLA-рейтинг</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     {% for row in sla_monthly_rows %}
                     <tr>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Месяц">
                             {{ row.month }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Всего">
                             {{ row.total_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Завершено">
                             {{ row.completed_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Просрочено">
                             {{ row.overdue_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Доля просрочек">
                             {{ "%.1f"|format(row.overdue_rate or 0) }}%
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="SLA-рейтинг">
                             {{ "%.1f"|format(row.sla_score or 0) }}%
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" style="padding:16px;text-align:center;color:#6b7280;">
+                        <td colspan="6" class="empty-cell">
                             Нет данных по SLA за месяцы
                         </td>
                     </tr>
@@ -179,7 +330,7 @@
         </div>
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card section">
         <h2>Сроки выполнения</h2>
 
         <div class="grid" style="margin-top:16px;">
@@ -202,47 +353,47 @@
         </div>
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card section">
         <h2>Просрочено: {{ task_label }}</h2>
 
-        <div style="overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+        <div class="table-scroll">
+            <table>
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ task_label }}</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ client_label }}</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ worker_label }}</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Дата</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочка</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Статус</th>
+                        <th>{{ task_label }}</th>
+                        <th>{{ client_label }}</th>
+                        <th>{{ worker_label }}</th>
+                        <th>Дата</th>
+                        <th>Просрочка</th>
+                        <th>Статус</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     {% for task in sla_overdue_tasks %}
                     <tr>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="{{ task_label }}">
                             <a href="/task/{{ task.id }}">#{{ task.id }}</a>
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="{{ client_label }}">
                             {{ task.client }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="{{ worker_label }}">
                             {{ task.workers }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Дата">
                             {{ task.task_date }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Просрочка">
                             {{ task.age_days }} дней
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Статус">
                             {{ task.status }}
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
+                        <td colspan="6" class="empty-cell">
                             Нет просрочек: {{ task_label }}
                         </td>
                     </tr>
@@ -252,51 +403,51 @@
         </div>
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card section">
         <h2>SLA: {{ client_label }}</h2>
 
-        <div style="overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+        <div class="table-scroll">
+            <table>
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ client_label }}</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Всего</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Завершено</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Открыто</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочено</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Доля просрочек</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA-рейтинг</th>
+                        <th>{{ client_label }}</th>
+                        <th>Всего</th>
+                        <th>Завершено</th>
+                        <th>Открыто</th>
+                        <th>Просрочено</th>
+                        <th>Доля просрочек</th>
+                        <th>SLA-рейтинг</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     {% for row in sla_client_rows %}
                     <tr>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="{{ client_label }}">
                             {{ row.client }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Всего">
                             {{ row.total_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Завершено">
                             {{ row.completed_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Открыто">
                             {{ row.open_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Просрочено">
                             {{ row.overdue_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Доля просрочек">
                             {{ "%.1f"|format(row.overdue_rate or 0) }}%
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="SLA-рейтинг">
                             {{ "%.1f"|format(row.sla_score or 0) }}%
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
+                        <td colspan="7" class="empty-cell">
                             Нет SLA-данных: {{ client_label }}
                         </td>
                     </tr>
@@ -306,51 +457,51 @@
         </div>
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card section">
         <h2>SLA: {{ worker_label }}</h2>
 
-        <div style="overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+        <div class="table-scroll">
+            <table>
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">{{ worker_label }}</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Всего</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Завершено</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Открыто</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Просрочено</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Доля просрочек</th>
-                        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">SLA-рейтинг</th>
+                        <th>{{ worker_label }}</th>
+                        <th>Всего</th>
+                        <th>Завершено</th>
+                        <th>Открыто</th>
+                        <th>Просрочено</th>
+                        <th>Доля просрочек</th>
+                        <th>SLA-рейтинг</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     {% for row in sla_worker_rows %}
                     <tr>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="{{ worker_label }}">
                             {{ row.worker }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Всего">
                             {{ row.total_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Завершено">
                             {{ row.completed_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Открыто">
                             {{ row.open_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Просрочено">
                             {{ row.overdue_tasks }}
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="Доля просрочек">
                             {{ "%.1f"|format(row.overdue_rate or 0) }}%
                         </td>
-                        <td style="padding:12px;border-bottom:1px solid #e5e7eb;">
+                        <td data-label="SLA-рейтинг">
                             {{ "%.1f"|format(row.sla_score or 0) }}%
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" style="padding:16px;text-align:center;color:#6b7280;">
+                        <td colspan="7" class="empty-cell">
                             Нет SLA-данных: {{ worker_label }}
                         </td>
                     </tr>
@@ -361,6 +512,8 @@
     </div>
 
 </div>
+
+{% include 'mobile_nav.html' %}
 
 </body>
 </html>

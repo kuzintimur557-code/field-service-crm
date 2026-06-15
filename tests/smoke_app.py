@@ -14189,6 +14189,18 @@ async def assert_overdue_sla(task):
     assert "helper2" in sla_html
     assert f"#{task['id']}" in sla_html
 
+    sla_analytics_response = await crm.sla_analytics_page(
+        make_asgi_request("owner2", "/sla/analytics")
+    )
+    assert sla_analytics_response.status_code == 200
+    sla_analytics_html = sla_analytics_response.body.decode("utf-8")
+    assert "SLA-аналитика" in sla_analytics_html
+    assert "SLA по месяцам" in sla_analytics_html
+    assert "table-scroll" in sla_analytics_html
+    assert "data-label=\"Клиент\"" in sla_analytics_html
+    assert 'class="mobile-nav"' in sla_analytics_html
+    assert "Unknown" not in sla_analytics_html
+
     worker_sla_response = await crm.sla_page(
         make_asgi_request("owner2", "/sla"),
         filter="overdue",

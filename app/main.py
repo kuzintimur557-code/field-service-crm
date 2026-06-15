@@ -24033,7 +24033,7 @@ async def sla_analytics_page(request: Request):
 
         sla_overdue_tasks.append({
             "id": row["id"],
-            "client": row["client"] or "Unknown",
+            "client": row["client"] or "Не указан",
             "workers": row["workers"] or "",
             "task_date": row["task_date"],
             "status": row["status"],
