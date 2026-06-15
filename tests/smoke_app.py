@@ -14075,6 +14075,13 @@ async def assert_client_card(task):
     assert ">Активные</a>" in worker_tasks_html
     assert ">Завершённые</a>" in worker_tasks_html
     assert "badge " in worker_tasks_html
+    assert 'class="mobile-nav"' in worker_tasks_html
+    assert ".container{padding:14px 14px 92px}" in worker_tasks_html
+    assert "📋 Мои заявки" not in worker_tasks_html
+    assert "👤 Профиль" not in worker_tasks_html
+    assert "❌ Перед завершением" not in worker_tasks_html
+    assert "▶️ Взять в работу" not in worker_tasks_html
+    assert "✅ Завершить" not in worker_tasks_html
 
     create_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),
