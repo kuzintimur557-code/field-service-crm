@@ -4,25 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Аналитика владельца</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/app.css">
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: Arial, sans-serif;
             background: #f3f4f6;
             margin: 0;
             padding: 24px;
             color: #111827;
+            overflow-x: hidden;
         }
 
         .container {
             max-width: 1300px;
+            width: 100%;
             margin: 0 auto;
         }
 
         .card {
             background: white;
+            border: 1px solid #e5e7eb;
             border-radius: 18px;
             padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+
+        .card .card {
+            box-shadow: none;
         }
 
         .row {
@@ -42,7 +55,10 @@
         }
 
         .btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
             padding: 12px 16px;
             border-radius: 12px;
             text-decoration: none;
@@ -83,6 +99,27 @@
             gap: 8px;
         }
 
+        .page-header,
+        .header-actions,
+        .quick-links {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .page-header {
+            justify-content: space-between;
+        }
+
+        .header-actions {
+            justify-content: flex-end;
+        }
+
+        .quick-links {
+            align-items: stretch;
+        }
+
         .g-3 {
             gap: 16px;
         }
@@ -108,10 +145,19 @@
             text-align: left;
             padding: 12px;
             border-bottom: 1px solid #e5e7eb;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+        }
+
+        th {
+            color: #6b7280;
+            font-size: 12px;
+            text-transform: uppercase;
         }
 
         .form-control {
             width: 100%;
+            min-height: 46px;
             padding: 12px;
             border-radius: 12px;
             border: 1px solid #d1d5db;
@@ -122,6 +168,160 @@
             margin-bottom: 6px;
             font-weight: 700;
         }
+
+        .filter-form {
+            display: grid;
+            grid-template-columns: minmax(220px, 340px) 160px 160px;
+            gap: 18px;
+            align-items: end;
+            max-width: 720px;
+        }
+
+        .owner-chart {
+            display: flex;
+            align-items: end;
+            gap: 10px;
+            height: 260px;
+            overflow-x: auto;
+            padding-top: 20px;
+        }
+
+        .chart-month {
+            min-width: 95px;
+            text-align: center;
+        }
+
+        .chart-bars {
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            gap: 4px;
+            height: 200px;
+        }
+
+        .chart-bar {
+            width: 14px;
+            min-height: 2px;
+        }
+
+        .chart-bar.revenue { background: #198754; }
+        .chart-bar.payroll { background: #0d6efd; }
+        .chart-bar.net { background: #ffc107; }
+        .chart-bar.average { background: #6f42c1; }
+
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .small {
+            font-size: 13px;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                padding: 16px 14px 92px;
+            }
+
+            .page-header,
+            .header-actions,
+            .quick-links {
+                display: grid;
+                grid-template-columns: 1fr;
+                align-items: stretch;
+            }
+
+            .btn,
+            .header-actions .btn,
+            .quick-links .btn {
+                width: 100%;
+            }
+
+            .card {
+                padding: 16px;
+                border-radius: 16px;
+            }
+
+            h2 {
+                font-size: 28px;
+            }
+
+            .filter-form {
+                grid-template-columns: 1fr;
+                max-width: none;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .table-responsive {
+                overflow: visible;
+            }
+
+            table,
+            thead,
+            tbody,
+            tr,
+            th,
+            td {
+                display: block;
+                width: 100%;
+            }
+
+            thead {
+                display: none;
+            }
+
+            tbody tr {
+                border: 1px solid #e5e7eb;
+                border-radius: 16px;
+                padding: 4px 12px;
+                margin-bottom: 10px;
+                background: #fff;
+            }
+
+            td {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                text-align: right;
+                padding: 10px 0;
+                border-bottom: 1px solid #eef2f7;
+            }
+
+            td:last-child {
+                border-bottom: 0;
+            }
+
+            td::before {
+                content: attr(data-label);
+                color: #6b7280;
+                font-size: 12px;
+                font-weight: 900;
+                text-align: left;
+            }
+
+            td[colspan] {
+                display: block;
+                text-align: center;
+            }
+
+            td[colspan]::before {
+                content: "";
+            }
+
+            .owner-chart {
+                height: 220px;
+            }
+
+            .chart-bars {
+                height: 165px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -129,18 +329,18 @@
 
 <div class="container mt-4">
 
-  <div class="d-flex justify-content-between align-items-center mb-4">
+  <div class="page-header mb-4">
     <div>
       <h2 class="mb-1">Аналитика владельца</h2>
       <p class="text-muted mb-0">Сводка по финансам, выплатам, клиентам и рискам компании</p>
     </div>
 
-    <div style="display:flex;gap:12px;align-items:center;">
-      <a href="/" class="btn btn-outline-secondary" style="height:48px;display:flex;align-items:center;justify-content:center;padding:0 22px;">
+    <div class="header-actions">
+      <a href="/" class="btn btn-outline-secondary">
         ← Главное меню
       </a>
 
-      <a href="/owner/dashboard/export" class="btn btn-success" style="height:48px;display:flex;align-items:center;justify-content:center;padding:0 22px;">
+      <a href="/owner/dashboard/export" class="btn btn-success">
         Экспорт CSV
       </a>
     </div>
@@ -150,7 +350,7 @@
     <div class="card-body">
 <h3 class="mb-3">Фильтры</h3>
 
-<form method="get" action="/owner/dashboard" style="display:grid;grid-template-columns:340px 160px 160px;gap:18px;align-items:end;max-width:720px;">
+<form method="get" action="/owner/dashboard" class="filter-form">
 
   <div>
     <label class="form-label">Месяц</label>
@@ -159,14 +359,12 @@
       name="month"
       value="{{ month }}"
       class="form-control"
-      style="height:54px;box-sizing:border-box;padding:0 18px;margin:0;"
     >
   </div>
 
   <button
     type="submit"
     class="btn btn-primary"
-    style="height:54px;box-sizing:border-box;padding:0 24px;margin:0;display:flex;align-items:center;justify-content:center;"
   >
     Применить
   </button>
@@ -174,7 +372,6 @@
   <a
     href="/owner/dashboard"
     class="btn btn-outline-secondary"
-    style="height:54px;box-sizing:border-box;padding:0 24px;margin:0;display:flex;align-items:center;justify-content:center;"
   >
     Сбросить
   </a>
@@ -191,8 +388,8 @@
 
       <h3 class="mb-3">Быстрые ссылки</h3>
 
-      <div class="d-flex flex-wrap gap-2">
-        <a href="/finance/summary" class="btn btn-primary" style="height:48px;display:flex;align-items:center;justify-content:center;padding:0 24px;">
+      <div class="quick-links">
+        <a href="/finance/summary" class="btn btn-primary">
           Финансовая сводка
         </a>
 
@@ -436,15 +633,15 @@
           <tbody>
             {% for task in unpaid_risk_tasks %}
             <tr>
-              <td>
+              <td data-label="Заявка">
                 <a href="/task/{{ task.id }}">
                   #{{ task.id }}
                 </a>
               </td>
-              <td>{{ task.client_name }}</td>
-              <td>{{ task.task_date }}</td>
-              <td>{{ task.age_days }} дн.</td>
-              <td>₽{{ "%.2f"|format(task.unpaid_amount or 0) }}</td>
+              <td data-label="Клиент">{{ task.client_name }}</td>
+              <td data-label="Дата">{{ task.task_date }}</td>
+              <td data-label="Просрочка">{{ task.age_days }} дн.</td>
+              <td data-label="Не оплачено">₽{{ "%.2f"|format(task.unpaid_amount or 0) }}</td>
             </tr>
             {% else %}
             <tr>
@@ -505,12 +702,12 @@
           <tbody>
             {% for client in top_repeat_clients %}
             <tr>
-              <td>{{ client.client_name }}</td>
-              <td>{{ client.jobs_count or 0 }}</td>
-              <td>₽{{ "%.2f"|format(client.revenue or 0) }}</td>
-              <td>₽{{ "%.2f"|format(client.payroll or 0) }}</td>
-              <td>₽{{ "%.2f"|format(client.profit or 0) }}</td>
-              <td>₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
+              <td data-label="Клиент">{{ client.client_name }}</td>
+              <td data-label="Задачи">{{ client.jobs_count or 0 }}</td>
+              <td data-label="Выручка">₽{{ "%.2f"|format(client.revenue or 0) }}</td>
+              <td data-label="Выплаты">₽{{ "%.2f"|format(client.payroll or 0) }}</td>
+              <td data-label="Прибыль">₽{{ "%.2f"|format(client.profit or 0) }}</td>
+              <td data-label="Чистая прибыль">₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
             </tr>
             {% else %}
             <tr>
@@ -549,12 +746,12 @@
           <tbody>
             {% for client in top_owner_clients %}
             <tr>
-              <td>{{ client.client_name }}</td>
-              <td>₽{{ "%.2f"|format(client.revenue or 0) }}</td>
-              <td>₽{{ "%.2f"|format(client.payroll or 0) }}</td>
-              <td>₽{{ "%.2f"|format(client.profit or 0) }}</td>
-              <td>₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
-              <td>{{ client.jobs_count or 0 }}</td>
+              <td data-label="Клиент">{{ client.client_name }}</td>
+              <td data-label="Выручка">₽{{ "%.2f"|format(client.revenue or 0) }}</td>
+              <td data-label="Выплаты">₽{{ "%.2f"|format(client.payroll or 0) }}</td>
+              <td data-label="Прибыль">₽{{ "%.2f"|format(client.profit or 0) }}</td>
+              <td data-label="Чистая прибыль">₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
+              <td data-label="Задачи">{{ client.jobs_count or 0 }}</td>
             </tr>
             {% else %}
             <tr>
@@ -590,9 +787,9 @@
           <tbody>
             {% for worker in top_owner_workers %}
             <tr>
-              <td>{{ worker.worker_name }}</td>
-              <td>₽{{ "%.2f"|format(worker.total_paid or 0) }}</td>
-              <td>{{ worker.payouts_count or 0 }}</td>
+              <td data-label="Исполнитель">{{ worker.worker_name }}</td>
+              <td data-label="Выплачено">₽{{ "%.2f"|format(worker.total_paid or 0) }}</td>
+              <td data-label="Кол-во выплат">{{ worker.payouts_count or 0 }}</td>
             </tr>
             {% else %}
             <tr>
@@ -634,10 +831,10 @@
                   <tbody>
                     {% for client in low_margin_clients %}
                     <tr>
-                      <td>{{ client.client_name }}</td>
-                      <td>{{ "%.1f"|format(client.margin or 0) }}%</td>
-                      <td>₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
-                      <td>{{ client.jobs_count or 0 }}</td>
+                      <td data-label="Клиент">{{ client.client_name }}</td>
+                      <td data-label="Маржа">{{ "%.1f"|format(client.margin or 0) }}%</td>
+                      <td data-label="Чистая прибыль">₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
+                      <td data-label="Задачи">{{ client.jobs_count or 0 }}</td>
                     </tr>
                     {% else %}
                     <tr>
@@ -671,9 +868,9 @@
                   <tbody>
                     {% for row in negative_months %}
                     <tr>
-                      <td>{{ row.month }}</td>
-                      <td>₽{{ "%.2f"|format(row.revenue or 0) }}</td>
-                      <td>₽{{ "%.2f"|format(row.net_profit or 0) }}</td>
+                      <td data-label="Месяц">{{ row.month }}</td>
+                      <td data-label="Выручка">₽{{ "%.2f"|format(row.revenue or 0) }}</td>
+                      <td data-label="Чистая прибыль">₽{{ "%.2f"|format(row.net_profit or 0) }}</td>
                     </tr>
                     {% else %}
                     <tr>
@@ -718,13 +915,13 @@
           <tbody>
             {% for row in owner_monthly_metrics %}
             <tr>
-              <td>{{ row.month }}</td>
-              <td>₽{{ "%.2f"|format(row.revenue or 0) }}</td>
-              <td>₽{{ "%.2f"|format(row.payroll or 0) }}</td>
-              <td>₽{{ "%.2f"|format(row.profit or 0) }}</td>
-              <td>₽{{ "%.2f"|format(row.net_profit or 0) }}</td>
-              <td>{{ row.jobs_count or 0 }}</td>
-              <td>₽{{ "%.2f"|format(row.average_job_value or 0) }}</td>
+              <td data-label="Месяц">{{ row.month }}</td>
+              <td data-label="Выручка">₽{{ "%.2f"|format(row.revenue or 0) }}</td>
+              <td data-label="Выплаты">₽{{ "%.2f"|format(row.payroll or 0) }}</td>
+              <td data-label="Прибыль">₽{{ "%.2f"|format(row.profit or 0) }}</td>
+              <td data-label="Чистая прибыль">₽{{ "%.2f"|format(row.net_profit or 0) }}</td>
+              <td data-label="Задачи">{{ row.jobs_count or 0 }}</td>
+              <td data-label="Средний чек">₽{{ "%.2f"|format(row.average_job_value or 0) }}</td>
             </tr>
             {% else %}
             <tr>
@@ -746,22 +943,22 @@
 
       <h3 class="mb-3">Графики аналитики владельца</h3>
 
-      <div style="display: flex; align-items: end; gap: 10px; height: 260px; overflow-x: auto; padding-top: 20px;">
+      <div class="owner-chart">
 
         {% for row in owner_chart_data %}
           {% set max_value = [row.revenue, row.payroll, row.net_profit, row.average_job_value] | max %}
           {% set chart_height = 190 %}
 
-          <div style="min-width: 95px; text-align: center;">
-            <div style="display: flex; align-items: end; justify-content: center; gap: 4px; height: 200px;">
+          <div class="chart-month">
+            <div class="chart-bars">
 
-              <div title="Выручка: ₽{{ row.revenue }}" style="width: 14px; height: {{ (row.revenue / max_value * chart_height) if max_value else 0 }}px; background: #198754;"></div>
+              <div class="chart-bar revenue" title="Выручка: ₽{{ row.revenue }}" style="height: {{ (row.revenue / max_value * chart_height) if max_value else 0 }}px;"></div>
 
-              <div title="Выплаты: ₽{{ row.payroll }}" style="width: 14px; height: {{ (row.payroll / max_value * chart_height) if max_value else 0 }}px; background: #0d6efd;"></div>
+              <div class="chart-bar payroll" title="Выплаты: ₽{{ row.payroll }}" style="height: {{ (row.payroll / max_value * chart_height) if max_value else 0 }}px;"></div>
 
-              <div title="Чистая прибыль: ₽{{ row.net_profit }}" style="width: 14px; height: {{ (row.net_profit / max_value * chart_height) if max_value else 0 }}px; background: #ffc107;"></div>
+              <div class="chart-bar net" title="Чистая прибыль: ₽{{ row.net_profit }}" style="height: {{ (row.net_profit / max_value * chart_height) if max_value else 0 }}px;"></div>
 
-              <div title="Средний чек: ₽{{ row.average_job_value }}" style="width: 14px; height: {{ (row.average_job_value / max_value * chart_height) if max_value else 0 }}px; background: #6f42c1;"></div>
+              <div class="chart-bar average" title="Средний чек: ₽{{ row.average_job_value }}" style="height: {{ (row.average_job_value / max_value * chart_height) if max_value else 0 }}px;"></div>
 
             </div>
 
@@ -779,7 +976,7 @@
 
       </div>
 
-      <div class="mt-3 small">
+      <div class="mt-3 small chart-legend">
         <span class="me-3">🟩 Выручка</span>
         <span class="me-3">🟦 Выплаты</span>
         <span class="me-3">🟨 Чистая прибыль</span>
@@ -791,6 +988,7 @@
 
 </div>
 
+{% include 'mobile_nav.html' %}
 
 </body>
 </html>

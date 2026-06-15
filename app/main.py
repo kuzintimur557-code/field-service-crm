@@ -24322,6 +24322,12 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     if not month:
         month = datetime.now().strftime("%Y-%m")
 
+    try:
+        owner_selected_month_date = datetime.strptime(month + "-01", "%Y-%m-%d")
+    except ValueError:
+        month = datetime.now().strftime("%Y-%m")
+        owner_selected_month_date = datetime.strptime(month + "-01", "%Y-%m-%d")
+
     conn = connect()
     c = conn.cursor()
 
@@ -24558,7 +24564,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
 
     top_repeat_clients = [
         {
-            "client_name": row["client"] or "Не указан",
+            "client_name": row["client_name"] or "Не указан",
             "jobs_count": int(row["jobs_count"] or 0),
             "revenue": round(float(row["revenue"] or 0), 1),
             "profit": round(float(row["profit"] or 0), 1),
@@ -24570,7 +24576,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
 
     top_owner_clients = [
         {
-            "client_name": row["client"] or "Не указан",
+            "client_name": row["client_name"] or "Не указан",
             "revenue": round(float(row["revenue"] or 0), 1),
             "profit": round(float(row["profit"] or 0), 1),
             "payroll": round(float(row["payroll"] or 0), 1),
@@ -24591,7 +24597,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
 
     low_margin_clients = [
         {
-            "client_name": row["client"] or "Unknown",
+            "client_name": row["client_name"] or "Не указан",
             "revenue": round(float(row["revenue"] or 0), 1),
             "profit": round(float(row["profit"] or 0), 1),
             "payroll": round(float(row["payroll"] or 0), 1),
@@ -24636,8 +24642,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
       AND month=?
     """, (company_id, month)).fetchone()
 
-    selected_month_date = datetime.strptime(month + "-01", "%Y-%m-%d")
-    previous_month = (selected_month_date.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    previous_month = (owner_selected_month_date.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
 
     previous_month_metrics = c.execute("""
     SELECT
@@ -24684,6 +24689,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
             "request": request,
             "username": username,
             "role": role,
+            "month": month,
             "total_clients": total_clients,
             "total_workers": total_workers,
             "total_tasks": total_tasks,

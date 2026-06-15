@@ -13773,6 +13773,31 @@ async def assert_finance_summary_page():
     assert 'class="mobile-nav"' in html
 
 
+async def assert_owner_dashboard_page():
+    response = await crm.owner_dashboard_page(
+        make_asgi_request("owner2", "/owner/dashboard"),
+        month="2026-05",
+    )
+    assert response.status_code == 200
+
+    html = response.body.decode("utf-8")
+    assert html.startswith("<!DOCTYPE html>")
+    assert "Аналитика владельца" in html
+    assert "Фильтры" in html
+    assert "Риски бизнеса" in html
+    assert "data-label=\"Клиент\"" in html
+    assert "owner-chart" in html
+    assert 'class="mobile-nav"' in html
+    assert 'value="2026-05"' in html
+    assert "Unknown" not in html
+
+    invalid_month_response = await crm.owner_dashboard_page(
+        make_asgi_request("owner2", "/owner/dashboard?month=bad"),
+        month="bad",
+    )
+    assert invalid_month_response.status_code == 200
+
+
 async def assert_notifications(task):
     crm.create_notification(
         2,
@@ -15714,6 +15739,7 @@ def main():
         asyncio.run(assert_catalog_create())
         asyncio.run(assert_finance_margin(task))
         asyncio.run(assert_finance_summary_page())
+        asyncio.run(assert_owner_dashboard_page())
         asyncio.run(assert_notifications(task))
         asyncio.run(assert_client_card(task))
         asyncio.run(assert_overdue_sla(task))
