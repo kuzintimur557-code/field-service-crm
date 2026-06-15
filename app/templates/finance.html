@@ -12,7 +12,7 @@
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
 .container{max-width:1200px;margin:auto;padding:28px;width:100%}
 .header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
-h1{margin:0;font-size:34px}
+h1{margin:0;font-size:34px;line-height:1.12}
 h2{margin:0 0 16px;font-size:22px}
 .back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;color:#2563eb;text-decoration:none;font-weight:900}
 .card{background:white;padding:24px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
@@ -44,7 +44,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .mobile-label{display:none;color:#6b7280;font-size:12px;font-weight:900;margin-bottom:4px}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:26px}
 @media(max-width:950px){
-.container{padding:16px}
+.container{padding:16px 14px 92px}
 .header{display:block}
 h1{font-size:28px;margin-bottom:12px}
 .stats{grid-template-columns:1fr}
@@ -69,7 +69,7 @@ input,select,button{width:100%;margin-top:8px}
 
 <div class="header">
     <div>
-        <h1>💰 Финансы</h1>
+        <h1>Финансы</h1>
         <div style="color:#6b7280;font-weight:800;margin-top:6px">
             Оплаты, выручка и прибыль по заявкам
         </div>
@@ -121,7 +121,7 @@ input,select,button{width:100%;margin-top:8px}
 
 <div class="actions-row">
 <a href="/finance/export?month={{ month }}{% if selected_payment_filter %}&payment_filter={{ selected_payment_filter }}{% endif %}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}{% if selected_profit_filter %}&profit_filter={{ selected_profit_filter }}{% endif %}" class="action-link green">
-⬇️ Скачать CSV
+Скачать CSV
 </a>
 <a href="/payroll?month={{ month }}" class="action-link dark">
 Зарплаты за месяц

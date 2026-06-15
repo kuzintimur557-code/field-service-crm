@@ -13508,6 +13508,11 @@ async def assert_finance_margin(task):
     assert "mobile-label" in finance_html
     assert "action-link green" in finance_html
     assert "action-link dark" in finance_html
+    assert 'class="mobile-nav"' in finance_html
+    assert ".container{padding:16px 14px 92px}" in finance_html
+    assert "💰 Финансы" not in finance_html
+    assert "⬇️ Скачать CSV" not in finance_html
+    assert "Скачать CSV" in finance_html
 
     payroll_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll"),
