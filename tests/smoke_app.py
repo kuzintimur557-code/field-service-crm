@@ -12369,6 +12369,24 @@ async def assert_catalog_create():
 
     assert item is not None
 
+    catalog_response = await crm.catalog_page(make_asgi_request("owner2", "/catalog"))
+    assert catalog_response.status_code == 200
+    catalog_html = catalog_response.body.decode("utf-8")
+    assert "Каталог" in catalog_html
+    assert "Добавить в каталог" in catalog_html
+    assert "Smoke service" in catalog_html
+    assert 'class="mobile-nav"' in catalog_html
+    assert ".container{padding:16px 14px 92px}" in catalog_html
+    assert "📦 Каталог" not in catalog_html
+    assert "✅ Позиция добавлена" not in catalog_html
+    assert "❌ Название обязательно" not in catalog_html
+    assert "➕ Добавить в каталог" not in catalog_html
+
+    created_response = await crm.catalog_page(
+        make_asgi_request("owner2", "/catalog", "created=1")
+    )
+    assert "Позиция добавлена" in created_response.body.decode("utf-8")
+
 
 async def assert_finance_margin(task):
     conn = connect()
