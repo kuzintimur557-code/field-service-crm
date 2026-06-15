@@ -4353,6 +4353,31 @@ async def assert_more_page():
     assert "🚪 Выйти" not in html
 
 
+async def assert_home_page():
+    response = await crm.home(make_asgi_request("owner2", "/"))
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "Бизнес CRM" in html
+    assert "Новая Заявка" in html
+    assert "Календарь" in html
+    assert "Каталог" in html
+    assert "Финансы" in html
+    assert "Аналитика владельца" in html
+    assert "Уведомления" in html
+    assert 'class="mobile-nav"' in html
+    assert ".container{padding:16px 14px 92px}" in html
+    assert ".nav a{display:inline-flex" in html
+    assert "🚀 Бизнес CRM" not in html
+    assert "➕ Новая" not in html
+    assert "📅 Календарь" not in html
+    assert "📦 Каталог" not in html
+    assert "💰 Финансы" not in html
+    assert "📊 Аналитика владельца" not in html
+    assert "🔔 Уведомления" not in html
+    assert "✅ Завершено" not in html
+    assert "🚧 В работе" not in html
+
+
 async def assert_login_page():
     response = await crm.login_page(make_public_asgi_request("/login"))
     assert response.status_code == 200
@@ -15913,6 +15938,7 @@ def main():
         asyncio.run(assert_ai_assistant_page())
         asyncio.run(assert_login_page())
         asyncio.run(assert_more_page())
+        asyncio.run(assert_home_page())
         asyncio.run(assert_profile_page())
         asyncio.run(assert_settings_page())
         asyncio.run(assert_billing_page())

@@ -9,40 +9,52 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.container{max-width:1200px;margin:auto;padding:28px}
-.header{background:white;padding:30px;border-radius:28px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:24px}
-h1{margin:0;font-size:38px}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{width:100%;max-width:1200px;margin:auto;padding:28px}
+.header{background:white;padding:30px;border:1px solid #e5e7eb;border-radius:22px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:24px}
+h1{margin:0;font-size:38px;line-height:1.12}
 .subtitle{color:#6b7280;font-weight:800;margin-top:10px;font-size:18px}
 .nav{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
-.nav a{display:inline-block;padding:14px 18px;border-radius:15px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
+.nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 18px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900}
 .nav a.dark{background:#111827}
 .nav a.red{background:#991b1b}
 .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:28px}
-.stat{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
-.stat-label{font-size:14px;color:#6b7280;font-weight:900;margin-bottom:10px}
+.stat{background:white;padding:24px;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
+.stat-label,.stat-title{font-size:14px;color:#6b7280;font-weight:900;margin-bottom:10px}
 .stat-value{font-size:32px;font-weight:900}
 .section-title{font-size:26px;font-weight:900;margin:28px 0 16px}
 .worker-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-bottom:28px}
-.worker-card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
+.worker-card{background:white;padding:24px;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 10px 25px rgba(0,0,0,.07)}
 .worker-name{font-size:22px;font-weight:900;margin-bottom:14px}
 .worker-line{margin:8px 0;color:#374151;font-weight:700}
-.card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+.card{background:white;padding:24px;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
 .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
-input,select,button{width:100%;padding:14px;border-radius:14px;font-size:16px}
+input,select,button{width:100%;min-height:44px;padding:14px;border-radius:14px;font-size:16px}
 input,select{border:1px solid #d1d5db;background:white}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
-.task{display:grid;grid-template-columns:1.2fr 1.3fr .8fr .8fr auto;gap:14px;align-items:center;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px}
+.task{display:grid;grid-template-columns:1.2fr 1.3fr .8fr .8fr auto;gap:14px;align-items:center;background:#f9fafb;padding:16px;border-radius:16px;margin-bottom:10px}
 .label{font-size:12px;color:#6b7280;font-weight:900;margin-bottom:5px}
 .value{font-size:16px;font-weight:900;word-break:break-word}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;font-weight:900;background:#dbeafe;color:#1d4ed8}
-.btn{display:inline-block;padding:11px 15px;border-radius:13px;background:#2563eb;color:white;text-decoration:none;font-weight:900;text-align:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 15px;border-radius:13px;background:#2563eb;color:white;text-decoration:none;font-weight:900;text-align:center}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:30px}
+.alert{padding:18px;border:1px solid transparent;border-radius:18px;font-weight:900;margin-bottom:18px}
+.alert a{display:inline-block;margin-left:12px;text-decoration:underline}
+.alert.danger{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+.alert.danger a{color:#991b1b}
+.alert.warning{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.alert.warning a{color:#92400e}
+.alert.info{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}
+.alert.info a{color:#1d4ed8}
 @media(max-width:900px){
-.container{padding:16px}
+.container{padding:16px 14px 92px}
+.header,.card,.stat,.worker-card{border-radius:18px}
+.header,.card,.stat,.worker-card{padding:20px}
 .stats,.filters,.task{grid-template-columns:1fr}
 .nav a{width:100%;text-align:center}
 h1{font-size:30px}
+.subtitle{font-size:16px}
+.section-title{font-size:22px}
 }
 </style>
 </head>
@@ -51,107 +63,107 @@ h1{font-size:30px}
 <div class="container">
 
 <div class="header">
-    <h1>🚀 Бизнес CRM</h1>
+    <h1>Бизнес CRM</h1>
     <div class="subtitle">Вы вошли как: {{ username }} / {{ role_label(role) }}</div>
 
     <div class="nav">
         {% set f = features if features is defined else {} %}
-        <a href="/create-task">➕ Новая {{ settings["task_label"] or "Заявка" }}</a>
+        <a href="/create-task">Новая {{ settings["task_label"] or "Заявка" }}</a>
         {% if f.get("calendar", True) %}
-        <a href="/calendar">📅 Календарь</a>
+        <a href="/calendar">Календарь</a>
         {% endif %}
         {% if f.get("sla", True) %}
-        <a href="/sla">⏰ SLA</a>
+        <a href="/sla">SLA</a>
         {% endif %}
 
         {% if role in ["boss", "manager"] %}
         {% if f.get("clients", True) %}
-        <a href="/clients">👤 {{ settings["client_label"] or "Клиенты" }}</a>
+        <a href="/clients">{{ settings["client_label"] or "Клиенты" }}</a>
         {% endif %}
         {% if f.get("catalog", True) %}
-        <a href="/catalog">📦 Каталог</a>
+        <a href="/catalog">Каталог</a>
         {% endif %}
         {% if f.get("recurring", True) %}
-        <a href="/recurring">🔁 Регулярные</a>
+        <a href="/recurring">Регулярные</a>
         {% endif %}
         {% if f.get("finance", True) %}
-        <a href="/finance">💰 Финансы</a>
+        <a href="/finance">Финансы</a>
         {% endif %}
         {% if f.get("payroll", True) %}
-        <a href="/payroll">💵 Зарплаты</a>
+        <a href="/payroll">Зарплаты</a>
         {% endif %}
         {% if f.get("analytics", True) %}
-        <a href="/owner/dashboard">📊 Аналитика владельца</a>
+        <a href="/owner/dashboard">Аналитика владельца</a>
         {% endif %}
         {% if f.get("sla", True) %}
-        <a href="/sla/analytics">⏱ SLA-аналитика</a>
+        <a href="/sla/analytics">SLA-аналитика</a>
         {% endif %}
         {% if f.get("archive", True) %}
-        <a href="/archive" class="dark">🗄 Архив</a>
+        <a href="/archive" class="dark">Архив</a>
         {% endif %}
         {% if f.get("calls", True) %}
-        <a href="/calls">☎️ Звонки</a>
+        <a href="/calls">Звонки</a>
         {% endif %}
         {% if f.get("automation", True) %}
-        <a href="/automation">⚙️ Автоматизация</a>
+        <a href="/automation">Автоматизация</a>
         {% endif %}
 
         {% if f.get("ai_insights", True) %}
-        <a href="/ai/insights">🤖 AI-инсайты</a>
-        <a href="/ai/assistant">🧠 AI-помощник</a>
+        <a href="/ai/insights">AI-инсайты</a>
+        <a href="/ai/assistant">AI-помощник</a>
         {% endif %}
         {% endif %}
 
         {% if role == "boss" %}
-        <a href="/workers" class="dark">👥 {{ settings["worker_label"] or "Исполнители" }}</a>
+        <a href="/workers" class="dark">{{ settings["worker_label"] or "Исполнители" }}</a>
         {% endif %}
 
         {% if role == "boss" %}
         {% if role == "superadmin" %}
-        <a href="/admin" class="dark">🛠 Админ</a>
+        <a href="/admin" class="dark">Админ</a>
         {% endif %}
-        <a href="/settings" class="dark">⚙️ Настройки</a>
+        <a href="/settings" class="dark">Настройки</a>
         {% endif %}
 
         {% if f.get("notifications", True) %}
-        <a href="/notifications" class="dark">🔔 Уведомления</a>
+        <a href="/notifications" class="dark">Уведомления</a>
         {% endif %}
-        <a href="/profile" class="dark">👤 Профиль</a>
+        <a href="/profile" class="dark">Профиль</a>
         <a href="/logout" class="red">Выйти</a>
     </div>
 </div>
 
 {% if f.get("sla", True) and sla_breached_tasks and sla_breached_tasks > 0 %}
-<div style="background:#fee2e2;color:#991b1b;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
-    🔴 Есть просроченные SLA: {{ sla_breached_tasks }}
-    <a href="/sla?filter=overdue" style="display:inline-block;margin-left:12px;color:#991b1b;text-decoration:underline">
+<div class="alert danger">
+    Есть просроченные SLA: {{ sla_breached_tasks }}
+    <a href="/sla?filter=overdue">
         Открыть
     </a>
 </div>
 {% endif %}
 
 {% if f.get("sla", True) and sla_due_soon_tasks and sla_due_soon_tasks > 0 %}
-<div style="background:#fef3c7;color:#92400e;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
-    🟡 Горит SLA в ближайшие 24 часа: {{ sla_due_soon_tasks }}
-    <a href="/sla?filter=soon" style="display:inline-block;margin-left:12px;color:#92400e;text-decoration:underline">
+<div class="alert warning">
+    Горит SLA в ближайшие 24 часа: {{ sla_due_soon_tasks }}
+    <a href="/sla?filter=soon">
         Открыть
     </a>
 </div>
 {% endif %}
 
 {% if overdue_tasks and overdue_tasks > 0 %}
-<div style="background:#fee2e2;color:#991b1b;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
-    ⚠️ Есть просроченные {{ (settings["task_label"] or "заявка")|lower }}: {{ overdue_tasks }}
-    <a href="/overdue" style="display:inline-block;margin-left:12px;color:#991b1b;text-decoration:underline">
+<div class="alert danger">
+    Есть просроченные {{ (settings["task_label"] or "заявка")|lower }}: {{ overdue_tasks }}
+    <a href="/overdue">
         Открыть
     </a>
 </div>
 {% endif %}
 
 {% if today_tasks and today_tasks > 0 %}
-<div style="background:#dbeafe;color:#1d4ed8;padding:18px;border-radius:22px;font-weight:900;margin-bottom:18px">
-    📅 Сегодня есть {{ (settings["task_label"] or "заявка")|lower }}: {{ today_tasks }}
-    <a href="/today" style="display:inline-block;margin-left:12px;color:#1d4ed8;text-decoration:underline">
+<div class="alert info">
+    Сегодня есть {{ (settings["task_label"] or "заявка")|lower }}: {{ today_tasks }}
+    <a href="/today">
         Открыть
     </a>
 </div>
@@ -216,17 +228,17 @@ h1{font-size:30px}
 </div>
 
 {% if role in ["boss", "manager"] and f.get("workload", True) %}
-<div class="section-title">👥 {{ settings["worker_label"] or "Исполнители" }}</div>
+<div class="section-title">{{ settings["worker_label"] or "Исполнители" }}</div>
 
 {% if worker_stats %}
 <div class="worker-grid">
 {% for stat in worker_stats %}
     <div class="worker-card">
         <div class="worker-name">{{ stat.username }}</div>
-        <div class="worker-line">✅ Завершено: <b>{{ stat.completed }}</b></div>
-        <div class="worker-line">🚧 В работе: <b>{{ stat.active }}</b></div>
-        <div class="worker-line">💰 Доход: <b>{{ stat.revenue }} ₽</b></div>
-        <div class="worker-line">🕒 Был онлайн: <b>{{ stat.last_seen }}</b></div>
+        <div class="worker-line">Завершено: <b>{{ stat.completed }}</b></div>
+        <div class="worker-line">В работе: <b>{{ stat.active }}</b></div>
+        <div class="worker-line">Доход: <b>{{ stat.revenue }} ₽</b></div>
+        <div class="worker-line">Был онлайн: <b>{{ stat.last_seen }}</b></div>
     </div>
 {% endfor %}
 </div>
@@ -236,7 +248,7 @@ h1{font-size:30px}
 {% endif %}
 
 <div class="card">
-<div class="section-title">📋 {{ settings["task_label"] or "Заявки" }}</div>
+<div class="section-title">{{ settings["task_label"] or "Заявки" }}</div>
 
 <form method="get" action="/">
 <div class="filters">
