@@ -14150,6 +14150,12 @@ async def assert_client_card(task):
     assert f"#{task['id']}" in html
     assert 'class="mobile-nav"' in html
     assert "overflow-x:hidden" in html
+    assert "h1{margin:0 0 20px;font-size:34px;line-height:1.12;overflow-wrap:anywhere}" in html
+    assert ".btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%" in html
+    assert ".latest-meta{color:#4b5563;font-weight:800;line-height:1.45;overflow-wrap:anywhere}" in html
+    assert ".timeline-details{color:#4b5563;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}" in html
+    assert ".stats{grid-template-columns:1fr 1fr}" in html
+    assert "@media(max-width:460px)" in html
     assert 'input[type="hidden"]{display:none}' in html
     assert "💾 Сохранить изменения" not in html
     assert "📝 Добавить заметку" not in html
