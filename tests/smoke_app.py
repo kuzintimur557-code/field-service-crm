@@ -14187,6 +14187,12 @@ async def assert_client_card(task):
     assert 'value="Company 2 address"' in create_html
     assert "Исполнители не выбраны" in create_html
     assert "syncWorkerSummary" in create_html
+    assert 'class="mobile-nav"' in create_html
+    assert ".container{padding:16px 14px 92px}" in create_html
+    assert "Новая заявка" in create_html
+    assert "Создать заявку" in create_html
+    assert "➕ Новая заявка" not in create_html
+    assert "🚀 Создать заявку" not in create_html
 
     repeat_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),

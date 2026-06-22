@@ -13,7 +13,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;over
 .container{max-width:900px;margin:auto;padding:28px;width:100%}
 .back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
 .card{background:white;padding:30px;border:1px solid #e5e7eb;border-radius:22px;box-shadow:0 12px 30px rgba(0,0,0,.08)}
-h1{margin:0 0 24px;font-size:32px}
+h1{margin:0 0 24px;font-size:32px;line-height:1.12}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 label{display:block;font-weight:800;margin:14px 0 7px}
 input,textarea,select{width:100%;padding:15px;border:1px solid #d1d5db;border-radius:14px;font-size:16px;background:white}
@@ -40,7 +40,7 @@ button:hover{background:#1d4ed8}
 .worker-option.at-capacity .worker-load{color:#991b1b}
 .worker-option.unavailable .worker-load{color:#4b5563}
 @media(max-width:700px){
-    .container{padding:16px}
+    .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
     .grid{grid-template-columns:1fr}
     h1{font-size:26px}
@@ -58,7 +58,7 @@ button:hover{background:#1d4ed8}
 
 <div class="card">
 
-<h1>➕ Новая заявка</h1>
+<h1>Новая заявка</h1>
 
 	<div class="note">
 	После создания заявка появится в CRM, а уведомление отправится в Telegram.
@@ -253,7 +253,7 @@ button:hover{background:#1d4ed8}
 	<label>Фото / документ</label>
 <input name="photo" type="file" accept="image/*,application/pdf">
 
-<button type="submit">🚀 Создать заявку</button>
+<button type="submit">Создать заявку</button>
 
 </form>
 
