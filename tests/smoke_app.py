@@ -14368,6 +14368,48 @@ async def assert_overdue_sla(task):
     assert f"#{task['id']}" in html
     assert "Создать напоминания по просрочкам" in html
     assert 'href="/automation"' in html
+    assert 'class="mobile-nav"' in html
+    assert ".container{padding:16px 14px 92px}" in html
+    assert "⏰ Просроченные заявки" not in html
+    assert "📅 Дата:" not in html
+    assert "📍 Адрес:" not in html
+    assert "👷 Исполнитель:" not in html
+    assert "Просроченных заявок нет ✅" not in html
+
+    today_value = datetime.now().strftime("%Y-%m-%d")
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE tasks
+    SET archived=0, status='Новая', task_date=?, deadline_at=NULL
+    WHERE id=?
+    """, (today_value, task["id"]))
+    conn.commit()
+    conn.close()
+
+    today_response = await crm.today_page(make_asgi_request("owner2", "/today"))
+    assert today_response.status_code == 200
+    today_html = today_response.body.decode("utf-8")
+    assert "Заявки сегодня" in today_html
+    assert f"#{task['id']}" in today_html
+    assert "Открыть заявку" in today_html
+    assert 'class="mobile-nav"' in today_html
+    assert ".container{padding:16px 14px 92px}" in today_html
+    assert "📅 Заявки сегодня" not in today_html
+    assert "⏰ Время:" not in today_html
+    assert "📍 Адрес:" not in today_html
+    assert "👷 Исполнитель:" not in today_html
+    assert "На сегодня заявок нет ✅" not in today_html
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE tasks
+    SET archived=0, status='Новая', task_date='2000-01-01', deadline_at='2000-01-01T10:00'
+    WHERE id=?
+    """, (task["id"],))
+    conn.commit()
+    conn.close()
 
     sla_response = await crm.sla_page(
         make_asgi_request("owner2", "/sla"),
