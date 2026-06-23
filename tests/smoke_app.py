@@ -15654,6 +15654,15 @@ async def assert_a3_workflow_center():
     assert "A3 Цепочки автоматизации" in body
     assert "/automation/builder" in body
     assert "Конструктор" in body
+    assert 'class="mobile-nav"' in body
+    assert 'class="header-actions"' in body
+    assert 'class="filter-actions"' in body
+    assert "workflow-card-actions" in body
+    assert "chain-actions" in body
+    assert "timeline-control-row" in body
+    assert "problem-card" in body
+    assert ".container{padding:16px 14px 92px}" in body
+    assert "overflow-x:hidden" in body
     assert "Условие:" in body
     assert "/api/a3/workflows/graph" in body
     assert "Фильтры" in body

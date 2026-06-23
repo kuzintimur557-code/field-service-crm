@@ -9,22 +9,26 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
 .container{max-width:1180px;margin:auto;padding:24px}
 .header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}
 .card{background:white;padding:18px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:14px}
-.back{display:inline-block;padding:10px 14px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900;border:0;cursor:pointer}
-h1{margin:0 0 8px;font-size:30px}
-h2{margin:0 0 16px;font-size:20px}
-.meta{color:#6b7280;font-weight:800;line-height:1.45}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:42px;max-width:100%;padding:10px 14px;border-radius:14px;background:#111827;color:white;text-align:center;line-height:1.2;text-decoration:none;font-weight:900;border:0;cursor:pointer;white-space:normal}
+h1{margin:0 0 8px;font-size:30px;line-height:1.12;overflow-wrap:anywhere}
+h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
+.meta{color:#6b7280;font-weight:800;line-height:1.45;overflow-wrap:anywhere}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}
 .chain{border:1px solid #e5e7eb;background:#f9fafb;border-radius:22px;padding:14px}
-.chain-title{font-size:17px;font-weight:900;margin-bottom:8px}
-.pill{display:inline-block;padding:6px 9px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;margin-right:6px;margin-top:6px}
+.chain-title{font-size:17px;font-weight:900;margin-bottom:8px;line-height:1.25;overflow-wrap:anywhere}
+.pill{display:inline-flex;align-items:center;max-width:100%;padding:6px 9px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;line-height:1.2;margin-right:6px;margin-top:6px;overflow-wrap:anywhere;white-space:normal}
 .pill.ok{background:#dcfce7;color:#166534}
 .pill.warn{background:#fef3c7;color:#92400e}
 .pill.off{background:#fee2e2;color:#991b1b}
-.graph-box{margin-top:12px;padding:10px;border-radius:18px;background:white;border:1px solid #e5e7eb;overflow:hidden}
+.graph-box{margin-top:12px;padding:10px;border-radius:18px;background:white;border:1px solid #e5e7eb;overflow-x:auto;overflow-y:hidden}
+.header-actions,.filter-actions,.workflow-card-actions,.chain-actions,.timeline-control-row,.problem-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.debug-action-row{display:flex;gap:8px;flex-wrap:wrap}
+.timeline-step{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px}
+.problem-card{padding:16px;border-radius:18px;background:#fff7ed;border:1px solid #fdba74}
 .flow-edge{stroke-dasharray:8 7;animation:flowMove 1.6s linear infinite}
 .chain:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,0,0,.09)}
 .chain{transition:.18s ease}
@@ -63,9 +67,20 @@ h2{margin:0 0 16px;font-size:20px}
 }
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:24px}
 @media(max-width:760px){
-    .container{padding:14px}
+    .container{padding:16px 14px 92px}
     .header{flex-direction:column}
     .back{width:100%;text-align:center}
+    .card,.chain{border-radius:16px}
+    .grid{grid-template-columns:1fr}
+    .header-actions,.filter-actions,.workflow-card-actions,.chain-actions,.timeline-control-row,.problem-actions,.debug-action-row{display:grid;grid-template-columns:1fr;align-items:stretch}
+    .workflow-card-actions a,.workflow-card-actions button,
+    .chain-actions a,.chain-actions button,.chain-actions select,
+    .problem-actions a,.problem-actions button,
+    .debug-action-row button,
+    .filter-actions button,
+    .header-actions a{width:100%}
+    .timeline-step{display:grid;grid-template-columns:1fr}
+    .graph-box svg{min-width:640px}
 }
 </style>
 </head>
@@ -81,7 +96,7 @@ h2{margin:0 0 16px;font-size:20px}
         </div>
     </div>
 
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <div class="header-actions">
         <a href="/automation/builder" class="back">Конструктор</a>
         <a href="/automation" class="back">← Автоматизация</a>
         <a href="/" class="back">Главная</a>
@@ -90,7 +105,7 @@ h2{margin:0 0 16px;font-size:20px}
 
 <div class="card">
     <h2>Фильтры цепочек</h2>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <div class="filter-actions">
         <button class="back" onclick="setChainFilter('all')">Все</button>
         <button class="back" onclick="setChainFilter('active')">Активные</button>
         <button class="back" onclick="setChainFilter('disabled')">Выключенные</button>
@@ -193,7 +208,7 @@ async function loadWorkflowApprovalQueue() {
                             ${workflowApprovalTargetLabel(item.target_type)} #${item.target_id || "-"} · ${item.created_at || ""}
                         </div>
                     </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <div class="workflow-card-actions">
                         <button class="back" onclick="approveWorkflowAction(${item.id})">Одобрить</button>
                         <button class="back" onclick="rejectWorkflowAction(${item.id})">Отклонить</button>
                     </div>
@@ -477,7 +492,7 @@ async function loadChains() {
                         ${debug.risk?.description || "Критических проблем не найдено."}
                     </div>
 
-                    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                    <div class="debug-action-row" style="margin-top:10px">
                         ${(debug.issues || []).slice(0, 3).map(issue => `
                             <span class="pill ${debug.status === "ok" ? "ok" : "warn"}">${issue}</span>
                         `).join("")}
@@ -507,7 +522,7 @@ async function loadChains() {
 
                     <div style="margin-top:12px">
                         <div style="font-weight:900;margin-bottom:8px">Безопасные исправления</div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <div class="debug-action-row">
                             ${(debug.safe_fixes || []).length ? (debug.safe_fixes || []).map(fix => `
                                 <button class="back" title="${fix.description || ""}" onclick="handleDebugAction('${fix.action_type}', '${fix.target}')">
                                     ${fix.label}
@@ -520,7 +535,7 @@ async function loadChains() {
 
                     <div style="margin-top:12px">
                         <div style="font-weight:900;margin-bottom:8px">Требует подтверждения</div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <div class="debug-action-row">
                             ${(debug.dangerous_fixes || []).length ? (debug.dangerous_fixes || []).map(fix => `
                                 <button class="back" title="${fix.description || ""}" onclick="requestDangerousFixApproval('${fix.action_type}', '${fix.target_type}', '${fix.target_id}', '${fix.label}')">
                                     ${fix.label}
@@ -540,7 +555,7 @@ async function loadChains() {
                         </div>
                     </div>
 
-                    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                    <div class="debug-action-row" style="margin-top:12px">
                         ${(debug.quick_actions || []).slice(0, 4).map(action => `
                             <button class="back" onclick="handleDebugAction('${action.action_type}', '${action.target}')">
                                 ${action.label}
@@ -560,7 +575,7 @@ async function loadChains() {
                          style="margin-top:8px;font-weight:800"></div>
                 </div>
 
-                <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+                <div class="chain-actions" style="margin-top:16px">
                     <a class="back" href="/automation/rules/${rule.id}">Открыть</a>
                     <button class="back" onclick="runChain(${rule.id})">Запустить</button>
                     <button class="back" onclick="loadChainTimeline(${rule.id})">Обновить историю</button>
@@ -985,7 +1000,7 @@ function renderChainTimeline(ruleId, timeline) {
         <div class="meta" style="margin-bottom:8px">
             ${workflowSessionCounters(activeSession)}
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div class="timeline-control-row" style="margin-bottom:10px">
             ${sessions.slice(0, 4).map((session, index) => {
                 let cls = "pill";
 
@@ -1009,7 +1024,7 @@ function renderChainTimeline(ruleId, timeline) {
                 `;
             }).join("")}
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div class="timeline-control-row" style="margin-bottom:10px">
             ${[
                 ["all", "Все"],
                 ["failed", "Ошибки"],
@@ -1046,7 +1061,7 @@ function renderChainTimeline(ruleId, timeline) {
                 }
 
                 return `
-                    <div data-timeline-step="${index + 1}" data-timeline-level="${step.level}" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px">
+                    <div class="timeline-step" data-timeline-step="${index + 1}" data-timeline-level="${step.level}">
                         <div>
                             <span class="${cls}">
                                 ${step.label}
@@ -1185,10 +1200,7 @@ function renderProblemChains(chains) {
         const debug = chain.debug || {};
         const card = document.createElement("div");
 
-        card.style.padding = "16px";
-        card.style.borderRadius = "18px";
-        card.style.background = "#fff7ed";
-        card.style.border = "1px solid #fdba74";
+        card.className = "problem-card";
 
         card.innerHTML = `
             <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap">
@@ -1208,7 +1220,7 @@ function renderProblemChains(chains) {
                     </div>
                 </div>
 
-                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                <div class="problem-actions">
                     <a class="back" href="/automation/rules/${rule.id}">Открыть</a>
                     <button class="back" onclick="runChain(${rule.id})">Запустить</button>
                     <button class="back" onclick="enableChain(${rule.id})">Включить</button>
@@ -1252,5 +1264,6 @@ loadWorkflowApprovalHistory();
 startPlaybackLoop();
 </script>
 
+{% include 'mobile_nav.html' %}
 </body>
 </html>
