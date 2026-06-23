@@ -477,6 +477,12 @@ async def assert_automation_page():
     assert "Последние пропущенные события" in diagnostics_html
     assert "Повторить" in diagnostics_html
     assert 'href="/automation/diagnostics/export"' in diagnostics_html
+    assert 'class="mobile-nav"' in diagnostics_html
+    assert 'class="top-actions"' in diagnostics_html
+    assert 'class="maintenance-actions"' in diagnostics_html
+    assert 'class="table-wrap"' in diagnostics_html
+    assert ".container { padding:0 0 92px; }" in diagnostics_html
+    assert "overflow-x:hidden" in diagnostics_html
 
     diagnostics_export_response = await crm.automation_diagnostics_export(
         make_request("owner2")
