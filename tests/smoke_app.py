@@ -14436,6 +14436,25 @@ async def assert_overdue_sla(task):
     assert "SLA: Исполнитель" in sla_html
     assert "helper2" in sla_html
     assert f"#{task['id']}" in sla_html
+    assert 'class="mobile-nav"' in sla_html
+    assert ".container{padding:16px 14px 92px}" in sla_html
+    assert "sla-actions" in sla_html
+    assert "info-row" in sla_html
+    assert "Создать SLA-напоминания" in sla_html
+    assert "Создать SLA-эскалации" in sla_html
+    assert "⏰ SLA контроль" not in sla_html
+    assert "🔴 Создать SLA-напоминания" not in sla_html
+    assert "🚨 Создать SLA-эскалации" not in sla_html
+    assert "📅 Дата:" not in sla_html
+    assert "👷 Исполнитель:" not in sla_html
+    assert "🟢 Выполнено" not in sla_html
+
+    sla_reminder_page = await crm.sla_page(
+        make_asgi_request("owner2", "/sla", "reminders=1&created=2"),
+    )
+    sla_reminder_html = sla_reminder_page.body.decode("utf-8")
+    assert "SLA-напоминания созданы: 2" in sla_reminder_html
+    assert "✅ SLA-напоминания" not in sla_reminder_html
 
     sla_analytics_response = await crm.sla_analytics_page(
         make_asgi_request("owner2", "/sla/analytics")
