@@ -666,7 +666,14 @@ async def assert_automation_page():
     assert "Условия" in builder_html
     assert "Действия" in builder_html
     assert "Проверка" in builder_html
-    assert "Runtime debug" in builder_html
+    assert "Проверка выполнения" in builder_html
+    assert "Runtime debug" not in builder_html
+    assert 'class="mobile-nav"' in builder_html
+    assert 'class="header-actions"' in builder_html
+    assert 'class="condition-form"' in builder_html
+    assert 'class="chain-heading"' in builder_html
+    assert 'name="viewport"' in builder_html
+    assert ".container{padding:0 0 92px}" in builder_html
     assert "/automation#new-rule" in builder_html
     assert f"/automation/rules/{rule['id']}/conditions" in builder_html
     assert f"/automation/rules/{rule['id']}/test-condition" in builder_html

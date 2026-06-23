@@ -2,35 +2,51 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>A3 Конструктор цепочек</title>
     <style>
-        body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;padding:24px;color:#111827}
+        *{box-sizing:border-box}
+        body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;padding:24px;color:#111827;overflow-x:hidden}
         .container{max-width:1180px;margin:0 auto}
         .header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:22px}
-        h1{margin:0;font-size:32px}
-        h2{margin:0 0 12px;font-size:20px}
-        .meta{color:#6b7280;font-size:13px;line-height:1.45}
+        h1{margin:0;font-size:32px;line-height:1.12;overflow-wrap:anywhere}
+        h2{margin:0 0 12px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
+        .meta{color:#6b7280;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
         .card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 10px 25px rgba(15,23,42,.08);margin-bottom:16px}
-        .back{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:999px;text-decoration:none;font-weight:900;background:#111827;color:#fff;border:0;cursor:pointer}
+        .back{display:inline-flex;align-items:center;justify-content:center;min-height:42px;max-width:100%;padding:10px 14px;border-radius:999px;text-align:center;line-height:1.2;text-decoration:none;font-weight:900;background:#111827;color:#fff;border:0;cursor:pointer;white-space:normal}
         .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
         .chain{border:1px solid #e5e7eb;border-radius:16px;padding:16px;background:#fff}
         .chain.disabled{opacity:.72}
         .builder{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:10px;align-items:stretch;margin-top:14px}
         .node{border:1px solid #e5e7eb;border-radius:14px;padding:14px;background:#f8fafc;min-height:86px}
         .node-title{font-size:12px;color:#6b7280;font-weight:900;text-transform:uppercase}
-        .node-value{font-weight:900;margin-top:8px}
+        .node-value{font-weight:900;margin-top:8px;line-height:1.25;overflow-wrap:anywhere}
         .arrow{display:flex;align-items:center;justify-content:center;font-weight:900;color:#6b7280}
-        .pill{display:inline-flex;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900;background:#e5e7eb;color:#111827}
+        .pill{display:inline-flex;align-items:center;max-width:100%;padding:7px 10px;border-radius:999px;font-size:12px;line-height:1.2;font-weight:900;background:#e5e7eb;color:#111827;overflow-wrap:anywhere;white-space:normal}
         .pill.ok{background:#dcfce7;color:#166534}
         .pill.warn{background:#fef3c7;color:#92400e}
         .pill.off{background:#fee2e2;color:#991b1b}
         .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
         .filters{display:flex;gap:8px;flex-wrap:wrap}
+        .header-actions,.inline-pills{display:flex;gap:10px;flex-wrap:wrap}
+        .chain-heading{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+        .condition-form{display:grid;gap:8px;margin-top:10px}
         select,input[type="number"],input[type="text"]{width:100%;box-sizing:border-box;padding:10px;border-radius:12px;border:1px solid #d1d5db;background:#fff}
         .small-button{width:100%;margin-top:8px;padding:9px 10px;border-radius:12px;border:0;background:#111827;color:#fff;font-weight:900;cursor:pointer}
         @media(max-width:820px){
+            body{padding:16px 14px}
+            .container{padding:0 0 92px}
             .builder{grid-template-columns:1fr}
             .arrow{display:none}
+            .header{display:grid;grid-template-columns:1fr}
+            .header-actions,.filters,.actions,.inline-pills,.chain-heading{display:grid;grid-template-columns:1fr}
+            .header-actions a,.filters button,.actions a,.actions button,.inline-pills a,.inline-pills button{width:100%}
+            .card,.chain{border-radius:16px;padding:16px}
+            .grid{grid-template-columns:1fr}
+            .back{width:100%}
+        }
+        @media(max-width:460px){
+            h1{font-size:28px}
         }
     </style>
 </head>
@@ -41,7 +57,7 @@
             <h1>A3 Конструктор цепочек</h1>
             <div class="meta">Визуальная сборка автоматизаций: триггер, условия, действия и проверка.</div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="header-actions">
             <a href="/automation#new-rule" class="back">Создать правило</a>
             <a href="/automation/workflows" class="back">Цепочки</a>
             <a href="/automation" class="back">Автоматизация</a>
@@ -145,7 +161,7 @@
              data-builder-chain="1"
              data-active="{% if rule['active'] %}1{% else %}0{% endif %}"
              data-action-count="{{ rule_actions|length }}">
-            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+            <div class="chain-heading">
                 <div>
                     <h2>{{ rule["name"] }}</h2>
                     <div class="meta">ID #{{ rule["id"] }}</div>
@@ -165,7 +181,7 @@
                     <div class="node-title">Условия</div>
                     <div class="node-value">{{ rule["condition_label"] }}</div>
                     <form method="post" action="/automation/rules/{{ rule['id'] }}/conditions"
-                          data-condition-form style="margin-top:10px">
+                          data-condition-form class="condition-form">
                         <select name="condition_mode" data-condition-mode="primary">
                             {% for group_label, group_items in condition_groups %}
                             <optgroup label="{{ group_label }}">
@@ -351,7 +367,7 @@
                         Настроенные действия — не запустятся
                         {% endif %}
                     </div>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                    <div class="inline-pills" style="gap:6px;margin-top:6px">
                         {% for action in rule["dry_run"]["executable_actions"] %}
                         <span class="pill ok">
                             {{ action_labels.get(action["action_key"], action["action_key"]) }}
@@ -362,7 +378,7 @@
                     {% endif %}
                     {% if rule["dry_run"]["unsupported_actions"] %}
                     <div class="meta" style="margin-top:8px">Пока не исполняются</div>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                    <div class="inline-pills" style="gap:6px;margin-top:6px">
                         {% for action in rule["dry_run"]["unsupported_actions"] %}
                         <span class="pill warn">
                             {{ action_labels.get(action["action_key"], action["action_key"]) }}
@@ -373,7 +389,7 @@
                     {% endif %}
                     {% if rule["dry_run"]["inactive_actions"] %}
                     <div class="meta" style="margin-top:8px">Отключённые действия</div>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                    <div class="inline-pills" style="gap:6px;margin-top:6px">
                         {% for action in rule["dry_run"]["inactive_actions"] %}
                         <span class="pill off">
                             {{ action_labels.get(action["action_key"], action["action_key"]) }}
@@ -452,7 +468,7 @@
                 <div class="node">
                     <div class="node-title">Действия</div>
                     <div class="node-value">{{ rule_actions|length }}</div>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+                    <div class="inline-pills" style="gap:6px;margin-top:8px">
                         {% for action in rule_actions[:3] %}
                         <span class="pill {% if action['active'] %}ok{% else %}off{% endif %}">
                             {{ action_labels.get(action["action_key"], action["action_key"]) }}
@@ -465,7 +481,7 @@
                 <div class="arrow">→</div>
                 <div class="node">
                     <div class="node-title">Проверка</div>
-                    <div class="node-value">Runtime debug</div>
+                    <div class="node-value">Проверка выполнения</div>
                     <div class="meta">Откройте цепочку, чтобы посмотреть события и replay.</div>
                 </div>
             </div>
@@ -546,5 +562,6 @@ document.querySelectorAll("[data-condition-form]").forEach(form => {
     });
 });
 </script>
+{% include 'mobile_nav.html' %}
 </body>
 </html>
