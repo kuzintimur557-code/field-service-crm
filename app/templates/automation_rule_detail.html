@@ -4,18 +4,48 @@
     <meta charset="UTF-8">
     <title>Правило автоматизации</title>
     <style>
-        body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; }
+        * { box-sizing:border-box; }
+        body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; overflow-x:hidden; }
         .container { max-width:1100px; margin:0 auto; }
-        .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:22px; }
-        .card { background:white; border-radius:20px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.08); margin-bottom:16px; }
+        .top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:22px; }
+        h1 { margin:0 0 10px; line-height:1.12; overflow-wrap:anywhere; }
+        h2, h3 { line-height:1.2; overflow-wrap:anywhere; }
+        .card { background:white; border-radius:18px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.08); margin-bottom:16px; }
         .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
-        .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 14px; border-radius:999px; text-decoration:none; font-weight:900; border:0; cursor:pointer; background:#111827; color:white; }
+        .rule-actions { display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+        .btn { display:inline-flex; align-items:center; justify-content:center; min-height:42px; max-width:100%; padding:10px 14px; border-radius:999px; text-decoration:none; text-align:center; line-height:1.2; font-weight:900; border:0; cursor:pointer; background:#111827; color:white; white-space:normal; }
         .label { color:#6b7280; font-size:13px; font-weight:900; }
         .value { font-size:26px; font-weight:900; margin-top:8px; }
-        table { width:100%; border-collapse:collapse; margin-top:12px; }
-        th, td { text-align:left; padding:12px; border-bottom:1px solid #e5e7eb; }
-        .pill { display:inline-flex; padding:7px 11px; border-radius:999px; font-size:13px; font-weight:900; background:#e5e7eb; }
-        pre { white-space:pre-wrap; word-break:break-word; background:#f9fafb; border-radius:16px; padding:12px; }
+        .table-wrap { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        table { width:100%; min-width:720px; border-collapse:collapse; margin-top:12px; }
+        th, td { text-align:left; padding:12px; border-bottom:1px solid #e5e7eb; vertical-align:top; overflow-wrap:anywhere; }
+        .pill { display:inline-flex; align-items:center; max-width:100%; padding:7px 11px; border-radius:999px; font-size:13px; line-height:1.2; font-weight:900; background:#e5e7eb; overflow-wrap:anywhere; }
+        pre { max-width:320px; white-space:pre-wrap; word-break:break-word; background:#f9fafb; border-radius:16px; padding:12px; margin:0; }
+        select, textarea { font:inherit; max-width:100%; }
+        .chain-row, .quick-actions, .event-preview { display:flex; gap:8px; flex-wrap:wrap; }
+        .event-item { display:flex; justify-content:space-between; gap:10px; align-items:center; background:#f9fafb; border-radius:14px; padding:10px; }
+        .event-item > div:first-child { min-width:0; }
+        .section-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+        @media(max-width:760px){
+            body { padding:16px 14px; }
+            .container { padding:0 0 92px; }
+            .top { display:grid; grid-template-columns:1fr; }
+            .rule-actions { justify-content:stretch; display:grid; grid-template-columns:1fr; }
+            .rule-actions form, .quick-actions form { width:100%; }
+            .btn { width:100%; }
+            .card { border-radius:16px; padding:16px; }
+            .grid { grid-template-columns:1fr; gap:12px; }
+            .event-item { display:grid; grid-template-columns:1fr; }
+            .chain-row { display:grid; grid-template-columns:1fr; }
+            .chain-row > div:not(.pill) { display:none; }
+            .quick-actions { display:grid; grid-template-columns:1fr; }
+            .table-wrap { margin:0 -4px; padding:0 4px; }
+            table { min-width:660px; }
+        }
+        @media(max-width:460px){
+            h1 { font-size:28px; }
+            .value { font-size:24px; }
+        }
     </style>
 </head>
 <body>
@@ -27,7 +57,7 @@
             <div class="pill">{% if rule["active"] %}Включено{% else %}Выключено{% endif %}</div>
         </div>
 
-        <div style="display:flex;gap:10px;align-items:center;">
+        <div class="rule-actions">
             {% if not rule["active"] %}
             <form method="post" action="/automation/diagnostics/rules/{{ rule['id'] }}/enable" style="margin:0;">
                 <button type="submit" class="btn" style="background:#16a34a;">Включить</button>
@@ -88,7 +118,7 @@
             <p><b>Рекомендация:</b> {{ a3_recommendation }}</p>
         </div>
 
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-weight:900;">
+        <div class="chain-row" style="font-weight:900;">
             <div class="pill">Триггер: {{ trigger_labels.get(rule["trigger_key"], rule["trigger_key"]) }}</div>
             <div>→</div>
             <div class="pill">Правило: {{ rule["name"] }}</div>
@@ -118,7 +148,7 @@
 
             <div style="display:grid;gap:8px;margin-top:8px;">
                 {% for event in events[:3] %}
-                <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;background:#f9fafb;border-radius:14px;padding:10px;">
+                <div class="event-item">
                     <div>
                         <b>{{ status_labels.get(event["status"], event["status"]) }}</b>
                         <div class="label">{{ event["created_at"] }}</div>
@@ -135,7 +165,7 @@
         <div style="margin-top:16px;">
             <div class="label">Быстрые действия цепочки</div>
 
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            <div class="quick-actions" style="margin-top:8px;">
                 <form method="post" action="/automation/rules/{{ rule['id'] }}/run" style="margin:0;">
                     <button type="submit" class="btn" style="background:#2563eb;">Запустить правило</button>
                 </form>
@@ -323,7 +353,7 @@
     </div>
 
     <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div class="section-heading">
             <h2>Действия</h2>
 
             {% if not actions %}
@@ -335,6 +365,7 @@
             {% endif %}
         </div>
 
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -375,11 +406,13 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="card">
         <h2>История выполненных действий</h2>
 
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -422,11 +455,13 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="card">
         <h2>Последние события правила</h2>
 
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -453,9 +488,11 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
 </div>
+{% include 'mobile_nav.html' %}
 <script>
 const actionKeySelect = document.querySelector("[data-action-key]");
 const actionTargetSelect = document.querySelector("[data-action-target]");
@@ -548,12 +585,13 @@ async function loadA3WorkflowBuilderPreview() {
             const item = document.createElement("div");
             const isDisabled = node.status === "disabled";
 
-            item.style.minWidth = "160px";
+            item.style.minWidth = "min(100%, 150px)";
             item.style.flex = "1";
             item.style.padding = "14px";
             item.style.borderRadius = "16px";
             item.style.border = "1px solid #e5e7eb";
             item.style.background = isDisabled ? "#fee2e2" : "#f9fafb";
+            item.style.overflowWrap = "anywhere";
 
             item.innerHTML = `
                 <div class="label">${a3WorkflowNodeLabel(node.type)}</div>

@@ -644,6 +644,11 @@ async def assert_automation_page():
     assert "Действия цепочки" in rule_detail_html
     assert "Последние события цепочки" in rule_detail_html
     assert "Быстрые действия цепочки" in rule_detail_html
+    assert 'class="mobile-nav"' in rule_detail_html
+    assert 'class="rule-actions"' in rule_detail_html
+    assert 'class="table-wrap"' in rule_detail_html
+    assert ".container { padding:0 0 92px; }" in rule_detail_html
+    assert 'item.style.minWidth = "min(100%, 150px)"' in rule_detail_html
 
     builder_response = await crm.automation_builder_page(
         make_asgi_request("owner2", "/automation/builder")
