@@ -1814,6 +1814,10 @@ async def assert_automation_page():
     assert "Нет исполнителя с доступной загрузкой" in capacity_event_html
     assert "Лимит на исполнителя: 1 в день" in capacity_event_html
     assert "Повторить" in capacity_event_html
+    assert 'class="mobile-nav"' in capacity_event_html
+    assert 'class="event-actions"' in capacity_event_html
+    assert ".container { padding:0 0 92px; }" in capacity_event_html
+    assert "overflow-x:hidden" in capacity_event_html
 
     action_history_response = await crm.automation_rule_detail(
         make_asgi_request(
