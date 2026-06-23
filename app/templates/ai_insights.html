@@ -4,12 +4,15 @@
     <meta charset="UTF-8">
     <title>AI-инсайты</title>
     <style>
-        body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; }
+        * { box-sizing:border-box; }
+        body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; overflow-x:hidden; }
         .container { max-width:1200px; margin:0 auto; }
-        .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:24px; }
-        .btn { display:inline-flex; align-items:center; justify-content:center; padding:12px 18px; border-radius:14px; text-decoration:none; font-weight:900; background:#111827; color:white; }
+        .top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:24px; }
+        .top-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; align-items:center; }
+        .btn { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:12px 18px; border-radius:14px; border:0; text-decoration:none; font-weight:900; background:#111827; color:white; cursor:pointer; text-align:center; white-space:normal; }
         .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
         .card { background:white; border-radius:20px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.08); }
+        .card-section { margin-top:24px; }
         .label { color:#6b7280; font-size:14px; font-weight:800; }
         .value { font-size:30px; font-weight:900; margin-top:8px; }
         .danger { color:#dc2626; }
@@ -21,9 +24,27 @@
         .insight.warning { border-left-color:#d97706; }
         .insight.info { border-left-color:#2563eb; }
         .insight.success { border-left-color:#16a34a; }
-        h1, h2, h3 { margin-top:0; }
+        .insight-panel { background:#f9fafb; border-radius:16px; padding:16px; }
+        .summary-list { font-weight:800; line-height:1.8; padding-left:22px; margin-bottom:0; }
+        .table-wrap { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        h1, h2, h3 { margin-top:0; line-height:1.15; overflow-wrap:anywhere; }
+        p { overflow-wrap:anywhere; }
         table { width:100%; border-collapse:collapse; margin-top:12px; }
         th, td { text-align:left; padding:12px; border-bottom:1px solid #e5e7eb; }
+        th, td { vertical-align:top; }
+        @media(max-width:760px) {
+            body { padding:16px 14px; }
+            .container { padding:0 0 92px; }
+            .top { display:grid; grid-template-columns:1fr; margin-bottom:18px; }
+            .top-actions { display:grid; grid-template-columns:1fr; justify-content:stretch; width:100%; }
+            .top-actions form { width:100%; }
+            .btn { width:100%; }
+            .grid { grid-template-columns:1fr; gap:12px; }
+            .card { border-radius:16px; padding:16px; }
+            .card-section { margin-top:16px; }
+            .value { font-size:26px; }
+            table { min-width:520px; }
+        }
     </style>
 </head>
 <body>
@@ -35,16 +56,16 @@
             <p class="label">Рекомендации и риски по бизнесу</p>
         </div>
 
-        <div style="display:flex;gap:12px;align-items:center;">
+        <div class="top-actions">
             <a href="/ai/assistant" class="btn">AI-помощник</a>
 
             <form method="post" action="/ai/insights/digest" style="margin:0;">
-                <button type="submit" class="btn" style="border:0;cursor:pointer;">
+                <button type="submit" class="btn">
                     Создать AI-сводку
                 </button>
             </form>
 
-            <a href="/" class="btn">← Главное меню</a>
+            <a href="/" class="btn">Главное меню</a>
         </div>
     </div>
 
@@ -86,22 +107,22 @@
         </div>
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card card-section">
         <h2>Еженедельная сводка</h2>
 
-        <ul style="font-weight:800;line-height:1.8;">
+        <ul class="summary-list">
             {% for item in weekly_summary %}
             <li>{{ item }}</li>
             {% endfor %}
         </ul>
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card card-section">
         <h2>Рекомендации</h2>
 
         <div class="grid">
             {% for insight in insights %}
-            <div class="card insight {{ insight.level }}">
+            <div class="insight insight-panel {{ insight.level }}">
                 <h3>{{ insight.title }}</h3>
                 <p>{{ insight.message }}</p>
             </div>
@@ -109,10 +130,11 @@
         </div>
     </div>
 
-    <div class="grid" style="margin-top:24px;">
+    <div class="grid card-section">
         <div class="card">
             <h2>{{ settings["worker_label"] or "Сотрудники" }} требуют внимания</h2>
 
+            <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
@@ -135,11 +157,13 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div class="card">
             <h2>{{ settings["client_label"] or "Клиенты" }} с низкой выручкой</h2>
 
+            <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
@@ -162,9 +186,11 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
     </div>
 
 </div>
+{% include 'mobile_nav.html' %}
 </body>
 </html>

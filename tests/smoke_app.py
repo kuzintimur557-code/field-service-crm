@@ -4359,6 +4359,25 @@ async def assert_ai_assistant_page():
     assert digest_rule_count >= 2
 
 
+async def assert_ai_insights_page():
+    response = await crm.ai_insights_page(make_asgi_request("owner2", "/ai/insights"))
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "AI-инсайты" in html
+    assert "AI-оценка риска" in html
+    assert "Еженедельная сводка" in html
+    assert "Рекомендации" in html
+    assert "Создать AI-сводку" in html
+    assert 'action="/ai/insights/digest"' in html
+    assert 'class="mobile-nav"' in html
+    assert ".container { padding:0 0 92px; }" in html
+    assert "overflow-x:hidden" in html
+    assert 'class="top-actions"' in html
+    assert 'class="table-wrap"' in html
+    assert "Главное меню" in html
+    assert "← Главное меню" not in html
+
+
 async def assert_more_page():
     response = await crm.more_page(make_asgi_request("owner2", "/more"))
     assert response.status_code == 200
@@ -16065,6 +16084,7 @@ def main():
         asyncio.run(assert_automation_runner(task))
         asyncio.run(assert_automation_delete())
         asyncio.run(assert_ai_assistant_page())
+        asyncio.run(assert_ai_insights_page())
         asyncio.run(assert_login_page())
         asyncio.run(assert_more_page())
         asyncio.run(assert_home_page())
