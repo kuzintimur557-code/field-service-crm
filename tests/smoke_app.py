@@ -14905,6 +14905,26 @@ async def assert_custom_fields():
     assert "VIN" in page_html
     assert f"/custom-fields/{field['id']}/toggle" in page_html
     assert f"/custom-fields/{field['id']}/order" in page_html
+    assert 'class="mobile-nav"' in page_html
+    assert ".container{padding:16px 14px 92px}" in page_html
+    assert ".field{display:grid;grid-template-columns:minmax(0,1.3fr)" in page_html
+    assert "textarea{min-height:90px;resize:vertical}" in page_html
+    assert "Поля компании" in page_html
+    assert "🧩 Поля компании" not in page_html
+
+    created_page = await crm.custom_fields_page(
+        make_asgi_request("owner2", "/custom-fields", "created=1")
+    )
+    created_html = created_page.body.decode("utf-8")
+    assert "Поле добавлено" in created_html
+    assert "✅ Поле добавлено" not in created_html
+
+    options_error_page = await crm.custom_fields_page(
+        make_asgi_request("owner2", "/custom-fields", "error=options")
+    )
+    options_error_html = options_error_page.body.decode("utf-8")
+    assert "Для списка добавьте хотя бы один вариант" in options_error_html
+    assert "❌ Для списка" not in options_error_html
 
     order_response = await crm.update_custom_field_order(make_form_request(
         "owner2",

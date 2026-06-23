@@ -9,27 +9,28 @@
 
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
 .container{max-width:950px;margin:auto;padding:24px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.back{display:inline-flex;align-items:center;min-height:44px;max-width:100%;line-height:1.2;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
 .card{background:white;padding:24px;border-radius:24px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:16px}
-h1{margin:0 0 8px;font-size:34px}
+h1{margin:0 0 8px;font-size:34px;line-height:1.12;overflow-wrap:anywhere}
 h2{margin:0 0 16px;font-size:22px}
-.meta{color:#6b7280;font-weight:800}
+.meta{color:#6b7280;font-weight:800;line-height:1.45;overflow-wrap:anywhere}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 label{display:block;font-weight:900;margin:12px 0 6px;color:#374151}
-input,select,button{width:100%;padding:14px;border-radius:14px;font-size:16px}
-input,select{border:1px solid #d1d5db;background:white}
+input,select,textarea,button{width:100%;padding:14px;border-radius:14px;font-size:16px}
+input,select,textarea{border:1px solid #d1d5db;background:white}
+textarea{min-height:90px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;margin-top:16px}
-	.field{display:grid;grid-template-columns:1.3fr .9fr .8fr .9fr auto;gap:14px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
-.title{font-size:18px;font-weight:900}
+.field{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.9fr) minmax(0,.8fr) minmax(0,.9fr) minmax(120px,auto);gap:14px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
+.title{font-size:18px;font-weight:900;overflow-wrap:anywhere}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900}
 .badge.off{background:#e5e7eb;color:#374151}
 .notice{margin-bottom:16px;padding:14px;border-radius:16px;font-weight:900}
 .notice.ok{background:#dcfce7;color:#166534}
 .notice.err{background:#fee2e2;color:#991b1b}
 .empty{font-weight:900;color:#6b7280;text-align:center;padding:22px}
-@media(max-width:800px){.container{padding:14px}.grid,.field{grid-template-columns:1fr}h1{font-size:28px}}
+@media(max-width:800px){.container{padding:16px 14px 92px}.card{padding:20px;border-radius:18px}.grid,.field{grid-template-columns:1fr}h1{font-size:28px}.field form button{margin-top:8px}}
 </style>
 </head>
 
@@ -39,28 +40,28 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 <a href="/settings" class="back">← Назад к настройкам</a>
 
 <div class="card">
-<h1>🧩 Поля компании</h1>
+<h1>Поля компании</h1>
 <div class="meta">Добавляйте свои поля под отрасль: VIN, госномер, площадь, маршрут, кабинет, вес груза и другие.</div>
 </div>
 
 	{% if request.query_params.get("created") == "1" %}
-	<div class="notice ok">✅ Поле добавлено</div>
+	<div class="notice ok">Поле добавлено</div>
 	{% endif %}
 
 	{% if request.query_params.get("ordered") == "1" %}
-	<div class="notice ok">✅ Порядок поля обновлён</div>
+	<div class="notice ok">Порядок поля обновлён</div>
 	{% endif %}
 
 	{% if request.query_params.get("updated") == "1" %}
-	<div class="notice ok">✅ Поле обновлено</div>
+	<div class="notice ok">Поле обновлено</div>
 	{% endif %}
 
 	{% if request.query_params.get("error") == "empty" %}
-	<div class="notice err">❌ Название поля обязательно</div>
+	<div class="notice err">Название поля обязательно</div>
 	{% endif %}
 
 	{% if request.query_params.get("error") == "options" %}
-	<div class="notice err">❌ Для списка добавьте хотя бы один вариант</div>
+	<div class="notice err">Для списка добавьте хотя бы один вариант</div>
 	{% endif %}
 
 <div class="card">
@@ -93,7 +94,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 	<input name="sort_order" type="number" placeholder="Например: 10">
 
 	<label>Варианты для списка</label>
-	<textarea name="options" placeholder="Каждый вариант с новой строки" style="width:100%;min-height:90px;padding:14px;border-radius:14px;border:1px solid #d1d5db;font-size:16px"></textarea>
+	<textarea name="options" placeholder="Каждый вариант с новой строки"></textarea>
 
 	<label style="display:flex;align-items:center;gap:10px">
     <input type="checkbox" name="is_required" style="width:auto">
