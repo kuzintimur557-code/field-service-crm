@@ -7307,6 +7307,23 @@ async def assert_platform_companies_page():
     assert 'class="platform-mobile-nav-grid"' in html
     assert "/platform/readiness" in html
     assert "/platform/calendar-health" in html
+    assert "🏢" not in html
+    assert "➕" not in html
+    assert "← Назад" not in html
+
+    created_response = await crm.platform_companies_page(
+        make_asgi_request("super", "/platform/companies", "created=1"),
+    )
+    created_html = created_response.body.decode("utf-8")
+    assert "Компания создана" in created_html
+    assert "✅ Компания создана" not in created_html
+
+    error_response = await crm.platform_companies_page(
+        make_asgi_request("super", "/platform/companies", "error=empty"),
+    )
+    error_html = error_response.body.decode("utf-8")
+    assert "Заполните все поля" in error_html
+    assert "❌ Заполните все поля" not in error_html
 
 
 async def assert_platform_calendar_health():
@@ -9756,6 +9773,11 @@ async def assert_platform_calendar_health():
         assert "Готовность релиза" in platform_html
         assert "Релизный штаб" in platform_html
         assert "Быстрые действия" in platform_html
+        assert "🛠 Панель платформы" not in platform_html
+        assert "🏢 Компании" not in platform_html
+        assert "🧪 Диагностика" not in platform_html
+        assert "💾 Резервная копия" not in platform_html
+        assert "👤 Профиль" not in platform_html
         assert platform_page.context["release_readiness"]["checks"]
         assert 'class="platform-mobile-nav"' in platform_html
         assert 'class="platform-mobile-nav-grid"' in platform_html

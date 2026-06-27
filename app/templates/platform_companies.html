@@ -24,37 +24,37 @@ h1{margin:0 0 12px;font-size:36px}
 <body>
 <div class="container">
 
-<a href="/platform" class="back">← Назад</a>
+<a href="/platform" class="back">Назад</a>
 
 <div class="card">
-<h1>🏢 Компании</h1>
+<h1>Компании</h1>
 <div class="meta">SaaS-клиенты платформы</div>
 </div>
 
 <div class="card">
-<h2>➕ Создать компанию</h2>
+<h2>Создать компанию</h2>
 
 {% if request.query_params.get("created") == "1" %}
 <div style="padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900;margin-bottom:16px">
-✅ Компания создана
+Компания создана
 </div>
 {% endif %}
 
 {% if request.query_params.get("error") == "empty" %}
 <div style="padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900;margin-bottom:16px">
-❌ Заполните все поля
+Заполните все поля
 </div>
 {% endif %}
 
 {% if request.query_params.get("error") == "weak_password" %}
 <div style="padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900;margin-bottom:16px">
-❌ Пароль должен быть минимум 6 символов
+Пароль должен быть минимум 6 символов
 </div>
 {% endif %}
 
 {% if request.query_params.get("error") == "user_exists" %}
 <div style="padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900;margin-bottom:16px">
-❌ Такой логин владельца уже существует
+Такой логин владельца уже существует
 </div>
 {% endif %}
 
