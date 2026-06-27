@@ -266,9 +266,14 @@ def assert_session_cookie_auth():
 
     assert crm.get_user_company_id("companyless") is None
     assert crm.get_current_company_id(make_request()) is None
+    assert crm.get_current_company_id(make_request("owner2")) == 2
+    assert crm.get_current_company_id(make_request("companyless")) is None
     assert crm.get_current_company_id(
         SimpleNamespace(cookies={}, session={"company_id": "2"})
     ) == 2
+    assert crm.get_current_company_id(
+        SimpleNamespace(cookies={}, session={"company_id": "bad"})
+    ) is None
 
 
 def assert_task_access(task):

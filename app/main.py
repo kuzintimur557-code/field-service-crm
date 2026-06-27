@@ -269,22 +269,20 @@ templates.env.globals["ui_text"] = ui_text
 
 
 def get_current_company_id(request=None):
-    try:
-        if request and hasattr(request, "session"):
-            company_id = request.session.get("company_id")
+    if request and hasattr(request, "session"):
+        company_id = request.session.get("company_id")
 
-            if company_id:
+        if company_id:
+            try:
                 return int(company_id)
-    except Exception:
-        pass
+            except (TypeError, ValueError):
+                return None
 
-    try:
-        user = get_current_user(request)
+    if request:
+        username = get_user(request)
 
-        if user and user.get("company_id"):
-            return int(user["company_id"])
-    except Exception:
-        pass
+        if username:
+            return get_user_company_id(username)
 
     return None
 
