@@ -959,6 +959,18 @@ def task_has_worker(username, task):
     return username in get_task_worker_names(task)
 
 
+def get_task_company_id(task):
+    if not task:
+        return None
+
+    task_keys = task.keys() if hasattr(task, "keys") else []
+
+    if "company_id" not in task_keys:
+        return None
+
+    return task["company_id"]
+
+
 def get_overdue_days(task_date, today=None):
     task_day = str(task_date or "")[:10]
 
@@ -1001,7 +1013,10 @@ def get_next_recurring_date(current_date, interval_type):
 
 def get_task_worker_chat_ids(cursor, task):
     chat_ids = []
-    task_company_id = task["company_id"] if "company_id" in task.keys() else 1
+    task_company_id = get_task_company_id(task)
+
+    if not task_company_id:
+        return chat_ids
 
     for worker_name in get_task_worker_names(task):
         worker = cursor.execute("""
@@ -1024,7 +1039,10 @@ def can_access_task(username, role, task):
         return True
 
     user_company_id = get_user_company_id(username)
-    task_company_id = task["company_id"] if "company_id" in task.keys() else 1
+    task_company_id = get_task_company_id(task)
+
+    if not task_company_id:
+        return False
 
     if role in ("boss", "manager"):
         return task_company_id == user_company_id
@@ -3642,7 +3660,7 @@ def get_user_company_id(username):
     if not user:
         return None
 
-    return user["company_id"] if "company_id" in user.keys() else 1
+    return user["company_id"] if "company_id" in user.keys() else None
 
 
 def get_role(username):

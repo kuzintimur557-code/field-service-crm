@@ -255,6 +255,17 @@ def assert_session_cookie_auth():
     })
     assert crm.get_user(tampered_request) is None
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO users (username, password, role, company_id)
+    VALUES (?, ?, ?, ?)
+    """, ("companyless", "x", "boss", None))
+    conn.commit()
+    conn.close()
+
+    assert crm.get_user_company_id("companyless") is None
+
 
 def assert_task_access(task):
     assert crm.can_access_task("super", "superadmin", task)
@@ -274,6 +285,16 @@ def assert_task_access(task):
         "chat-worker2",
         "chat-helper2",
     ]
+
+    task_without_company = {
+        "worker": "worker2",
+        "workers": "helper2",
+    }
+
+    assert crm.get_task_company_id(task_without_company) is None
+    assert not crm.can_access_task("owner2", "boss", task_without_company)
+    assert not crm.can_access_task("worker2", "worker", task_without_company)
+    assert crm.get_task_worker_chat_ids(c, task_without_company) == []
 
     matched = c.execute(f"""
     SELECT *
