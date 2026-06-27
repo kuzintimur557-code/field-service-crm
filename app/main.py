@@ -286,7 +286,7 @@ def get_current_company_id(request=None):
     except Exception:
         pass
 
-    return 1
+    return None
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "."))
 UPLOAD_DIR = DATA_DIR / "uploads"

@@ -265,6 +265,10 @@ def assert_session_cookie_auth():
     conn.close()
 
     assert crm.get_user_company_id("companyless") is None
+    assert crm.get_current_company_id(make_request()) is None
+    assert crm.get_current_company_id(
+        SimpleNamespace(cookies={}, session={"company_id": "2"})
+    ) == 2
 
 
 def assert_task_access(task):
@@ -15924,6 +15928,9 @@ async def assert_a3_workflow_center():
 
 async def assert_a3_api_layer():
     request = make_request("owner2")
+
+    missing_company_response = crm.api_a3_system_health(make_request("companyless"))
+    assert missing_company_response.status_code == 403
 
     data = crm.api_a3_system_health(request)
     assert "score" in data
