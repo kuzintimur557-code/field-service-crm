@@ -5,7 +5,10 @@ from app.database import connect
 from app.services.ops_timeline import create_ops_timeline_event
 
 
-def run_self_healing_cycle(company_id=1):
+def run_self_healing_cycle(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
     started_at = time.time()
 
     conn = connect()

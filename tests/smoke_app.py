@@ -15926,6 +15926,12 @@ async def assert_a3_api_layer():
     assert recovery_result["ok"] is True
     assert "result" in recovery_result
 
+    try:
+        crm.run_self_healing_cycle(company_id=None)
+        assert False, "run_self_healing_cycle must require company_id"
+    except ValueError as exc:
+        assert "company_id is required" in str(exc)
+
     recovery_history = crm.api_a3_recovery_history(request)
     assert "items" in recovery_history
 
@@ -15956,6 +15962,12 @@ async def assert_a3_api_layer():
 
     actions = crm.api_a3_autonomous_actions(request)
     assert "items" in actions
+
+    try:
+        crm.process_autonomous_actions(company_id=None)
+        assert False, "process_autonomous_actions must require company_id"
+    except ValueError as exc:
+        assert "company_id is required" in str(exc)
 
     conn = connect()
     c = conn.cursor()

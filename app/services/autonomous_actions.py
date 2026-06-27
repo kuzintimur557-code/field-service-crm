@@ -118,7 +118,10 @@ def get_autonomous_actions(company_id, limit=50):
     return [dict(row) for row in rows]
 
 
-def process_autonomous_actions(company_id=1):
+def process_autonomous_actions(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
     governance = get_governance_settings(company_id)
 
     if not governance.get("autonomous_enabled", 1):
