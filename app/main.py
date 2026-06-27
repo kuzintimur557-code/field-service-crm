@@ -3723,6 +3723,20 @@ def get_user_company_id(username):
     return user["company_id"] if "company_id" in user.keys() else None
 
 
+def missing_company_context_response(role):
+    target = "/platform" if role == "superadmin" else "/"
+    return RedirectResponse(target, status_code=302)
+
+
+def require_route_company_context(username, role):
+    company_id = get_user_company_id(username)
+
+    if company_id:
+        return company_id, None
+
+    return None, missing_company_context_response(role)
+
+
 def get_role(username):
     conn = connect()
     c = conn.cursor()
@@ -15867,7 +15881,11 @@ async def sla_page(request: Request, filter: str = "", worker: str = ""):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
-    company_id = get_user_company_id(username)
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
     settings = get_company_settings(company_id)
     disabled_response = require_feature(company_id, "sla")
 
@@ -18608,7 +18626,7 @@ def escalate_calendar_scheduler_incidents(
 
         for recipient in recipients:
             recipient_company_id = int(
-                recipient["company_id"] or 1
+                recipient["company_id"] or incident["company_id"]
             )
             c.execute("""
             INSERT INTO notifications (
@@ -18779,7 +18797,7 @@ def notify_overdue_calendar_recoveries(
 
         for recipient in recipients:
             recipient_company_id = int(
-                recipient["company_id"] or 1
+                recipient["company_id"] or incident["company_id"]
             )
             c.execute("""
             INSERT INTO notifications (
@@ -23987,7 +24005,11 @@ async def sla_analytics_page(request: Request):
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
-    company_id = get_user_company_id(username)
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
     settings = get_company_settings(company_id)
     disabled_response = require_feature(company_id, "sla")
 
@@ -26248,7 +26270,11 @@ async def integration_1c_page(request: Request):
     if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
-    company_id = get_user_company_id(username)
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
     settings = get_company_settings(company_id)
 
     return templates.TemplateResponse(
@@ -26276,7 +26302,11 @@ async def billing_page(request: Request):
     if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
-    company_id = get_user_company_id(username)
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
     settings = get_company_settings(company_id)
     plan = settings["plan"] if settings and "plan" in settings.keys() else "basic"
     user_limit = get_plan_user_limit(plan)
@@ -26944,7 +26974,11 @@ async def settings_page(request: Request):
     if role not in ("boss", "superadmin"):
         return RedirectResponse("/", status_code=302)
 
-    company_id = get_user_company_id(username)
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
     settings = get_company_settings(company_id)
     features = get_company_features(company_id)
 
@@ -27006,7 +27040,11 @@ async def update_settings(request: Request):
     one_c_enabled = 1 if plan in ("business_1c", "enterprise_1c") else 0
     calls_enabled = 1 if plan in ("business", "business_1c", "enterprise_1c") else 0
     ai_calls_enabled = 1 if plan == "enterprise_1c" else 0
-    company_id = get_user_company_id(username)
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
 
     if form.get("apply_business_preset") == "1":
         apply_business_preset(company_id, industry)
@@ -27644,7 +27682,11 @@ async def client_detail(
     if role not in ("boss", "manager"):
         return RedirectResponse("/", status_code=302)
 
-    company_id = get_user_company_id(username)
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
     settings = get_company_settings(company_id)
     task_label = settings["task_label"] or "Заявка"
     disabled_response = require_feature(company_id, "clients")
@@ -31270,7 +31312,12 @@ async def debug_page(request: Request):
     catalog_count = c.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
     company_context_diagnostics = get_company_context_diagnostics(c)
 
-    company_id = get_user_company_id(username)
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        conn.close()
+        return missing_company_response
+
     settings = get_company_settings(company_id)
 
     recent_users = c.execute("""

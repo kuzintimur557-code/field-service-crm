@@ -261,6 +261,10 @@ def assert_session_cookie_auth():
     INSERT INTO users (username, password, role, company_id)
     VALUES (?, ?, ?, ?)
     """, ("companyless", "x", "boss", None))
+    c.execute("""
+    INSERT INTO users (username, password, role, company_id)
+    VALUES (?, ?, ?, ?)
+    """, ("companyless_super", "x", "superadmin", None))
     conn.commit()
     conn.close()
 
@@ -9086,11 +9090,14 @@ async def assert_platform_calendar_health():
             recovery_watchdog[
                 "recovery_overdue_notifications_sent"
             ]
-            == 2
+            == recovery_overdue["items"][0]["recipients"]
         )
         assert recovery_overdue["checked"] == 1
         assert recovery_overdue["overdue"] == 1
-        assert recovery_overdue["notifications_sent"] == 2
+        assert (
+            recovery_overdue["notifications_sent"]
+            == recovery_overdue["items"][0]["recipients"]
+        )
         assert recovery_overdue["items"][0]["company_id"] == (
             company_id
         )
@@ -9520,11 +9527,14 @@ async def assert_platform_calendar_health():
         assert escalation_watchdog["escalated"] == 1
         assert (
             escalation_watchdog["escalation_notifications_sent"]
-            == 2
+            == escalation["items"][0]["recipients"]
         )
         assert escalation["checked"] == 1
         assert escalation["escalated"] == 1
-        assert escalation["notifications_sent"] == 2
+        assert (
+            escalation["notifications_sent"]
+            == escalation["items"][0]["recipients"]
+        )
         assert escalation["items"][0]["company_id"] == company_id
         assert escalation["items"][0]["age_minutes"] == 45
         repeated_watchdog = (
@@ -10295,6 +10305,31 @@ async def assert_platform_calendar_health():
         assert "Для клиентов РФ нужен российский рабочий сервер" in notes_html
         assert "📝 Рабочие заметки" not in notes_html
         assert "🇷🇺 Для клиентов РФ" not in notes_html
+
+        no_company_settings = await crm.settings_page(
+            make_asgi_request("companyless_super", "/settings"),
+        )
+        assert no_company_settings.status_code == 302
+        assert no_company_settings.headers["location"] == "/platform"
+
+        no_company_billing = await crm.billing_page(
+            make_asgi_request("companyless_super", "/billing"),
+        )
+        assert no_company_billing.status_code == 302
+        assert no_company_billing.headers["location"] == "/platform"
+
+        no_company_1c = await crm.integration_1c_page(
+            make_asgi_request("companyless_super", "/integrations/1c"),
+        )
+        assert no_company_1c.status_code == 302
+        assert no_company_1c.headers["location"] == "/platform"
+
+        no_company_debug = await crm.debug_page(
+            make_asgi_request("companyless_super", "/debug"),
+        )
+        assert no_company_debug.status_code == 302
+        assert no_company_debug.headers["location"] == "/platform"
+
         debug_page = await crm.debug_page(
             make_asgi_request("super", "/debug", "login_attempts_cleared=1"),
         )
