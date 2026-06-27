@@ -7280,6 +7280,35 @@ async def assert_dispatch_planner():
     conn.close()
 
 
+async def assert_platform_companies_page():
+    anonymous = await crm.platform_companies_page(
+        make_public_asgi_request("/platform/companies"),
+    )
+    assert anonymous.status_code == 302
+    assert anonymous.headers["location"] == "/login"
+
+    boss = await crm.platform_companies_page(
+        make_asgi_request("owner2", "/platform/companies"),
+    )
+    assert boss.status_code == 302
+    assert boss.headers["location"] == "/"
+
+    response = await crm.platform_companies_page(
+        make_asgi_request("super", "/platform/companies"),
+    )
+    assert response.status_code == 200
+    html = response.body.decode("utf-8")
+    assert "Компании" in html
+    assert "Создать компанию" in html
+    assert "Сервис / выездные работы" in html
+    assert "Бьюти" in html
+    assert 'name="industry"' in html
+    assert 'class="platform-mobile-nav"' in html
+    assert 'class="platform-mobile-nav-grid"' in html
+    assert "/platform/readiness" in html
+    assert "/platform/calendar-health" in html
+
+
 async def assert_platform_calendar_health():
     policy_environment_names = (
         "CALENDAR_INCIDENT_RESPONSE_MINUTES",
@@ -7784,6 +7813,8 @@ async def assert_platform_calendar_health():
         )
         html = page.body.decode("utf-8")
         assert "Здоровье календарных автоматизаций" in html
+        assert 'class="platform-mobile-nav"' in html
+        assert 'class="platform-mobile-nav-grid"' in html
         assert "Рабочая очередь компаний" in html
         assert "Общий статус" in html
         assert "Критично" in html
@@ -7957,6 +7988,7 @@ async def assert_platform_calendar_health():
         assert detail_page.status_code == 200
         detail_html = detail_page.body.decode("utf-8")
         assert "Последние запуски" in detail_html
+        assert 'class="platform-mobile-nav"' in detail_html
         assert "История инцидентов" in detail_html
         assert "Операции с планами" in detail_html
         assert "Smoke scheduler failure" in detail_html
@@ -9612,6 +9644,7 @@ async def assert_platform_calendar_health():
         assert analytics_page.context["selected_days"] == 30
         analytics_html = analytics_page.body.decode("utf-8")
         assert "Аналитика календарных инцидентов" in analytics_html
+        assert 'class="platform-mobile-nav"' in analytics_html
         assert (
             "/platform/calendar-health/analytics/export?days=30"
             in analytics_html
@@ -9724,6 +9757,8 @@ async def assert_platform_calendar_health():
         assert "Релизный штаб" in platform_html
         assert "Быстрые действия" in platform_html
         assert platform_page.context["release_readiness"]["checks"]
+        assert 'class="platform-mobile-nav"' in platform_html
+        assert 'class="platform-mobile-nav-grid"' in platform_html
         assert platform_page.context["release_readiness"]["score"] >= 0
         assert platform_page.context["release_readiness"]["categories"]
         assert platform_page.context["release_readiness"]["export_url"] == (
@@ -10607,6 +10642,8 @@ async def assert_platform_calendar_health():
         assert readiness_page.status_code == 200
         readiness_html = readiness_page.body.decode("utf-8")
         assert "Готовность релиза" in readiness_html
+        assert 'class="platform-mobile-nav"' in readiness_html
+        assert 'class="platform-mobile-nav-grid"' in readiness_html
         assert "Проверки готовности" in readiness_html
         assert "Сравнение" in readiness_html
         assert "Тренд снимков" in readiness_html
@@ -10763,6 +10800,8 @@ async def assert_platform_calendar_health():
         assert snapshot_page.status_code == 200
         snapshot_html = snapshot_page.body.decode("utf-8")
         assert "Снимок готовности релиза" in snapshot_html
+        assert 'class="platform-mobile-nav"' in snapshot_html
+        assert 'class="platform-mobile-nav-grid"' in snapshot_html
         assert "Сравнение с предыдущим снимком" in snapshot_html
         assert "Предыдущий снимок:" in snapshot_html
         assert "План запуска снимка" in snapshot_html
@@ -16096,6 +16135,7 @@ def main():
         asyncio.run(assert_schedule_conflicts())
         asyncio.run(assert_dispatch_board())
         asyncio.run(assert_dispatch_planner())
+        asyncio.run(assert_platform_companies_page())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))

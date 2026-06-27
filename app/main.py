@@ -6285,7 +6285,8 @@ async def platform_companies_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "companies": companies
+            "companies": companies,
+            "industry_options": INDUSTRY_OPTIONS
         }
     )
 

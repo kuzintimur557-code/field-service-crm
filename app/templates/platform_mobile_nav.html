@@ -1,0 +1,62 @@
+<style>
+.platform-mobile-nav{display:none}
+@media(max-width:900px){
+    .platform-mobile-nav{
+        position:fixed;
+        right:0;
+        bottom:0;
+        left:0;
+        display:block;
+        height:calc(76px + env(safe-area-inset-bottom));
+        padding-bottom:env(safe-area-inset-bottom);
+        background:rgba(255,255,255,.96);
+        border-top:1px solid #e5e7eb;
+        box-shadow:0 -10px 30px rgba(15,23,42,.1);
+        z-index:9999;
+        backdrop-filter:blur(14px);
+    }
+    .platform-mobile-nav-grid{
+        display:grid;
+        grid-template-columns:repeat(5,minmax(0,1fr));
+        height:76px;
+    }
+    .platform-mobile-nav a{
+        display:flex;
+        min-width:0;
+        align-items:center;
+        justify-content:center;
+        padding:8px 4px;
+        color:#6b7280;
+        font-size:11px;
+        font-weight:900;
+        line-height:1.12;
+        text-align:center;
+        text-decoration:none;
+        overflow-wrap:anywhere;
+    }
+    .platform-mobile-nav a.active{
+        color:#2563eb;
+    }
+    body{padding-bottom:calc(98px + env(safe-area-inset-bottom))!important}
+}
+</style>
+
+<nav class="platform-mobile-nav" aria-label="Навигация платформы">
+    <div class="platform-mobile-nav-grid">
+        <a href="/platform" class="{% if request.url.path == '/platform' %}active{% endif %}">
+            <span>Панель</span>
+        </a>
+        <a href="/platform/companies" class="{% if '/platform/companies' in request.url.path %}active{% endif %}">
+            <span>Компании</span>
+        </a>
+        <a href="/platform/readiness" class="{% if '/platform/readiness' in request.url.path %}active{% endif %}">
+            <span>Релиз</span>
+        </a>
+        <a href="/platform/calendar-health" class="{% if '/platform/calendar-health' in request.url.path %}active{% endif %}">
+            <span>Контроль</span>
+        </a>
+        <a href="/logout">
+            <span>Выход</span>
+        </a>
+    </div>
+</nav>
