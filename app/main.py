@@ -1092,8 +1092,15 @@ def get_plan_user_limit(plan):
     return limits.get(plan, 3)
 
 
-def get_company_settings(company_id=1):
-    company_id = company_id or 1
+def require_company_id_value(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
+    return company_id
+
+
+def get_company_settings(company_id):
+    company_id = require_company_id_value(company_id)
 
     conn = connect()
     c = conn.cursor()
@@ -1121,8 +1128,8 @@ def get_company_settings(company_id=1):
     return settings
 
 
-def ensure_company_features(company_id=1):
-    company_id = company_id or 1
+def ensure_company_features(company_id):
+    company_id = require_company_id_value(company_id)
 
     conn = connect()
     c = conn.cursor()
@@ -1148,8 +1155,8 @@ def ensure_company_features(company_id=1):
     conn.close()
 
 
-def get_company_features(company_id=1):
-    company_id = company_id or 1
+def get_company_features(company_id):
+    company_id = require_company_id_value(company_id)
     ensure_company_features(company_id)
 
     features = {
@@ -1189,7 +1196,7 @@ def require_feature(company_id, feature_key):
 
 
 def update_company_features(company_id, form):
-    company_id = company_id or 1
+    company_id = require_company_id_value(company_id)
     ensure_company_features(company_id)
 
     conn = connect()
@@ -1223,7 +1230,7 @@ def get_industry_labels(industry):
 
 
 def apply_business_preset(company_id, industry):
-    company_id = company_id or 1
+    company_id = require_company_id_value(company_id)
     ensure_company_features(company_id)
 
     enabled_features = set(BUSINESS_PRESETS.get(industry) or BUSINESS_PRESETS["other"])
@@ -2980,7 +2987,7 @@ def run_automation_event(
     message="",
     link=""
 ):
-    company_id = company_id or 1
+    company_id = require_company_id_value(company_id)
 
     if not has_feature(company_id, "automation"):
         return 0
@@ -3241,7 +3248,7 @@ def run_automation_event(
 
 
 def run_ai_digest_scheduler(company_id, now_dt=None):
-    company_id = company_id or 1
+    company_id = require_company_id_value(company_id)
 
     result = {
         "daily": 0,
@@ -3361,7 +3368,7 @@ def run_ai_digest_scheduler_for_all_companies(now_dt=None):
 
 
 def ensure_ai_digest_automation_rules(company_id, username):
-    company_id = company_id or 1
+    company_id = require_company_id_value(company_id)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     created_count = 0
     defaults = [

@@ -286,6 +286,21 @@ def assert_task_access(task):
 
 
 def assert_company_features():
+    guarded_calls = [
+        (crm.get_company_settings, (None,)),
+        (crm.ensure_company_features, (None,)),
+        (crm.get_company_features, (None,)),
+        (crm.update_company_features, (None, {})),
+        (crm.apply_business_preset, (None, "beauty")),
+    ]
+
+    for func, args in guarded_calls:
+        try:
+            func(*args)
+            assert False, f"{func.__name__} must require company_id"
+        except ValueError as exc:
+            assert "company_id is required" in str(exc)
+
     features = crm.get_company_features(2)
     assert features["tasks"]
     assert features["finance"]
@@ -15968,6 +15983,28 @@ async def assert_a3_api_layer():
         assert False, "process_autonomous_actions must require company_id"
     except ValueError as exc:
         assert "company_id is required" in str(exc)
+
+    automation_company_guarded_calls = [
+        (
+            crm.run_automation_event,
+            (None, "daily_digest"),
+        ),
+        (
+            crm.run_ai_digest_scheduler,
+            (None,),
+        ),
+        (
+            crm.ensure_ai_digest_automation_rules,
+            (None, "owner2"),
+        ),
+    ]
+
+    for func, args in automation_company_guarded_calls:
+        try:
+            func(*args)
+            assert False, f"{func.__name__} must require company_id"
+        except ValueError as exc:
+            assert "company_id is required" in str(exc)
 
     conn = connect()
     c = conn.cursor()
