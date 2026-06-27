@@ -10200,6 +10200,50 @@ async def assert_platform_calendar_health():
         assert 'href="/health"' in admin_html
         assert 'href="/ready"' in admin_html
         assert "Готовность" in admin_html
+        assert "🛠 Админ-центр" not in admin_html
+        assert "🧪 Диагностика" not in admin_html
+        assert "💾 Резервная копия" not in admin_html
+        assert "💰 Финансы" not in admin_html
+        assert "← Назад" not in admin_html
+        checklist_page = await crm.admin_checklist_page(
+            make_asgi_request("super", "/admin/checklist"),
+        )
+        assert checklist_page.status_code == 200
+        checklist_html = checklist_page.body.decode("utf-8")
+        assert "Чеклист запуска" in checklist_html
+        assert "FastAPI приложение" in checklist_html
+        assert "✅ FastAPI приложение" not in checklist_html
+        assert "← Назад в админ-центр" not in checklist_html
+        roadmap_page = await crm.admin_roadmap_page(
+            make_asgi_request("super", "/admin/roadmap"),
+        )
+        assert roadmap_page.status_code == 200
+        roadmap_html = roadmap_page.body.decode("utf-8")
+        assert "План развития продукта" in roadmap_html
+        assert "Этап 1 — базовая CRM" in roadmap_html
+        assert "🧭 План развития продукта" not in roadmap_html
+        assert "✅ Заявки" not in roadmap_html
+        notes_page = await crm.admin_notes_page(
+            make_asgi_request("super", "/admin/notes"),
+        )
+        assert notes_page.status_code == 200
+        notes_html = notes_page.body.decode("utf-8")
+        assert "Рабочие заметки" in notes_html
+        assert "Для клиентов РФ нужен российский рабочий сервер" in notes_html
+        assert "📝 Рабочие заметки" not in notes_html
+        assert "🇷🇺 Для клиентов РФ" not in notes_html
+        debug_page = await crm.debug_page(
+            make_asgi_request("super", "/debug", "login_attempts_cleared=1"),
+        )
+        assert debug_page.status_code == 200
+        debug_html = debug_page.body.decode("utf-8")
+        assert "Диагностика / проверка системы" in debug_html
+        assert "Блокировки входа очищены" in debug_html
+        assert "Вкл" in debug_html or "Выкл" in debug_html
+        assert "🧪 Диагностика / проверка системы" not in debug_html
+        assert "✅ Блокировки входа очищены" not in debug_html
+        assert ">ON<" not in debug_html
+        assert ">OFF<" not in debug_html
         anonymous_system_events_export = await crm.system_events_export(
             make_public_asgi_request("/system/events/export"),
         )

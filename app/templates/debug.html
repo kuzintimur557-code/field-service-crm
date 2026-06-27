@@ -27,10 +27,10 @@ h1{margin:0 0 20px;font-size:34px}
 <body>
 <div class="container">
 
-<a href="/" class="back">← Назад</a>
+<a href="/" class="back">Назад</a>
 
 <div class="card">
-<h1>🧪 Диагностика / проверка системы</h1>
+<h1>Диагностика / проверка системы</h1>
 <div style="color:#6b7280;font-weight:800">
 Техническая страница только для владельца.
 </div>
@@ -82,21 +82,21 @@ h1{margin:0 0 20px;font-size:34px}
     <div class="stat">
         <div class="label">1С</div>
         <div class="value {% if settings['one_c_enabled'] %}ok{% else %}no{% endif %}">
-            {% if settings["one_c_enabled"] %}ON{% else %}OFF{% endif %}
+            {% if settings["one_c_enabled"] %}Вкл{% else %}Выкл{% endif %}
         </div>
     </div>
 
     <div class="stat">
         <div class="label">Звонки</div>
         <div class="value {% if settings['calls_enabled'] %}ok{% else %}no{% endif %}">
-            {% if settings["calls_enabled"] %}ON{% else %}OFF{% endif %}
+            {% if settings["calls_enabled"] %}Вкл{% else %}Выкл{% endif %}
         </div>
     </div>
 
     <div class="stat">
         <div class="label">AI звонки</div>
         <div class="value {% if settings['ai_calls_enabled'] %}ok{% else %}no{% endif %}">
-            {% if settings["ai_calls_enabled"] %}ON{% else %}OFF{% endif %}
+            {% if settings["ai_calls_enabled"] %}Вкл{% else %}Выкл{% endif %}
         </div>
     </div>
 </div>
@@ -107,7 +107,7 @@ h1{margin:0 0 20px;font-size:34px}
 
 {% if request.query_params.get("login_attempts_cleared") == "1" %}
 <div style="padding:12px;border-radius:14px;background:#dcfce7;color:#166534;margin-bottom:12px;font-weight:900">
-✅ Блокировки входа очищены
+Блокировки входа очищены
 </div>
 {% endif %}
 
