@@ -20,6 +20,8 @@ h1{margin:0 0 20px;font-size:34px}
 .value{font-size:26px;font-weight:900}
 .ok{color:#166534}
 .no{color:#991b1b}
+.diag-row{display:flex;justify-content:space-between;gap:12px;padding:12px;border-radius:14px;background:#f9fafb;margin-bottom:8px;font-weight:800}
+.diag-meta{color:#6b7280}
 @media(max-width:750px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}}
 </style>
 </head>
@@ -68,6 +70,36 @@ h1{margin:0 0 20px;font-size:34px}
         <div class="value">{{ catalog_count }}</div>
     </div>
 </div>
+</div>
+
+<div class="card">
+<h2>Проверка изоляции компаний</h2>
+
+<div class="stat" style="margin-bottom:14px">
+    <div class="label">Проблемы company_id</div>
+    <div class="value {% if company_context_diagnostics.ok %}ok{% else %}no{% endif %}">
+        {{ company_context_diagnostics.total_issues }}
+    </div>
+</div>
+
+{% for item in company_context_diagnostics["items"] %}
+{% if not item["ok"] %}
+<div class="diag-row">
+    <div>
+        {{ item["label"] }}
+        <div class="diag-meta">{{ item["table"] }}</div>
+    </div>
+    <div>
+        без компании: {{ item["missing_company"] }},
+        неверная компания: {{ item["invalid_company"] }}
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% if company_context_diagnostics.ok %}
+<div style="color:#166534;font-weight:900">Проблем с company_id не найдено</div>
+{% endif %}
 </div>
 
 <div class="card">

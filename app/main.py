@@ -1203,6 +1203,64 @@ def get_company_features(company_id):
     return features
 
 
+COMPANY_CONTEXT_DIAGNOSTIC_TABLES = [
+    ("users", "Пользователи", "role!='superadmin'"),
+    ("tasks", "Заявки", "1=1"),
+    ("clients", "Клиенты", "1=1"),
+    ("catalog_items", "Каталог", "1=1"),
+    ("task_items", "Позиции смет", "1=1"),
+    ("client_notes", "Заметки клиентов", "1=1"),
+    ("client_files", "Файлы клиентов", "1=1"),
+    ("recurring_jobs", "Повторяющиеся работы", "1=1"),
+    ("custom_fields", "Настраиваемые поля", "1=1"),
+    ("custom_field_values", "Значения настраиваемых полей", "1=1"),
+    ("company_settings", "Настройки компаний", "1=1"),
+    ("company_features", "Функции компаний", "1=1"),
+]
+
+
+def get_company_context_diagnostics(cursor):
+    items = []
+
+    for table_name, label, base_where in COMPANY_CONTEXT_DIAGNOSTIC_TABLES:
+        missing_company = cursor.execute(f"""
+        SELECT COUNT(*)
+        FROM {table_name}
+        WHERE ({base_where})
+          AND company_id IS NULL
+        """).fetchone()[0]
+
+        invalid_company = cursor.execute(f"""
+        SELECT COUNT(*)
+        FROM {table_name}
+        WHERE ({base_where})
+          AND company_id IS NOT NULL
+          AND company_id NOT IN (
+              SELECT id
+              FROM companies
+          )
+        """).fetchone()[0]
+
+        items.append({
+            "table": table_name,
+            "label": label,
+            "missing_company": missing_company,
+            "invalid_company": invalid_company,
+            "ok": missing_company == 0 and invalid_company == 0,
+        })
+
+    total_issues = sum(
+        item["missing_company"] + item["invalid_company"]
+        for item in items
+    )
+
+    return {
+        "items": items,
+        "total_issues": total_issues,
+        "ok": total_issues == 0,
+    }
+
+
 def has_feature(company_id, feature_key):
     if not company_id:
         return False
@@ -31212,6 +31270,7 @@ async def debug_page(request: Request):
     archived_tasks_count = c.execute("SELECT COUNT(*) FROM tasks WHERE archived=1").fetchone()[0]
     clients_count = c.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
     catalog_count = c.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
+    company_context_diagnostics = get_company_context_diagnostics(c)
 
     company_id = get_user_company_id(username)
     settings = get_company_settings(company_id)
@@ -31251,6 +31310,7 @@ async def debug_page(request: Request):
             "archived_tasks_count": archived_tasks_count,
             "clients_count": clients_count,
             "catalog_count": catalog_count,
+            "company_context_diagnostics": company_context_diagnostics,
             "settings": settings,
             "recent_users": recent_users,
             "login_events": login_events,

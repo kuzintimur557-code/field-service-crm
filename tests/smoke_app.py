@@ -338,6 +338,18 @@ def assert_company_features():
     assert features["notifications"]
     assert features["automation"]
 
+    conn = connect()
+    c = conn.cursor()
+    diagnostics = crm.get_company_context_diagnostics(c)
+    conn.close()
+
+    assert diagnostics["total_issues"] >= 1
+    assert any(
+        item["table"] == "users"
+        and item["missing_company"] >= 1
+        for item in diagnostics["items"]
+    )
+
     crm.update_company_features(2, {"feature_finance": "1"})
 
     features = crm.get_company_features(2)
@@ -10284,6 +10296,10 @@ async def assert_platform_calendar_health():
         assert debug_page.status_code == 200
         debug_html = debug_page.body.decode("utf-8")
         assert "Диагностика / проверка системы" in debug_html
+        assert "Проверка изоляции компаний" in debug_html
+        assert "Проблемы company_id" in debug_html
+        assert "Пользователи" in debug_html
+        assert "без компании:" in debug_html
         assert "Блокировки входа очищены" in debug_html
         assert "Вкл" in debug_html or "Выкл" in debug_html
         assert "🧪 Диагностика / проверка системы" not in debug_html
