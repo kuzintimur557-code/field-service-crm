@@ -1204,6 +1204,9 @@ def get_company_features(company_id):
 
 
 def has_feature(company_id, feature_key):
+    if not company_id:
+        return False
+
     return get_company_features(company_id).get(feature_key, True)
 
 

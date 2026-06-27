@@ -323,6 +323,11 @@ def assert_company_features():
         except ValueError as exc:
             assert "company_id is required" in str(exc)
 
+    assert not crm.has_feature(None, "calendar")
+    missing_company_feature = crm.require_feature(None, "calendar")
+    assert missing_company_feature.status_code == 302
+    assert missing_company_feature.headers["location"] == "/"
+
     features = crm.get_company_features(2)
     assert features["tasks"]
     assert features["finance"]
