@@ -1035,14 +1035,15 @@ def can_access_task(username, role, task):
     if not task:
         return False
 
-    if role == "superadmin":
-        return True
-
-    user_company_id = get_user_company_id(username)
     task_company_id = get_task_company_id(task)
 
     if not task_company_id:
         return False
+
+    user_company_id = get_user_company_id(username)
+
+    if role == "superadmin":
+        return True
 
     if role in ("boss", "manager"):
         return task_company_id == user_company_id
@@ -32254,7 +32255,7 @@ async def task_detail(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
     linked_client = None
 
     if "client_id" in task.keys() and task["client_id"]:
@@ -32513,7 +32514,7 @@ async def add_task_item(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
 
     item = c.execute("""
     SELECT *
@@ -32641,7 +32642,7 @@ async def add_manual_task_item(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
     total = price * qty
     profit = (price - cost) * qty
 
@@ -32720,7 +32721,7 @@ async def delete_task_item(request: Request, task_id: int, item_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
 
     item = c.execute("""
     SELECT *
@@ -32784,7 +32785,7 @@ async def apply_task_estimate_total(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
     estimate_total = c.execute("""
     SELECT SUM(total)
     FROM task_items
@@ -32862,7 +32863,7 @@ async def add_task_expense(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
 
     c.execute("""
     INSERT INTO task_expenses (
@@ -32925,7 +32926,7 @@ async def delete_task_expense(request: Request, task_id: int, expense_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
     expense = c.execute("""
     SELECT *
     FROM task_expenses
@@ -32996,7 +32997,7 @@ async def update_task_discount(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
     old_discount = task["discount_amount"] if "discount_amount" in task.keys() else 0
 
     c.execute("""
@@ -33682,7 +33683,7 @@ async def update_task_custom_field(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    company_id = get_task_company_id(task)
 
     disabled_response = require_feature(company_id, "custom_fields")
 
@@ -34502,7 +34503,7 @@ async def task_invoice_pdf(request: Request, task_id: int):
 
     estimate_total = sum(item["total"] for item in task_items)
     payment_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
-    task_company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    task_company_id = get_task_company_id(task)
     settings = get_company_settings(task_company_id)
 
     pdf_path = DOCS_DIR / f"task_{task_id}_invoice.pdf"
@@ -34654,7 +34655,7 @@ async def task_pdf(request: Request, task_id: int):
     conn.close()
 
     estimate_total = sum(item["total"] for item in task_items)
-    task_company_id = task["company_id"] if "company_id" in task.keys() else get_user_company_id(username)
+    task_company_id = get_task_company_id(task)
     settings = get_company_settings(task_company_id)
 
     pdf_path = DOCS_DIR / f"task_{task_id}.pdf"

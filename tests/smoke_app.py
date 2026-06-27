@@ -292,6 +292,7 @@ def assert_task_access(task):
     }
 
     assert crm.get_task_company_id(task_without_company) is None
+    assert not crm.can_access_task("super", "superadmin", task_without_company)
     assert not crm.can_access_task("owner2", "boss", task_without_company)
     assert not crm.can_access_task("worker2", "worker", task_without_company)
     assert crm.get_task_worker_chat_ids(c, task_without_company) == []
