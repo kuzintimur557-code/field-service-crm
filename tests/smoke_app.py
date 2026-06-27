@@ -8936,7 +8936,7 @@ async def assert_platform_calendar_health():
         ORDER BY id
         """, (company_id,)).fetchall()
         assignment_notifications = c.execute("""
-        SELECT username, title, message, link
+        SELECT company_id, username, title, message, link
         FROM notifications
         WHERE username=?
           AND title='Назначен календарный инцидент'
@@ -8964,6 +8964,7 @@ async def assert_platform_calendar_health():
             collaboration_events[1]["message"]
         )
         assert len(assignment_notifications) == 1
+        assert assignment_notifications[0]["company_id"] == company_id
         assert company_name in assignment_notifications[0]["message"]
         reassigned_health = crm.get_platform_calendar_health(
             now_dt=now_dt,

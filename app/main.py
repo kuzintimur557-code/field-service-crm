@@ -18458,7 +18458,7 @@ def reassign_calendar_scheduler_incident(
     )
     VALUES (?, ?, ?, ?, ?, 0, ?)
     """, (
-        int(assignee["company_id"] or 1),
+        int(company_id),
         assignee_username,
         "Назначен календарный инцидент",
         (
