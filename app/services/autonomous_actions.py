@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 from app.database import connect
@@ -13,6 +13,14 @@ def enqueue_autonomous_action(
     target_id=None,
     payload_json=None,
 ):
+    if not company_id:
+        raise ValueError("company_id is required")
+
+    now_value = datetime.now()
+    cooldown_cutoff = (
+        now_value - timedelta(minutes=10)
+    ).isoformat(timespec="seconds")
+
     conn = connect()
     c = conn.cursor()
 
@@ -48,12 +56,13 @@ def enqueue_autonomous_action(
           AND action_type=?
           AND target_type=?
           AND COALESCE(target_id, 0)=COALESCE(?, 0)
-          AND created_at >= datetime('now', '-10 minutes')
+          AND created_at >= ?
     """, (
         company_id,
         action_type,
         target_type,
         target_id,
+        cooldown_cutoff,
     )).fetchone()["total"]
 
     if cooldown_count >= 3:
@@ -79,7 +88,7 @@ def enqueue_autonomous_action(
         target_type,
         target_id,
         payload_json,
-        datetime.now().isoformat(timespec="seconds"),
+        now_value.isoformat(timespec="seconds"),
     ))
 
     conn.commit()

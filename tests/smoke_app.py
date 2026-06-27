@@ -16075,6 +16075,17 @@ async def assert_a3_api_layer():
     except ValueError as exc:
         assert "company_id is required" in str(exc)
 
+    try:
+        crm.enqueue_autonomous_action(
+            company_id=None,
+            action_type="retry_events",
+            target_type="automation_rule",
+            target_id=1,
+        )
+        assert False, "enqueue_autonomous_action must require company_id"
+    except ValueError as exc:
+        assert "company_id is required" in str(exc)
+
     automation_company_guarded_calls = [
         (
             crm.run_automation_event,
@@ -16276,6 +16287,22 @@ async def assert_a3_api_layer():
     )
     assert approval_request_duplicate["ok"] is False
     assert approval_request_duplicate["reason"] == "duplicate_pending_action"
+
+    cooldown_action = crm.enqueue_autonomous_action(
+        company_id=2,
+        action_type="retry_events",
+        target_type="automation_rule",
+        target_id=disable_rule_id,
+    )
+    assert cooldown_action["queued"] is True
+    second_cooldown_action = crm.enqueue_autonomous_action(
+        company_id=2,
+        action_type="retry_events",
+        target_type="automation_rule",
+        target_id=disable_rule_id,
+    )
+    assert second_cooldown_action["queued"] is False
+    assert second_cooldown_action["reason"] == "duplicate_pending_action"
 
     updated_approval_queue = crm.api_a3_approval_queue(request)
     assert any(
