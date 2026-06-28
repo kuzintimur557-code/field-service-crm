@@ -2,7 +2,14 @@ from app.database import connect
 from app.services.autonomous_actions import enqueue_autonomous_action
 
 
+def require_company_id(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
+
 def get_decision_engine(company_id):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 

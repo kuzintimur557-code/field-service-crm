@@ -5,9 +5,13 @@ from app.database import connect
 from app.services.ops_timeline import create_ops_timeline_event
 
 
-def run_self_healing_cycle(company_id):
+def require_company_id(company_id):
     if not company_id:
         raise ValueError("company_id is required")
+
+
+def run_self_healing_cycle(company_id):
+    require_company_id(company_id)
 
     started_at = time.time()
 
@@ -90,6 +94,8 @@ def run_self_healing_cycle(company_id):
 
 
 def get_recovery_history(company_id, limit=20):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
