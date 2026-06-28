@@ -1,6 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.database import connect
+
+
+def require_company_id(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
 
 
 def create_ops_timeline_event(
@@ -14,6 +19,13 @@ def create_ops_timeline_event(
     target_id=None,
     cooldown_minutes=10,
 ):
+    require_company_id(company_id)
+
+    now_value = datetime.now()
+    cooldown_cutoff = (
+        now_value - timedelta(minutes=cooldown_minutes)
+    ).isoformat(timespec="seconds")
+
     conn = connect()
     c = conn.cursor()
 
@@ -52,10 +64,7 @@ def create_ops_timeline_event(
               COALESCE(?, '')
           AND COALESCE(target_id, 0) =
               COALESCE(?, 0)
-          AND created_at >= datetime(
-                'now',
-                '-' || ? || ' minutes'
-          )
+          AND created_at >= ?
         ORDER BY id DESC
         LIMIT 1
     """, (
@@ -65,7 +74,7 @@ def create_ops_timeline_event(
         message,
         target_type,
         target_id,
-        cooldown_minutes,
+        cooldown_cutoff,
     )).fetchone()
 
     if existing:
@@ -95,7 +104,7 @@ def create_ops_timeline_event(
         source,
         target_type,
         target_id,
-        datetime.now().isoformat(timespec="seconds"),
+        now_value.isoformat(timespec="seconds"),
     ))
 
     conn.commit()
@@ -106,6 +115,8 @@ def create_ops_timeline_event(
 
 
 def get_ops_timeline(company_id, limit=100):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 

@@ -5,6 +5,11 @@ from app.database import connect
 from app.services.ops_timeline import create_ops_timeline_event
 
 
+def require_company_id(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
+
 @dataclass
 class SystemHealthResult:
     score: int
@@ -188,6 +193,8 @@ class SystemHealthCalculator:
 
 
 def save_system_health_snapshot(company_id, data):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
     now = datetime.now()
@@ -253,6 +260,8 @@ def save_system_health_snapshot(company_id, data):
 
 
 def calculate_system_health(company_id):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -315,6 +324,8 @@ def calculate_system_health(company_id):
 
 
 def get_system_health_history(company_id, limit=30):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
