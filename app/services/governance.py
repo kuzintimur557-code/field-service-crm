@@ -3,7 +3,14 @@ from datetime import datetime
 from app.database import connect
 
 
+def require_company_id(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
+
 def get_governance_settings(company_id):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -55,6 +62,8 @@ def save_governance_settings(
     confidence_threshold,
     protected_rules_json="[]",
 ):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -87,6 +96,8 @@ def save_governance_settings(
 
 
 def get_approval_queue(company_id):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -105,6 +116,8 @@ def get_approval_queue(company_id):
 
 
 def get_approval_history(company_id):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
