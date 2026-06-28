@@ -16086,6 +16086,28 @@ async def assert_a3_api_layer():
     except ValueError as exc:
         assert "company_id is required" in str(exc)
 
+    autonomous_company_guarded_calls = [
+        (
+            crm.get_autonomous_actions,
+            (None,),
+        ),
+        (
+            crm.approve_autonomous_action,
+            (None, 1),
+        ),
+        (
+            crm.reject_autonomous_action,
+            (None, 1),
+        ),
+    ]
+
+    for func, args in autonomous_company_guarded_calls:
+        try:
+            func(*args)
+            assert False, f"{func.__name__} must require company_id"
+        except ValueError as exc:
+            assert "company_id is required" in str(exc)
+
     automation_company_guarded_calls = [
         (
             crm.run_automation_event,

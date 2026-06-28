@@ -6,6 +6,11 @@ from app.services.governance import get_governance_settings
 from app.services.ops_timeline import create_ops_timeline_event
 
 
+def require_company_id(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
+
 def enqueue_autonomous_action(
     company_id,
     action_type,
@@ -13,8 +18,7 @@ def enqueue_autonomous_action(
     target_id=None,
     payload_json=None,
 ):
-    if not company_id:
-        raise ValueError("company_id is required")
+    require_company_id(company_id)
 
     now_value = datetime.now()
     cooldown_cutoff = (
@@ -100,6 +104,8 @@ def enqueue_autonomous_action(
 
 
 def get_autonomous_actions(company_id, limit=50):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -128,8 +134,7 @@ def get_autonomous_actions(company_id, limit=50):
 
 
 def process_autonomous_actions(company_id):
-    if not company_id:
-        raise ValueError("company_id is required")
+    require_company_id(company_id)
 
     governance = get_governance_settings(company_id)
 
@@ -263,6 +268,8 @@ def process_autonomous_actions(company_id):
 
 
 def approve_autonomous_action(company_id, action_id, decided_by="system"):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -334,6 +341,8 @@ def approve_autonomous_action(company_id, action_id, decided_by="system"):
 
 
 def reject_autonomous_action(company_id, action_id, decided_by="system"):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
