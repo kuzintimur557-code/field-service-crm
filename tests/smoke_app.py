@@ -15985,9 +15985,137 @@ async def assert_a3_workflow_center():
 
 async def assert_a3_api_layer():
     request = make_request("owner2")
+    companyless_request = make_request("companyless")
 
-    missing_company_response = crm.api_a3_system_health(make_request("companyless"))
-    assert missing_company_response.status_code == 403
+    def assert_forbidden(response):
+        assert response.status_code == 403
+        assert b"forbidden" in response.body
+
+    a3_company_guarded_routes = [
+        (
+            crm.api_a3_system_health,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_system_health_history,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_automation_analytics,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_unhealthy_rules,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_operations_insights,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_self_healing_run,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_recovery_history,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_ops_timeline,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_predictive_signals,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_decision_engine,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_workflow_rule_graph,
+            (companyless_request, 1),
+        ),
+        (
+            crm.api_a3_workflow_rule_debug,
+            (companyless_request, 1),
+        ),
+        (
+            crm.api_a3_workflows_graph,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_autonomous_actions,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_process_autonomous_actions,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_governance_settings,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_approve_autonomous_action,
+            (companyless_request, 1),
+        ),
+        (
+            crm.api_a3_reject_autonomous_action,
+            (companyless_request, 1),
+        ),
+        (
+            crm.api_a3_approval_queue,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_approval_history,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_workflow_timeline,
+            (companyless_request, 1),
+        ),
+    ]
+
+    for func, args in a3_company_guarded_routes:
+        assert_forbidden(func(*args))
+
+    async_a3_company_guarded_routes = [
+        crm.api_a3_request_autonomous_action_approval(
+            make_json_request(
+                "companyless",
+                "/api/a3/autonomous-actions/request-approval",
+                {
+                    "action_type": "disable_rule",
+                    "target_type": "automation_rule",
+                    "target_id": 1,
+                },
+            )
+        ),
+        crm.api_a3_governance_settings_update(
+            make_json_request(
+                "companyless",
+                "/api/a3/governance-settings/update",
+                {},
+            )
+        ),
+        crm.api_a3_create_ops_timeline_event(
+            make_json_request(
+                "companyless",
+                "/api/a3/ops-timeline",
+                {
+                    "event_type": "smoke",
+                    "severity": "info",
+                    "title": "Smoke",
+                    "message": "Smoke",
+                },
+            )
+        ),
+    ]
+
+    for guarded_call in async_a3_company_guarded_routes:
+        assert_forbidden(await guarded_call)
 
     data = crm.api_a3_system_health(request)
     assert "score" in data
