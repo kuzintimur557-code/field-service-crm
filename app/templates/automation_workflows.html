@@ -127,7 +127,12 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
                 Опасные действия A3, которые ждут решения владельца.
             </div>
         </div>
-        <div class="pill off">Подтверждения</div>
+        <div class="workflow-card-actions">
+            <button class="back" onclick="approveSafeWorkflowActions()">
+                Одобрить безопасные
+            </button>
+            <div class="pill off">Подтверждения</div>
+        </div>
     </div>
 
     <div id="workflow-approval-queue" style="display:flex;flex-direction:column;gap:10px;margin-top:18px"></div>
@@ -272,6 +277,22 @@ async function rejectWorkflowAction(actionId) {
     await loadWorkflowApprovalHistory();
     loadChains();
     alert("Действие отклонено");
+}
+
+async function approveSafeWorkflowActions() {
+    const response = await fetch("/api/a3/autonomous-actions/approve-safe", {
+        method: "POST"
+    });
+    const data = await response.json();
+
+    await loadWorkflowApprovalQueue();
+    await loadWorkflowApprovalHistory();
+    loadChains();
+
+    alert(
+        "Одобрено: " + (data.approved || 0)
+        + ". Пропущено: " + (data.skipped || 0)
+    );
 }
 
 function getChainStatus(rule, actions) {

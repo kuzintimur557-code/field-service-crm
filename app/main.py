@@ -5,6 +5,7 @@ from app.services.automation_analytics import (
 )
 from app.services.autonomous_actions import (
     approve_autonomous_action,
+    approve_safe_autonomous_actions,
     enqueue_autonomous_action,
     get_autonomous_actions,
     process_autonomous_actions,
@@ -35357,6 +35358,21 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
         return JSONResponse(result, status_code=404)
 
     return result
+
+
+@app.post("/api/a3/autonomous-actions/approve-safe")
+def api_a3_approve_safe_autonomous_actions(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    decided_by = get_user(request) or "system"
+
+    return approve_safe_autonomous_actions(
+        company_id=company_id,
+        decided_by=decided_by,
+    )
 
 
 @app.post("/api/a3/autonomous-actions/{action_id}/reject")

@@ -1472,8 +1472,15 @@ setInterval(loadA3GovernanceSettings, 30000);
             </div>
         </div>
 
-        <div class="pill off">
-            Требует подтверждения
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn"
+                    onclick="approveSafeA3Actions()">
+                Одобрить безопасные
+            </button>
+
+            <div class="pill off">
+                Требует подтверждения
+            </div>
         </div>
     </div>
 
@@ -1557,6 +1564,25 @@ async function approveA3Action(actionId) {
 
 async function rejectA3Action(actionId) {
     await rejectA3AutonomousAction(actionId);
+}
+
+async function approveSafeA3Actions() {
+    try {
+        const response = await fetch("/api/a3/autonomous-actions/approve-safe", {
+            method: "POST"
+        });
+        const data = await response.json();
+
+        refreshA3ApprovalWidgets();
+
+        alert(
+            "Одобрено: " + (data.approved || 0)
+            + ". Пропущено: " + (data.skipped || 0)
+        );
+    } catch (err) {
+        console.error("Ошибка массового подтверждения", err);
+        alert("Не удалось выполнить массовое подтверждение");
+    }
 }
 
 loadA3ApprovalQueue();
