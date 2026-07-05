@@ -239,14 +239,17 @@ def process_autonomous_actions(company_id):
             action_type == "disable_rule"
             and target_type == "automation_rule"
             and target_id in protected_rules
-            and status != "approved"
         ):
             c.execute("""
                 UPDATE autonomous_action_queue
-                SET status='awaiting_approval'
+                SET status='failed',
+                    processed_at=?
                 WHERE id=?
-            """, (row["id"],))
-            awaiting_approval += 1
+            """, (
+                datetime.now().isoformat(timespec="seconds"),
+                row["id"],
+            ))
+            failed += 1
             continue
 
         if (

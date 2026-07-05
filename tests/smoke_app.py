@@ -16995,6 +16995,86 @@ async def assert_a3_api_layer():
         == [disabled_unhealthy_rule_id]
     )
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "A3 protected runtime smoke",
+        "weekly_digest",
+        "{}",
+        1,
+        "owner2",
+        datetime.now().isoformat(timespec="seconds"),
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    protected_runtime_rule_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    protected_runtime_update = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "protected_rules": [
+                    disabled_unhealthy_rule_id,
+                    protected_runtime_rule_id,
+                ],
+            },
+        )
+    )
+    assert protected_runtime_update["ok"] is True
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        protected_runtime_rule_id,
+        "approved",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    protected_runtime_action_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    protected_runtime_process = crm.api_a3_process_autonomous_actions(request)
+    assert protected_runtime_process["ok"] is True
+    assert protected_runtime_process["result"]["failed"] >= 1
+
+    conn = connect()
+    c = conn.cursor()
+    protected_runtime_action = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (protected_runtime_action_id,)).fetchone()
+    protected_runtime_rule = c.execute("""
+    SELECT active
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=2
+    """, (protected_runtime_rule_id,)).fetchone()
+    conn.close()
+
+    assert protected_runtime_action["status"] == "failed"
+    assert protected_runtime_rule["active"] == 1
+
     partial_governance_update = await crm.api_a3_governance_settings_update(
         make_json_request(
             "owner2",
