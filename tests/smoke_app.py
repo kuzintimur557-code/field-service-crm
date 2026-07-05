@@ -16589,6 +16589,34 @@ async def assert_a3_api_layer():
     assert approval_request_duplicate["ok"] is False
     assert approval_request_duplicate["reason"] == "duplicate_pending_action"
 
+    invalid_approval_target = await crm.api_a3_request_autonomous_action_approval(
+        make_json_request(
+            "owner2",
+            "/api/a3/autonomous-actions/request-approval",
+            {
+                "action_type": "disable_rule",
+                "target_type": "automation_rule",
+                "target_id": "bad",
+            },
+        )
+    )
+    assert invalid_approval_target.status_code == 400
+    assert b"invalid_target_id" in invalid_approval_target.body
+
+    zero_approval_target = await crm.api_a3_request_autonomous_action_approval(
+        make_json_request(
+            "owner2",
+            "/api/a3/autonomous-actions/request-approval",
+            {
+                "action_type": "disable_rule",
+                "target_type": "automation_rule",
+                "target_id": 0,
+            },
+        )
+    )
+    assert zero_approval_target.status_code == 400
+    assert b"invalid_target_id" in zero_approval_target.body
+
     cooldown_action = crm.enqueue_autonomous_action(
         company_id=2,
         action_type="retry_events",

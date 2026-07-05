@@ -35130,11 +35130,36 @@ async def api_a3_request_autonomous_action_approval(request: Request):
     target_type = payload.get("target_type")
     target_id = payload.get("target_id")
 
-    if action_type != "disable_rule" or target_type != "automation_rule" or not target_id:
+    if (
+        action_type != "disable_rule"
+        or target_type != "automation_rule"
+        or target_id is None
+        or target_id == ""
+    ):
         return JSONResponse(
             {
                 "ok": False,
                 "error": "unsupported_action",
+            },
+            status_code=400,
+        )
+
+    try:
+        target_id = int(target_id)
+    except Exception:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_target_id",
+            },
+            status_code=400,
+        )
+
+    if target_id <= 0:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_target_id",
             },
             status_code=400,
         )
