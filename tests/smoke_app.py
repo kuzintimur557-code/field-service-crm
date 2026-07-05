@@ -17033,6 +17033,35 @@ async def assert_a3_api_layer():
 
     conn = connect()
     c = conn.cursor()
+    protected_enqueue_count_before = c.execute("""
+    SELECT COUNT(*)
+    FROM autonomous_action_queue
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    protected_enqueue = crm.enqueue_autonomous_action(
+        company_id=2,
+        action_type="disable_rule",
+        target_type="automation_rule",
+        target_id=protected_runtime_rule_id,
+    )
+    assert protected_enqueue["queued"] is False
+    assert protected_enqueue["reason"] == "protected_rule"
+
+    conn = connect()
+    c = conn.cursor()
+    protected_enqueue_count_after = c.execute("""
+    SELECT COUNT(*)
+    FROM autonomous_action_queue
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    assert protected_enqueue_count_after == protected_enqueue_count_before
+
+    conn = connect()
+    c = conn.cursor()
     c.execute("""
     INSERT INTO autonomous_action_queue (
         company_id, action_type, target_type, target_id,

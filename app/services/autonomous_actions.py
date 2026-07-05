@@ -97,6 +97,17 @@ def enqueue_autonomous_action(
             "reason": "target_not_found",
         }
 
+    if (
+        action_type == "disable_rule"
+        and target_id in _protected_rule_ids(get_governance_settings(company_id))
+    ):
+        conn.close()
+
+        return {
+            "queued": False,
+            "reason": "protected_rule",
+        }
+
     existing = c.execute("""
         SELECT id
         FROM autonomous_action_queue
