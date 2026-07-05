@@ -34911,6 +34911,25 @@ def get_a3_company_id(request: Request):
     return get_user_company_id(username)
 
 
+def parse_a3_governance_bool(value):
+    if isinstance(value, bool):
+        return 1 if value else 0
+
+    if isinstance(value, int) and value in (0, 1):
+        return value
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+
+        if normalized in ("1", "true", "yes", "on"):
+            return 1
+
+        if normalized in ("0", "false", "no", "off"):
+            return 0
+
+    raise ValueError("invalid boolean value")
+
+
 @app.get("/api/a3/system-health")
 def api_a3_system_health(request: Request):
     company_id = get_a3_company_id(request)
@@ -35196,16 +35215,16 @@ async def api_a3_governance_settings_update(request: Request):
         pass
 
     current_governance = get_governance_settings(company_id)
-    autonomous_enabled = 1 if payload.get(
-        "autonomous_enabled",
-        current_governance.get("autonomous_enabled", 1),
-    ) else 0
-    require_critical_approval = 1 if payload.get(
-        "require_critical_approval",
-        current_governance.get("require_critical_approval", 1),
-    ) else 0
 
     try:
+        autonomous_enabled = parse_a3_governance_bool(payload.get(
+            "autonomous_enabled",
+            current_governance.get("autonomous_enabled", 1),
+        ))
+        require_critical_approval = parse_a3_governance_bool(payload.get(
+            "require_critical_approval",
+            current_governance.get("require_critical_approval", 1),
+        ))
         confidence_threshold = int(payload.get(
             "confidence_threshold",
             current_governance.get("confidence_threshold", 70),

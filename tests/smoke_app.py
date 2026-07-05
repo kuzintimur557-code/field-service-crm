@@ -16799,6 +16799,36 @@ async def assert_a3_api_layer():
         == [disabled_unhealthy_rule_id]
     )
 
+    string_bool_update = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "autonomous_enabled": "false",
+                "require_critical_approval": "false",
+            },
+        )
+    )
+    assert string_bool_update["ok"] is True
+
+    string_bool_governance = crm.api_a3_governance_settings(request)
+    assert string_bool_governance["autonomous_enabled"] == 0
+    assert string_bool_governance["require_critical_approval"] == 0
+    assert string_bool_governance["confidence_threshold"] == 75
+    assert string_bool_governance["max_actions_per_cycle"] == 5
+
+    invalid_bool_governance = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "autonomous_enabled": "maybe",
+            },
+        )
+    )
+    assert invalid_bool_governance.status_code == 400
+    assert b"invalid_governance_settings" in invalid_bool_governance.body
+
 
 def main():
     try:
