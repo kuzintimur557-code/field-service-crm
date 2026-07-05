@@ -16657,6 +16657,27 @@ async def assert_a3_api_layer():
     assert "autonomous_enabled" in governance
     assert "require_critical_approval" in governance
 
+    protected_rules_update = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "autonomous_enabled": True,
+                "require_critical_approval": True,
+                "confidence_threshold": 70,
+                "max_actions_per_cycle": 20,
+                "protected_rules": [disabled_unhealthy_rule_id],
+            },
+        )
+    )
+    assert protected_rules_update["ok"] is True
+
+    protected_governance = crm.api_a3_governance_settings(request)
+    assert (
+        json.loads(protected_governance["protected_rules_json"])
+        == [disabled_unhealthy_rule_id]
+    )
+
     update_result = await crm.api_a3_governance_settings_update(
         make_json_request(
             "owner2",
@@ -16674,6 +16695,10 @@ async def assert_a3_api_layer():
     updated_governance = crm.api_a3_governance_settings(request)
     assert updated_governance["confidence_threshold"] == 75
     assert updated_governance["max_actions_per_cycle"] == 5
+    assert (
+        json.loads(updated_governance["protected_rules_json"])
+        == [disabled_unhealthy_rule_id]
+    )
 
 
 def main():

@@ -35199,6 +35199,23 @@ async def api_a3_governance_settings_update(request: Request):
     require_critical_approval = 1 if payload.get("require_critical_approval", True) else 0
     confidence_threshold = int(payload.get("confidence_threshold", 70))
     max_actions_per_cycle = int(payload.get("max_actions_per_cycle", 20))
+    current_governance = get_governance_settings(company_id)
+    protected_rules_json = current_governance.get("protected_rules_json") or "[]"
+
+    if "protected_rules" in payload:
+        try:
+            protected_rules_json = json.dumps([
+                int(rule_id)
+                for rule_id in payload.get("protected_rules") or []
+            ])
+        except Exception:
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "invalid_protected_rules",
+                },
+                status_code=400,
+            )
 
     return save_governance_settings(
         company_id=company_id,
@@ -35206,7 +35223,7 @@ async def api_a3_governance_settings_update(request: Request):
         max_actions_per_cycle=max_actions_per_cycle,
         require_critical_approval=require_critical_approval,
         confidence_threshold=confidence_threshold,
-        protected_rules_json="[]",
+        protected_rules_json=protected_rules_json,
     )
 
 
