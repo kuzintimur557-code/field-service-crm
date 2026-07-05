@@ -11,6 +11,9 @@ SUPPORTED_AUTONOMOUS_ACTIONS = {
     ("retry_events", "automation_rule"),
 }
 
+AUTONOMOUS_ACTION_COOLDOWN_MINUTES = 10
+AUTONOMOUS_ACTION_COOLDOWN_LIMIT = 3
+
 
 def require_company_id(company_id):
     if not company_id:
@@ -80,7 +83,7 @@ def enqueue_autonomous_action(
 
     now_value = datetime.now()
     cooldown_cutoff = (
-        now_value - timedelta(minutes=10)
+        now_value - timedelta(minutes=AUTONOMOUS_ACTION_COOLDOWN_MINUTES)
     ).isoformat(timespec="seconds")
 
     conn = connect()
@@ -149,7 +152,7 @@ def enqueue_autonomous_action(
         cooldown_cutoff,
     )).fetchone()["total"]
 
-    if cooldown_count >= 3:
+    if cooldown_count >= AUTONOMOUS_ACTION_COOLDOWN_LIMIT:
         conn.close()
 
         return {

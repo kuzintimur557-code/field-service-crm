@@ -16792,6 +16792,70 @@ async def assert_a3_api_layer():
     conn = connect()
     c = conn.cursor()
     c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "A3 cooldown smoke",
+        "weekly_digest",
+        "{}",
+        1,
+        "owner2",
+        datetime.now().isoformat(timespec="seconds"),
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    cooldown_rule_id = c.lastrowid
+
+    for _ in range(3):
+        c.execute("""
+        INSERT INTO autonomous_action_queue (
+            company_id, action_type, target_type, target_id,
+            status, payload_json, created_at, processed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            2,
+            "retry_events",
+            "automation_rule",
+            cooldown_rule_id,
+            "completed",
+            "{}",
+            datetime.now().isoformat(timespec="seconds"),
+            datetime.now().isoformat(timespec="seconds"),
+        ))
+
+    cooldown_count_before = c.execute("""
+    SELECT COUNT(*)
+    FROM autonomous_action_queue
+    WHERE company_id=2
+      AND target_id=?
+    """, (cooldown_rule_id,)).fetchone()[0]
+    conn.commit()
+    conn.close()
+
+    cooldown_blocked_action = crm.enqueue_autonomous_action(
+        company_id=2,
+        action_type="retry_events",
+        target_type="automation_rule",
+        target_id=cooldown_rule_id,
+    )
+    assert cooldown_blocked_action["queued"] is False
+    assert cooldown_blocked_action["reason"] == "cooldown_active"
+
+    conn = connect()
+    c = conn.cursor()
+    cooldown_count_after = c.execute("""
+    SELECT COUNT(*)
+    FROM autonomous_action_queue
+    WHERE company_id=2
+      AND target_id=?
+    """, (cooldown_rule_id,)).fetchone()[0]
+    assert cooldown_count_after == cooldown_count_before
+
+    c.execute("""
     INSERT INTO autonomous_action_queue (
         company_id, action_type, target_type, target_id,
         status, payload_json, created_at
