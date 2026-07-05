@@ -16117,6 +16117,31 @@ async def assert_a3_api_layer():
     for guarded_call in async_a3_company_guarded_routes:
         assert_forbidden(await guarded_call)
 
+    a3_denied_role_requests = [
+        make_request(),
+        make_request("helper2"),
+        make_request("super"),
+    ]
+
+    for denied_request in a3_denied_role_requests:
+        assert_forbidden(crm.api_a3_system_health(denied_request))
+        assert_forbidden(crm.api_a3_automation_analytics(denied_request))
+        assert_forbidden(crm.api_a3_autonomous_actions(denied_request))
+        assert_forbidden(crm.api_a3_workflows_graph(denied_request))
+
+    for denied_username in (None, "helper2", "super"):
+        assert_forbidden(await crm.api_a3_request_autonomous_action_approval(
+            make_json_request(
+                denied_username,
+                "/api/a3/autonomous-actions/request-approval",
+                {
+                    "action_type": "disable_rule",
+                    "target_type": "automation_rule",
+                    "target_id": 1,
+                },
+            )
+        ))
+
     data = crm.api_a3_system_health(request)
     assert "score" in data
     assert 0 <= data["score"] <= 100
