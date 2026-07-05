@@ -35,7 +35,7 @@ def enqueue_autonomous_action(
           AND action_type=?
           AND target_type=?
           AND COALESCE(target_id, 0)=COALESCE(?, 0)
-          AND status IN ('pending', 'awaiting_approval')
+          AND status IN ('pending', 'awaiting_approval', 'approved')
         ORDER BY id DESC
         LIMIT 1
     """, (

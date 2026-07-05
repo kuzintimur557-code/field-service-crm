@@ -16605,6 +16605,35 @@ async def assert_a3_api_layer():
     assert second_cooldown_action["queued"] is False
     assert second_cooldown_action["reason"] == "duplicate_pending_action"
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "retry_events",
+        "automation_rule",
+        disabled_unhealthy_rule_id,
+        "approved",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    conn.commit()
+    conn.close()
+
+    duplicate_approved_action = crm.enqueue_autonomous_action(
+        company_id=2,
+        action_type="retry_events",
+        target_type="automation_rule",
+        target_id=disabled_unhealthy_rule_id,
+    )
+    assert duplicate_approved_action["queued"] is False
+    assert duplicate_approved_action["reason"] == "duplicate_pending_action"
+
     updated_approval_queue = crm.api_a3_approval_queue(request)
     assert any(
         item["action_type"] == "disable_rule"
