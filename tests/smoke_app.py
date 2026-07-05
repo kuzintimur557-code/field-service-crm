@@ -16662,6 +16662,43 @@ async def assert_a3_api_layer():
     assert duplicate_approved_action["queued"] is False
     assert duplicate_approved_action["reason"] == "duplicate_pending_action"
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        999999,
+        "approved",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    missing_rule_action_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    missing_rule_process = crm.api_a3_process_autonomous_actions(request)
+    assert missing_rule_process["ok"] is True
+    assert missing_rule_process["result"]["failed"] >= 1
+
+    conn = connect()
+    c = conn.cursor()
+    missing_rule_action = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (missing_rule_action_id,)).fetchone()
+    conn.close()
+
+    assert missing_rule_action["status"] == "failed"
+
     updated_approval_queue = crm.api_a3_approval_queue(request)
     assert any(
         item["action_type"] == "disable_rule"

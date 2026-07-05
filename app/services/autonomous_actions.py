@@ -223,6 +223,29 @@ def process_autonomous_actions(company_id):
                 target_id,
             ))
         elif action_type == "disable_rule" and target_type == "automation_rule":
+            rule = c.execute("""
+                SELECT id
+                FROM automation_rules
+                WHERE company_id=?
+                  AND id=?
+            """, (
+                company_id,
+                target_id,
+            )).fetchone()
+
+            if not rule:
+                c.execute("""
+                    UPDATE autonomous_action_queue
+                    SET status='failed',
+                        processed_at=?
+                    WHERE id=?
+                """, (
+                    datetime.now().isoformat(timespec="seconds"),
+                    row["id"],
+                ))
+                failed += 1
+                continue
+
             c.execute("""
                 UPDATE automation_rules
                 SET active=0
