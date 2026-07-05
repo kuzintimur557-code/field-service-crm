@@ -11,6 +11,21 @@ def require_company_id(company_id):
         raise ValueError("company_id is required")
 
 
+def _automation_rule_exists(cursor, company_id, rule_id):
+    if not rule_id:
+        return False
+
+    return cursor.execute("""
+        SELECT id
+        FROM automation_rules
+        WHERE company_id=?
+          AND id=?
+    """, (
+        company_id,
+        rule_id,
+    )).fetchone() is not None
+
+
 def enqueue_autonomous_action(
     company_id,
     action_type,
@@ -208,17 +223,7 @@ def process_autonomous_actions(company_id):
 
         if action_type == "retry_events":
             if target_type == "automation_rule":
-                rule = c.execute("""
-                    SELECT id
-                    FROM automation_rules
-                    WHERE company_id=?
-                      AND id=?
-                """, (
-                    company_id,
-                    target_id,
-                )).fetchone()
-
-                if not rule:
+                if not _automation_rule_exists(c, company_id, target_id):
                     c.execute("""
                         UPDATE autonomous_action_queue
                         SET status='failed',
@@ -247,17 +252,7 @@ def process_autonomous_actions(company_id):
                 target_id,
             ))
         elif action_type == "disable_rule" and target_type == "automation_rule":
-            rule = c.execute("""
-                SELECT id
-                FROM automation_rules
-                WHERE company_id=?
-                  AND id=?
-            """, (
-                company_id,
-                target_id,
-            )).fetchone()
-
-            if not rule:
+            if not _automation_rule_exists(c, company_id, target_id):
                 c.execute("""
                     UPDATE autonomous_action_queue
                     SET status='failed',
@@ -337,6 +332,30 @@ def approve_autonomous_action(company_id, action_id, decided_by="system"):
         return {
             "ok": False,
             "error": "not_found",
+        }
+
+    if (
+        row["target_type"] == "automation_rule"
+        and not _automation_rule_exists(c, company_id, row["target_id"])
+    ):
+        c.execute("""
+            UPDATE autonomous_action_queue
+            SET status='failed',
+                processed_at=?
+            WHERE id=?
+              AND company_id=?
+        """, (
+            datetime.now().isoformat(timespec="seconds"),
+            action_id,
+            company_id,
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return {
+            "ok": False,
+            "error": "target_not_found",
         }
 
     c.execute("""

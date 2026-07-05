@@ -16451,7 +16451,7 @@ async def assert_a3_api_layer():
         2,
         "disable_rule",
         "automation_rule",
-        0,
+        disabled_unhealthy_rule_id,
         "awaiting_approval",
         "{}",
         datetime.now().isoformat(timespec="seconds"),
@@ -16467,7 +16467,7 @@ async def assert_a3_api_layer():
         2,
         "disable_rule",
         "automation_rule",
-        0,
+        disabled_unhealthy_rule_id,
         "awaiting_approval",
         "{}",
         datetime.now().isoformat(timespec="seconds"),
@@ -16516,6 +16516,46 @@ async def assert_a3_api_layer():
         and item["decision"] == "rejected"
         for item in approval_history["items"]
     )
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        999997,
+        "awaiting_approval",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    missing_approval_target_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    missing_approval_target = crm.api_a3_approve_autonomous_action(
+        request,
+        missing_approval_target_id,
+    )
+    assert missing_approval_target.status_code == 404
+    assert b"target_not_found" in missing_approval_target.body
+
+    conn = connect()
+    c = conn.cursor()
+    missing_approval_target_row = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (missing_approval_target_id,)).fetchone()
+    conn.close()
+
+    assert missing_approval_target_row["status"] == "failed"
 
     conn = connect()
     c = conn.cursor()
