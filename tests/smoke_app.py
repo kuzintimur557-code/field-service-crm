@@ -16248,6 +16248,44 @@ async def assert_a3_api_layer():
     assert unsupported_enqueue["queued"] is False
     assert unsupported_enqueue["reason"] == "unsupported_action"
 
+    conn = connect()
+    c = conn.cursor()
+    enqueue_count_before = c.execute("""
+    SELECT COUNT(*)
+    FROM autonomous_action_queue
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    invalid_target_enqueue = crm.enqueue_autonomous_action(
+        company_id=2,
+        action_type="retry_events",
+        target_type="automation_rule",
+        target_id="bad",
+    )
+    assert invalid_target_enqueue["queued"] is False
+    assert invalid_target_enqueue["reason"] == "invalid_target_id"
+
+    missing_target_enqueue = crm.enqueue_autonomous_action(
+        company_id=2,
+        action_type="retry_events",
+        target_type="automation_rule",
+        target_id=999996,
+    )
+    assert missing_target_enqueue["queued"] is False
+    assert missing_target_enqueue["reason"] == "target_not_found"
+
+    conn = connect()
+    c = conn.cursor()
+    enqueue_count_after = c.execute("""
+    SELECT COUNT(*)
+    FROM autonomous_action_queue
+    WHERE company_id=2
+    """).fetchone()[0]
+    conn.close()
+
+    assert enqueue_count_after == enqueue_count_before
+
     autonomous_company_guarded_calls = [
         (
             crm.get_autonomous_actions,

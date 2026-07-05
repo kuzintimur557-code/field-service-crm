@@ -51,6 +51,21 @@ def enqueue_autonomous_action(
             "reason": "unsupported_action",
         }
 
+    if target_type == "automation_rule":
+        try:
+            target_id = int(target_id)
+        except Exception:
+            return {
+                "queued": False,
+                "reason": "invalid_target_id",
+            }
+
+        if target_id <= 0:
+            return {
+                "queued": False,
+                "reason": "invalid_target_id",
+            }
+
     now_value = datetime.now()
     cooldown_cutoff = (
         now_value - timedelta(minutes=10)
@@ -58,6 +73,17 @@ def enqueue_autonomous_action(
 
     conn = connect()
     c = conn.cursor()
+
+    if (
+        target_type == "automation_rule"
+        and not _automation_rule_exists(c, company_id, target_id)
+    ):
+        conn.close()
+
+        return {
+            "queued": False,
+            "reason": "target_not_found",
+        }
 
     existing = c.execute("""
         SELECT id
