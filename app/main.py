@@ -35351,7 +35351,7 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
     )
 
     if not result.get("ok"):
-        if result.get("error") == "unsupported_action":
+        if result.get("error") in {"unsupported_action", "protected_rule"}:
             return JSONResponse(result, status_code=400)
 
         return JSONResponse(result, status_code=404)

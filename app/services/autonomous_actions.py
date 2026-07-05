@@ -21,6 +21,18 @@ def _is_supported_action(action_type, target_type):
     return (action_type, target_type) in SUPPORTED_AUTONOMOUS_ACTIONS
 
 
+def _protected_rule_ids(governance):
+    try:
+        return {
+            int(rule_id)
+            for rule_id in json.loads(
+                governance.get("protected_rules_json") or "[]"
+            )
+        }
+    except Exception:
+        return set()
+
+
 def _automation_rule_exists(cursor, company_id, rule_id):
     if not rule_id:
         return False
@@ -205,13 +217,7 @@ def process_autonomous_actions(company_id):
     conn = connect()
     c = conn.cursor()
 
-    try:
-        protected_rules = {
-            int(rule_id)
-            for rule_id in json.loads(governance.get("protected_rules_json") or "[]")
-        }
-    except Exception:
-        protected_rules = set()
+    protected_rules = _protected_rule_ids(governance)
 
     rows = c.execute("""
         SELECT *
@@ -425,6 +431,27 @@ def approve_autonomous_action(company_id, action_id, decided_by="system"):
         return {
             "ok": False,
             "error": "target_not_found",
+        }
+
+    if row["target_id"] in _protected_rule_ids(get_governance_settings(company_id)):
+        c.execute("""
+            UPDATE autonomous_action_queue
+            SET status='failed',
+                processed_at=?
+            WHERE id=?
+              AND company_id=?
+        """, (
+            datetime.now().isoformat(timespec="seconds"),
+            action_id,
+            company_id,
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return {
+            "ok": False,
+            "error": "protected_rule",
         }
 
     c.execute("""

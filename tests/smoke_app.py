@@ -17044,6 +17044,53 @@ async def assert_a3_api_layer():
         "disable_rule",
         "automation_rule",
         protected_runtime_rule_id,
+        "awaiting_approval",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    protected_approval_action_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    protected_approval = crm.api_a3_approve_autonomous_action(
+        request,
+        protected_approval_action_id,
+    )
+    assert protected_approval.status_code == 400
+    assert b"protected_rule" in protected_approval.body
+
+    conn = connect()
+    c = conn.cursor()
+    protected_approval_action = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (protected_approval_action_id,)).fetchone()
+    protected_approval_rule = c.execute("""
+    SELECT active
+    FROM automation_rules
+    WHERE id=?
+      AND company_id=2
+    """, (protected_runtime_rule_id,)).fetchone()
+    conn.close()
+
+    assert protected_approval_action["status"] == "failed"
+    assert protected_approval_rule["active"] == 1
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        protected_runtime_rule_id,
         "approved",
         "{}",
         datetime.now().isoformat(timespec="seconds"),
