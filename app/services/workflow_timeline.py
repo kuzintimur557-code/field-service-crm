@@ -3,7 +3,14 @@ from datetime import datetime
 from app.database import connect
 
 
+def require_company_id(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
+
 def get_workflow_timeline(company_id, rule_id, limit=20):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 

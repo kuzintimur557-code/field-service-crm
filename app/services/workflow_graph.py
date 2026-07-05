@@ -3,6 +3,11 @@ import json
 from app.database import connect
 
 
+def require_company_id(company_id):
+    if not company_id:
+        raise ValueError("company_id is required")
+
+
 def _safe_payload(payload_json):
     if not payload_json:
         return {}
@@ -322,6 +327,8 @@ def _workflow_debug(rule, actions, latest_problem_event):
 
 
 def get_rule_workflow_graph(company_id, rule_id):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -486,6 +493,8 @@ def get_rule_workflow_graph(company_id, rule_id):
 
 
 def get_company_workflow_graphs(company_id, limit=50):
+    require_company_id(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -518,6 +527,8 @@ def get_company_workflow_graphs(company_id, limit=50):
 
 
 def get_rule_workflow_debug(company_id, rule_id):
+    require_company_id(company_id)
+
     graph = get_rule_workflow_graph(company_id, rule_id)
 
     if not graph:
