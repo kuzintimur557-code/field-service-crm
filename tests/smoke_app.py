@@ -16780,6 +16780,25 @@ async def assert_a3_api_layer():
         == [disabled_unhealthy_rule_id]
     )
 
+    partial_governance_update = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "protected_rules": [disabled_unhealthy_rule_id],
+            },
+        )
+    )
+    assert partial_governance_update["ok"] is True
+
+    partial_governance = crm.api_a3_governance_settings(request)
+    assert partial_governance["confidence_threshold"] == 75
+    assert partial_governance["max_actions_per_cycle"] == 5
+    assert (
+        json.loads(partial_governance["protected_rules_json"])
+        == [disabled_unhealthy_rule_id]
+    )
+
 
 def main():
     try:
