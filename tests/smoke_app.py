@@ -16726,9 +16726,59 @@ async def assert_a3_api_layer():
     assert invalid_governance_range.status_code == 400
     assert b"invalid_governance_settings" in invalid_governance_range.body
 
+    invalid_protected_rule = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "protected_rules": [999999],
+            },
+        )
+    )
+    assert invalid_protected_rule.status_code == 400
+    assert b"invalid_protected_rules" in invalid_protected_rule.body
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        1,
+        "A3 foreign protected smoke",
+        "weekly_digest",
+        "{}",
+        1,
+        "manager1",
+        datetime.now().isoformat(timespec="seconds"),
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    foreign_rule_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    foreign_protected_rule = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "protected_rules": [foreign_rule_id],
+            },
+        )
+    )
+    assert foreign_protected_rule.status_code == 400
+    assert b"invalid_protected_rules" in foreign_protected_rule.body
+
     stable_governance = crm.api_a3_governance_settings(request)
     assert stable_governance["confidence_threshold"] == 75
     assert stable_governance["max_actions_per_cycle"] == 5
+    assert (
+        json.loads(stable_governance["protected_rules_json"])
+        == [disabled_unhealthy_rule_id]
+    )
 
 
 def main():

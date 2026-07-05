@@ -35229,10 +35229,10 @@ async def api_a3_governance_settings_update(request: Request):
 
     if "protected_rules" in payload:
         try:
-            protected_rules_json = json.dumps([
+            protected_rule_ids = [
                 int(rule_id)
                 for rule_id in payload.get("protected_rules") or []
-            ])
+            ]
         except Exception:
             return JSONResponse(
                 {
@@ -35241,6 +35241,34 @@ async def api_a3_governance_settings_update(request: Request):
                 },
                 status_code=400,
             )
+
+        if protected_rule_ids:
+            placeholders = ",".join("?" for _ in protected_rule_ids)
+            conn = connect()
+            c = conn.cursor()
+            rows = c.execute(f"""
+            SELECT id
+            FROM automation_rules
+            WHERE company_id=?
+              AND id IN ({placeholders})
+            """, (
+                company_id,
+                *protected_rule_ids,
+            )).fetchall()
+            conn.close()
+
+            existing_rule_ids = {row["id"] for row in rows}
+
+            if existing_rule_ids != set(protected_rule_ids):
+                return JSONResponse(
+                    {
+                        "ok": False,
+                        "error": "invalid_protected_rules",
+                    },
+                    status_code=400,
+                )
+
+        protected_rules_json = json.dumps(protected_rule_ids)
 
     return save_governance_settings(
         company_id=company_id,
