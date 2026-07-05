@@ -16239,6 +16239,15 @@ async def assert_a3_api_layer():
     except ValueError as exc:
         assert "company_id is required" in str(exc)
 
+    unsupported_enqueue = crm.enqueue_autonomous_action(
+        company_id=2,
+        action_type="delete_company",
+        target_type="company",
+        target_id=2,
+    )
+    assert unsupported_enqueue["queued"] is False
+    assert unsupported_enqueue["reason"] == "unsupported_action"
+
     autonomous_company_guarded_calls = [
         (
             crm.get_autonomous_actions,

@@ -6,9 +6,19 @@ from app.services.governance import get_governance_settings
 from app.services.ops_timeline import create_ops_timeline_event
 
 
+SUPPORTED_AUTONOMOUS_ACTIONS = {
+    ("disable_rule", "automation_rule"),
+    ("retry_events", "automation_rule"),
+}
+
+
 def require_company_id(company_id):
     if not company_id:
         raise ValueError("company_id is required")
+
+
+def _is_supported_action(action_type, target_type):
+    return (action_type, target_type) in SUPPORTED_AUTONOMOUS_ACTIONS
 
 
 def _automation_rule_exists(cursor, company_id, rule_id):
@@ -34,6 +44,12 @@ def enqueue_autonomous_action(
     payload_json=None,
 ):
     require_company_id(company_id)
+
+    if not _is_supported_action(action_type, target_type):
+        return {
+            "queued": False,
+            "reason": "unsupported_action",
+        }
 
     now_value = datetime.now()
     cooldown_cutoff = (
