@@ -335,6 +335,30 @@ def approve_autonomous_action(company_id, action_id, decided_by="system"):
         }
 
     if (
+        row["action_type"] != "disable_rule"
+        or row["target_type"] != "automation_rule"
+    ):
+        c.execute("""
+            UPDATE autonomous_action_queue
+            SET status='failed',
+                processed_at=?
+            WHERE id=?
+              AND company_id=?
+        """, (
+            datetime.now().isoformat(timespec="seconds"),
+            action_id,
+            company_id,
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return {
+            "ok": False,
+            "error": "unsupported_action",
+        }
+
+    if (
         row["target_type"] == "automation_rule"
         and not _automation_rule_exists(c, company_id, row["target_id"])
     ):

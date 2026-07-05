@@ -16560,6 +16560,46 @@ async def assert_a3_api_layer():
     conn = connect()
     c = conn.cursor()
     c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "retry_events",
+        "automation_rule",
+        disabled_unhealthy_rule_id,
+        "awaiting_approval",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    unsupported_approval_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    unsupported_approval = crm.api_a3_approve_autonomous_action(
+        request,
+        unsupported_approval_id,
+    )
+    assert unsupported_approval.status_code == 400
+    assert b"unsupported_action" in unsupported_approval.body
+
+    conn = connect()
+    c = conn.cursor()
+    unsupported_approval_row = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (unsupported_approval_id,)).fetchone()
+    conn.close()
+
+    assert unsupported_approval_row["status"] == "failed"
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
     INSERT INTO automation_rules (
         company_id, name, trigger_key, conditions_json,
         active, created_by, created_at, updated_at
