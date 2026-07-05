@@ -16700,6 +16700,36 @@ async def assert_a3_api_layer():
         == [disabled_unhealthy_rule_id]
     )
 
+    invalid_governance_type = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "confidence_threshold": "bad",
+                "max_actions_per_cycle": 5,
+            },
+        )
+    )
+    assert invalid_governance_type.status_code == 400
+    assert b"invalid_governance_settings" in invalid_governance_type.body
+
+    invalid_governance_range = await crm.api_a3_governance_settings_update(
+        make_json_request(
+            "owner2",
+            "/api/a3/governance-settings/update",
+            {
+                "confidence_threshold": 101,
+                "max_actions_per_cycle": 0,
+            },
+        )
+    )
+    assert invalid_governance_range.status_code == 400
+    assert b"invalid_governance_settings" in invalid_governance_range.body
+
+    stable_governance = crm.api_a3_governance_settings(request)
+    assert stable_governance["confidence_threshold"] == 75
+    assert stable_governance["max_actions_per_cycle"] == 5
+
 
 def main():
     try:

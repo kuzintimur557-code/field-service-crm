@@ -35197,8 +35197,33 @@ async def api_a3_governance_settings_update(request: Request):
 
     autonomous_enabled = 1 if payload.get("autonomous_enabled", True) else 0
     require_critical_approval = 1 if payload.get("require_critical_approval", True) else 0
-    confidence_threshold = int(payload.get("confidence_threshold", 70))
-    max_actions_per_cycle = int(payload.get("max_actions_per_cycle", 20))
+
+    try:
+        confidence_threshold = int(payload.get("confidence_threshold", 70))
+        max_actions_per_cycle = int(payload.get("max_actions_per_cycle", 20))
+    except Exception:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_governance_settings",
+            },
+            status_code=400,
+        )
+
+    if (
+        confidence_threshold < 0
+        or confidence_threshold > 100
+        or max_actions_per_cycle < 1
+        or max_actions_per_cycle > 100
+    ):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "invalid_governance_settings",
+            },
+            status_code=400,
+        )
+
     current_governance = get_governance_settings(company_id)
     protected_rules_json = current_governance.get("protected_rules_json") or "[]"
 
