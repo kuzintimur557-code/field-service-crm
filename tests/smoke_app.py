@@ -579,7 +579,6 @@ async def assert_automation_page():
     assert "formatA3ApprovalHistoryDate" in html
     assert "setA3ApprovalHistoryQuickPeriod" in html
     assert "resetA3ApprovalHistoryFilters" in html
-    assert "getA3ApprovalHistoryActiveFilterCount" in html
     assert "a3-approval-date-from" in html
     assert "Кто решил" in html
     assert "Показать автора" in html
@@ -16070,7 +16069,6 @@ async def assert_a3_workflow_center():
     assert "formatWorkflowApprovalHistoryDate" in body
     assert "setWorkflowApprovalHistoryQuickPeriod" in body
     assert "resetWorkflowApprovalHistoryFilters" in body
-    assert "getWorkflowApprovalHistoryActiveFilterCount" in body
     assert "workflow-approval-date-from" in body
     assert "Кто решил" in body
     assert "Показать автора" in body

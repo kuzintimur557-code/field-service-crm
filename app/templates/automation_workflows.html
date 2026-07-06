@@ -432,36 +432,6 @@ function resetWorkflowApprovalHistoryFilters() {
     loadWorkflowApprovalHistory();
 }
 
-function getWorkflowApprovalHistoryActiveFilterCount() {
-    let count = 0;
-
-    if (workflowApprovalHistoryFilter !== "all") {
-        count += 1;
-    }
-
-    if (workflowApprovalHistoryActionType !== "all") {
-        count += 1;
-    }
-
-    if (workflowApprovalHistoryTargetType !== "all") {
-        count += 1;
-    }
-
-    if (workflowApprovalHistoryDecidedBy) {
-        count += 1;
-    }
-
-    if (workflowApprovalHistoryTargetId) {
-        count += 1;
-    }
-
-    if (workflowApprovalHistoryDateFrom || workflowApprovalHistoryDateTo) {
-        count += 1;
-    }
-
-    return count;
-}
-
 function renderWorkflowApprovalHistoryFilters(activeFilter) {
     return `
         <div class="workflow-card-actions">

@@ -1886,36 +1886,6 @@ function resetA3ApprovalHistoryFilters() {
     loadA3ApprovalHistory();
 }
 
-function getA3ApprovalHistoryActiveFilterCount() {
-    let count = 0;
-
-    if (a3ApprovalHistoryFilter !== "all") {
-        count += 1;
-    }
-
-    if (a3ApprovalHistoryActionType !== "all") {
-        count += 1;
-    }
-
-    if (a3ApprovalHistoryTargetType !== "all") {
-        count += 1;
-    }
-
-    if (a3ApprovalHistoryDecidedBy) {
-        count += 1;
-    }
-
-    if (a3ApprovalHistoryTargetId) {
-        count += 1;
-    }
-
-    if (a3ApprovalHistoryDateFrom || a3ApprovalHistoryDateTo) {
-        count += 1;
-    }
-
-    return count;
-}
-
 function renderA3ApprovalHistoryFilters(activeFilter) {
     return `
         <div class="approval-history-filters">
