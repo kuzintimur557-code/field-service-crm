@@ -35539,43 +35539,7 @@ def api_a3_approval_history_export(request: Request):
     output = io.StringIO()
     output.write("\ufeff")
     writer = csv.writer(output)
-    writer.writerow(["Фильтры экспорта"])
-    writer.writerow([
-        "Решение",
-        get_a3_approval_decision_label(filters["decision"]),
-    ])
-    writer.writerow([
-        "Тип действия",
-        (
-            "Все действия"
-            if filters["action_type"] == "all"
-            else action_label(filters["action_type"])
-        ),
-    ])
-    writer.writerow([
-        "Тип цели",
-        (
-            "Все цели"
-            if filters["target_type"] == "all"
-            else target_label(filters["target_type"])
-        ),
-    ])
-    writer.writerow([
-        "Кто решил",
-        get_a3_approval_actor_label(filters["decided_by"]),
-    ])
-    writer.writerow([
-        "ID цели",
-        filters["target_id"] or "Все",
-    ])
-    writer.writerow([
-        "Период",
-        get_a3_approval_period_label(
-            filters["date_from"],
-            filters["date_to"],
-        ),
-    ])
-    writer.writerow([])
+    writer.writerows(build_a3_approval_export_filter_rows(filters))
     writer.writerow([
         "ID решения",
         "ID действия",
@@ -35632,6 +35596,48 @@ def get_a3_approval_decision_filter(request: Request) -> str:
         return "all"
 
     return decision_filter
+
+
+def build_a3_approval_export_filter_rows(filters):
+    return [
+        ["Фильтры экспорта"],
+        [
+            "Решение",
+            get_a3_approval_decision_label(filters["decision"]),
+        ],
+        [
+            "Тип действия",
+            (
+                "Все действия"
+                if filters["action_type"] == "all"
+                else action_label(filters["action_type"])
+            ),
+        ],
+        [
+            "Тип цели",
+            (
+                "Все цели"
+                if filters["target_type"] == "all"
+                else target_label(filters["target_type"])
+            ),
+        ],
+        [
+            "Кто решил",
+            get_a3_approval_actor_label(filters["decided_by"]),
+        ],
+        [
+            "ID цели",
+            filters["target_id"] or "Все",
+        ],
+        [
+            "Период",
+            get_a3_approval_period_label(
+                filters["date_from"],
+                filters["date_to"],
+            ),
+        ],
+        [],
+    ]
 
 
 def get_a3_approval_decision_label(value):

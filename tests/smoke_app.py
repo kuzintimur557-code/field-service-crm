@@ -17049,6 +17049,17 @@ async def assert_a3_api_layer():
     approved_export_body = approved_export.body.decode("utf-8")
     assert approved_export_body.startswith("\ufeff")
     assert "Фильтры экспорта" in approved_export_body
+    assert crm.build_a3_approval_export_filter_rows(
+        {
+            "decision": "approved",
+            "action_type": "disable_rule",
+            "target_type": "all",
+            "decided_by": "owner2",
+            "target_id": disabled_unhealthy_rule_id,
+            "date_from": today_filter,
+            "date_to": today_filter,
+        }
+    )[0] == ["Фильтры экспорта"]
     assert "Решение,Одобренные" in approved_export_body
     assert "Тип действия,Отключить правило" in approved_export_body
     assert "Тип цели,Все цели" in approved_export_body
