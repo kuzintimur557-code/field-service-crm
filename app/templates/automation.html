@@ -1844,6 +1844,16 @@ function clearA3ApprovalHistoryDateFilter() {
     loadA3ApprovalHistory();
 }
 
+function resetA3ApprovalHistoryFilters() {
+    a3ApprovalHistoryFilter = "all";
+    a3ApprovalHistoryActionType = "all";
+    a3ApprovalHistoryDecidedBy = "";
+    a3ApprovalHistoryTargetId = "";
+    a3ApprovalHistoryDateFrom = "";
+    a3ApprovalHistoryDateTo = "";
+    loadA3ApprovalHistory();
+}
+
 function renderA3ApprovalHistoryFilters(activeFilter) {
     return `
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1917,6 +1927,10 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
             <button class="btn off"
                     onclick="clearA3ApprovalHistoryDateFilter()">
                 Сбросить период
+            </button>
+            <button class="btn off"
+                    onclick="resetA3ApprovalHistoryFilters()">
+                Сбросить все фильтры
             </button>
         </div>
     `;
