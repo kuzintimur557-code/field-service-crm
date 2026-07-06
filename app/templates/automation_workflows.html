@@ -1060,13 +1060,20 @@ function workflowTimelineFilterLabel(statusFilter) {
     return labels[statusFilter] || "Все";
 }
 
-function workflowTimelineSummary(summary) {
+function workflowTimelineSummary(summary, timeline) {
     if (!summary) {
         return "Всего событий: 0";
     }
 
+    const totalInHistory = timeline?.events_total ?? summary.total ?? 0;
+    const loadedTotal = summary.total || 0;
+    const loadedLabel = timeline?.has_more
+        ? `Показаны последние: ${loadedTotal}`
+        : `Показано: ${loadedTotal}`;
+
     return [
-        `Всего событий: ${summary.total || 0}`,
+        `Всего событий в истории: ${totalInHistory}`,
+        loadedLabel,
         `Выполнено: ${summary.done || 0}`,
         `Пропущено: ${summary.skipped || 0}`,
         `Ошибки: ${summary.failed || 0}`,
@@ -1369,7 +1376,7 @@ function renderChainTimeline(ruleId, timeline) {
             Последние события
         </div>
         <div class="meta" style="margin-bottom:8px">
-            ${workflowTimelineSummary(summary)}
+            ${workflowTimelineSummary(summary, timeline)}
         </div>
         <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
         <div class="meta" style="margin-bottom:8px">

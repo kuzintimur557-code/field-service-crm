@@ -28,6 +28,17 @@ def get_workflow_timeline(company_id, rule_id, limit=20):
         conn.close()
         return None
 
+    total_events_row = c.execute("""
+        SELECT COUNT(*) AS total
+        FROM automation_events
+        WHERE company_id=?
+          AND rule_id=?
+    """, (
+        company_id,
+        rule_id,
+    )).fetchone()
+    total_events = total_events_row["total"] if total_events_row else 0
+
     rows = c.execute("""
         SELECT
             id,
@@ -57,6 +68,9 @@ def get_workflow_timeline(company_id, rule_id, limit=20):
     return {
         "rule_id": rule_id,
         "items": items,
+        "events_total": total_events,
+        "limit": limit,
+        "has_more": total_events > len(items),
         "summary": build_timeline_summary(items),
         "steps": build_timeline_steps(items),
         "sessions": build_timeline_sessions(items),

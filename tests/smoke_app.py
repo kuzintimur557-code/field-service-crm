@@ -2198,6 +2198,9 @@ async def assert_automation_page():
     )
     assert workflow_timeline["ok"] is True
     assert "sessions" in workflow_timeline["timeline"]
+    assert "events_total" in workflow_timeline["timeline"]
+    assert "limit" in workflow_timeline["timeline"]
+    assert "has_more" in workflow_timeline["timeline"]
     assert "summary" in workflow_timeline["timeline"]
     assert "total" in workflow_timeline["timeline"]["summary"]
     assert "failed" in workflow_timeline["timeline"]["summary"]
@@ -16147,7 +16150,8 @@ async def assert_a3_workflow_center():
     assert "filterWorkflowTimeline" in body
     assert "workflowTimelineFilterLabel" in body
     assert "workflowTimelineSummary" in body
-    assert "Всего событий:" in body
+    assert "Всего событий в истории:" in body
+    assert "Показаны последние:" in body
     assert "data-timeline-filter" in body
     assert "Фильтр:" in body
     assert "Показано событий:" in body
