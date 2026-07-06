@@ -973,6 +973,17 @@ function replayStepStyle(level) {
     };
 }
 
+function replayStepLevelLabel(level) {
+    const labels = {
+        success: "Успешно",
+        warning: "Предупреждение",
+        critical: "Ошибка",
+        pending: "Ожидает",
+    };
+
+    return labels[level] || "Событие";
+}
+
 function workflowSessionStatusLabel(status) {
     const labels = {
         done: "Выполнено",
@@ -1094,9 +1105,10 @@ function replayChainTimeline(ruleId) {
         const active = rows[state.index];
         const level = active?.dataset?.timelineLevel || "pending";
         const style = replayStepStyle(level);
+        const levelLabel = replayStepLevelLabel(level);
 
         if (progress) {
-            progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length}`;
+            progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length} · ${levelLabel}`;
         }
 
         if (active) {

@@ -16004,6 +16004,9 @@ async def assert_a3_workflow_center():
     assert "Обновить историю" in body
     assert "Воспроизвести" in body
     assert "Воспроизведение:" in body
+    assert "replayStepLevelLabel" in body
+    assert 'warning: "Предупреждение"' in body
+    assert "${levelLabel}" in body
     assert "timeline-progress-" in body
     assert "Пауза" in body
     assert "Остановить" in body
