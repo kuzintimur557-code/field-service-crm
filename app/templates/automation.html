@@ -1665,12 +1665,14 @@ setInterval(loadA3ApprovalQueue, 30000);
 
 <script>
 let a3ApprovalHistoryFilter = "all";
+let a3ApprovalHistoryActionType = "all";
 let a3ApprovalHistoryDateFrom = "";
 let a3ApprovalHistoryDateTo = "";
 
 function buildA3ApprovalHistoryQuery() {
     const params = new URLSearchParams();
     params.set("decision", a3ApprovalHistoryFilter);
+    params.set("action_type", a3ApprovalHistoryActionType);
 
     if (a3ApprovalHistoryDateFrom) {
         params.set("date_from", a3ApprovalHistoryDateFrom);
@@ -1786,6 +1788,11 @@ function setA3ApprovalHistoryFilter(filter) {
     loadA3ApprovalHistory();
 }
 
+function setA3ApprovalHistoryActionType(actionType) {
+    a3ApprovalHistoryActionType = actionType || "all";
+    loadA3ApprovalHistory();
+}
+
 function exportA3ApprovalHistory() {
     window.location.href =
         "/api/a3/approval-history/export?" + buildA3ApprovalHistoryQuery();
@@ -1824,6 +1831,18 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                     onclick="exportA3ApprovalHistory()">
                 Экспорт CSV
             </button>
+            <select onchange="setA3ApprovalHistoryActionType(this.value)"
+                    style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px">
+                <option value="all" ${a3ApprovalHistoryActionType === "all" ? "selected" : ""}>
+                    Все действия
+                </option>
+                <option value="disable_rule" ${a3ApprovalHistoryActionType === "disable_rule" ? "selected" : ""}>
+                    Отключить правило
+                </option>
+                <option value="retry_events" ${a3ApprovalHistoryActionType === "retry_events" ? "selected" : ""}>
+                    Повторить события
+                </option>
+            </select>
             <input id="a3-approval-date-from"
                    type="date"
                    value="${a3ApprovalHistoryDateFrom}"
@@ -1853,6 +1872,11 @@ function renderA3ApprovalHistorySummary(summary) {
             ${summary.date_from || summary.date_to ? `
                 <span class="pill">
                     Период: ${summary.date_from || "начало"} - ${summary.date_to || "сегодня"}
+                </span>
+            ` : ""}
+            ${summary.action_label && summary.action_type !== "all" ? `
+                <span class="pill">
+                    Действие: ${summary.action_label}
                 </span>
             ` : ""}
         </div>

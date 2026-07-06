@@ -164,12 +164,14 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 <script>
 let chainFilter = "all";
 let workflowApprovalHistoryFilter = "all";
+let workflowApprovalHistoryActionType = "all";
 let workflowApprovalHistoryDateFrom = "";
 let workflowApprovalHistoryDateTo = "";
 
 function buildWorkflowApprovalHistoryQuery() {
     const params = new URLSearchParams();
     params.set("decision", workflowApprovalHistoryFilter);
+    params.set("action_type", workflowApprovalHistoryActionType);
 
     if (workflowApprovalHistoryDateFrom) {
         params.set("date_from", workflowApprovalHistoryDateFrom);
@@ -331,6 +333,11 @@ function setWorkflowApprovalHistoryFilter(filter) {
     loadWorkflowApprovalHistory();
 }
 
+function setWorkflowApprovalHistoryActionType(actionType) {
+    workflowApprovalHistoryActionType = actionType || "all";
+    loadWorkflowApprovalHistory();
+}
+
 function exportWorkflowApprovalHistory() {
     window.location.href =
         "/api/a3/approval-history/export?" + buildWorkflowApprovalHistoryQuery();
@@ -365,6 +372,17 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
             <button class="back" onclick="exportWorkflowApprovalHistory()">
                 Экспорт CSV
             </button>
+            <select onchange="setWorkflowApprovalHistoryActionType(this.value)">
+                <option value="all" ${workflowApprovalHistoryActionType === "all" ? "selected" : ""}>
+                    Все действия
+                </option>
+                <option value="disable_rule" ${workflowApprovalHistoryActionType === "disable_rule" ? "selected" : ""}>
+                    Отключить правило
+                </option>
+                <option value="retry_events" ${workflowApprovalHistoryActionType === "retry_events" ? "selected" : ""}>
+                    Повторить события
+                </option>
+            </select>
             <input id="workflow-approval-date-from"
                    type="date"
                    value="${workflowApprovalHistoryDateFrom}">
@@ -391,6 +409,11 @@ function renderWorkflowApprovalHistorySummary(summary) {
             ${summary.date_from || summary.date_to ? `
                 <span class="pill">
                     Период: ${summary.date_from || "начало"} - ${summary.date_to || "сегодня"}
+                </span>
+            ` : ""}
+            ${summary.action_label && summary.action_type !== "all" ? `
+                <span class="pill">
+                    Действие: ${summary.action_label}
                 </span>
             ` : ""}
         </div>

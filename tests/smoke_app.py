@@ -554,9 +554,14 @@ async def assert_automation_page():
     assert "item.target_label" in html
     assert "setA3ApprovalHistoryFilter" in html
     assert "buildA3ApprovalHistoryQuery" in html
+    assert "a3ApprovalHistoryActionType" in html
+    assert "setA3ApprovalHistoryActionType" in html
     assert "setA3ApprovalHistoryDateFilter" in html
     assert "clearA3ApprovalHistoryDateFilter" in html
     assert "a3-approval-date-from" in html
+    assert "Все действия" in html
+    assert "Отключить правило" in html
+    assert "Повторить события" in html
     assert "Показать период" in html
     assert "Сбросить период" in html
     assert "Все решения" in html
@@ -16000,9 +16005,14 @@ async def assert_a3_workflow_center():
     assert "item.target_label" in body
     assert "setWorkflowApprovalHistoryFilter" in body
     assert "buildWorkflowApprovalHistoryQuery" in body
+    assert "workflowApprovalHistoryActionType" in body
+    assert "setWorkflowApprovalHistoryActionType" in body
     assert "setWorkflowApprovalHistoryDateFilter" in body
     assert "clearWorkflowApprovalHistoryDateFilter" in body
     assert "workflow-approval-date-from" in body
+    assert "Все действия" in body
+    assert "Отключить правило" in body
+    assert "Повторить события" in body
     assert "Показать период" in body
     assert "Сбросить период" in body
     assert "Все решения" in body
@@ -16729,8 +16739,40 @@ async def assert_a3_api_layer():
         )
     )
     assert invalid_filter_history["summary"]["filter"] == "all"
+    assert invalid_filter_history["summary"]["action_type"] == "all"
+    assert invalid_filter_history["summary"]["action_label"] == "Все действия"
     assert invalid_filter_history["summary"]["date_from"] is None
     assert invalid_filter_history["summary"]["date_to"] is None
+
+    action_filtered_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "action_type=disable_rule",
+        )
+    )
+    assert action_filtered_history["summary"]["action_type"] == "disable_rule"
+    assert (
+        action_filtered_history["summary"]["action_label"]
+        == "Отключить правило"
+    )
+    assert any(
+        item["action_id"] == approve_action_id
+        for item in action_filtered_history["items"]
+    )
+    assert all(
+        item["action_type"] == "disable_rule"
+        for item in action_filtered_history["items"]
+    )
+
+    invalid_action_filtered_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "action_type=bad",
+        )
+    )
+    assert invalid_action_filtered_history["summary"]["action_type"] == "all"
 
     today_filter = datetime.now().strftime("%Y-%m-%d")
     dated_history = crm.api_a3_approval_history(
@@ -16739,12 +16781,14 @@ async def assert_a3_api_layer():
             "/api/a3/approval-history",
             (
                 "decision=approved"
+                "&action_type=disable_rule"
                 f"&date_from={today_filter}"
                 f"&date_to={today_filter}"
             ),
         )
     )
     assert dated_history["summary"]["filter"] == "approved"
+    assert dated_history["summary"]["action_type"] == "disable_rule"
     assert dated_history["summary"]["date_from"] == today_filter
     assert dated_history["summary"]["date_to"] == today_filter
     assert any(
@@ -16772,6 +16816,7 @@ async def assert_a3_api_layer():
             "/api/a3/approval-history/export",
             (
                 "decision=approved"
+                "&action_type=disable_rule"
                 f"&date_from={today_filter}"
                 f"&date_to={today_filter}"
             ),
@@ -16786,7 +16831,7 @@ async def assert_a3_api_layer():
     assert "Правило автоматизации" in approved_export_body
     assert "Отклонено" not in approved_export_body
     assert "A3 disabled unhealthy smoke" in approved_export_body
-    assert "a3_approval_history_approved.csv" in (
+    assert "a3_approval_history_approved_disable_rule.csv" in (
         approved_export.headers.get("content-disposition") or ""
     )
 

@@ -15,6 +15,7 @@ from app.services.autonomous_actions import (
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
+    action_label,
     ensure_governance_settings,
     get_governance_settings,
     save_governance_settings,
@@ -35464,6 +35465,7 @@ def api_a3_approval_history(request: Request):
         decision_filter=filters["decision"],
         date_from=filters["date_from"],
         date_to=filters["date_to"],
+        action_type_filter=filters["action_type"],
     )
     summary = {
         "total": len(items),
@@ -35472,6 +35474,12 @@ def api_a3_approval_history(request: Request):
         "filter": filters["decision"],
         "date_from": filters["date_from"],
         "date_to": filters["date_to"],
+        "action_type": filters["action_type"],
+        "action_label": (
+            "Все действия"
+            if filters["action_type"] == "all"
+            else action_label(filters["action_type"])
+        ),
     }
 
     for item in items:
@@ -35500,6 +35508,7 @@ def api_a3_approval_history_export(request: Request):
         decision_filter=filters["decision"],
         date_from=filters["date_from"],
         date_to=filters["date_to"],
+        action_type_filter=filters["action_type"],
     )
 
     output = io.StringIO()
@@ -35533,7 +35542,10 @@ def api_a3_approval_history_export(request: Request):
             item.get("created_at") or "",
         ])
 
-    filename = f"a3_approval_history_{filters['decision']}.csv"
+    filename = (
+        f"a3_approval_history_{filters['decision']}"
+        f"_{filters['action_type']}.csv"
+    )
     return Response(
         output.getvalue(),
         media_type="text/csv; charset=utf-8",
@@ -35558,6 +35570,9 @@ def get_a3_approval_history_filters(request: Request) -> dict:
 
     return {
         "decision": get_a3_approval_decision_filter(request),
+        "action_type": get_a3_approval_action_type_filter_value(
+            query_params.get("action_type")
+        ),
         "date_from": get_a3_approval_date_filter_value(
             query_params.get("date_from")
         ),
@@ -35577,6 +35592,15 @@ def get_a3_approval_date_filter_value(value):
         datetime.strptime(value, "%Y-%m-%d")
     except Exception:
         return None
+
+    return value
+
+
+def get_a3_approval_action_type_filter_value(value):
+    value = str(value or "all").strip()
+
+    if value not in {"all", "disable_rule", "retry_events", "recovery_cycle"}:
+        return "all"
 
     return value
 
