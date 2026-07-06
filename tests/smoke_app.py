@@ -16139,7 +16139,11 @@ async def assert_a3_workflow_center():
     assert "selectWorkflowSession" in body
     assert "data-session-index" in body
     assert "filterWorkflowTimeline" in body
+    assert "workflowTimelineFilterLabel" in body
     assert "data-timeline-filter" in body
+    assert "Фильтр:" in body
+    assert "Показано событий:" in body
+    assert "workflowSessionStatusLabel(step.status)" in body
     assert "По выбранному фильтру событий нет" in body
 
     public_timeline_response = crm.api_a3_workflow_timeline(

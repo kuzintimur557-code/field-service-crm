@@ -1048,6 +1048,18 @@ function filterWorkflowTimeline(ruleId, statusFilter) {
     renderChainTimeline(ruleId, state.timeline);
 }
 
+function workflowTimelineFilterLabel(statusFilter) {
+    const labels = {
+        all: "Все",
+        failed: "Ошибки",
+        skipped: "Пропущенные",
+        pending: "Ожидающие",
+        done: "Выполненные",
+    };
+
+    return labels[statusFilter] || "Все";
+}
+
 function replayChainTimeline(ruleId) {
     const container = document.getElementById(`timeline-${ruleId}`);
 
@@ -1320,6 +1332,7 @@ function renderChainTimeline(ruleId, timeline) {
     const steps = statusFilter === "all"
         ? sessionSteps
         : sessionSteps.filter(step => step.status === statusFilter);
+    const visibleStepsCount = Math.min(steps.length, 5);
 
     if (!sessionSteps.length) {
         container.innerHTML = `
@@ -1394,6 +1407,9 @@ function renderChainTimeline(ruleId, timeline) {
         <div id="timeline-progress-${ruleId}"
              class="meta"
              style="margin-bottom:8px;font-weight:800"></div>
+        <div class="meta" style="margin-bottom:8px">
+            Фильтр: ${workflowTimelineFilterLabel(statusFilter)} · Показано событий: ${visibleStepsCount} / ${steps.length}
+        </div>
 
         <div style="display:flex;flex-direction:column;gap:8px">
             ${steps.length ? steps.slice(0, 5).map((step, index) => {
@@ -1418,7 +1434,8 @@ function renderChainTimeline(ruleId, timeline) {
                             </span>
                         </div>
                         <div class="meta">
-                            ${step.created_at || ""}
+                            <div>${step.created_at || ""}</div>
+                            <div>#${step.event_id || "-"} · ${workflowSessionStatusLabel(step.status)}</div>
                         </div>
                     </div>
                     `;
