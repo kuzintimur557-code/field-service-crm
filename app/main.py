@@ -10,6 +10,7 @@ from app.services.autonomous_actions import (
     get_autonomous_actions,
     process_autonomous_actions,
     reject_autonomous_action,
+    reject_unsafe_autonomous_actions,
 )
 from app.services.decision_engine import get_decision_engine
 
@@ -35393,6 +35394,21 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
         return JSONResponse(result, status_code=404)
 
     return result
+
+
+@app.post("/api/a3/autonomous-actions/reject-unsafe")
+def api_a3_reject_unsafe_autonomous_actions(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    decided_by = get_user(request) or "system"
+
+    return reject_unsafe_autonomous_actions(
+        company_id=company_id,
+        decided_by=decided_by,
+    )
 
 
 @app.get("/api/a3/approval-queue")

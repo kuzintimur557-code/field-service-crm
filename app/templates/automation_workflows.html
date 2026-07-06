@@ -131,6 +131,9 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
             <button class="back" onclick="approveSafeWorkflowActions()">
                 Одобрить безопасные
             </button>
+            <button class="back" onclick="rejectUnsafeWorkflowActions()">
+                Отклонить небезопасные
+            </button>
             <div class="pill off">Подтверждения</div>
         </div>
     </div>
@@ -291,6 +294,22 @@ async function approveSafeWorkflowActions() {
 
     alert(
         "Одобрено: " + (data.approved || 0)
+        + ". Пропущено: " + (data.skipped || 0)
+    );
+}
+
+async function rejectUnsafeWorkflowActions() {
+    const response = await fetch("/api/a3/autonomous-actions/reject-unsafe", {
+        method: "POST"
+    });
+    const data = await response.json();
+
+    await loadWorkflowApprovalQueue();
+    await loadWorkflowApprovalHistory();
+    loadChains();
+
+    alert(
+        "Отклонено: " + (data.rejected || 0)
         + ". Пропущено: " + (data.skipped || 0)
     );
 }

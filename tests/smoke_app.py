@@ -533,6 +533,9 @@ async def assert_automation_page():
     assert "Одобрить безопасные" in html
     assert "approveSafeA3Actions" in html
     assert "/api/a3/autonomous-actions/approve-safe" in html
+    assert "Отклонить небезопасные" in html
+    assert "rejectUnsafeA3Actions" in html
+    assert "/api/a3/autonomous-actions/reject-unsafe" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15948,12 +15951,15 @@ async def assert_a3_workflow_center():
     assert "rejectWorkflowAction" in body
     assert "approveSafeWorkflowActions" in body
     assert "Одобрить безопасные" in body
+    assert "rejectUnsafeWorkflowActions" in body
+    assert "Отклонить небезопасные" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
     assert "requestDangerousFixApproval" in body
     assert "/api/a3/autonomous-actions/request-approval" in body
     assert "/api/a3/autonomous-actions/approve-safe" in body
+    assert "/api/a3/autonomous-actions/reject-unsafe" in body
     assert "/api/a3/approval-queue" in body
     assert "Ждёт подтверждения:" in body
     assert "Действие отправлено на подтверждение" in body
@@ -16068,6 +16074,10 @@ async def assert_a3_api_layer():
         ),
         (
             crm.api_a3_approve_safe_autonomous_actions,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_reject_unsafe_autonomous_actions,
             (companyless_request,),
         ),
         (
@@ -17072,6 +17082,103 @@ async def assert_a3_api_layer():
     assert bulk_safe_action["status"] == "approved"
     assert bulk_protected_action["status"] == "awaiting_approval"
     assert bulk_unsupported_action["status"] == "awaiting_approval"
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "A3 unsafe rejection safe smoke",
+        "weekly_digest",
+        "{}",
+        1,
+        "owner2",
+        datetime.now().isoformat(timespec="seconds"),
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    unsafe_rejection_safe_rule_id = c.lastrowid
+
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        unsafe_rejection_safe_rule_id,
+        "awaiting_approval",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    unsafe_rejection_safe_action_id = c.lastrowid
+
+    c.execute("""
+    INSERT INTO autonomous_action_queue (
+        company_id, action_type, target_type, target_id,
+        status, payload_json, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "disable_rule",
+        "automation_rule",
+        999995,
+        "awaiting_approval",
+        "{}",
+        datetime.now().isoformat(timespec="seconds"),
+    ))
+    unsafe_rejection_missing_action_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    unsafe_rejection = crm.api_a3_reject_unsafe_autonomous_actions(request)
+    assert unsafe_rejection["ok"] is True
+    assert unsafe_rejection["rejected"] >= 3
+    assert unsafe_rejection["skipped"] >= 1
+    assert unsafe_rejection["protected"] >= 1
+    assert unsafe_rejection["missing_target"] >= 1
+    assert unsafe_rejection["unsupported"] >= 1
+
+    conn = connect()
+    c = conn.cursor()
+    unsafe_rejection_safe_action = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (unsafe_rejection_safe_action_id,)).fetchone()
+    unsafe_rejection_protected_action = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (bulk_protected_action_id,)).fetchone()
+    unsafe_rejection_unsupported_action = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (bulk_unsupported_action_id,)).fetchone()
+    unsafe_rejection_missing_action = c.execute("""
+    SELECT status
+    FROM autonomous_action_queue
+    WHERE id=?
+      AND company_id=2
+    """, (unsafe_rejection_missing_action_id,)).fetchone()
+    conn.close()
+
+    assert unsafe_rejection_safe_action["status"] == "awaiting_approval"
+    assert unsafe_rejection_protected_action["status"] == "rejected"
+    assert unsafe_rejection_unsupported_action["status"] == "rejected"
+    assert unsafe_rejection_missing_action["status"] == "rejected"
 
     update_result = await crm.api_a3_governance_settings_update(
         make_json_request(

@@ -1478,6 +1478,11 @@ setInterval(loadA3GovernanceSettings, 30000);
                 Одобрить безопасные
             </button>
 
+            <button class="btn off"
+                    onclick="rejectUnsafeA3Actions()">
+                Отклонить небезопасные
+            </button>
+
             <div class="pill off">
                 Требует подтверждения
             </div>
@@ -1582,6 +1587,25 @@ async function approveSafeA3Actions() {
     } catch (err) {
         console.error("Ошибка массового подтверждения", err);
         alert("Не удалось выполнить массовое подтверждение");
+    }
+}
+
+async function rejectUnsafeA3Actions() {
+    try {
+        const response = await fetch("/api/a3/autonomous-actions/reject-unsafe", {
+            method: "POST"
+        });
+        const data = await response.json();
+
+        refreshA3ApprovalWidgets();
+
+        alert(
+            "Отклонено: " + (data.rejected || 0)
+            + ". Пропущено: " + (data.skipped || 0)
+        );
+    } catch (err) {
+        console.error("Ошибка массового отклонения", err);
+        alert("Не удалось выполнить массовое отклонение");
     }
 }
 

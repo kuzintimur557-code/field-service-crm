@@ -519,48 +519,10 @@ def approve_autonomous_action(company_id, action_id, decided_by="system"):
 def approve_safe_autonomous_actions(company_id, decided_by="system", limit=50):
     require_company_id(company_id)
 
-    governance = get_governance_settings(company_id)
-    protected_rules = _protected_rule_ids(governance)
-
-    conn = connect()
-    c = conn.cursor()
-
-    rows = c.execute("""
-        SELECT *
-        FROM autonomous_action_queue
-        WHERE company_id=?
-          AND status='awaiting_approval'
-        ORDER BY id ASC
-        LIMIT ?
-    """, (
+    rows, protected_rules, existing_rule_ids = _build_approval_queue_context(
         company_id,
         limit,
-    )).fetchall()
-
-    rule_ids = [
-        row["target_id"]
-        for row in rows
-        if row["target_type"] == "automation_rule" and row["target_id"]
-    ]
-
-    existing_rule_ids = set()
-
-    if rule_ids:
-        placeholders = ",".join("?" for _ in rule_ids)
-        existing_rule_ids = {
-            row["id"]
-            for row in c.execute(f"""
-                SELECT id
-                FROM automation_rules
-                WHERE company_id=?
-                  AND id IN ({placeholders})
-            """, (
-                company_id,
-                *rule_ids,
-            )).fetchall()
-        }
-
-    conn.close()
+    )
 
     result = {
         "ok": True,
@@ -610,6 +572,114 @@ def approve_safe_autonomous_actions(company_id, decided_by="system", limit=50):
             severity="info",
             title="AI-действия подтверждены",
             message=f"Массово подтверждено действий: {result['approved']}",
+            target_type="autonomous_action",
+            target_id=None,
+        )
+
+    return result
+
+
+def _build_approval_queue_context(company_id, limit):
+    governance = get_governance_settings(company_id)
+    protected_rules = _protected_rule_ids(governance)
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT *
+        FROM autonomous_action_queue
+        WHERE company_id=?
+          AND status='awaiting_approval'
+        ORDER BY id ASC
+        LIMIT ?
+    """, (
+        company_id,
+        limit,
+    )).fetchall()
+
+    rule_ids = [
+        row["target_id"]
+        for row in rows
+        if row["target_type"] == "automation_rule" and row["target_id"]
+    ]
+
+    existing_rule_ids = set()
+
+    if rule_ids:
+        placeholders = ",".join("?" for _ in rule_ids)
+        existing_rule_ids = {
+            row["id"]
+            for row in c.execute(f"""
+                SELECT id
+                FROM automation_rules
+                WHERE company_id=?
+                  AND id IN ({placeholders})
+            """, (
+                company_id,
+                *rule_ids,
+            )).fetchall()
+        }
+
+    conn.close()
+
+    return rows, protected_rules, existing_rule_ids
+
+
+def reject_unsafe_autonomous_actions(company_id, decided_by="system", limit=50):
+    require_company_id(company_id)
+
+    rows, protected_rules, existing_rule_ids = _build_approval_queue_context(
+        company_id,
+        limit,
+    )
+
+    result = {
+        "ok": True,
+        "total": len(rows),
+        "rejected": 0,
+        "skipped": 0,
+        "protected": 0,
+        "missing_target": 0,
+        "unsupported": 0,
+    }
+
+    for row in rows:
+        unsafe = False
+
+        if (
+            row["action_type"] != "disable_rule"
+            or row["target_type"] != "automation_rule"
+        ):
+            unsafe = True
+            result["unsupported"] += 1
+        elif row["target_id"] in protected_rules:
+            unsafe = True
+            result["protected"] += 1
+        elif row["target_id"] not in existing_rule_ids:
+            unsafe = True
+            result["missing_target"] += 1
+
+        if not unsafe:
+            result["skipped"] += 1
+            continue
+
+        rejection = reject_autonomous_action(
+            company_id=company_id,
+            action_id=row["id"],
+            decided_by=decided_by,
+        )
+
+        if rejection.get("ok"):
+            result["rejected"] += 1
+
+    if result["rejected"]:
+        create_ops_timeline_event(
+            company_id=company_id,
+            event_type="approval",
+            severity="warning",
+            title="AI-действия отклонены",
+            message=f"Массово отклонено небезопасных действий: {result['rejected']}",
             target_type="autonomous_action",
             target_id=None,
         )
