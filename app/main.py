@@ -35568,10 +35568,16 @@ def api_a3_approval_history_export(request: Request):
             item.get("created_at") or "",
         ])
 
-    filename = (
-        f"a3_approval_history_{filters['decision']}"
-        f"_{filters['action_type']}.csv"
-    )
+    filename_parts = [
+        "a3_approval_history",
+        filters["decision"],
+        filters["action_type"],
+    ]
+
+    if filters["target_type"] != "all":
+        filename_parts.append(filters["target_type"])
+
+    filename = "_".join(filename_parts) + ".csv"
     return Response(
         output.getvalue(),
         media_type="text/csv; charset=utf-8",

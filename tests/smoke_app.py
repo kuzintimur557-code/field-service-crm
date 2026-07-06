@@ -17055,6 +17055,18 @@ async def assert_a3_api_layer():
         approved_export.headers.get("content-disposition") or ""
     )
 
+    target_type_export = crm.api_a3_approval_history_export(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history/export",
+            "target_type=automation_rule",
+        )
+    )
+    assert target_type_export.status_code == 200
+    assert "a3_approval_history_all_all_automation_rule.csv" in (
+        target_type_export.headers.get("content-disposition") or ""
+    )
+
     conn = connect()
     c = conn.cursor()
     c.execute("""
