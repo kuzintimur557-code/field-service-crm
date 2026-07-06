@@ -812,6 +812,8 @@ async def assert_automation_page():
     assert "Проверка" in builder_html
     assert "Проверка выполнения" in builder_html
     assert "Runtime debug" not in builder_html
+    assert "Открыть выполнение" in builder_html
+    assert "Открыть runtime" not in builder_html
     assert 'class="mobile-nav"' in builder_html
     assert 'class="header-actions"' in builder_html
     assert 'class="condition-form"' in builder_html
@@ -16000,13 +16002,13 @@ async def assert_a3_workflow_center():
     assert "Сессия: нет" in body
     assert "Сессия: активно" in body
     assert "chain.replaying" in body
-    assert "Debug цепочки" in body
+    assert "Диагностика цепочки" in body
     assert "handleDebugAction" in body
     assert "/enable" in body
     assert "/retry-skipped" in body
     assert "Повтор пропущенных событий отправлен" in body
     assert "AI debug рекомендации" in body
-    assert "Debug:" in body
+    assert "Диагностика:" in body
     assert "Диагноз" in body
     assert "Следующий шаг:" in body
     assert "Риск:" in body

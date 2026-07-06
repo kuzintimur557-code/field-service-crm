@@ -810,7 +810,7 @@ async function loadChains() {
 
                 <div style="margin-top:14px;padding:14px;border-radius:16px;background:#ffffff;border:1px solid #e5e7eb">
                     <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
-                        <div style="font-weight:900">Debug цепочки</div>
+                        <div style="font-weight:900">Диагностика цепочки</div>
                         <span class="pill ${debug.status === "ok" ? "ok" : "warn"}">
                             ${debug.reason || "Проблем не найдено"}
                         </span>
@@ -1227,7 +1227,7 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
                 action_type: actionType,
                 target_type: targetType,
                 target_id: Number(targetId),
-                reason: label || "Опасное исправление из A3 workflow debug",
+                reason: label || "Опасное исправление из диагностики A3",
             })
         });
         const data = await response.json();
@@ -1540,7 +1540,7 @@ function renderProblemChains(chains) {
                     <div style="margin-top:10px">
                         <span class="pill off">${state.title || "Проблема"}</span>
                         <span class="pill off">Оценка: ${state.score || 0}</span>
-                        <span class="pill off">Debug: ${debug.reason || "Требует проверки"}</span>
+                        <span class="pill off">Диагностика: ${debug.reason || "Требует проверки"}</span>
                     </div>
 
                     <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
