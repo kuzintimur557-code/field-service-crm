@@ -197,15 +197,19 @@ async function loadWorkflowApprovalQueue() {
         const response = await fetch("/api/a3/approval-queue");
         const data = await response.json();
         const items = data.items || [];
+        const summary = data.summary || {};
 
         if (!items.length) {
             container.innerHTML = `
+                ${renderWorkflowApprovalSummary(summary)}
                 <div class="pill ok">Нет действий, ожидающих подтверждения</div>
             `;
             return;
         }
 
-        container.innerHTML = items.slice(0, 5).map(item => `
+        container.innerHTML = `
+            ${renderWorkflowApprovalSummary(summary)}
+            ${items.slice(0, 5).map(item => `
             <div style="padding:14px;border-radius:14px;background:#fff7ed;border:1px solid #fdba74">
                 <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
                     <div>
@@ -227,11 +231,25 @@ async function loadWorkflowApprovalQueue() {
                     </div>
                 </div>
             </div>
-        `).join("");
+            `).join("")}
+        `;
     } catch (err) {
         console.error(err);
         container.innerHTML = `<div class="pill off">Не удалось загрузить очередь подтверждений</div>`;
     }
+}
+
+function renderWorkflowApprovalSummary(summary) {
+    return `
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="pill">Всего: ${summary.total || 0}</span>
+            <span class="pill ok">Можно подтвердить: ${summary.safe || 0}</span>
+            <span class="pill off">Небезопасные: ${summary.unsafe || 0}</span>
+            <span class="pill off">Защищённые: ${summary.protected || 0}</span>
+            <span class="pill">Цель не найдена: ${summary.missing_target || 0}</span>
+            <span class="pill">Неподдерживаемые: ${summary.unsupported || 0}</span>
+        </div>
+    `;
 }
 
 async function loadWorkflowApprovalHistory() {

@@ -1505,15 +1505,19 @@ async function loadA3ApprovalQueue() {
         container.innerHTML = "";
 
         const items = data.items || [];
+        const summary = data.summary || {};
 
         if (!items.length) {
             container.innerHTML = `
+                ${renderA3ApprovalSummary(summary)}
                 <div class="pill">
                     Нет действий, ожидающих подтверждения
                 </div>
             `;
             return;
         }
+
+        container.innerHTML = renderA3ApprovalSummary(summary);
 
         for (const item of items) {
             const card = document.createElement("div");
@@ -1567,6 +1571,19 @@ async function loadA3ApprovalQueue() {
     } catch (err) {
         console.error("Ошибка загрузки очереди подтверждений", err);
     }
+}
+
+function renderA3ApprovalSummary(summary) {
+    return `
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span class="pill">Всего: ${summary.total || 0}</span>
+            <span class="pill ok">Можно подтвердить: ${summary.safe || 0}</span>
+            <span class="pill off">Небезопасные: ${summary.unsafe || 0}</span>
+            <span class="pill off">Защищённые: ${summary.protected || 0}</span>
+            <span class="pill">Цель не найдена: ${summary.missing_target || 0}</span>
+            <span class="pill">Неподдерживаемые: ${summary.unsupported || 0}</span>
+        </div>
+    `;
 }
 
 async function approveA3Action(actionId) {

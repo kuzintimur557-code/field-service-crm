@@ -538,6 +538,10 @@ async def assert_automation_page():
     assert "/api/a3/autonomous-actions/reject-unsafe" in html
     assert "approval_safety_label" in html
     assert "Требует проверки" in html
+    assert "renderA3ApprovalSummary" in html
+    assert "Можно подтвердить:" in html
+    assert "Небезопасные:" in html
+    assert "Защищённые:" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15957,6 +15961,10 @@ async def assert_a3_workflow_center():
     assert "Отклонить небезопасные" in body
     assert "approval_safety_label" in body
     assert "Требует проверки" in body
+    assert "renderWorkflowApprovalSummary" in body
+    assert "Можно подтвердить:" in body
+    assert "Небезопасные:" in body
+    assert "Защищённые:" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
@@ -16549,6 +16557,10 @@ async def assert_a3_api_layer():
 
     approval_queue = crm.api_a3_approval_queue(request)
     assert "items" in approval_queue
+    assert "summary" in approval_queue
+    assert approval_queue["summary"]["total"] >= 2
+    assert approval_queue["summary"]["safe"] >= 2
+    assert approval_queue["summary"]["unsafe"] == 0
     assert any(item["id"] == approve_action_id for item in approval_queue["items"])
     assert any(item["id"] == reject_action_id for item in approval_queue["items"])
     approval_queue_items = {
@@ -17066,6 +17078,10 @@ async def assert_a3_api_layer():
     conn.close()
 
     bulk_approval_queue = crm.api_a3_approval_queue(request)
+    assert bulk_approval_queue["summary"]["safe"] >= 1
+    assert bulk_approval_queue["summary"]["unsafe"] >= 2
+    assert bulk_approval_queue["summary"]["protected"] >= 1
+    assert bulk_approval_queue["summary"]["unsupported"] >= 1
     bulk_approval_items = {
         item["id"]: item
         for item in bulk_approval_queue["items"]

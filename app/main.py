@@ -35419,9 +35419,33 @@ def api_a3_approval_queue(request: Request):
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     items = get_approval_queue(company_id)
+    summary = {
+        "total": len(items),
+        "safe": 0,
+        "unsafe": 0,
+        "protected": 0,
+        "missing_target": 0,
+        "unsupported": 0,
+    }
+
+    for item in items:
+        if item.get("approval_safety") == "safe":
+            summary["safe"] += 1
+        else:
+            summary["unsafe"] += 1
+
+        reason = item.get("approval_safety_reason")
+
+        if reason == "protected_rule":
+            summary["protected"] += 1
+        elif reason == "missing_target":
+            summary["missing_target"] += 1
+        elif reason == "unsupported_action":
+            summary["unsupported"] += 1
 
     return {
         "count": len(items),
+        "summary": summary,
         "items": items,
     }
 
