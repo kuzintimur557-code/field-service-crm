@@ -561,7 +561,17 @@ function a3WorkflowStatusLabel(status) {
         active: "Включено",
         disabled: "Выключено",
         has_events: "Есть события",
-        empty: "Нет событий"
+        empty: "Нет событий",
+        healthy: "Стабильно",
+        warning: "Внимание",
+        degraded: "Снижено",
+        critical: "Критично",
+        pending: "Ожидает",
+        done: "Выполнено",
+        skipped: "Пропущено",
+        failed: "Ошибка",
+        completed: "Завершено",
+        awaiting_approval: "Ждёт подтверждения"
     };
 
     return labels[status] || status || "-";

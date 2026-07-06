@@ -2136,6 +2136,9 @@ async def assert_automation_page():
     assert 'class="pill warn" id="a3-workflow-builder-status"' in rule_detail_html
     assert 'status.className = "pill ok"' in rule_detail_html
     assert 'status.className = "pill off"' in rule_detail_html
+    assert 'healthy: "Стабильно"' in rule_detail_html
+    assert 'failed: "Ошибка"' in rule_detail_html
+    assert 'awaiting_approval: "Ждёт подтверждения"' in rule_detail_html
     assert f"/api/a3/workflow/rules/{rule['id']}/graph" in rule_detail_html
     assert "Диагностика правила" in rule_detail_html
     assert "Действия" in rule_detail_html
