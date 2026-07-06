@@ -16843,6 +16843,26 @@ async def assert_a3_api_layer():
     assert invalid_filter_history["summary"]["period_label"] == "За всё время"
     assert invalid_filter_history["summary"]["active_filters_count"] == 0
     assert invalid_filter_history["summary"]["active_filter_labels"] == []
+    helper_summary = crm.build_a3_approval_history_summary(
+        [
+            {"decision": "approved"},
+            {"decision": "rejected"},
+            {"decision": "pending"},
+        ],
+        {
+            "decision": "all",
+            "action_type": "all",
+            "target_type": "all",
+            "decided_by": None,
+            "target_id": None,
+            "date_from": None,
+            "date_to": None,
+        },
+    )
+    assert helper_summary["total"] == 3
+    assert helper_summary["approved"] == 1
+    assert helper_summary["rejected"] == 1
+    assert helper_summary["active_filters_count"] == 0
 
     action_filtered_history = crm.api_a3_approval_history(
         make_asgi_request(

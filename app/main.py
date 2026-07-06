@@ -35472,46 +35472,7 @@ def api_a3_approval_history(request: Request):
         decided_by_filter=filters["decided_by"],
         target_id_filter=filters["target_id"],
     )
-    summary = {
-        "total": len(items),
-        "approved": 0,
-        "rejected": 0,
-        "history_limit": APPROVAL_HISTORY_LIMIT,
-        "history_limit_label": f"Последние {APPROVAL_HISTORY_LIMIT} решений",
-        "filter": filters["decision"],
-        "date_from": filters["date_from"],
-        "date_to": filters["date_to"],
-        "period_label": get_a3_approval_period_label(
-            filters["date_from"],
-            filters["date_to"],
-        ),
-        "action_type": filters["action_type"],
-        "action_label": (
-            "Все действия"
-            if filters["action_type"] == "all"
-            else action_label(filters["action_type"])
-        ),
-        "target_type": filters["target_type"],
-        "target_type_label": (
-            "Все цели"
-            if filters["target_type"] == "all"
-            else target_label(filters["target_type"])
-        ),
-        "decided_by": filters["decided_by"],
-        "decided_by_label": get_a3_approval_actor_label(
-            filters["decided_by"]
-        ),
-        "target_id": filters["target_id"],
-    }
-    active_filter_labels = build_a3_approval_active_filter_labels(filters)
-    summary["active_filters_count"] = len(active_filter_labels)
-    summary["active_filter_labels"] = active_filter_labels
-
-    for item in items:
-        if item.get("decision") == "approved":
-            summary["approved"] += 1
-        elif item.get("decision") == "rejected":
-            summary["rejected"] += 1
+    summary = build_a3_approval_history_summary(items, filters)
 
     return {
         "count": len(items),
@@ -35658,6 +35619,51 @@ def build_a3_approval_export_filter_rows(filters, items_count=None):
         ],
         [],
     ]
+
+
+def build_a3_approval_history_summary(items, filters):
+    summary = {
+        "total": len(items),
+        "approved": 0,
+        "rejected": 0,
+        "history_limit": APPROVAL_HISTORY_LIMIT,
+        "history_limit_label": f"Последние {APPROVAL_HISTORY_LIMIT} решений",
+        "filter": filters["decision"],
+        "date_from": filters["date_from"],
+        "date_to": filters["date_to"],
+        "period_label": get_a3_approval_period_label(
+            filters["date_from"],
+            filters["date_to"],
+        ),
+        "action_type": filters["action_type"],
+        "action_label": (
+            "Все действия"
+            if filters["action_type"] == "all"
+            else action_label(filters["action_type"])
+        ),
+        "target_type": filters["target_type"],
+        "target_type_label": (
+            "Все цели"
+            if filters["target_type"] == "all"
+            else target_label(filters["target_type"])
+        ),
+        "decided_by": filters["decided_by"],
+        "decided_by_label": get_a3_approval_actor_label(
+            filters["decided_by"]
+        ),
+        "target_id": filters["target_id"],
+    }
+    active_filter_labels = build_a3_approval_active_filter_labels(filters)
+    summary["active_filters_count"] = len(active_filter_labels)
+    summary["active_filter_labels"] = active_filter_labels
+
+    for item in items:
+        if item.get("decision") == "approved":
+            summary["approved"] += 1
+        elif item.get("decision") == "rejected":
+            summary["rejected"] += 1
+
+    return summary
 
 
 def build_a3_approval_active_filter_labels(filters):
