@@ -987,6 +987,11 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_autonomous_action_approvals_history
+    ON autonomous_action_approvals(company_id, decision, created_at)
+    """)
+
+    c.execute("""
     CREATE INDEX IF NOT EXISTS idx_ai_assistant_notes_company_created
     ON ai_assistant_notes(company_id, created_at)
     """)

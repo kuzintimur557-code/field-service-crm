@@ -16293,6 +16293,14 @@ async def assert_a3_api_layer():
 
     conn = connect()
     c = conn.cursor()
+    approval_history_index = c.execute("""
+    SELECT name
+    FROM sqlite_master
+    WHERE type='index'
+      AND name='idx_autonomous_action_approvals_history'
+    """).fetchone()
+    assert approval_history_index is not None
+
     snapshot_count_before = c.execute("""
     SELECT COUNT(*)
     FROM system_health_snapshots
