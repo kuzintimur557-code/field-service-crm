@@ -315,6 +315,12 @@ function setWorkflowApprovalHistoryFilter(filter) {
     loadWorkflowApprovalHistory();
 }
 
+function exportWorkflowApprovalHistory() {
+    window.location.href =
+        "/api/a3/approval-history/export?decision="
+        + encodeURIComponent(workflowApprovalHistoryFilter);
+}
+
 function renderWorkflowApprovalHistoryFilters(activeFilter) {
     return `
         <div class="workflow-card-actions">
@@ -326,6 +332,9 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
             </button>
             <button class="back" onclick="setWorkflowApprovalHistoryFilter('rejected')">
                 Отклонённые
+            </button>
+            <button class="back" onclick="exportWorkflowApprovalHistory()">
+                Экспорт CSV
             </button>
             <span class="pill">${activeFilter === "approved" ? "Фильтр: одобрено" : activeFilter === "rejected" ? "Фильтр: отклонено" : "Фильтр: все"}</span>
         </div>

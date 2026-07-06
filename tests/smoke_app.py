@@ -555,6 +555,9 @@ async def assert_automation_page():
     assert "Одобренные" in html
     assert "Отклонённые" in html
     assert "/api/a3/approval-history?decision=" in html
+    assert "exportA3ApprovalHistory" in html
+    assert "/api/a3/approval-history/export?decision=" in html
+    assert "Экспорт CSV" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15990,6 +15993,9 @@ async def assert_a3_workflow_center():
     assert "Одобренные" in body
     assert "Отклонённые" in body
     assert "/api/a3/approval-history?decision=" in body
+    assert "exportWorkflowApprovalHistory" in body
+    assert "/api/a3/approval-history/export?decision=" in body
+    assert "Экспорт CSV" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
@@ -16127,6 +16133,10 @@ async def assert_a3_api_layer():
         ),
         (
             crm.api_a3_approval_history,
+            (companyless_request,),
+        ),
+        (
+            crm.api_a3_approval_history_export,
             (companyless_request,),
         ),
         (
@@ -16693,6 +16703,24 @@ async def assert_a3_api_layer():
         )
     )
     assert invalid_filter_history["summary"]["filter"] == "all"
+
+    approved_export = crm.api_a3_approval_history_export(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history/export",
+            "decision=approved",
+        )
+    )
+    assert approved_export.status_code == 200
+    assert approved_export.media_type == "text/csv; charset=utf-8"
+    approved_export_body = approved_export.body.decode("utf-8")
+    assert "ID решения,ID действия,Решение" in approved_export_body
+    assert "Одобрено" in approved_export_body
+    assert "Отклонено" not in approved_export_body
+    assert "A3 disabled unhealthy smoke" in approved_export_body
+    assert "a3_approval_history_approved.csv" in (
+        approved_export.headers.get("content-disposition") or ""
+    )
 
     conn = connect()
     c = conn.cursor()

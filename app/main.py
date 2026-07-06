@@ -35457,11 +35457,7 @@ def api_a3_approval_history(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    query_params = getattr(request, "query_params", {}) or {}
-    decision_filter = query_params.get("decision") or "all"
-
-    if decision_filter not in {"all", "approved", "rejected"}:
-        decision_filter = "all"
+    decision_filter = get_a3_approval_decision_filter(request)
 
     items = get_approval_history(company_id, decision_filter=decision_filter)
     summary = {
@@ -35482,6 +35478,67 @@ def api_a3_approval_history(request: Request):
         "summary": summary,
         "items": items,
     }
+
+
+@app.get("/api/a3/approval-history/export")
+def api_a3_approval_history_export(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    decision_filter = get_a3_approval_decision_filter(request)
+    items = get_approval_history(company_id, decision_filter=decision_filter)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID решения",
+        "ID действия",
+        "Решение",
+        "Кто решил",
+        "Причина",
+        "Тип действия",
+        "Тип цели",
+        "ID цели",
+        "Название цели",
+        "Цель активна",
+        "Дата",
+    ])
+
+    for item in items:
+        writer.writerow([
+            item.get("id"),
+            item.get("action_id"),
+            item.get("decision_label") or item.get("decision"),
+            item.get("decided_by_label") or item.get("decided_by"),
+            item.get("reason") or "",
+            item.get("action_type"),
+            item.get("target_type"),
+            item.get("target_id"),
+            item.get("target_name") or "",
+            "Да" if item.get("target_active") else "Нет",
+            item.get("created_at") or "",
+        ])
+
+    filename = f"a3_approval_history_{decision_filter}.csv"
+    return Response(
+        output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+def get_a3_approval_decision_filter(request: Request) -> str:
+    query_params = getattr(request, "query_params", {}) or {}
+    decision_filter = query_params.get("decision") or "all"
+
+    if decision_filter not in {"all", "approved", "rejected"}:
+        return "all"
+
+    return decision_filter
 
 
 @app.post("/api/a3/ops-timeline")
