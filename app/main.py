@@ -35458,9 +35458,21 @@ def api_a3_approval_history(request: Request):
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
     items = get_approval_history(company_id)
+    summary = {
+        "total": len(items),
+        "approved": 0,
+        "rejected": 0,
+    }
+
+    for item in items:
+        if item.get("decision") == "approved":
+            summary["approved"] += 1
+        elif item.get("decision") == "rejected":
+            summary["rejected"] += 1
 
     return {
         "count": len(items),
+        "summary": summary,
         "items": items,
     }
 

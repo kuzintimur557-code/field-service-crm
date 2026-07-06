@@ -544,6 +544,10 @@ async def assert_automation_page():
     assert "Защищённые:" in html
     assert "Правило:" in html
     assert "item.target_name" in html
+    assert "renderA3ApprovalHistorySummary" in html
+    assert "Всего решений:" in html
+    assert "Одобрено:" in html
+    assert "Отклонено:" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15969,6 +15973,10 @@ async def assert_a3_workflow_center():
     assert "Защищённые:" in body
     assert "Правило:" in body
     assert "item.target_name" in body
+    assert "renderWorkflowApprovalHistorySummary" in body
+    assert "Всего решений:" in body
+    assert "Одобрено:" in body
+    assert "Отклонено:" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
@@ -16609,6 +16617,10 @@ async def assert_a3_api_layer():
 
     approval_history = crm.api_a3_approval_history(request)
     assert "items" in approval_history
+    assert "summary" in approval_history
+    assert approval_history["summary"]["total"] >= 2
+    assert approval_history["summary"]["approved"] >= 1
+    assert approval_history["summary"]["rejected"] >= 1
     assert any(
         item["action_id"] == approve_action_id
         and item["decision"] == "approved"

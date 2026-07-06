@@ -268,13 +268,19 @@ async function loadWorkflowApprovalHistory() {
         const response = await fetch("/api/a3/approval-history");
         const data = await response.json();
         const items = data.items || [];
+        const summary = data.summary || {};
 
         if (!items.length) {
-            container.innerHTML = `<div class="meta">История решений пока пустая</div>`;
+            container.innerHTML = `
+                ${renderWorkflowApprovalHistorySummary(summary)}
+                <div class="meta">История решений пока пустая</div>
+            `;
             return;
         }
 
-        container.innerHTML = items.slice(0, 3).map(item => {
+        container.innerHTML = `
+            ${renderWorkflowApprovalHistorySummary(summary)}
+            ${items.slice(0, 3).map(item => {
             const decision = item.decision === "approved" ? "Одобрено" : "Отклонено";
             const cls = item.decision === "approved" ? "ok" : "off";
 
@@ -288,11 +294,22 @@ async function loadWorkflowApprovalHistory() {
                     · ${item.created_at || ""}
                 </div>
             `;
-        }).join("");
+            }).join("")}
+        `;
     } catch (err) {
         console.error(err);
         container.innerHTML = `<div class="meta">Не удалось загрузить историю решений</div>`;
     }
+}
+
+function renderWorkflowApprovalHistorySummary(summary) {
+    return `
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="pill">Всего решений: ${summary.total || 0}</span>
+            <span class="pill ok">Одобрено: ${summary.approved || 0}</span>
+            <span class="pill off">Отклонено: ${summary.rejected || 0}</span>
+        </div>
+    `;
 }
 
 async function approveWorkflowAction(actionId) {

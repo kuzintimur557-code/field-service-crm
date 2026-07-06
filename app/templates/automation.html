@@ -1674,15 +1674,19 @@ async function loadA3ApprovalHistory() {
         container.innerHTML = "";
 
         const items = data.items || [];
+        const summary = data.summary || {};
 
         if (!items.length) {
             container.innerHTML = `
+                ${renderA3ApprovalHistorySummary(summary)}
                 <div class="pill">
                     История подтверждений пуста
                 </div>
             `;
             return;
         }
+
+        container.innerHTML = renderA3ApprovalHistorySummary(summary);
 
         for (const item of items.slice(0, 20)) {
             const card = document.createElement("div");
@@ -1751,6 +1755,16 @@ async function loadA3ApprovalHistory() {
     } catch (err) {
         console.error("Ошибка загрузки истории подтверждений", err);
     }
+}
+
+function renderA3ApprovalHistorySummary(summary) {
+    return `
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span class="pill">Всего решений: ${summary.total || 0}</span>
+            <span class="pill ok">Одобрено: ${summary.approved || 0}</span>
+            <span class="pill off">Отклонено: ${summary.rejected || 0}</span>
+        </div>
+    `;
 }
 
 loadA3ApprovalHistory();
