@@ -16170,6 +16170,9 @@ async def assert_a3_workflow_center():
     assert "Фильтр:" in body
     assert "Показано событий:" in body
     assert "step.status_label || workflowSessionStatusLabel(step.status)" in body
+    assert "data-timeline-event" in body
+    assert "data-timeline-status" in body
+    assert "Событие #" in body
     assert "Показать ещё" in body
     assert "Свернуть" in body
     assert "По выбранному фильтру событий нет" in body

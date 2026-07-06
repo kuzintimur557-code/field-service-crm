@@ -1150,11 +1150,12 @@ function replayChainTimeline(ruleId) {
 
         const active = rows[state.index];
         const level = active?.dataset?.timelineLevel || "pending";
+        const eventId = active?.dataset?.timelineEvent || "-";
+        const eventStatus = active?.dataset?.timelineStatus || replayStepLevelLabel(level);
         const style = replayStepStyle(level);
-        const levelLabel = replayStepLevelLabel(level);
 
         if (progress) {
-            progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length} · ${levelLabel}`;
+            progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length} · Событие #${eventId} · ${eventStatus}`;
         }
 
         if (active) {
@@ -1465,7 +1466,11 @@ function renderChainTimeline(ruleId, timeline) {
                 }
 
                 return `
-                    <div class="timeline-step" data-timeline-step="${index + 1}" data-timeline-level="${step.level}">
+                    <div class="timeline-step"
+                         data-timeline-step="${index + 1}"
+                         data-timeline-level="${step.level}"
+                         data-timeline-event="${step.event_id || "-"}"
+                         data-timeline-status="${step.status_label || workflowSessionStatusLabel(step.status)}">
                         <div>
                             <span class="${cls}">
                                 ${step.label}
