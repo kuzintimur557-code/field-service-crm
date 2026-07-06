@@ -16253,6 +16253,8 @@ async def assert_a3_workflow_center():
     assert 'progress.textContent = "Загрузка истории..."' in body
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "workflowTimelineFilterLabel" in body
+    assert "workflowTimelineEventsUrl" in body
+    assert "Открыть события по фильтру" in body
     assert "workflowTimelineSummary" in body
     assert "Всего событий в истории:" in body
     assert "Осталось:" in body

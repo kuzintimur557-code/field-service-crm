@@ -1090,6 +1090,17 @@ function workflowTimelineFilterLabel(statusFilter) {
     return labels[statusFilter] || "Все";
 }
 
+function workflowTimelineEventsUrl(ruleId, statusFilter) {
+    const params = new URLSearchParams();
+    params.set("event_rule_id", String(ruleId));
+
+    if (statusFilter && statusFilter !== "all") {
+        params.set("event_filter", statusFilter);
+    }
+
+    return `/automation?${params.toString()}`;
+}
+
 function workflowTimelineSummary(summary, timeline) {
     if (!summary) {
         return "Всего событий: 0";
@@ -1492,6 +1503,11 @@ function renderChainTimeline(ruleId, timeline) {
              style="margin-bottom:8px;font-weight:800"></div>
         <div class="meta" style="margin-bottom:8px">
             Фильтр: ${timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)} · Показано событий: ${visibleStepsCount} / ${steps.length}
+        </div>
+        <div class="timeline-control-row" style="margin-bottom:8px">
+            <a class="back" href="${workflowTimelineEventsUrl(ruleId, statusFilter)}">
+                Открыть события по фильтру
+            </a>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:8px">
