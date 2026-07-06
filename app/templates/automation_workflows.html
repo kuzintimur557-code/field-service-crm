@@ -979,6 +979,10 @@ function workflowSessionStatusLabel(status) {
         skipped: "Пропущено",
         failed: "Ошибка",
         pending: "Ожидает",
+        completed: "Завершено",
+        awaiting_approval: "Ждёт подтверждения",
+        approved: "Одобрено",
+        rejected: "Отклонено",
     };
 
     return labels[status] || status || "-";
