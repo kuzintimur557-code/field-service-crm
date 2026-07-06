@@ -12234,7 +12234,8 @@ async def automation_page(
     event_search: str = "",
     event_entity_filter: str = "",
     event_date_from: str = "",
-    event_date_to: str = ""
+    event_date_to: str = "",
+    event_rule_id: str = ""
 ):
 
     username = get_user(request)
@@ -12273,6 +12274,12 @@ async def automation_page(
     selected_event_entity_filter = event_entity_filter if event_entity_filter in entity_labels else ""
     selected_event_date_from = (event_date_from or "").strip()[:10]
     selected_event_date_to = (event_date_to or "").strip()[:10]
+    try:
+        selected_event_rule_id = int(event_rule_id or 0)
+    except ValueError:
+        selected_event_rule_id = 0
+    if selected_event_rule_id < 0:
+        selected_event_rule_id = 0
     event_filter_sql = ""
     event_params = [company_id]
 
@@ -12288,6 +12295,10 @@ async def automation_page(
     if selected_event_filter:
         event_filter_sql = "AND automation_events.status=?"
         event_params.append(selected_event_filter)
+
+    if selected_event_rule_id:
+        event_filter_sql += "\n      AND automation_events.rule_id=?"
+        event_params.append(selected_event_rule_id)
 
     if selected_trigger_filter:
         event_filter_sql += "\n      AND automation_events.trigger_key=?"
@@ -12316,6 +12327,33 @@ async def automation_page(
     if selected_event_date_to:
         event_filter_sql += "\n      AND substr(automation_events.created_at, 1, 10) <= ?"
         event_params.append(selected_event_date_to)
+
+    event_export_params = {}
+    if selected_event_filter:
+        event_export_params["event_filter"] = selected_event_filter
+    if selected_trigger_filter:
+        event_export_params["trigger_filter"] = selected_trigger_filter
+    if selected_event_entity_filter:
+        event_export_params["event_entity_filter"] = selected_event_entity_filter
+    if selected_event_search:
+        event_export_params["event_search"] = selected_event_search
+    if selected_event_date_from:
+        event_export_params["event_date_from"] = selected_event_date_from
+    if selected_event_date_to:
+        event_export_params["event_date_to"] = selected_event_date_to
+    if selected_event_rule_id:
+        event_export_params["event_rule_id"] = selected_event_rule_id
+
+    event_export_query = (
+        "?" + urlencode(event_export_params)
+        if event_export_params
+        else ""
+    )
+    event_rule_query_suffix = (
+        f"&event_rule_id={selected_event_rule_id}"
+        if selected_event_rule_id
+        else ""
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -12523,6 +12561,9 @@ async def automation_page(
             "selected_event_entity_filter": selected_event_entity_filter,
             "selected_event_date_from": selected_event_date_from,
             "selected_event_date_to": selected_event_date_to,
+            "selected_event_rule_id": selected_event_rule_id,
+            "event_export_query": event_export_query,
+            "event_rule_query_suffix": event_rule_query_suffix,
             "automation_stats": automation_stats,
             "features": get_company_features(company_id)
         }
@@ -13298,7 +13339,8 @@ async def automation_events_export(
     event_search: str = "",
     event_entity_filter: str = "",
     event_date_from: str = "",
-    event_date_to: str = ""
+    event_date_to: str = "",
+    event_rule_id: str = ""
 ):
 
     username = get_user(request)
@@ -13325,6 +13367,12 @@ async def automation_events_export(
     selected_event_entity_filter = event_entity_filter if event_entity_filter in entity_keys else ""
     selected_event_date_from = (event_date_from or "").strip()[:10]
     selected_event_date_to = (event_date_to or "").strip()[:10]
+    try:
+        selected_event_rule_id = int(event_rule_id or 0)
+    except ValueError:
+        selected_event_rule_id = 0
+    if selected_event_rule_id < 0:
+        selected_event_rule_id = 0
     event_filter_sql = ""
     event_params = [company_id]
 
@@ -13340,6 +13388,10 @@ async def automation_events_export(
     if selected_event_filter:
         event_filter_sql = "AND automation_events.status=?"
         event_params.append(selected_event_filter)
+
+    if selected_event_rule_id:
+        event_filter_sql += "\n      AND automation_events.rule_id=?"
+        event_params.append(selected_event_rule_id)
 
     if selected_trigger_filter:
         event_filter_sql += "\n      AND automation_events.trigger_key=?"
@@ -13423,7 +13475,7 @@ async def automation_events_export(
         content,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}_{selected_event_entity_filter or 'all'}_{selected_event_search or 'all'}_{selected_event_date_from or 'from'}_{selected_event_date_to or 'to'}.csv"
+            "Content-Disposition": f"attachment; filename=automation_events_{selected_event_filter or 'all'}_{selected_trigger_filter or 'all'}_{selected_event_entity_filter or 'all'}_{selected_event_search or 'all'}_{selected_event_date_from or 'from'}_{selected_event_date_to or 'to'}_rule_{selected_event_rule_id or 'all'}.csv"
         }
     )
 

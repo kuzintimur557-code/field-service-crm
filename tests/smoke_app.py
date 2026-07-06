@@ -3677,6 +3677,29 @@ async def assert_automation_runner(task):
     assert 'href="/automation/events/export?event_filter=done"' in done_html
     assert "Все триггеры" in done_html
 
+    rule_events_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        event_rule_id=str(event["rule_id"]),
+    )
+    assert rule_events_response.status_code == 200
+    rule_events_html = rule_events_response.body.decode("utf-8")
+    assert "SLA event happened" in rule_events_html
+    assert f'name="event_rule_id" value="{event["rule_id"]}"' in rule_events_html
+    assert (
+        f'href="/automation/events/export?event_rule_id={event["rule_id"]}"'
+        in rule_events_html
+    )
+
+    rule_events_export_response = await crm.automation_events_export(
+        make_request("owner2"),
+        event_rule_id=str(event["rule_id"]),
+    )
+    assert rule_events_export_response.status_code == 200
+    assert (
+        f"rule_{event['rule_id']}.csv"
+        in rule_events_export_response.headers["Content-Disposition"]
+    )
+
     done_export_response = await crm.automation_events_export(
         make_request("owner2"),
         event_filter="done",
@@ -3715,7 +3738,7 @@ async def assert_automation_runner(task):
     trigger_filter_html = trigger_filter_response.body.decode("utf-8")
     assert 'option value="sla_overdue" selected' in trigger_filter_html
     assert "SLA event happened" in trigger_filter_html
-    assert 'href="/automation/events/export?event_filter=done&trigger_filter=sla_overdue"' in trigger_filter_html
+    assert 'href="/automation/events/export?event_filter=done&amp;trigger_filter=sla_overdue"' in trigger_filter_html
 
     trigger_export_response = await crm.automation_events_export(
         make_request("owner2"),
@@ -3737,7 +3760,7 @@ async def assert_automation_runner(task):
     assert 'option value="task" selected' in entity_filter_html
     assert 'name="event_entity_filter" value="task"' in entity_filter_html
     assert "SLA event happened" in entity_filter_html
-    assert 'href="/automation/events/export?event_filter=done&event_entity_filter=task"' in entity_filter_html
+    assert 'href="/automation/events/export?event_filter=done&amp;event_entity_filter=task"' in entity_filter_html
 
     entity_export_response = await crm.automation_events_export(
         make_request("owner2"),
@@ -3758,7 +3781,7 @@ async def assert_automation_runner(task):
     event_search_html = event_search_response.body.decode("utf-8")
     assert 'name="event_search" value="happened"' in event_search_html
     assert "SLA event happened" in event_search_html
-    assert 'href="/automation/events/export?event_filter=done&event_search=happened"' in event_search_html
+    assert 'href="/automation/events/export?event_filter=done&amp;event_search=happened"' in event_search_html
 
     event_search_export_response = await crm.automation_events_export(
         make_request("owner2"),
@@ -16239,6 +16262,7 @@ async def assert_a3_workflow_center():
     assert "data-timeline-event" in body
     assert "data-timeline-status" in body
     assert "Событие #" in body
+    assert "event_rule_id=${rule.id}" in body
     assert "Показать ещё" in body
     assert "Свернуть" in body
     assert "По выбранному фильтру событий нет" in body
