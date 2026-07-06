@@ -559,7 +559,12 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
 }
 
 function renderWorkflowApprovalHistorySummary(summary) {
-    const activeFiltersCount = getWorkflowApprovalHistoryActiveFilterCount();
+    const activeFilterLabels = Array.isArray(summary.active_filter_labels)
+        ? summary.active_filter_labels
+        : [];
+    const activeFiltersCount = Number(
+        summary.active_filters_count || activeFilterLabels.length || 0
+    );
 
     return `
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -574,34 +579,9 @@ function renderWorkflowApprovalHistorySummary(summary) {
                     Активных фильтров: ${activeFiltersCount}
                 </span>
             ` : ""}
-            ${summary.date_from || summary.date_to ? `
-                <span class="pill">
-                    Период: ${summary.period_label || "Выбранный период"}
-                    ${summary.period_label === "Выбранный период"
-                        ? `(${summary.date_from || "начало"} - ${summary.date_to || "сегодня"})`
-                        : ""}
-                </span>
-            ` : ""}
-            ${summary.action_label && summary.action_type !== "all" ? `
-                <span class="pill">
-                    Действие: ${summary.action_label}
-                </span>
-            ` : ""}
-            ${summary.target_type_label && summary.target_type !== "all" ? `
-                <span class="pill">
-                    Тип цели: ${summary.target_type_label}
-                </span>
-            ` : ""}
-            ${summary.decided_by ? `
-                <span class="pill">
-                    Кто решил: ${summary.decided_by_label}
-                </span>
-            ` : ""}
-            ${summary.target_id ? `
-                <span class="pill">
-                    Цель: #${summary.target_id}
-                </span>
-            ` : ""}
+            ${activeFilterLabels.map(label => `
+                <span class="pill">${label}</span>
+            `).join("")}
         </div>
     `;
 }

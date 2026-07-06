@@ -554,7 +554,8 @@ async def assert_automation_page():
     assert '.approval-history-filters select,.approval-history-filters input' in html
     assert "summary.history_limit_label" in html
     assert "Последние 100 решений" in html
-    assert "summary.period_label" in html
+    assert "summary.active_filter_labels" in html
+    assert "summary.active_filters_count" in html
     assert "decision_label" in html
     assert "decided_by_label" in html
     assert "item.action_label" in html
@@ -589,7 +590,7 @@ async def assert_automation_page():
     assert "Все действия" in html
     assert "Все цели" in html
     assert "AI-действия" in html
-    assert "Тип цели:" in html
+    assert "activeFilterLabels.map" in html
     assert "Отключить правило" in html
     assert "Повторить события" in html
     assert 'a3ApprovalHistoryActionType === "recovery_cycle"' in html
@@ -16043,7 +16044,8 @@ async def assert_a3_workflow_center():
     assert "Отклонено:" in body
     assert "summary.history_limit_label" in body
     assert "Последние 100 решений" in body
-    assert "summary.period_label" in body
+    assert "summary.active_filter_labels" in body
+    assert "summary.active_filters_count" in body
     assert "decision_label" in body
     assert "item.action_label" in body
     assert "item.target_label" in body
@@ -16079,7 +16081,7 @@ async def assert_a3_workflow_center():
     assert "Все действия" in body
     assert "Все цели" in body
     assert "AI-действия" in body
-    assert "Тип цели:" in body
+    assert "activeFilterLabels.map" in body
     assert "Отключить правило" in body
     assert "Повторить события" in body
     assert "recovery_cycle: \"Запустить восстановление\"" in body
@@ -16841,6 +16843,8 @@ async def assert_a3_api_layer():
     assert invalid_filter_history["summary"]["date_from"] is None
     assert invalid_filter_history["summary"]["date_to"] is None
     assert invalid_filter_history["summary"]["period_label"] == "За всё время"
+    assert invalid_filter_history["summary"]["active_filters_count"] == 0
+    assert invalid_filter_history["summary"]["active_filter_labels"] == []
 
     action_filtered_history = crm.api_a3_approval_history(
         make_asgi_request(
@@ -16896,6 +16900,10 @@ async def assert_a3_api_layer():
         target_type_filtered_history["summary"]["target_type_label"]
         == "Правило автоматизации"
     )
+    assert target_type_filtered_history["summary"]["active_filters_count"] == 1
+    assert target_type_filtered_history["summary"]["active_filter_labels"] == [
+        "Тип цели: Правило автоматизации",
+    ]
     assert any(
         item["action_id"] == approve_action_id
         for item in target_type_filtered_history["items"]
@@ -16992,6 +17000,14 @@ async def assert_a3_api_layer():
     assert dated_history["summary"]["date_from"] == today_filter
     assert dated_history["summary"]["date_to"] == today_filter
     assert dated_history["summary"]["period_label"] == "Сегодня"
+    assert dated_history["summary"]["active_filters_count"] == 5
+    assert dated_history["summary"]["active_filter_labels"] == [
+        "Решение: Одобренные",
+        "Действие: Отключить правило",
+        "Кто решил: owner2",
+        f"Цель: #{disabled_unhealthy_rule_id}",
+        "Период: Сегодня",
+    ]
     assert any(
         item["action_id"] == approve_action_id
         for item in dated_history["items"]

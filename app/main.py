@@ -35503,6 +35503,9 @@ def api_a3_approval_history(request: Request):
         ),
         "target_id": filters["target_id"],
     }
+    active_filter_labels = build_a3_approval_active_filter_labels(filters)
+    summary["active_filters_count"] = len(active_filter_labels)
+    summary["active_filter_labels"] = active_filter_labels
 
     for item in items:
         if item.get("decision") == "approved":
@@ -35655,6 +35658,45 @@ def build_a3_approval_export_filter_rows(filters, items_count=None):
         ],
         [],
     ]
+
+
+def build_a3_approval_active_filter_labels(filters):
+    labels = []
+
+    if filters["decision"] != "all":
+        labels.append(
+            f"Решение: {get_a3_approval_decision_label(filters['decision'])}"
+        )
+
+    if filters["action_type"] != "all":
+        labels.append(f"Действие: {action_label(filters['action_type'])}")
+
+    if filters["target_type"] != "all":
+        labels.append(f"Тип цели: {target_label(filters['target_type'])}")
+
+    if filters["decided_by"]:
+        labels.append(
+            f"Кто решил: {get_a3_approval_actor_label(filters['decided_by'])}"
+        )
+
+    if filters["target_id"]:
+        labels.append(f"Цель: #{filters['target_id']}")
+
+    if filters["date_from"] or filters["date_to"]:
+        period_label = get_a3_approval_period_label(
+            filters["date_from"],
+            filters["date_to"],
+        )
+        if period_label == "Выбранный период":
+            labels.append(
+                "Период: "
+                f"{filters['date_from'] or 'начало'} - "
+                f"{filters['date_to'] or 'сегодня'}"
+            )
+        else:
+            labels.append(f"Период: {period_label}")
+
+    return labels
 
 
 def get_a3_approval_decision_label(value):
