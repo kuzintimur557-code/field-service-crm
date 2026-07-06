@@ -543,6 +543,7 @@ async def assert_automation_page():
     assert "Небезопасные:" in html
     assert "Защищённые:" in html
     assert "Правило:" in html
+    assert "item.target_name" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15967,6 +15968,7 @@ async def assert_a3_workflow_center():
     assert "Небезопасные:" in body
     assert "Защищённые:" in body
     assert "Правило:" in body
+    assert "item.target_name" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
@@ -16610,11 +16612,15 @@ async def assert_a3_api_layer():
     assert any(
         item["action_id"] == approve_action_id
         and item["decision"] == "approved"
+        and item["target_name"] == "A3 disabled unhealthy smoke"
+        and item["target_active"] == 0
         for item in approval_history["items"]
     )
     assert any(
         item["action_id"] == reject_action_id
         and item["decision"] == "rejected"
+        and item["target_name"] == "A3 disabled unhealthy smoke"
+        and item["target_active"] == 0
         for item in approval_history["items"]
     )
 

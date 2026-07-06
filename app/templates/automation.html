@@ -1717,6 +1717,12 @@ async function loadA3ApprovalHistory() {
                             #${item.target_id || "-"}
                         </div>
 
+                        ${item.target_name ? `
+                            <div class="meta" style="margin-top:6px">
+                                Правило: ${item.target_name}
+                            </div>
+                        ` : ""}
+
                         <div style="margin-top:8px">
                             <span class="pill">
                                 ${a3DecisionLabel(item.decision)}

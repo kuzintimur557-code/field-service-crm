@@ -199,11 +199,18 @@ def get_approval_history(company_id):
             autonomous_action_approvals.action_queue_id AS action_id,
             autonomous_action_queue.action_type,
             autonomous_action_queue.target_type,
-            autonomous_action_queue.target_id
+            autonomous_action_queue.target_id,
+            automation_rules.name AS target_name,
+            automation_rules.active AS target_active
         FROM autonomous_action_approvals
         LEFT JOIN autonomous_action_queue
           ON autonomous_action_queue.id =
              autonomous_action_approvals.action_queue_id
+        LEFT JOIN automation_rules
+          ON automation_rules.company_id =
+             autonomous_action_approvals.company_id
+         AND automation_rules.id = autonomous_action_queue.target_id
+         AND autonomous_action_queue.target_type='automation_rule'
         WHERE autonomous_action_approvals.company_id=?
         ORDER BY autonomous_action_approvals.id DESC
         LIMIT 100

@@ -284,6 +284,7 @@ async function loadWorkflowApprovalHistory() {
                     ${workflowApprovalActionLabel(item.action_type)}
                     для ${workflowApprovalTargetLabel(item.target_type)}
                     #${item.target_id || "-"}
+                    ${item.target_name ? "· Правило: " + item.target_name : ""}
                     · ${item.created_at || ""}
                 </div>
             `;
