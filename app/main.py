@@ -35525,6 +35525,7 @@ def api_a3_approval_history_export(request: Request):
     )
 
     output = io.StringIO()
+    output.write("\ufeff")
     writer = csv.writer(output)
     writer.writerow([
         "ID решения",

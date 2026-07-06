@@ -16973,6 +16973,7 @@ async def assert_a3_api_layer():
     assert approved_export.status_code == 200
     assert approved_export.media_type == "text/csv; charset=utf-8"
     approved_export_body = approved_export.body.decode("utf-8")
+    assert approved_export_body.startswith("\ufeff")
     assert "ID решения,ID действия,Решение" in approved_export_body
     assert "Одобрено" in approved_export_body
     assert "Отключить правило" in approved_export_body
