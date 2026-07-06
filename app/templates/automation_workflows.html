@@ -281,7 +281,9 @@ async function loadWorkflowApprovalHistory() {
         container.innerHTML = `
             ${renderWorkflowApprovalHistorySummary(summary)}
             ${items.slice(0, 3).map(item => {
-            const decision = item.decision === "approved" ? "Одобрено" : "Отклонено";
+            const decision = item.decision_label || (
+                item.decision === "approved" ? "Одобрено" : "Отклонено"
+            );
             const cls = item.decision === "approved" ? "ok" : "off";
 
             return `

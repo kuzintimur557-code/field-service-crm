@@ -218,4 +218,21 @@ def get_approval_history(company_id):
 
     conn.close()
 
-    return [dict(row) for row in rows]
+    items = []
+
+    for row in rows:
+        item = dict(row)
+        decision = item.get("decision")
+        decided_by = item.get("decided_by") or "system"
+
+        item["decision_label"] = {
+            "approved": "Одобрено",
+            "rejected": "Отклонено",
+        }.get(decision, decision or "Решение не указано")
+        item["decided_by_label"] = (
+            "Система" if decided_by == "system" else decided_by
+        )
+
+        items.append(item)
+
+    return items

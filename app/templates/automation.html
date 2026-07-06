@@ -1729,7 +1729,7 @@ async function loadA3ApprovalHistory() {
 
                         <div style="margin-top:8px">
                             <span class="pill">
-                                ${a3DecisionLabel(item.decision)}
+                                ${item.decision_label || a3DecisionLabel(item.decision)}
                             </span>
                         </div>
 
@@ -1740,7 +1740,7 @@ async function loadA3ApprovalHistory() {
 
                     <div style="text-align:right">
                         <div class="meta">
-                            ${a3ActorLabel(item.decided_by)}
+                            ${item.decided_by_label || a3ActorLabel(item.decided_by)}
                         </div>
 
                         <div class="meta" style="margin-top:8px">

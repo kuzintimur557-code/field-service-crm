@@ -548,6 +548,8 @@ async def assert_automation_page():
     assert "Всего решений:" in html
     assert "Одобрено:" in html
     assert "Отклонено:" in html
+    assert "decision_label" in html
+    assert "decided_by_label" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15977,6 +15979,7 @@ async def assert_a3_workflow_center():
     assert "Всего решений:" in body
     assert "Одобрено:" in body
     assert "Отклонено:" in body
+    assert "decision_label" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
@@ -16624,6 +16627,8 @@ async def assert_a3_api_layer():
     assert any(
         item["action_id"] == approve_action_id
         and item["decision"] == "approved"
+        and item["decision_label"] == "Одобрено"
+        and item["decided_by_label"] == "owner2"
         and item["target_name"] == "A3 disabled unhealthy smoke"
         and item["target_active"] == 0
         for item in approval_history["items"]
@@ -16631,6 +16636,8 @@ async def assert_a3_api_layer():
     assert any(
         item["action_id"] == reject_action_id
         and item["decision"] == "rejected"
+        and item["decision_label"] == "Отклонено"
+        and item["decided_by_label"] == "owner2"
         and item["target_name"] == "A3 disabled unhealthy smoke"
         and item["target_active"] == 0
         for item in approval_history["items"]
