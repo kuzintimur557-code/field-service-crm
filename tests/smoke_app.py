@@ -812,6 +812,8 @@ async def assert_automation_page():
     assert "Проверка" in builder_html
     assert "Проверка выполнения" in builder_html
     assert "События, диагностика и подтверждения" in builder_html
+    assert "события и повторное воспроизведение" in builder_html
+    assert "события и replay" not in builder_html
     assert "Runtime debug" not in builder_html
     assert "Открыть выполнение" in builder_html
     assert "Открыть runtime" not in builder_html
