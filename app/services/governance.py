@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from app.database import connect
 
@@ -98,6 +99,18 @@ def save_governance_settings(
 def get_approval_queue(company_id):
     require_company_id(company_id)
 
+    governance = get_governance_settings(company_id)
+
+    try:
+        protected_rules = {
+            int(rule_id)
+            for rule_id in json.loads(
+                governance.get("protected_rules_json") or "[]"
+            )
+        }
+    except Exception:
+        protected_rules = set()
+
     conn = connect()
     c = conn.cursor()
 
@@ -110,9 +123,64 @@ def get_approval_queue(company_id):
         LIMIT 100
     """, (company_id,)).fetchall()
 
+    rule_ids = [
+        row["target_id"]
+        for row in rows
+        if row["target_type"] == "automation_rule" and row["target_id"]
+    ]
+
+    existing_rule_ids = set()
+
+    if rule_ids:
+        placeholders = ",".join("?" for _ in rule_ids)
+        existing_rule_ids = {
+            row["id"]
+            for row in c.execute(f"""
+                SELECT id
+                FROM automation_rules
+                WHERE company_id=?
+                  AND id IN ({placeholders})
+            """, (
+                company_id,
+                *rule_ids,
+            )).fetchall()
+        }
+
     conn.close()
 
-    return [dict(row) for row in rows]
+    items = []
+
+    for row in rows:
+        item = dict(row)
+        reason = "ready"
+        label = "Можно подтвердить"
+        safe = True
+
+        if (
+            item["action_type"] != "disable_rule"
+            or item["target_type"] != "automation_rule"
+        ):
+            reason = "unsupported_action"
+            label = "Неподдерживаемое действие"
+            safe = False
+        elif item["target_id"] in protected_rules:
+            reason = "protected_rule"
+            label = "Защищённое правило"
+            safe = False
+        elif item["target_id"] not in existing_rule_ids:
+            reason = "missing_target"
+            label = "Цель не найдена"
+            safe = False
+
+        item["approval_safety"] = "safe" if safe else "unsafe"
+        item["approval_safety_reason"] = reason
+        item["approval_safety_label"] = label
+        item["can_bulk_approve"] = safe
+        item["can_bulk_reject"] = not safe
+
+        items.append(item)
+
+    return items
 
 
 def get_approval_history(company_id):

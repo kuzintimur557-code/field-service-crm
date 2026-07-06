@@ -215,6 +215,11 @@ async function loadWorkflowApprovalQueue() {
                         <div class="meta" style="margin-top:6px">
                             ${workflowApprovalTargetLabel(item.target_type)} #${item.target_id || "-"} · ${item.created_at || ""}
                         </div>
+                        <div style="margin-top:8px">
+                            <span class="pill ${item.approval_safety === "safe" ? "ok" : "off"}">
+                                ${item.approval_safety_label || "Требует проверки"}
+                            </span>
+                        </div>
                     </div>
                     <div class="workflow-card-actions">
                         <button class="back" onclick="approveWorkflowAction(${item.id})">Одобрить</button>

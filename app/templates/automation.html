@@ -1538,6 +1538,12 @@ async function loadA3ApprovalQueue() {
                         <div class="meta" style="margin-top:8px">
                             ${item.created_at}
                         </div>
+
+                        <div style="margin-top:10px">
+                            <span class="pill ${item.approval_safety === "safe" ? "ok" : "off"}">
+                                ${item.approval_safety_label || "Требует проверки"}
+                            </span>
+                        </div>
                     </div>
 
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">

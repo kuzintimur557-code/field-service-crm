@@ -536,6 +536,8 @@ async def assert_automation_page():
     assert "Отклонить небезопасные" in html
     assert "rejectUnsafeA3Actions" in html
     assert "/api/a3/autonomous-actions/reject-unsafe" in html
+    assert "approval_safety_label" in html
+    assert "Требует проверки" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15953,6 +15955,8 @@ async def assert_a3_workflow_center():
     assert "Одобрить безопасные" in body
     assert "rejectUnsafeWorkflowActions" in body
     assert "Отклонить небезопасные" in body
+    assert "approval_safety_label" in body
+    assert "Требует проверки" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
@@ -16547,6 +16551,17 @@ async def assert_a3_api_layer():
     assert "items" in approval_queue
     assert any(item["id"] == approve_action_id for item in approval_queue["items"])
     assert any(item["id"] == reject_action_id for item in approval_queue["items"])
+    approval_queue_items = {
+        item["id"]: item
+        for item in approval_queue["items"]
+    }
+    assert approval_queue_items[approve_action_id]["approval_safety"] == "safe"
+    assert (
+        approval_queue_items[approve_action_id]["approval_safety_label"]
+        == "Можно подтвердить"
+    )
+    assert approval_queue_items[approve_action_id]["can_bulk_approve"] is True
+    assert approval_queue_items[approve_action_id]["can_bulk_reject"] is False
 
     approve_result = crm.api_a3_approve_autonomous_action(request, approve_action_id)
     assert approve_result["ok"] is True
@@ -17049,6 +17064,27 @@ async def assert_a3_api_layer():
     bulk_unsupported_action_id = c.lastrowid
     conn.commit()
     conn.close()
+
+    bulk_approval_queue = crm.api_a3_approval_queue(request)
+    bulk_approval_items = {
+        item["id"]: item
+        for item in bulk_approval_queue["items"]
+    }
+    assert (
+        bulk_approval_items[bulk_safe_action_id]["approval_safety_label"]
+        == "Можно подтвердить"
+    )
+    assert (
+        bulk_approval_items[bulk_protected_action_id]["approval_safety_label"]
+        == "Защищённое правило"
+    )
+    assert (
+        bulk_approval_items[bulk_unsupported_action_id]["approval_safety_label"]
+        == "Неподдерживаемое действие"
+    )
+    assert bulk_approval_items[bulk_safe_action_id]["can_bulk_approve"] is True
+    assert bulk_approval_items[bulk_protected_action_id]["can_bulk_reject"] is True
+    assert bulk_approval_items[bulk_unsupported_action_id]["can_bulk_reject"] is True
 
     bulk_approval = crm.api_a3_approve_safe_autonomous_actions(request)
     assert bulk_approval["ok"] is True
