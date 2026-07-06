@@ -1929,6 +1929,9 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                 <option value="retry_events" ${a3ApprovalHistoryActionType === "retry_events" ? "selected" : ""}>
                     Повторить события
                 </option>
+                <option value="recovery_cycle" ${a3ApprovalHistoryActionType === "recovery_cycle" ? "selected" : ""}>
+                    Запустить восстановление
+                </option>
             </select>
             <input id="a3-approval-decided-by"
                    type="text"

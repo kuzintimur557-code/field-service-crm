@@ -583,6 +583,7 @@ async def assert_automation_page():
     assert "Все действия" in html
     assert "Отключить правило" in html
     assert "Повторить события" in html
+    assert 'a3ApprovalHistoryActionType === "recovery_cycle"' in html
     assert "Сегодня" in html
     assert "7 дней" in html
     assert "30 дней" in html
@@ -16063,6 +16064,8 @@ async def assert_a3_workflow_center():
     assert "Все действия" in body
     assert "Отключить правило" in body
     assert "Повторить события" in body
+    assert "recovery_cycle: \"Запустить восстановление\"" in body
+    assert 'workflowApprovalHistoryActionType === "recovery_cycle"' in body
     assert "Сегодня" in body
     assert "7 дней" in body
     assert "30 дней" in body
@@ -16838,6 +16841,18 @@ async def assert_a3_api_layer():
     assert all(
         item["action_type"] == "disable_rule"
         for item in action_filtered_history["items"]
+    )
+
+    recovery_action_filtered_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "action_type=recovery_cycle",
+        )
+    )
+    assert (
+        recovery_action_filtered_history["summary"]["action_label"]
+        == "Запустить восстановление"
     )
 
     invalid_action_filtered_history = crm.api_a3_approval_history(

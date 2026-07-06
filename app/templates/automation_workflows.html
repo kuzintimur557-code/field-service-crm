@@ -204,6 +204,7 @@ function workflowApprovalActionLabel(actionType) {
     const labels = {
         disable_rule: "Отключить правило",
         retry_events: "Повторить события",
+        recovery_cycle: "Запустить восстановление",
     };
 
     return labels[actionType] || actionType || "-";
@@ -472,6 +473,9 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
                 </option>
                 <option value="retry_events" ${workflowApprovalHistoryActionType === "retry_events" ? "selected" : ""}>
                     Повторить события
+                </option>
+                <option value="recovery_cycle" ${workflowApprovalHistoryActionType === "recovery_cycle" ? "selected" : ""}>
+                    Запустить восстановление
                 </option>
             </select>
             <input id="workflow-approval-decided-by"
