@@ -16014,6 +16014,8 @@ async def assert_a3_workflow_center():
     assert "workflow-approval-queue" in body
     assert "workflow-approval-history" in body
     assert ".back.off" in body
+    assert ".workflow-card-actions select" in body
+    assert ".workflow-card-actions select," in body
     assert "loadWorkflowApprovalQueue" in body
     assert "loadWorkflowApprovalHistory" in body
     assert "approveWorkflowAction" in body
