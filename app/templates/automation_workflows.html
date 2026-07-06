@@ -1365,10 +1365,11 @@ async function loadChainTimeline(ruleId, statusFilter = null, limit = null) {
         const data = await response.json();
         const timeline = data.timeline || {};
         const nextVisibleLimit = limit ? Math.max(5, Number(limit)) : 5;
+        const nextSessionIndex = limit ? (currentState.selectedSessionIndex || 0) : 0;
 
         a3TimelineState[ruleId] = {
             timeline,
-            selectedSessionIndex: 0,
+            selectedSessionIndex: nextSessionIndex,
             selectedStatusFilter: timeline.status_filter || requestedStatusFilter,
             visibleLimit: nextVisibleLimit,
             loadedLimit: Number(timeline.limit || requestedLimit || 20),
