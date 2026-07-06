@@ -201,6 +201,17 @@ def _event_status_label(status):
     return labels.get(status or "pending", "Ожидает")
 
 
+def _execution_state_label(state):
+    labels = {
+        "active": "В работе",
+        "finished": "Завершено",
+        "warning": "Нужно внимание",
+        "problem": "Проблема",
+    }
+
+    return labels.get(state or "active", "В работе")
+
+
 def build_timeline_sessions(events):
     sessions = []
     session_map = {}
@@ -245,6 +256,7 @@ def build_timeline_sessions(events):
         session["duration_seconds"] = duration_seconds
         session["duration_label"] = _format_duration(duration_seconds)
         session["execution_state"] = _session_execution_state(session)
+        session["execution_state_label"] = _execution_state_label(session["execution_state"])
 
         if session["failed"]:
             session["status"] = "failed"
@@ -254,6 +266,8 @@ def build_timeline_sessions(events):
             session["status"] = "pending"
         else:
             session["status"] = "done"
+
+        session["status_label"] = _event_status_label(session["status"])
 
     return sessions
 

@@ -2217,6 +2217,13 @@ async def assert_automation_page():
         assert session["label"].startswith("Сессия ")
         assert " · " in session["label"]
         assert session["execution_state"] in {"active", "finished", "warning", "problem"}
+        assert session["execution_state_label"] in {
+            "В работе",
+            "Завершено",
+            "Нужно внимание",
+            "Проблема",
+        }
+        assert session["status_label"] in {"Выполнено", "Пропущено", "Ошибка", "Ожидает"}
 
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
     assert workflows_graph["ok"] is True
@@ -16151,6 +16158,8 @@ async def assert_a3_workflow_center():
     assert "Длительность:" in body
     assert "selectWorkflowSession" in body
     assert "data-session-index" in body
+    assert "session.execution_state_label || workflowExecutionStateLabel(session.execution_state)" in body
+    assert "session.status_label || workflowSessionStatusLabel(session.status)" in body
     assert "filterWorkflowTimeline" in body
     assert "setWorkflowTimelineLimit" in body
     assert "workflowTimelineFilterLabel" in body
