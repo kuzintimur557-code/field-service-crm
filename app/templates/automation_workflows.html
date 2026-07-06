@@ -532,6 +532,9 @@ function renderWorkflowApprovalHistorySummary(summary) {
             <span class="pill">Всего решений: ${summary.total || 0}</span>
             <span class="pill ok">Одобрено: ${summary.approved || 0}</span>
             <span class="pill off">Отклонено: ${summary.rejected || 0}</span>
+            <span class="pill">
+                Лимит: ${summary.history_limit_label || "Последние 100 решений"}
+            </span>
             ${activeFiltersCount ? `
                 <span class="pill">
                     Активных фильтров: ${activeFiltersCount}

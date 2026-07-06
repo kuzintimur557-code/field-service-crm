@@ -548,6 +548,8 @@ async def assert_automation_page():
     assert "Всего решений:" in html
     assert "Одобрено:" in html
     assert "Отклонено:" in html
+    assert "summary.history_limit_label" in html
+    assert "Последние 100 решений" in html
     assert "summary.period_label" in html
     assert "decision_label" in html
     assert "decided_by_label" in html
@@ -16025,6 +16027,8 @@ async def assert_a3_workflow_center():
     assert "Всего решений:" in body
     assert "Одобрено:" in body
     assert "Отклонено:" in body
+    assert "summary.history_limit_label" in body
+    assert "Последние 100 решений" in body
     assert "summary.period_label" in body
     assert "decision_label" in body
     assert "item.action_label" in body
@@ -16737,6 +16741,11 @@ async def assert_a3_api_layer():
     assert approval_history["summary"]["total"] >= 2
     assert approval_history["summary"]["approved"] >= 1
     assert approval_history["summary"]["rejected"] >= 1
+    assert approval_history["summary"]["history_limit"] == 100
+    assert (
+        approval_history["summary"]["history_limit_label"]
+        == "Последние 100 решений"
+    )
     assert any(
         item["action_id"] == approve_action_id
         and item["decision"] == "approved"

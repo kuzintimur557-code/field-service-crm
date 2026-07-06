@@ -35473,6 +35473,8 @@ def api_a3_approval_history(request: Request):
         "total": len(items),
         "approved": 0,
         "rejected": 0,
+        "history_limit": 100,
+        "history_limit_label": "Последние 100 решений",
         "filter": filters["decision"],
         "date_from": filters["date_from"],
         "date_to": filters["date_to"],
