@@ -811,6 +811,7 @@ async def assert_automation_page():
     assert "Действия" in builder_html
     assert "Проверка" in builder_html
     assert "Проверка выполнения" in builder_html
+    assert "События, диагностика и подтверждения" in builder_html
     assert "Runtime debug" not in builder_html
     assert "Открыть выполнение" in builder_html
     assert "Открыть runtime" not in builder_html
@@ -16007,7 +16008,7 @@ async def assert_a3_workflow_center():
     assert "/enable" in body
     assert "/retry-skipped" in body
     assert "Повтор пропущенных событий отправлен" in body
-    assert "AI debug рекомендации" in body
+    assert "AI-рекомендации диагностики" in body
     assert "Диагностика:" in body
     assert "Диагноз" in body
     assert "Следующий шаг:" in body
