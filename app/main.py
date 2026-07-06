@@ -12354,6 +12354,27 @@ async def automation_page(
         if selected_event_rule_id
         else ""
     )
+    event_all_params = {}
+    if selected_rule_filter:
+        event_all_params["rule_filter"] = selected_rule_filter
+    if selected_trigger_filter:
+        event_all_params["trigger_filter"] = selected_trigger_filter
+    if selected_event_entity_filter:
+        event_all_params["event_entity_filter"] = selected_event_entity_filter
+    if selected_event_search:
+        event_all_params["event_search"] = selected_event_search
+    if selected_event_date_from:
+        event_all_params["event_date_from"] = selected_event_date_from
+    if selected_event_date_to:
+        event_all_params["event_date_to"] = selected_event_date_to
+    if selected_event_rule_id:
+        event_all_params["event_rule_id"] = selected_event_rule_id
+
+    event_all_query = (
+        "?" + urlencode(event_all_params)
+        if event_all_params
+        else ""
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -12563,6 +12584,7 @@ async def automation_page(
             "selected_event_date_to": selected_event_date_to,
             "selected_event_rule_id": selected_event_rule_id,
             "event_export_query": event_export_query,
+            "event_all_query": event_all_query,
             "event_rule_query_suffix": event_rule_query_suffix,
             "automation_stats": automation_stats,
             "features": get_company_features(company_id)

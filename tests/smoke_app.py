@@ -3685,6 +3685,7 @@ async def assert_automation_runner(task):
     rule_events_html = rule_events_response.body.decode("utf-8")
     assert "SLA event happened" in rule_events_html
     assert f'name="event_rule_id" value="{event["rule_id"]}"' in rule_events_html
+    assert f'href="/automation?event_rule_id={event["rule_id"]}"' in rule_events_html
     assert (
         f'href="/automation/events/export?event_rule_id={event["rule_id"]}"'
         in rule_events_html
