@@ -57,6 +57,7 @@ def get_workflow_timeline(company_id, rule_id, limit=20):
     return {
         "rule_id": rule_id,
         "items": items,
+        "summary": build_timeline_summary(items),
         "steps": build_timeline_steps(items),
         "sessions": build_timeline_sessions(items),
     }
@@ -153,6 +154,26 @@ def _session_execution_state(session):
         return "warning"
 
     return "finished"
+
+
+def build_timeline_summary(events):
+    summary = {
+        "total": len(events),
+        "done": 0,
+        "skipped": 0,
+        "failed": 0,
+        "pending": 0,
+    }
+
+    for event in events:
+        status = event.get("status") or "pending"
+
+        if status in ("done", "skipped", "failed", "pending"):
+            summary[status] += 1
+        else:
+            summary["pending"] += 1
+
+    return summary
 
 
 def build_timeline_sessions(events):
