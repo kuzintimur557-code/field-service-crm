@@ -35569,16 +35569,7 @@ def api_a3_approval_history_export(request: Request):
             item.get("created_at") or "",
         ])
 
-    filename_parts = [
-        "a3_approval_history",
-        filters["decision"],
-        filters["action_type"],
-    ]
-
-    if filters["target_type"] != "all":
-        filename_parts.append(filters["target_type"])
-
-    filename = "_".join(filename_parts) + ".csv"
+    filename = build_a3_approval_export_filename(filters)
     return Response(
         output.getvalue(),
         media_type="text/csv; charset=utf-8",
@@ -35596,6 +35587,19 @@ def get_a3_approval_decision_filter(request: Request) -> str:
         return "all"
 
     return decision_filter
+
+
+def build_a3_approval_export_filename(filters):
+    filename_parts = [
+        "a3_approval_history",
+        filters["decision"],
+        filters["action_type"],
+    ]
+
+    if filters["target_type"] != "all":
+        filename_parts.append(filters["target_type"])
+
+    return "_".join(filename_parts) + ".csv"
 
 
 def build_a3_approval_export_filter_rows(filters):

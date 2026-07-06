@@ -17072,6 +17072,16 @@ async def assert_a3_api_layer():
     assert "Правило автоматизации" in approved_export_body
     assert "Отклонено" not in approved_export_body
     assert "A3 disabled unhealthy smoke" in approved_export_body
+    assert (
+        crm.build_a3_approval_export_filename(
+            {
+                "decision": "approved",
+                "action_type": "disable_rule",
+                "target_type": "all",
+            }
+        )
+        == "a3_approval_history_approved_disable_rule.csv"
+    )
     assert "a3_approval_history_approved_disable_rule.csv" in (
         approved_export.headers.get("content-disposition") or ""
     )
