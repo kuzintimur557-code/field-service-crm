@@ -51,6 +51,11 @@ def _automation_rule_exists(cursor, company_id, rule_id):
     )).fetchone() is not None
 
 
+def _approval_reason(reason, default):
+    value = str(reason or default).strip()
+    return (value or default)[:500]
+
+
 def enqueue_autonomous_action(
     company_id,
     action_type,
@@ -374,7 +379,12 @@ def process_autonomous_actions(company_id):
     }
 
 
-def approve_autonomous_action(company_id, action_id, decided_by="system"):
+def approve_autonomous_action(
+    company_id,
+    action_id,
+    decided_by="system",
+    reason=None,
+):
     require_company_id(company_id)
 
     conn = connect()
@@ -482,7 +492,7 @@ def approve_autonomous_action(company_id, action_id, decided_by="system"):
         action_id,
         "approved",
         decided_by,
-        "Одобрено вручную",
+        _approval_reason(reason, "Одобрено вручную"),
         datetime.now().isoformat(timespec="seconds"),
     ))
 
@@ -558,6 +568,7 @@ def approve_safe_autonomous_actions(company_id, decided_by="system", limit=50):
             company_id=company_id,
             action_id=row["id"],
             decided_by=decided_by,
+            reason="Массово одобрено: безопасное действие",
         )
 
         if approval.get("ok"):
@@ -646,18 +657,22 @@ def reject_unsafe_autonomous_actions(company_id, decided_by="system", limit=50):
 
     for row in rows:
         unsafe = False
+        rejection_reason = ""
 
         if (
             row["action_type"] != "disable_rule"
             or row["target_type"] != "automation_rule"
         ):
             unsafe = True
+            rejection_reason = "Массово отклонено: неподдерживаемое действие"
             result["unsupported"] += 1
         elif row["target_id"] in protected_rules:
             unsafe = True
+            rejection_reason = "Массово отклонено: защищённое правило"
             result["protected"] += 1
         elif row["target_id"] not in existing_rule_ids:
             unsafe = True
+            rejection_reason = "Массово отклонено: цель не найдена"
             result["missing_target"] += 1
 
         if not unsafe:
@@ -668,6 +683,7 @@ def reject_unsafe_autonomous_actions(company_id, decided_by="system", limit=50):
             company_id=company_id,
             action_id=row["id"],
             decided_by=decided_by,
+            reason=rejection_reason,
         )
 
         if rejection.get("ok"):
@@ -687,7 +703,12 @@ def reject_unsafe_autonomous_actions(company_id, decided_by="system", limit=50):
     return result
 
 
-def reject_autonomous_action(company_id, action_id, decided_by="system"):
+def reject_autonomous_action(
+    company_id,
+    action_id,
+    decided_by="system",
+    reason=None,
+):
     require_company_id(company_id)
 
     conn = connect()
@@ -726,7 +747,7 @@ def reject_autonomous_action(company_id, action_id, decided_by="system"):
         action_id,
         "rejected",
         decided_by,
-        "Отклонено вручную",
+        _approval_reason(reason, "Отклонено вручную"),
         datetime.now().isoformat(timespec="seconds"),
     ))
 

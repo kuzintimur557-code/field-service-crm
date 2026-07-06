@@ -16627,6 +16627,7 @@ async def assert_a3_api_layer():
     assert any(
         item["action_id"] == approve_action_id
         and item["decision"] == "approved"
+        and item["reason"] == "Одобрено вручную"
         and item["decision_label"] == "Одобрено"
         and item["decided_by_label"] == "owner2"
         and item["target_name"] == "A3 disabled unhealthy smoke"
@@ -16636,6 +16637,7 @@ async def assert_a3_api_layer():
     assert any(
         item["action_id"] == reject_action_id
         and item["decision"] == "rejected"
+        and item["reason"] == "Отклонено вручную"
         and item["decision_label"] == "Отклонено"
         and item["decided_by_label"] == "owner2"
         and item["target_name"] == "A3 disabled unhealthy smoke"
@@ -17167,6 +17169,13 @@ async def assert_a3_api_layer():
     assert bulk_protected_action["status"] == "awaiting_approval"
     assert bulk_unsupported_action["status"] == "awaiting_approval"
 
+    bulk_approval_history = crm.api_a3_approval_history(request)
+    assert any(
+        item["action_id"] == bulk_safe_action_id
+        and item["reason"] == "Массово одобрено: безопасное действие"
+        for item in bulk_approval_history["items"]
+    )
+
     conn = connect()
     c = conn.cursor()
     c.execute("""
@@ -17263,6 +17272,23 @@ async def assert_a3_api_layer():
     assert unsafe_rejection_protected_action["status"] == "rejected"
     assert unsafe_rejection_unsupported_action["status"] == "rejected"
     assert unsafe_rejection_missing_action["status"] == "rejected"
+
+    unsafe_rejection_history = crm.api_a3_approval_history(request)
+    assert any(
+        item["action_id"] == bulk_protected_action_id
+        and item["reason"] == "Массово отклонено: защищённое правило"
+        for item in unsafe_rejection_history["items"]
+    )
+    assert any(
+        item["action_id"] == bulk_unsupported_action_id
+        and item["reason"] == "Массово отклонено: неподдерживаемое действие"
+        for item in unsafe_rejection_history["items"]
+    )
+    assert any(
+        item["action_id"] == unsafe_rejection_missing_action_id
+        and item["reason"] == "Массово отклонено: цель не найдена"
+        for item in unsafe_rejection_history["items"]
+    )
 
     update_result = await crm.api_a3_governance_settings_update(
         make_json_request(
