@@ -35467,6 +35467,7 @@ def api_a3_approval_history(request: Request):
         date_to=filters["date_to"],
         action_type_filter=filters["action_type"],
         decided_by_filter=filters["decided_by"],
+        target_id_filter=filters["target_id"],
     )
     summary = {
         "total": len(items),
@@ -35485,6 +35486,7 @@ def api_a3_approval_history(request: Request):
         "decided_by_label": get_a3_approval_actor_label(
             filters["decided_by"]
         ),
+        "target_id": filters["target_id"],
     }
 
     for item in items:
@@ -35515,6 +35517,7 @@ def api_a3_approval_history_export(request: Request):
         date_to=filters["date_to"],
         action_type_filter=filters["action_type"],
         decided_by_filter=filters["decided_by"],
+        target_id_filter=filters["target_id"],
     )
 
     output = io.StringIO()
@@ -35582,6 +35585,9 @@ def get_a3_approval_history_filters(request: Request) -> dict:
         "decided_by": get_a3_approval_actor_filter_value(
             query_params.get("decided_by")
         ),
+        "target_id": get_a3_approval_target_id_filter_value(
+            query_params.get("target_id")
+        ),
         "date_from": get_a3_approval_date_filter_value(
             query_params.get("date_from")
         ),
@@ -35640,6 +35646,23 @@ def get_a3_approval_actor_label(value):
         return "Система"
 
     return value
+
+
+def get_a3_approval_target_id_filter_value(value):
+    value = str(value or "").strip()
+
+    if not value:
+        return None
+
+    try:
+        target_id = int(value)
+    except Exception:
+        return None
+
+    if target_id <= 0:
+        return None
+
+    return target_id
 
 
 @app.post("/api/a3/ops-timeline")

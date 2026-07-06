@@ -166,6 +166,7 @@ let chainFilter = "all";
 let workflowApprovalHistoryFilter = "all";
 let workflowApprovalHistoryActionType = "all";
 let workflowApprovalHistoryDecidedBy = "";
+let workflowApprovalHistoryTargetId = "";
 let workflowApprovalHistoryDateFrom = "";
 let workflowApprovalHistoryDateTo = "";
 
@@ -176,6 +177,10 @@ function buildWorkflowApprovalHistoryQuery() {
 
     if (workflowApprovalHistoryDecidedBy) {
         params.set("decided_by", workflowApprovalHistoryDecidedBy);
+    }
+
+    if (workflowApprovalHistoryTargetId) {
+        params.set("target_id", workflowApprovalHistoryTargetId);
     }
 
     if (workflowApprovalHistoryDateFrom) {
@@ -354,6 +359,17 @@ function clearWorkflowApprovalHistoryActorFilter() {
     loadWorkflowApprovalHistory();
 }
 
+function setWorkflowApprovalHistoryTargetFilter() {
+    workflowApprovalHistoryTargetId =
+        document.getElementById("workflow-approval-target-id")?.value || "";
+    loadWorkflowApprovalHistory();
+}
+
+function clearWorkflowApprovalHistoryTargetFilter() {
+    workflowApprovalHistoryTargetId = "";
+    loadWorkflowApprovalHistory();
+}
+
 function exportWorkflowApprovalHistory() {
     window.location.href =
         "/api/a3/approval-history/export?" + buildWorkflowApprovalHistoryQuery();
@@ -409,6 +425,17 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
             <button class="back" onclick="clearWorkflowApprovalHistoryActorFilter()">
                 Сбросить автора
             </button>
+            <input id="workflow-approval-target-id"
+                   type="number"
+                   min="1"
+                   placeholder="ID цели"
+                   value="${workflowApprovalHistoryTargetId}">
+            <button class="back" onclick="setWorkflowApprovalHistoryTargetFilter()">
+                Показать цель
+            </button>
+            <button class="back" onclick="clearWorkflowApprovalHistoryTargetFilter()">
+                Сбросить цель
+            </button>
             <input id="workflow-approval-date-from"
                    type="date"
                    value="${workflowApprovalHistoryDateFrom}">
@@ -445,6 +472,11 @@ function renderWorkflowApprovalHistorySummary(summary) {
             ${summary.decided_by ? `
                 <span class="pill">
                     Кто решил: ${summary.decided_by_label}
+                </span>
+            ` : ""}
+            ${summary.target_id ? `
+                <span class="pill">
+                    Цель: #${summary.target_id}
                 </span>
             ` : ""}
         </div>

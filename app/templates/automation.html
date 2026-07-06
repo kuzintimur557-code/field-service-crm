@@ -1667,6 +1667,7 @@ setInterval(loadA3ApprovalQueue, 30000);
 let a3ApprovalHistoryFilter = "all";
 let a3ApprovalHistoryActionType = "all";
 let a3ApprovalHistoryDecidedBy = "";
+let a3ApprovalHistoryTargetId = "";
 let a3ApprovalHistoryDateFrom = "";
 let a3ApprovalHistoryDateTo = "";
 
@@ -1677,6 +1678,10 @@ function buildA3ApprovalHistoryQuery() {
 
     if (a3ApprovalHistoryDecidedBy) {
         params.set("decided_by", a3ApprovalHistoryDecidedBy);
+    }
+
+    if (a3ApprovalHistoryTargetId) {
+        params.set("target_id", a3ApprovalHistoryTargetId);
     }
 
     if (a3ApprovalHistoryDateFrom) {
@@ -1809,6 +1814,17 @@ function clearA3ApprovalHistoryActorFilter() {
     loadA3ApprovalHistory();
 }
 
+function setA3ApprovalHistoryTargetFilter() {
+    a3ApprovalHistoryTargetId =
+        document.getElementById("a3-approval-target-id")?.value || "";
+    loadA3ApprovalHistory();
+}
+
+function clearA3ApprovalHistoryTargetFilter() {
+    a3ApprovalHistoryTargetId = "";
+    loadA3ApprovalHistory();
+}
+
 function exportA3ApprovalHistory() {
     window.location.href =
         "/api/a3/approval-history/export?" + buildA3ApprovalHistoryQuery();
@@ -1872,6 +1888,20 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                     onclick="clearA3ApprovalHistoryActorFilter()">
                 Сбросить автора
             </button>
+            <input id="a3-approval-target-id"
+                   type="number"
+                   min="1"
+                   placeholder="ID цели"
+                   value="${a3ApprovalHistoryTargetId}"
+                   style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px;max-width:120px">
+            <button class="btn off"
+                    onclick="setA3ApprovalHistoryTargetFilter()">
+                Показать цель
+            </button>
+            <button class="btn off"
+                    onclick="clearA3ApprovalHistoryTargetFilter()">
+                Сбросить цель
+            </button>
             <input id="a3-approval-date-from"
                    type="date"
                    value="${a3ApprovalHistoryDateFrom}"
@@ -1911,6 +1941,11 @@ function renderA3ApprovalHistorySummary(summary) {
             ${summary.decided_by ? `
                 <span class="pill">
                     Кто решил: ${summary.decided_by_label}
+                </span>
+            ` : ""}
+            ${summary.target_id ? `
+                <span class="pill">
+                    Цель: #${summary.target_id}
                 </span>
             ` : ""}
         </div>

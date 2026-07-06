@@ -560,12 +560,19 @@ async def assert_automation_page():
     assert "setA3ApprovalHistoryActorFilter" in html
     assert "clearA3ApprovalHistoryActorFilter" in html
     assert "a3-approval-decided-by" in html
+    assert "a3ApprovalHistoryTargetId" in html
+    assert "setA3ApprovalHistoryTargetFilter" in html
+    assert "clearA3ApprovalHistoryTargetFilter" in html
+    assert "a3-approval-target-id" in html
     assert "setA3ApprovalHistoryDateFilter" in html
     assert "clearA3ApprovalHistoryDateFilter" in html
     assert "a3-approval-date-from" in html
     assert "Кто решил" in html
     assert "Показать автора" in html
     assert "Сбросить автора" in html
+    assert "ID цели" in html
+    assert "Показать цель" in html
+    assert "Сбросить цель" in html
     assert "Все действия" in html
     assert "Отключить правило" in html
     assert "Повторить события" in html
@@ -16018,12 +16025,19 @@ async def assert_a3_workflow_center():
     assert "setWorkflowApprovalHistoryActorFilter" in body
     assert "clearWorkflowApprovalHistoryActorFilter" in body
     assert "workflow-approval-decided-by" in body
+    assert "workflowApprovalHistoryTargetId" in body
+    assert "setWorkflowApprovalHistoryTargetFilter" in body
+    assert "clearWorkflowApprovalHistoryTargetFilter" in body
+    assert "workflow-approval-target-id" in body
     assert "setWorkflowApprovalHistoryDateFilter" in body
     assert "clearWorkflowApprovalHistoryDateFilter" in body
     assert "workflow-approval-date-from" in body
     assert "Кто решил" in body
     assert "Показать автора" in body
     assert "Сбросить автора" in body
+    assert "ID цели" in body
+    assert "Показать цель" in body
+    assert "Сбросить цель" in body
     assert "Все действия" in body
     assert "Отключить правило" in body
     assert "Повторить события" in body
@@ -16760,6 +16774,7 @@ async def assert_a3_api_layer():
         invalid_filter_history["summary"]["decided_by_label"]
         == "Все пользователи"
     )
+    assert invalid_filter_history["summary"]["target_id"] is None
     assert invalid_filter_history["summary"]["date_from"] is None
     assert invalid_filter_history["summary"]["date_to"] is None
 
@@ -16820,6 +16835,35 @@ async def assert_a3_api_layer():
     )
     assert invalid_actor_filtered_history["summary"]["decided_by"] is None
 
+    target_filtered_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            f"target_id={disabled_unhealthy_rule_id}",
+        )
+    )
+    assert (
+        target_filtered_history["summary"]["target_id"]
+        == disabled_unhealthy_rule_id
+    )
+    assert any(
+        item["action_id"] == approve_action_id
+        for item in target_filtered_history["items"]
+    )
+    assert all(
+        item["target_id"] == disabled_unhealthy_rule_id
+        for item in target_filtered_history["items"]
+    )
+
+    invalid_target_filtered_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "target_id=-1",
+        )
+    )
+    assert invalid_target_filtered_history["summary"]["target_id"] is None
+
     today_filter = datetime.now().strftime("%Y-%m-%d")
     dated_history = crm.api_a3_approval_history(
         make_asgi_request(
@@ -16829,6 +16873,7 @@ async def assert_a3_api_layer():
                 "decision=approved"
                 "&action_type=disable_rule"
                 "&decided_by=owner2"
+                f"&target_id={disabled_unhealthy_rule_id}"
                 f"&date_from={today_filter}"
                 f"&date_to={today_filter}"
             ),
@@ -16837,6 +16882,7 @@ async def assert_a3_api_layer():
     assert dated_history["summary"]["filter"] == "approved"
     assert dated_history["summary"]["action_type"] == "disable_rule"
     assert dated_history["summary"]["decided_by"] == "owner2"
+    assert dated_history["summary"]["target_id"] == disabled_unhealthy_rule_id
     assert dated_history["summary"]["date_from"] == today_filter
     assert dated_history["summary"]["date_to"] == today_filter
     assert any(
@@ -16866,6 +16912,7 @@ async def assert_a3_api_layer():
                 "decision=approved"
                 "&action_type=disable_rule"
                 "&decided_by=owner2"
+                f"&target_id={disabled_unhealthy_rule_id}"
                 f"&date_from={today_filter}"
                 f"&date_to={today_filter}"
             ),
