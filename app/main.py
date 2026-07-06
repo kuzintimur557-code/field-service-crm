@@ -35476,6 +35476,10 @@ def api_a3_approval_history(request: Request):
         "filter": filters["decision"],
         "date_from": filters["date_from"],
         "date_to": filters["date_to"],
+        "period_label": get_a3_approval_period_label(
+            filters["date_from"],
+            filters["date_to"],
+        ),
         "action_type": filters["action_type"],
         "action_label": (
             "Все действия"
@@ -35609,6 +35613,36 @@ def get_a3_approval_date_filter_value(value):
         return None
 
     return value
+
+
+def get_a3_approval_period_label(date_from, date_to):
+    if not date_from and not date_to:
+        return "За всё время"
+
+    today = datetime.now().date()
+
+    if date_from and date_to:
+        try:
+            from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+            to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+        except Exception:
+            return "Выбранный период"
+
+        if from_date == today and to_date == today:
+            return "Сегодня"
+
+        if to_date == today:
+            days = (to_date - from_date).days + 1
+
+            if days in {7, 30}:
+                return f"Последние {days} дней"
+
+        return "Выбранный период"
+
+    if date_from:
+        return f"С {date_from}"
+
+    return f"До {date_to}"
 
 
 def get_a3_approval_action_type_filter_value(value):

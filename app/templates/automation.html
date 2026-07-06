@@ -2008,7 +2008,10 @@ function renderA3ApprovalHistorySummary(summary) {
             ` : ""}
             ${summary.date_from || summary.date_to ? `
                 <span class="pill">
-                    Период: ${summary.date_from || "начало"} - ${summary.date_to || "сегодня"}
+                    Период: ${summary.period_label || "Выбранный период"}
+                    ${summary.period_label === "Выбранный период"
+                        ? `(${summary.date_from || "начало"} - ${summary.date_to || "сегодня"})`
+                        : ""}
                 </span>
             ` : ""}
             ${summary.action_label && summary.action_type !== "all" ? `

@@ -548,6 +548,7 @@ async def assert_automation_page():
     assert "Всего решений:" in html
     assert "Одобрено:" in html
     assert "Отклонено:" in html
+    assert "summary.period_label" in html
     assert "decision_label" in html
     assert "decided_by_label" in html
     assert "item.action_label" in html
@@ -16023,6 +16024,7 @@ async def assert_a3_workflow_center():
     assert "Всего решений:" in body
     assert "Одобрено:" in body
     assert "Отклонено:" in body
+    assert "summary.period_label" in body
     assert "decision_label" in body
     assert "item.action_label" in body
     assert "item.target_label" in body
@@ -16795,6 +16797,7 @@ async def assert_a3_api_layer():
     assert invalid_filter_history["summary"]["target_id"] is None
     assert invalid_filter_history["summary"]["date_from"] is None
     assert invalid_filter_history["summary"]["date_to"] is None
+    assert invalid_filter_history["summary"]["period_label"] == "За всё время"
 
     action_filtered_history = crm.api_a3_approval_history(
         make_asgi_request(
@@ -16903,6 +16906,7 @@ async def assert_a3_api_layer():
     assert dated_history["summary"]["target_id"] == disabled_unhealthy_rule_id
     assert dated_history["summary"]["date_from"] == today_filter
     assert dated_history["summary"]["date_to"] == today_filter
+    assert dated_history["summary"]["period_label"] == "Сегодня"
     assert any(
         item["action_id"] == approve_action_id
         for item in dated_history["items"]
@@ -16920,6 +16924,7 @@ async def assert_a3_api_layer():
     )
     assert future_history["summary"]["date_from"] == future_filter
     assert future_history["summary"]["date_to"] is None
+    assert future_history["summary"]["period_label"] == f"С {future_filter}"
     assert future_history["summary"]["total"] == 0
 
     approved_export = crm.api_a3_approval_history_export(
