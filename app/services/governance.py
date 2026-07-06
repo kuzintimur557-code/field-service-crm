@@ -218,6 +218,7 @@ def get_approval_history(
     date_from=None,
     date_to=None,
     action_type_filter="all",
+    target_type_filter="all",
     decided_by_filter=None,
     target_id_filter=None,
 ):
@@ -228,6 +229,9 @@ def get_approval_history(
 
     if action_type_filter not in {"all", *ACTION_LABELS.keys()}:
         action_type_filter = "all"
+
+    if target_type_filter not in {"all", *TARGET_LABELS.keys()}:
+        target_type_filter = "all"
 
     conn = connect()
     c = conn.cursor()
@@ -250,6 +254,10 @@ def get_approval_history(
     if action_type_filter != "all":
         where_sql += " AND autonomous_action_queue.action_type=?"
         params.append(action_type_filter)
+
+    if target_type_filter != "all":
+        where_sql += " AND autonomous_action_queue.target_type=?"
+        params.append(target_type_filter)
 
     if decided_by_filter:
         where_sql += " AND autonomous_action_approvals.decided_by=?"

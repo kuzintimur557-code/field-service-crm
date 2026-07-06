@@ -166,6 +166,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 let chainFilter = "all";
 let workflowApprovalHistoryFilter = "all";
 let workflowApprovalHistoryActionType = "all";
+let workflowApprovalHistoryTargetType = "all";
 let workflowApprovalHistoryDecidedBy = "";
 let workflowApprovalHistoryTargetId = "";
 let workflowApprovalHistoryDateFrom = "";
@@ -175,6 +176,7 @@ function buildWorkflowApprovalHistoryQuery() {
     const params = new URLSearchParams();
     params.set("decision", workflowApprovalHistoryFilter);
     params.set("action_type", workflowApprovalHistoryActionType);
+    params.set("target_type", workflowApprovalHistoryTargetType);
 
     if (workflowApprovalHistoryDecidedBy) {
         params.set("decided_by", workflowApprovalHistoryDecidedBy);
@@ -352,6 +354,11 @@ function setWorkflowApprovalHistoryActionType(actionType) {
     loadWorkflowApprovalHistory();
 }
 
+function setWorkflowApprovalHistoryTargetType(targetType) {
+    workflowApprovalHistoryTargetType = targetType || "all";
+    loadWorkflowApprovalHistory();
+}
+
 function setWorkflowApprovalHistoryActorFilter() {
     workflowApprovalHistoryDecidedBy =
         document.getElementById("workflow-approval-decided-by")?.value || "";
@@ -415,6 +422,7 @@ function setWorkflowApprovalHistoryQuickPeriod(days) {
 function resetWorkflowApprovalHistoryFilters() {
     workflowApprovalHistoryFilter = "all";
     workflowApprovalHistoryActionType = "all";
+    workflowApprovalHistoryTargetType = "all";
     workflowApprovalHistoryDecidedBy = "";
     workflowApprovalHistoryTargetId = "";
     workflowApprovalHistoryDateFrom = "";
@@ -430,6 +438,10 @@ function getWorkflowApprovalHistoryActiveFilterCount() {
     }
 
     if (workflowApprovalHistoryActionType !== "all") {
+        count += 1;
+    }
+
+    if (workflowApprovalHistoryTargetType !== "all") {
         count += 1;
     }
 
@@ -478,6 +490,20 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
                 </option>
                 <option value="recovery_cycle" ${workflowApprovalHistoryActionType === "recovery_cycle" ? "selected" : ""}>
                     Запустить восстановление
+                </option>
+            </select>
+            <select onchange="setWorkflowApprovalHistoryTargetType(this.value)">
+                <option value="all" ${workflowApprovalHistoryTargetType === "all" ? "selected" : ""}>
+                    Все цели
+                </option>
+                <option value="automation_rule" ${workflowApprovalHistoryTargetType === "automation_rule" ? "selected" : ""}>
+                    Правила
+                </option>
+                <option value="automation_event" ${workflowApprovalHistoryTargetType === "automation_event" ? "selected" : ""}>
+                    События
+                </option>
+                <option value="autonomous_action" ${workflowApprovalHistoryTargetType === "autonomous_action" ? "selected" : ""}>
+                    AI-действия
                 </option>
             </select>
             <input id="workflow-approval-decided-by"
@@ -557,6 +583,11 @@ function renderWorkflowApprovalHistorySummary(summary) {
             ${summary.action_label && summary.action_type !== "all" ? `
                 <span class="pill">
                     Действие: ${summary.action_label}
+                </span>
+            ` : ""}
+            ${summary.target_type_label && summary.target_type !== "all" ? `
+                <span class="pill">
+                    Тип цели: ${summary.target_type_label}
                 </span>
             ` : ""}
             ${summary.decided_by ? `

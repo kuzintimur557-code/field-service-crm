@@ -1667,6 +1667,7 @@ setInterval(loadA3ApprovalQueue, 30000);
 <script>
 let a3ApprovalHistoryFilter = "all";
 let a3ApprovalHistoryActionType = "all";
+let a3ApprovalHistoryTargetType = "all";
 let a3ApprovalHistoryDecidedBy = "";
 let a3ApprovalHistoryTargetId = "";
 let a3ApprovalHistoryDateFrom = "";
@@ -1676,6 +1677,7 @@ function buildA3ApprovalHistoryQuery() {
     const params = new URLSearchParams();
     params.set("decision", a3ApprovalHistoryFilter);
     params.set("action_type", a3ApprovalHistoryActionType);
+    params.set("target_type", a3ApprovalHistoryTargetType);
 
     if (a3ApprovalHistoryDecidedBy) {
         params.set("decided_by", a3ApprovalHistoryDecidedBy);
@@ -1804,6 +1806,11 @@ function setA3ApprovalHistoryActionType(actionType) {
     loadA3ApprovalHistory();
 }
 
+function setA3ApprovalHistoryTargetType(targetType) {
+    a3ApprovalHistoryTargetType = targetType || "all";
+    loadA3ApprovalHistory();
+}
+
 function setA3ApprovalHistoryActorFilter() {
     a3ApprovalHistoryDecidedBy =
         document.getElementById("a3-approval-decided-by")?.value || "";
@@ -1867,6 +1874,7 @@ function setA3ApprovalHistoryQuickPeriod(days) {
 function resetA3ApprovalHistoryFilters() {
     a3ApprovalHistoryFilter = "all";
     a3ApprovalHistoryActionType = "all";
+    a3ApprovalHistoryTargetType = "all";
     a3ApprovalHistoryDecidedBy = "";
     a3ApprovalHistoryTargetId = "";
     a3ApprovalHistoryDateFrom = "";
@@ -1882,6 +1890,10 @@ function getA3ApprovalHistoryActiveFilterCount() {
     }
 
     if (a3ApprovalHistoryActionType !== "all") {
+        count += 1;
+    }
+
+    if (a3ApprovalHistoryTargetType !== "all") {
         count += 1;
     }
 
@@ -1932,6 +1944,21 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                 </option>
                 <option value="recovery_cycle" ${a3ApprovalHistoryActionType === "recovery_cycle" ? "selected" : ""}>
                     Запустить восстановление
+                </option>
+            </select>
+            <select onchange="setA3ApprovalHistoryTargetType(this.value)"
+                    style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px">
+                <option value="all" ${a3ApprovalHistoryTargetType === "all" ? "selected" : ""}>
+                    Все цели
+                </option>
+                <option value="automation_rule" ${a3ApprovalHistoryTargetType === "automation_rule" ? "selected" : ""}>
+                    Правила
+                </option>
+                <option value="automation_event" ${a3ApprovalHistoryTargetType === "automation_event" ? "selected" : ""}>
+                    События
+                </option>
+                <option value="autonomous_action" ${a3ApprovalHistoryTargetType === "autonomous_action" ? "selected" : ""}>
+                    AI-действия
                 </option>
             </select>
             <input id="a3-approval-decided-by"
@@ -2024,6 +2051,11 @@ function renderA3ApprovalHistorySummary(summary) {
             ${summary.action_label && summary.action_type !== "all" ? `
                 <span class="pill">
                     Действие: ${summary.action_label}
+                </span>
+            ` : ""}
+            ${summary.target_type_label && summary.target_type !== "all" ? `
+                <span class="pill">
+                    Тип цели: ${summary.target_type_label}
                 </span>
             ` : ""}
             ${summary.decided_by ? `

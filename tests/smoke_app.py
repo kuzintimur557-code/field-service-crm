@@ -560,6 +560,8 @@ async def assert_automation_page():
     assert "buildA3ApprovalHistoryQuery" in html
     assert "a3ApprovalHistoryActionType" in html
     assert "setA3ApprovalHistoryActionType" in html
+    assert "a3ApprovalHistoryTargetType" in html
+    assert "setA3ApprovalHistoryTargetType" in html
     assert "a3ApprovalHistoryDecidedBy" in html
     assert "setA3ApprovalHistoryActorFilter" in html
     assert "clearA3ApprovalHistoryActorFilter" in html
@@ -582,6 +584,9 @@ async def assert_automation_page():
     assert "Показать цель" in html
     assert "Сбросить цель" in html
     assert "Все действия" in html
+    assert "Все цели" in html
+    assert "AI-действия" in html
+    assert "Тип цели:" in html
     assert "Отключить правило" in html
     assert "Повторить события" in html
     assert 'a3ApprovalHistoryActionType === "recovery_cycle"' in html
@@ -16043,6 +16048,8 @@ async def assert_a3_workflow_center():
     assert "buildWorkflowApprovalHistoryQuery" in body
     assert "workflowApprovalHistoryActionType" in body
     assert "setWorkflowApprovalHistoryActionType" in body
+    assert "workflowApprovalHistoryTargetType" in body
+    assert "setWorkflowApprovalHistoryTargetType" in body
     assert "workflowApprovalHistoryDecidedBy" in body
     assert "setWorkflowApprovalHistoryActorFilter" in body
     assert "clearWorkflowApprovalHistoryActorFilter" in body
@@ -16065,6 +16072,9 @@ async def assert_a3_workflow_center():
     assert "Показать цель" in body
     assert "Сбросить цель" in body
     assert "Все действия" in body
+    assert "Все цели" in body
+    assert "AI-действия" in body
+    assert "Тип цели:" in body
     assert "Отключить правило" in body
     assert "Повторить события" in body
     assert "recovery_cycle: \"Запустить восстановление\"" in body
@@ -16815,6 +16825,8 @@ async def assert_a3_api_layer():
     assert invalid_filter_history["summary"]["filter"] == "all"
     assert invalid_filter_history["summary"]["action_type"] == "all"
     assert invalid_filter_history["summary"]["action_label"] == "Все действия"
+    assert invalid_filter_history["summary"]["target_type"] == "all"
+    assert invalid_filter_history["summary"]["target_type_label"] == "Все цели"
     assert invalid_filter_history["summary"]["decided_by"] is None
     assert (
         invalid_filter_history["summary"]["decided_by_label"]
@@ -16866,6 +16878,36 @@ async def assert_a3_api_layer():
         )
     )
     assert invalid_action_filtered_history["summary"]["action_type"] == "all"
+
+    target_type_filtered_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "target_type=automation_rule",
+        )
+    )
+    assert target_type_filtered_history["summary"]["target_type"] == "automation_rule"
+    assert (
+        target_type_filtered_history["summary"]["target_type_label"]
+        == "Правило автоматизации"
+    )
+    assert any(
+        item["action_id"] == approve_action_id
+        for item in target_type_filtered_history["items"]
+    )
+    assert all(
+        item["target_type"] == "automation_rule"
+        for item in target_type_filtered_history["items"]
+    )
+
+    invalid_target_type_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "target_type=bad",
+        )
+    )
+    assert invalid_target_type_history["summary"]["target_type"] == "all"
 
     actor_filtered_history = crm.api_a3_approval_history(
         make_asgi_request(

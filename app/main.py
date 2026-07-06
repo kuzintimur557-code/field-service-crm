@@ -22,6 +22,7 @@ from app.services.governance import (
     save_governance_settings,
     get_approval_queue,
     get_approval_history,
+    target_label,
 )
 from app.services.ops_timeline import (
     create_ops_timeline_event,
@@ -35467,6 +35468,7 @@ def api_a3_approval_history(request: Request):
         date_from=filters["date_from"],
         date_to=filters["date_to"],
         action_type_filter=filters["action_type"],
+        target_type_filter=filters["target_type"],
         decided_by_filter=filters["decided_by"],
         target_id_filter=filters["target_id"],
     )
@@ -35488,6 +35490,12 @@ def api_a3_approval_history(request: Request):
             "Все действия"
             if filters["action_type"] == "all"
             else action_label(filters["action_type"])
+        ),
+        "target_type": filters["target_type"],
+        "target_type_label": (
+            "Все цели"
+            if filters["target_type"] == "all"
+            else target_label(filters["target_type"])
         ),
         "decided_by": filters["decided_by"],
         "decided_by_label": get_a3_approval_actor_label(
@@ -35523,6 +35531,7 @@ def api_a3_approval_history_export(request: Request):
         date_from=filters["date_from"],
         date_to=filters["date_to"],
         action_type_filter=filters["action_type"],
+        target_type_filter=filters["target_type"],
         decided_by_filter=filters["decided_by"],
         target_id_filter=filters["target_id"],
     )
@@ -35600,6 +35609,9 @@ def get_a3_approval_history_filters(request: Request) -> dict:
         "action_type": get_a3_approval_action_type_filter_value(
             query_params.get("action_type")
         ),
+        "target_type": get_a3_approval_target_type_filter_value(
+            query_params.get("target_type")
+        ),
         "decided_by": get_a3_approval_actor_filter_value(
             query_params.get("decided_by")
         ),
@@ -35675,6 +35687,20 @@ def get_a3_approval_action_type_filter_value(value):
     value = str(value or "all").strip()
 
     if value not in {"all", "disable_rule", "retry_events", "recovery_cycle"}:
+        return "all"
+
+    return value
+
+
+def get_a3_approval_target_type_filter_value(value):
+    value = str(value or "all").strip()
+
+    if value not in {
+        "all",
+        "automation_rule",
+        "automation_event",
+        "autonomous_action",
+    }:
         return "all"
 
     return value
