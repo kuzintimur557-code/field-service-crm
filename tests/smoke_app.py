@@ -549,6 +549,9 @@ async def assert_automation_page():
     assert "Всего решений:" in html
     assert "Одобрено:" in html
     assert "Отклонено:" in html
+    assert ".approval-history-filters" in html
+    assert 'class="approval-history-filters"' in html
+    assert '.approval-history-filters select,.approval-history-filters input' in html
     assert "summary.history_limit_label" in html
     assert "Последние 100 решений" in html
     assert "summary.period_label" in html

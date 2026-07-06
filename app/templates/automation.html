@@ -37,9 +37,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .filters a{padding:9px 12px;border-radius:999px;background:#f3f4f6;color:#374151;text-decoration:none;font-weight:900;font-size:13px}
 .filters a.active{background:#111827;color:white}
+.approval-history-filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.approval-history-filters select,.approval-history-filters input{width:auto;min-height:42px;padding:10px 12px;border:1px solid #d1d5db;border-radius:12px}
+.approval-history-filters input[type="text"]{max-width:160px}
+.approval-history-filters input[type="number"]{max-width:120px}
 .event{display:grid;grid-template-columns:150px 1fr 120px;gap:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin-bottom:10px}
 .empty{font-weight:900;color:#6b7280;text-align:center;padding:20px}
-@media(max-width:760px){.container{padding:14px}.header,.grid,.rule,.event{grid-template-columns:1fr}.back{text-align:center}}
+@media(max-width:760px){.container{padding:14px}.header,.grid,.rule,.event{grid-template-columns:1fr}.back{text-align:center}.approval-history-filters{display:grid;grid-template-columns:1fr}.approval-history-filters select,.approval-history-filters input,.approval-history-filters button{width:100%;max-width:none}}
 </style>
 </head>
 
@@ -1914,7 +1918,7 @@ function getA3ApprovalHistoryActiveFilterCount() {
 
 function renderA3ApprovalHistoryFilters(activeFilter) {
     return `
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div class="approval-history-filters">
             <button class="btn ${activeFilter === "all" ? "" : "off"}"
                     onclick="setA3ApprovalHistoryFilter('all')">
                 Все решения
@@ -1931,8 +1935,7 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                     onclick="exportA3ApprovalHistory()">
                 Экспорт CSV
             </button>
-            <select onchange="setA3ApprovalHistoryActionType(this.value)"
-                    style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px">
+            <select onchange="setA3ApprovalHistoryActionType(this.value)">
                 <option value="all" ${a3ApprovalHistoryActionType === "all" ? "selected" : ""}>
                     Все действия
                 </option>
@@ -1946,8 +1949,7 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                     Запустить восстановление
                 </option>
             </select>
-            <select onchange="setA3ApprovalHistoryTargetType(this.value)"
-                    style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px">
+            <select onchange="setA3ApprovalHistoryTargetType(this.value)">
                 <option value="all" ${a3ApprovalHistoryTargetType === "all" ? "selected" : ""}>
                     Все цели
                 </option>
@@ -1964,8 +1966,7 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
             <input id="a3-approval-decided-by"
                    type="text"
                    placeholder="Кто решил"
-                   value="${a3ApprovalHistoryDecidedBy}"
-                   style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px;max-width:160px">
+                   value="${a3ApprovalHistoryDecidedBy}">
             <button class="btn off"
                     onclick="setA3ApprovalHistoryActorFilter()">
                 Показать автора
@@ -1978,8 +1979,7 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                    type="number"
                    min="1"
                    placeholder="ID цели"
-                   value="${a3ApprovalHistoryTargetId}"
-                   style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px;max-width:120px">
+                   value="${a3ApprovalHistoryTargetId}">
             <button class="btn off"
                     onclick="setA3ApprovalHistoryTargetFilter()">
                 Показать цель
@@ -1990,12 +1990,10 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
             </button>
             <input id="a3-approval-date-from"
                    type="date"
-                   value="${a3ApprovalHistoryDateFrom}"
-                   style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px">
+                   value="${a3ApprovalHistoryDateFrom}">
             <input id="a3-approval-date-to"
                    type="date"
-                   value="${a3ApprovalHistoryDateTo}"
-                   style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px">
+                   value="${a3ApprovalHistoryDateTo}">
             <button class="btn off"
                     onclick="setA3ApprovalHistoryQuickPeriod(1)">
                 Сегодня
