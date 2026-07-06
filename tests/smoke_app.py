@@ -16918,6 +16918,24 @@ async def assert_a3_api_layer():
     future_filter = (
         datetime.now() + timedelta(days=2)
     ).strftime("%Y-%m-%d")
+    reversed_date_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            f"date_from={future_filter}&date_to={today_filter}",
+        )
+    )
+    assert reversed_date_history["summary"]["date_from"] == today_filter
+    assert reversed_date_history["summary"]["date_to"] == future_filter
+    assert (
+        reversed_date_history["summary"]["period_label"]
+        == "Выбранный период"
+    )
+    assert any(
+        item["action_id"] == approve_action_id
+        for item in reversed_date_history["items"]
+    )
+
     future_history = crm.api_a3_approval_history(
         make_asgi_request(
             "owner2",

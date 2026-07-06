@@ -35580,6 +35580,16 @@ def get_a3_approval_decision_filter(request: Request) -> str:
 
 def get_a3_approval_history_filters(request: Request) -> dict:
     query_params = getattr(request, "query_params", {}) or {}
+    date_from = get_a3_approval_date_filter_value(
+        query_params.get("date_from")
+    )
+    date_to = get_a3_approval_date_filter_value(
+        query_params.get("date_to")
+    )
+    date_from, date_to = normalize_a3_approval_date_range(
+        date_from,
+        date_to,
+    )
 
     return {
         "decision": get_a3_approval_decision_filter(request),
@@ -35592,12 +35602,8 @@ def get_a3_approval_history_filters(request: Request) -> dict:
         "target_id": get_a3_approval_target_id_filter_value(
             query_params.get("target_id")
         ),
-        "date_from": get_a3_approval_date_filter_value(
-            query_params.get("date_from")
-        ),
-        "date_to": get_a3_approval_date_filter_value(
-            query_params.get("date_to")
-        ),
+        "date_from": date_from,
+        "date_to": date_to,
     }
 
 
@@ -35613,6 +35619,22 @@ def get_a3_approval_date_filter_value(value):
         return None
 
     return value
+
+
+def normalize_a3_approval_date_range(date_from, date_to):
+    if not date_from or not date_to:
+        return date_from, date_to
+
+    try:
+        from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+        to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+    except Exception:
+        return date_from, date_to
+
+    if from_date <= to_date:
+        return date_from, date_to
+
+    return date_to, date_from
 
 
 def get_a3_approval_period_label(date_from, date_to):
