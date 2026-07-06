@@ -35539,6 +35539,43 @@ def api_a3_approval_history_export(request: Request):
     output = io.StringIO()
     output.write("\ufeff")
     writer = csv.writer(output)
+    writer.writerow(["Фильтры экспорта"])
+    writer.writerow([
+        "Решение",
+        get_a3_approval_decision_label(filters["decision"]),
+    ])
+    writer.writerow([
+        "Тип действия",
+        (
+            "Все действия"
+            if filters["action_type"] == "all"
+            else action_label(filters["action_type"])
+        ),
+    ])
+    writer.writerow([
+        "Тип цели",
+        (
+            "Все цели"
+            if filters["target_type"] == "all"
+            else target_label(filters["target_type"])
+        ),
+    ])
+    writer.writerow([
+        "Кто решил",
+        get_a3_approval_actor_label(filters["decided_by"]),
+    ])
+    writer.writerow([
+        "ID цели",
+        filters["target_id"] or "Все",
+    ])
+    writer.writerow([
+        "Период",
+        get_a3_approval_period_label(
+            filters["date_from"],
+            filters["date_to"],
+        ),
+    ])
+    writer.writerow([])
     writer.writerow([
         "ID решения",
         "ID действия",
@@ -35595,6 +35632,14 @@ def get_a3_approval_decision_filter(request: Request) -> str:
         return "all"
 
     return decision_filter
+
+
+def get_a3_approval_decision_label(value):
+    return {
+        "all": "Все решения",
+        "approved": "Одобренные",
+        "rejected": "Отклонённые",
+    }.get(value or "all", "Все решения")
 
 
 def get_a3_approval_history_filters(request: Request) -> dict:

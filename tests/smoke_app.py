@@ -17048,6 +17048,13 @@ async def assert_a3_api_layer():
     assert approved_export.media_type == "text/csv; charset=utf-8"
     approved_export_body = approved_export.body.decode("utf-8")
     assert approved_export_body.startswith("\ufeff")
+    assert "Фильтры экспорта" in approved_export_body
+    assert "Решение,Одобренные" in approved_export_body
+    assert "Тип действия,Отключить правило" in approved_export_body
+    assert "Тип цели,Все цели" in approved_export_body
+    assert "Кто решил,owner2" in approved_export_body
+    assert f"ID цели,{disabled_unhealthy_rule_id}" in approved_export_body
+    assert "Период,Сегодня" in approved_export_body
     assert "ID решения,ID действия,Решение" in approved_export_body
     assert "Одобрено" in approved_export_body
     assert "Отключить правило" in approved_export_body
