@@ -3687,6 +3687,25 @@ async def assert_automation_runner(task):
     assert "SLA runner rule" in done_export_csv
     assert "done" in done_export_csv
 
+    failed_filter_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        event_filter="failed",
+    )
+    assert failed_filter_response.status_code == 200
+    failed_filter_html = failed_filter_response.body.decode("utf-8")
+    assert 'event_filter=failed' in failed_filter_html
+    assert 'class="active">Ошибка</a>' in failed_filter_html
+
+    failed_export_response = await crm.automation_events_export(
+        make_request("owner2"),
+        event_filter="failed",
+    )
+    assert failed_export_response.status_code == 200
+    assert (
+        "automation_events_failed"
+        in failed_export_response.headers["Content-Disposition"]
+    )
+
     trigger_filter_response = await crm.automation_page(
         make_asgi_request("owner2", "/automation"),
         event_filter="done",

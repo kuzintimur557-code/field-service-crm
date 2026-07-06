@@ -327,7 +327,8 @@ AUTOMATION_ACTIONS = [
 AUTOMATION_STATUS_LABELS = {
     "pending": "Ожидает",
     "done": "Выполнено",
-    "skipped": "Пропущено"
+    "skipped": "Пропущено",
+    "failed": "Ошибка"
 }
 
 FEATURE_DEFINITIONS = [
@@ -12261,7 +12262,7 @@ async def automation_page(
         "company": "Компания"
     }
     selected_rule_filter = rule_filter if rule_filter in ("active", "disabled") else ""
-    selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
+    selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped", "failed") else ""
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     action_keys = {key for key, _ in AUTOMATION_ACTIONS}
     selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
@@ -13316,7 +13317,7 @@ async def automation_events_export(
     if disabled_response:
         return disabled_response
 
-    selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped") else ""
+    selected_event_filter = event_filter if event_filter in ("pending", "done", "skipped", "failed") else ""
     trigger_keys = {key for key, _ in AUTOMATION_TRIGGERS}
     entity_keys = {"task", "client", "company"}
     selected_trigger_filter = trigger_filter if trigger_filter in trigger_keys else ""
