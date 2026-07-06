@@ -35918,6 +35918,7 @@ async def api_a3_create_ops_timeline_event(request: Request):
 def api_a3_workflow_timeline(
     request: Request,
     rule_id: int,
+    status_filter: str = "all",
 ):
     company_id = get_a3_company_id(request)
 
@@ -35927,6 +35928,7 @@ def api_a3_workflow_timeline(
     timeline = get_workflow_timeline(
         company_id=company_id,
         rule_id=rule_id,
+        status_filter=status_filter,
     )
 
     if not timeline:

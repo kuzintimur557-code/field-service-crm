@@ -3,13 +3,26 @@ from datetime import datetime
 from app.database import connect
 
 
+TIMELINE_STATUS_FILTERS = {"all", "done", "skipped", "failed", "pending"}
+
+
 def require_company_id(company_id):
     if not company_id:
         raise ValueError("company_id is required")
 
 
-def get_workflow_timeline(company_id, rule_id, limit=20):
+def normalize_timeline_status_filter(status_filter):
+    value = (status_filter or "all").strip().lower()
+
+    if value in TIMELINE_STATUS_FILTERS:
+        return value
+
+    return "all"
+
+
+def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
     require_company_id(company_id)
+    status_filter = normalize_timeline_status_filter(status_filter)
 
     conn = connect()
     c = conn.cursor()
@@ -28,18 +41,29 @@ def get_workflow_timeline(company_id, rule_id, limit=20):
         conn.close()
         return None
 
-    total_events_row = c.execute("""
-        SELECT COUNT(*) AS total
-        FROM automation_events
-        WHERE company_id=?
-          AND rule_id=?
-    """, (
+    where_parts = [
+        "company_id=?",
+        "rule_id=?",
+    ]
+    params = [
         company_id,
         rule_id,
-    )).fetchone()
+    ]
+
+    if status_filter != "all":
+        where_parts.append("status=?")
+        params.append(status_filter)
+
+    where_sql = " AND ".join(where_parts)
+
+    total_events_row = c.execute(f"""
+        SELECT COUNT(*) AS total
+        FROM automation_events
+        WHERE {where_sql}
+    """, tuple(params)).fetchone()
     total_events = total_events_row["total"] if total_events_row else 0
 
-    rows = c.execute("""
+    rows = c.execute(f"""
         SELECT
             id,
             rule_id,
@@ -51,15 +75,10 @@ def get_workflow_timeline(company_id, rule_id, limit=20):
             created_at,
             processed_at
         FROM automation_events
-        WHERE company_id=?
-          AND rule_id=?
+        WHERE {where_sql}
         ORDER BY id DESC
         LIMIT ?
-    """, (
-        company_id,
-        rule_id,
-        limit,
-    )).fetchall()
+    """, tuple(params + [limit])).fetchall()
 
     conn.close()
 
@@ -67,6 +86,7 @@ def get_workflow_timeline(company_id, rule_id, limit=20):
 
     return {
         "rule_id": rule_id,
+        "status_filter": status_filter,
         "items": items,
         "events_total": total_events,
         "limit": limit,

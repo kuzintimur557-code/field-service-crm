@@ -1047,7 +1047,7 @@ function filterWorkflowTimeline(ruleId, statusFilter) {
 
     state.selectedStatusFilter = statusFilter;
     state.visibleLimit = 5;
-    renderChainTimeline(ruleId, state.timeline);
+    loadChainTimeline(ruleId, statusFilter);
 }
 
 function setWorkflowTimelineLimit(ruleId, visibleLimit) {
@@ -1317,7 +1317,7 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
 }
 
 
-async function loadChainTimeline(ruleId) {
+async function loadChainTimeline(ruleId, statusFilter = null) {
     const container = document.getElementById(`timeline-${ruleId}`);
 
     if (!container) {
@@ -1325,14 +1325,19 @@ async function loadChainTimeline(ruleId) {
     }
 
     try {
-        const response = await fetch(`/api/a3/workflow/rules/${ruleId}/timeline`);
+        const currentState = a3TimelineState[ruleId] || {};
+        const requestedStatusFilter = statusFilter || currentState.selectedStatusFilter || "all";
+        const query = requestedStatusFilter === "all"
+            ? ""
+            : `?status_filter=${encodeURIComponent(requestedStatusFilter)}`;
+        const response = await fetch(`/api/a3/workflow/rules/${ruleId}/timeline${query}`);
         const data = await response.json();
         const timeline = data.timeline || {};
 
         a3TimelineState[ruleId] = {
             timeline,
             selectedSessionIndex: 0,
-            selectedStatusFilter: "all",
+            selectedStatusFilter: timeline.status_filter || requestedStatusFilter,
             visibleLimit: 5,
         };
 
