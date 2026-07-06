@@ -538,6 +538,7 @@ async def assert_automation_page():
     assert "/api/a3/autonomous-actions/reject-unsafe" in html
     assert "approval_safety_label" in html
     assert "Требует проверки" in html
+    assert "autonomous_action: \"AI-действие\"" in html
     assert "renderA3ApprovalSummary" in html
     assert "Можно подтвердить:" in html
     assert "Небезопасные:" in html
@@ -16018,6 +16019,8 @@ async def assert_a3_workflow_center():
     assert "Отклонить небезопасные" in body
     assert "approval_safety_label" in body
     assert "Требует проверки" in body
+    assert "automation_event: \"Событие автоматизации\"" in body
+    assert "autonomous_action: \"AI-действие\"" in body
     assert "renderWorkflowApprovalSummary" in body
     assert "Можно подтвердить:" in body
     assert "Небезопасные:" in body
