@@ -542,6 +542,7 @@ async def assert_automation_page():
     assert "Можно подтвердить:" in html
     assert "Небезопасные:" in html
     assert "Защищённые:" in html
+    assert "Правило:" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15965,6 +15966,7 @@ async def assert_a3_workflow_center():
     assert "Можно подтвердить:" in body
     assert "Небезопасные:" in body
     assert "Защищённые:" in body
+    assert "Правило:" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
@@ -16572,6 +16574,11 @@ async def assert_a3_api_layer():
         approval_queue_items[approve_action_id]["approval_safety_label"]
         == "Можно подтвердить"
     )
+    assert (
+        approval_queue_items[approve_action_id]["target_name"]
+        == "A3 disabled unhealthy smoke"
+    )
+    assert approval_queue_items[approve_action_id]["target_active"] == 0
     assert approval_queue_items[approve_action_id]["can_bulk_approve"] is True
     assert approval_queue_items[approve_action_id]["can_bulk_reject"] is False
 

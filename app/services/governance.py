@@ -129,14 +129,14 @@ def get_approval_queue(company_id):
         if row["target_type"] == "automation_rule" and row["target_id"]
     ]
 
-    existing_rule_ids = set()
+    rules_by_id = {}
 
     if rule_ids:
         placeholders = ",".join("?" for _ in rule_ids)
-        existing_rule_ids = {
-            row["id"]
+        rules_by_id = {
+            row["id"]: dict(row)
             for row in c.execute(f"""
-                SELECT id
+                SELECT id, name, active
                 FROM automation_rules
                 WHERE company_id=?
                   AND id IN ({placeholders})
@@ -167,11 +167,15 @@ def get_approval_queue(company_id):
             reason = "protected_rule"
             label = "Защищённое правило"
             safe = False
-        elif item["target_id"] not in existing_rule_ids:
+        elif item["target_id"] not in rules_by_id:
             reason = "missing_target"
             label = "Цель не найдена"
             safe = False
 
+        target_rule = rules_by_id.get(item["target_id"]) or {}
+
+        item["target_name"] = target_rule.get("name") or ""
+        item["target_active"] = target_rule.get("active")
         item["approval_safety"] = "safe" if safe else "unsafe"
         item["approval_safety_reason"] = reason
         item["approval_safety_label"] = label

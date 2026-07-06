@@ -219,6 +219,11 @@ async function loadWorkflowApprovalQueue() {
                         <div class="meta" style="margin-top:6px">
                             ${workflowApprovalTargetLabel(item.target_type)} #${item.target_id || "-"} · ${item.created_at || ""}
                         </div>
+                        ${item.target_name ? `
+                            <div class="meta" style="margin-top:6px">
+                                Правило: ${item.target_name}
+                            </div>
+                        ` : ""}
                         <div style="margin-top:8px">
                             <span class="pill ${item.approval_safety === "safe" ? "ok" : "off"}">
                                 ${item.approval_safety_label || "Требует проверки"}
