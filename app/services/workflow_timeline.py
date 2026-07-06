@@ -69,6 +69,12 @@ def _session_key(event):
     return f"{event.get('rule_id')}:{day}"
 
 
+def _session_date_label(event):
+    created_at = event.get("created_at") or ""
+
+    return created_at[:10] or "дата неизвестна"
+
+
 def _parse_datetime(value):
     if not value:
         return None
@@ -157,9 +163,11 @@ def build_timeline_sessions(events):
         key = _session_key(event)
 
         if key not in session_map:
+            date_label = _session_date_label(event)
             session = {
                 "id": key,
-                "label": f"Сессия {len(sessions) + 1}",
+                "label": f"Сессия {len(sessions) + 1} · {date_label}",
+                "date_label": date_label,
                 "started_at": event.get("created_at"),
                 "ended_at": event.get("processed_at") or event.get("created_at"),
                 "events": [],
