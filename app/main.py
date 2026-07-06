@@ -35457,14 +35457,21 @@ def api_a3_approval_history(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    decision_filter = get_a3_approval_decision_filter(request)
+    filters = get_a3_approval_history_filters(request)
 
-    items = get_approval_history(company_id, decision_filter=decision_filter)
+    items = get_approval_history(
+        company_id,
+        decision_filter=filters["decision"],
+        date_from=filters["date_from"],
+        date_to=filters["date_to"],
+    )
     summary = {
         "total": len(items),
         "approved": 0,
         "rejected": 0,
-        "filter": decision_filter,
+        "filter": filters["decision"],
+        "date_from": filters["date_from"],
+        "date_to": filters["date_to"],
     }
 
     for item in items:
@@ -35487,8 +35494,13 @@ def api_a3_approval_history_export(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    decision_filter = get_a3_approval_decision_filter(request)
-    items = get_approval_history(company_id, decision_filter=decision_filter)
+    filters = get_a3_approval_history_filters(request)
+    items = get_approval_history(
+        company_id,
+        decision_filter=filters["decision"],
+        date_from=filters["date_from"],
+        date_to=filters["date_to"],
+    )
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -35521,7 +35533,7 @@ def api_a3_approval_history_export(request: Request):
             item.get("created_at") or "",
         ])
 
-    filename = f"a3_approval_history_{decision_filter}.csv"
+    filename = f"a3_approval_history_{filters['decision']}.csv"
     return Response(
         output.getvalue(),
         media_type="text/csv; charset=utf-8",
@@ -35539,6 +35551,34 @@ def get_a3_approval_decision_filter(request: Request) -> str:
         return "all"
 
     return decision_filter
+
+
+def get_a3_approval_history_filters(request: Request) -> dict:
+    query_params = getattr(request, "query_params", {}) or {}
+
+    return {
+        "decision": get_a3_approval_decision_filter(request),
+        "date_from": get_a3_approval_date_filter_value(
+            query_params.get("date_from")
+        ),
+        "date_to": get_a3_approval_date_filter_value(
+            query_params.get("date_to")
+        ),
+    }
+
+
+def get_a3_approval_date_filter_value(value):
+    value = str(value or "").strip()
+
+    if not value:
+        return None
+
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except Exception:
+        return None
+
+    return value
 
 
 @app.post("/api/a3/ops-timeline")

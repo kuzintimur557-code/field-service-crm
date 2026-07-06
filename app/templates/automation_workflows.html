@@ -164,6 +164,23 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 <script>
 let chainFilter = "all";
 let workflowApprovalHistoryFilter = "all";
+let workflowApprovalHistoryDateFrom = "";
+let workflowApprovalHistoryDateTo = "";
+
+function buildWorkflowApprovalHistoryQuery() {
+    const params = new URLSearchParams();
+    params.set("decision", workflowApprovalHistoryFilter);
+
+    if (workflowApprovalHistoryDateFrom) {
+        params.set("date_from", workflowApprovalHistoryDateFrom);
+    }
+
+    if (workflowApprovalHistoryDateTo) {
+        params.set("date_to", workflowApprovalHistoryDateTo);
+    }
+
+    return params.toString();
+}
 
 function setChainFilter(filter) {
     chainFilter = filter;
@@ -267,8 +284,7 @@ async function loadWorkflowApprovalHistory() {
 
     try {
         const response = await fetch(
-            "/api/a3/approval-history?decision="
-            + encodeURIComponent(workflowApprovalHistoryFilter)
+            "/api/a3/approval-history?" + buildWorkflowApprovalHistoryQuery()
         );
         const data = await response.json();
         const items = data.items || [];
@@ -317,8 +333,21 @@ function setWorkflowApprovalHistoryFilter(filter) {
 
 function exportWorkflowApprovalHistory() {
     window.location.href =
-        "/api/a3/approval-history/export?decision="
-        + encodeURIComponent(workflowApprovalHistoryFilter);
+        "/api/a3/approval-history/export?" + buildWorkflowApprovalHistoryQuery();
+}
+
+function setWorkflowApprovalHistoryDateFilter() {
+    workflowApprovalHistoryDateFrom =
+        document.getElementById("workflow-approval-date-from")?.value || "";
+    workflowApprovalHistoryDateTo =
+        document.getElementById("workflow-approval-date-to")?.value || "";
+    loadWorkflowApprovalHistory();
+}
+
+function clearWorkflowApprovalHistoryDateFilter() {
+    workflowApprovalHistoryDateFrom = "";
+    workflowApprovalHistoryDateTo = "";
+    loadWorkflowApprovalHistory();
 }
 
 function renderWorkflowApprovalHistoryFilters(activeFilter) {
@@ -336,6 +365,18 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
             <button class="back" onclick="exportWorkflowApprovalHistory()">
                 Экспорт CSV
             </button>
+            <input id="workflow-approval-date-from"
+                   type="date"
+                   value="${workflowApprovalHistoryDateFrom}">
+            <input id="workflow-approval-date-to"
+                   type="date"
+                   value="${workflowApprovalHistoryDateTo}">
+            <button class="back" onclick="setWorkflowApprovalHistoryDateFilter()">
+                Показать период
+            </button>
+            <button class="back" onclick="clearWorkflowApprovalHistoryDateFilter()">
+                Сбросить период
+            </button>
             <span class="pill">${activeFilter === "approved" ? "Фильтр: одобрено" : activeFilter === "rejected" ? "Фильтр: отклонено" : "Фильтр: все"}</span>
         </div>
     `;
@@ -347,6 +388,11 @@ function renderWorkflowApprovalHistorySummary(summary) {
             <span class="pill">Всего решений: ${summary.total || 0}</span>
             <span class="pill ok">Одобрено: ${summary.approved || 0}</span>
             <span class="pill off">Отклонено: ${summary.rejected || 0}</span>
+            ${summary.date_from || summary.date_to ? `
+                <span class="pill">
+                    Период: ${summary.date_from || "начало"} - ${summary.date_to || "сегодня"}
+                </span>
+            ` : ""}
         </div>
     `;
 }

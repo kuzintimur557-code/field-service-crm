@@ -210,7 +210,12 @@ def get_approval_queue(company_id):
     return items
 
 
-def get_approval_history(company_id, decision_filter="all"):
+def get_approval_history(
+    company_id,
+    decision_filter="all",
+    date_from=None,
+    date_to=None,
+):
     require_company_id(company_id)
 
     if decision_filter not in {"all", "approved", "rejected"}:
@@ -225,6 +230,14 @@ def get_approval_history(company_id, decision_filter="all"):
     if decision_filter != "all":
         where_sql += " AND autonomous_action_approvals.decision=?"
         params.append(decision_filter)
+
+    if date_from:
+        where_sql += " AND autonomous_action_approvals.created_at >= ?"
+        params.append(f"{date_from}T00:00:00")
+
+    if date_to:
+        where_sql += " AND autonomous_action_approvals.created_at <= ?"
+        params.append(f"{date_to}T23:59:59")
 
     rows = c.execute("""
         SELECT

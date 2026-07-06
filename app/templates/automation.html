@@ -1665,12 +1665,28 @@ setInterval(loadA3ApprovalQueue, 30000);
 
 <script>
 let a3ApprovalHistoryFilter = "all";
+let a3ApprovalHistoryDateFrom = "";
+let a3ApprovalHistoryDateTo = "";
+
+function buildA3ApprovalHistoryQuery() {
+    const params = new URLSearchParams();
+    params.set("decision", a3ApprovalHistoryFilter);
+
+    if (a3ApprovalHistoryDateFrom) {
+        params.set("date_from", a3ApprovalHistoryDateFrom);
+    }
+
+    if (a3ApprovalHistoryDateTo) {
+        params.set("date_to", a3ApprovalHistoryDateTo);
+    }
+
+    return params.toString();
+}
 
 async function loadA3ApprovalHistory() {
     try {
         const response = await fetch(
-            "/api/a3/approval-history?decision="
-            + encodeURIComponent(a3ApprovalHistoryFilter)
+            "/api/a3/approval-history?" + buildA3ApprovalHistoryQuery()
         );
         const data = await response.json();
 
@@ -1772,8 +1788,21 @@ function setA3ApprovalHistoryFilter(filter) {
 
 function exportA3ApprovalHistory() {
     window.location.href =
-        "/api/a3/approval-history/export?decision="
-        + encodeURIComponent(a3ApprovalHistoryFilter);
+        "/api/a3/approval-history/export?" + buildA3ApprovalHistoryQuery();
+}
+
+function setA3ApprovalHistoryDateFilter() {
+    a3ApprovalHistoryDateFrom =
+        document.getElementById("a3-approval-date-from")?.value || "";
+    a3ApprovalHistoryDateTo =
+        document.getElementById("a3-approval-date-to")?.value || "";
+    loadA3ApprovalHistory();
+}
+
+function clearA3ApprovalHistoryDateFilter() {
+    a3ApprovalHistoryDateFrom = "";
+    a3ApprovalHistoryDateTo = "";
+    loadA3ApprovalHistory();
 }
 
 function renderA3ApprovalHistoryFilters(activeFilter) {
@@ -1795,6 +1824,22 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                     onclick="exportA3ApprovalHistory()">
                 Экспорт CSV
             </button>
+            <input id="a3-approval-date-from"
+                   type="date"
+                   value="${a3ApprovalHistoryDateFrom}"
+                   style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px">
+            <input id="a3-approval-date-to"
+                   type="date"
+                   value="${a3ApprovalHistoryDateTo}"
+                   style="padding:10px 12px;border:1px solid #d1d5db;border-radius:12px">
+            <button class="btn off"
+                    onclick="setA3ApprovalHistoryDateFilter()">
+                Показать период
+            </button>
+            <button class="btn off"
+                    onclick="clearA3ApprovalHistoryDateFilter()">
+                Сбросить период
+            </button>
         </div>
     `;
 }
@@ -1805,6 +1850,11 @@ function renderA3ApprovalHistorySummary(summary) {
             <span class="pill">Всего решений: ${summary.total || 0}</span>
             <span class="pill ok">Одобрено: ${summary.approved || 0}</span>
             <span class="pill off">Отклонено: ${summary.rejected || 0}</span>
+            ${summary.date_from || summary.date_to ? `
+                <span class="pill">
+                    Период: ${summary.date_from || "начало"} - ${summary.date_to || "сегодня"}
+                </span>
+            ` : ""}
         </div>
     `;
 }

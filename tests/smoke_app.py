@@ -553,12 +553,18 @@ async def assert_automation_page():
     assert "item.action_label" in html
     assert "item.target_label" in html
     assert "setA3ApprovalHistoryFilter" in html
+    assert "buildA3ApprovalHistoryQuery" in html
+    assert "setA3ApprovalHistoryDateFilter" in html
+    assert "clearA3ApprovalHistoryDateFilter" in html
+    assert "a3-approval-date-from" in html
+    assert "Показать период" in html
+    assert "Сбросить период" in html
     assert "Все решения" in html
     assert "Одобренные" in html
     assert "Отклонённые" in html
-    assert "/api/a3/approval-history?decision=" in html
+    assert "/api/a3/approval-history?" in html
     assert "exportA3ApprovalHistory" in html
-    assert "/api/a3/approval-history/export?decision=" in html
+    assert "/api/a3/approval-history/export?" in html
     assert "Экспорт CSV" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
@@ -15993,12 +15999,18 @@ async def assert_a3_workflow_center():
     assert "item.action_label" in body
     assert "item.target_label" in body
     assert "setWorkflowApprovalHistoryFilter" in body
+    assert "buildWorkflowApprovalHistoryQuery" in body
+    assert "setWorkflowApprovalHistoryDateFilter" in body
+    assert "clearWorkflowApprovalHistoryDateFilter" in body
+    assert "workflow-approval-date-from" in body
+    assert "Показать период" in body
+    assert "Сбросить период" in body
     assert "Все решения" in body
     assert "Одобренные" in body
     assert "Отклонённые" in body
-    assert "/api/a3/approval-history?decision=" in body
+    assert "/api/a3/approval-history?" in body
     assert "exportWorkflowApprovalHistory" in body
-    assert "/api/a3/approval-history/export?decision=" in body
+    assert "/api/a3/approval-history/export?" in body
     assert "Экспорт CSV" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
@@ -16717,12 +16729,52 @@ async def assert_a3_api_layer():
         )
     )
     assert invalid_filter_history["summary"]["filter"] == "all"
+    assert invalid_filter_history["summary"]["date_from"] is None
+    assert invalid_filter_history["summary"]["date_to"] is None
+
+    today_filter = datetime.now().strftime("%Y-%m-%d")
+    dated_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            (
+                "decision=approved"
+                f"&date_from={today_filter}"
+                f"&date_to={today_filter}"
+            ),
+        )
+    )
+    assert dated_history["summary"]["filter"] == "approved"
+    assert dated_history["summary"]["date_from"] == today_filter
+    assert dated_history["summary"]["date_to"] == today_filter
+    assert any(
+        item["action_id"] == approve_action_id
+        for item in dated_history["items"]
+    )
+
+    future_filter = (
+        datetime.now() + timedelta(days=2)
+    ).strftime("%Y-%m-%d")
+    future_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            f"decision=approved&date_from={future_filter}",
+        )
+    )
+    assert future_history["summary"]["date_from"] == future_filter
+    assert future_history["summary"]["date_to"] is None
+    assert future_history["summary"]["total"] == 0
 
     approved_export = crm.api_a3_approval_history_export(
         make_asgi_request(
             "owner2",
             "/api/a3/approval-history/export",
-            "decision=approved",
+            (
+                "decision=approved"
+                f"&date_from={today_filter}"
+                f"&date_to={today_filter}"
+            ),
         )
     )
     assert approved_export.status_code == 200
