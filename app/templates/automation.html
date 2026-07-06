@@ -1854,6 +1854,32 @@ function resetA3ApprovalHistoryFilters() {
     loadA3ApprovalHistory();
 }
 
+function getA3ApprovalHistoryActiveFilterCount() {
+    let count = 0;
+
+    if (a3ApprovalHistoryFilter !== "all") {
+        count += 1;
+    }
+
+    if (a3ApprovalHistoryActionType !== "all") {
+        count += 1;
+    }
+
+    if (a3ApprovalHistoryDecidedBy) {
+        count += 1;
+    }
+
+    if (a3ApprovalHistoryTargetId) {
+        count += 1;
+    }
+
+    if (a3ApprovalHistoryDateFrom || a3ApprovalHistoryDateTo) {
+        count += 1;
+    }
+
+    return count;
+}
+
 function renderA3ApprovalHistoryFilters(activeFilter) {
     return `
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1937,11 +1963,18 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
 }
 
 function renderA3ApprovalHistorySummary(summary) {
+    const activeFiltersCount = getA3ApprovalHistoryActiveFilterCount();
+
     return `
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <span class="pill">Всего решений: ${summary.total || 0}</span>
             <span class="pill ok">Одобрено: ${summary.approved || 0}</span>
             <span class="pill off">Отклонено: ${summary.rejected || 0}</span>
+            ${activeFiltersCount ? `
+                <span class="pill">
+                    Активных фильтров: ${activeFiltersCount}
+                </span>
+            ` : ""}
             ${summary.date_from || summary.date_to ? `
                 <span class="pill">
                     Период: ${summary.date_from || "начало"} - ${summary.date_to || "сегодня"}

@@ -399,6 +399,32 @@ function resetWorkflowApprovalHistoryFilters() {
     loadWorkflowApprovalHistory();
 }
 
+function getWorkflowApprovalHistoryActiveFilterCount() {
+    let count = 0;
+
+    if (workflowApprovalHistoryFilter !== "all") {
+        count += 1;
+    }
+
+    if (workflowApprovalHistoryActionType !== "all") {
+        count += 1;
+    }
+
+    if (workflowApprovalHistoryDecidedBy) {
+        count += 1;
+    }
+
+    if (workflowApprovalHistoryTargetId) {
+        count += 1;
+    }
+
+    if (workflowApprovalHistoryDateFrom || workflowApprovalHistoryDateTo) {
+        count += 1;
+    }
+
+    return count;
+}
+
 function renderWorkflowApprovalHistoryFilters(activeFilter) {
     return `
         <div class="workflow-card-actions">
@@ -467,11 +493,18 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
 }
 
 function renderWorkflowApprovalHistorySummary(summary) {
+    const activeFiltersCount = getWorkflowApprovalHistoryActiveFilterCount();
+
     return `
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <span class="pill">Всего решений: ${summary.total || 0}</span>
             <span class="pill ok">Одобрено: ${summary.approved || 0}</span>
             <span class="pill off">Отклонено: ${summary.rejected || 0}</span>
+            ${activeFiltersCount ? `
+                <span class="pill">
+                    Активных фильтров: ${activeFiltersCount}
+                </span>
+            ` : ""}
             ${summary.date_from || summary.date_to ? `
                 <span class="pill">
                     Период: ${summary.date_from || "начало"} - ${summary.date_to || "сегодня"}
