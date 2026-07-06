@@ -113,6 +113,7 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
     conn.close()
 
     items = [dict(row) for row in rows]
+    loaded_count = len(items)
 
     return {
         "rule_id": rule_id,
@@ -120,8 +121,10 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
         "status_filter_label": timeline_status_filter_label(status_filter),
         "items": items,
         "events_total": total_events,
+        "loaded_count": loaded_count,
+        "remaining_count": max(total_events - loaded_count, 0),
         "limit": limit,
-        "has_more": total_events > len(items),
+        "has_more": total_events > loaded_count,
         "summary": build_timeline_summary(items),
         "steps": build_timeline_steps(items),
         "sessions": build_timeline_sessions(items),
