@@ -17063,6 +17063,17 @@ async def assert_a3_api_layer():
         },
         items_count=1,
     )[0] == ["Фильтры экспорта"]
+    assert crm.build_a3_approval_export_filter_rows(
+        {
+            "decision": "all",
+            "action_type": "all",
+            "target_type": "all",
+            "decided_by": None,
+            "target_id": None,
+            "date_from": None,
+            "date_to": None,
+        }
+    )[1] == ["Записей", "Не считалось"]
     assert "Решение,Одобренные" in approved_export_body
     assert "Тип действия,Отключить правило" in approved_export_body
     assert "Тип цели,Все цели" in approved_export_body
