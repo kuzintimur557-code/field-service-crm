@@ -2202,6 +2202,7 @@ async def assert_automation_page():
     assert "limit" in workflow_timeline["timeline"]
     assert "has_more" in workflow_timeline["timeline"]
     assert workflow_timeline["timeline"]["status_filter"] == "all"
+    assert workflow_timeline["timeline"]["status_filter_label"] == "Все"
     assert "summary" in workflow_timeline["timeline"]
     assert "total" in workflow_timeline["timeline"]["summary"]
     assert "failed" in workflow_timeline["timeline"]["summary"]
@@ -2233,6 +2234,7 @@ async def assert_automation_page():
     )
     assert filtered_workflow_timeline["ok"] is True
     assert filtered_workflow_timeline["timeline"]["status_filter"] == "failed"
+    assert filtered_workflow_timeline["timeline"]["status_filter_label"] == "Ошибки"
     assert all(
         item["status"] == "failed"
         for item in filtered_workflow_timeline["timeline"]["items"]
@@ -2244,6 +2246,7 @@ async def assert_automation_page():
         status_filter="unknown",
     )
     assert invalid_filtered_workflow_timeline["timeline"]["status_filter"] == "all"
+    assert invalid_filtered_workflow_timeline["timeline"]["status_filter_label"] == "Все"
 
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
     assert workflows_graph["ok"] is True
@@ -16183,6 +16186,7 @@ async def assert_a3_workflow_center():
     assert "filterWorkflowTimeline" in body
     assert "setWorkflowTimelineLimit" in body
     assert "status_filter=${encodeURIComponent(requestedStatusFilter)}" in body
+    assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "workflowTimelineFilterLabel" in body
     assert "workflowTimelineSummary" in body
     assert "Всего событий в истории:" in body

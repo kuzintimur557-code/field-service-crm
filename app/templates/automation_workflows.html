@@ -1455,7 +1455,7 @@ function renderChainTimeline(ruleId, timeline) {
              class="meta"
              style="margin-bottom:8px;font-weight:800"></div>
         <div class="meta" style="margin-bottom:8px">
-            Фильтр: ${workflowTimelineFilterLabel(statusFilter)} · Показано событий: ${visibleStepsCount} / ${steps.length}
+            Фильтр: ${timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)} · Показано событий: ${visibleStepsCount} / ${steps.length}
         </div>
 
         <div style="display:flex;flex-direction:column;gap:8px">

@@ -20,6 +20,18 @@ def normalize_timeline_status_filter(status_filter):
     return "all"
 
 
+def timeline_status_filter_label(status_filter):
+    labels = {
+        "all": "Все",
+        "done": "Выполненные",
+        "skipped": "Пропущенные",
+        "failed": "Ошибки",
+        "pending": "Ожидающие",
+    }
+
+    return labels.get(status_filter or "all", "Все")
+
+
 def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
     require_company_id(company_id)
     status_filter = normalize_timeline_status_filter(status_filter)
@@ -87,6 +99,7 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
     return {
         "rule_id": rule_id,
         "status_filter": status_filter,
+        "status_filter_label": timeline_status_filter_label(status_filter),
         "items": items,
         "events_total": total_events,
         "limit": limit,
