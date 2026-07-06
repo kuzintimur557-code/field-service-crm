@@ -1034,6 +1034,7 @@ function selectWorkflowSession(ruleId, sessionIndex) {
 
     state.selectedSessionIndex = sessionIndex;
     state.selectedStatusFilter = "all";
+    state.visibleLimit = 5;
     renderChainTimeline(ruleId, state.timeline);
 }
 
@@ -1045,6 +1046,18 @@ function filterWorkflowTimeline(ruleId, statusFilter) {
     }
 
     state.selectedStatusFilter = statusFilter;
+    state.visibleLimit = 5;
+    renderChainTimeline(ruleId, state.timeline);
+}
+
+function setWorkflowTimelineLimit(ruleId, visibleLimit) {
+    const state = a3TimelineState[ruleId];
+
+    if (!state) {
+        return;
+    }
+
+    state.visibleLimit = Math.max(5, Number(visibleLimit || 5));
     renderChainTimeline(ruleId, state.timeline);
 }
 
@@ -1319,6 +1332,7 @@ async function loadChainTimeline(ruleId) {
             timeline,
             selectedSessionIndex: 0,
             selectedStatusFilter: "all",
+            visibleLimit: 5,
         };
 
         renderChainTimeline(ruleId, timeline);
@@ -1354,7 +1368,9 @@ function renderChainTimeline(ruleId, timeline) {
     const steps = statusFilter === "all"
         ? sessionSteps
         : sessionSteps.filter(step => step.status === statusFilter);
-    const visibleStepsCount = Math.min(steps.length, 5);
+    const visibleLimit = Number(state.visibleLimit || 5);
+    const visibleStepsCount = Math.min(steps.length, visibleLimit);
+    const hasHiddenSteps = steps.length > visibleStepsCount;
 
     if (!sessionSteps.length) {
         container.innerHTML = `
@@ -1437,7 +1453,7 @@ function renderChainTimeline(ruleId, timeline) {
         </div>
 
         <div style="display:flex;flex-direction:column;gap:8px">
-            ${steps.length ? steps.slice(0, 5).map((step, index) => {
+            ${steps.length ? steps.slice(0, visibleLimit).map((step, index) => {
                 let cls = "pill";
 
                 if (step.level === "success") {
@@ -1468,6 +1484,20 @@ function renderChainTimeline(ruleId, timeline) {
                 <div class="meta">По выбранному фильтру событий нет</div>
             `}
         </div>
+        ${steps.length > 5 ? `
+            <div class="timeline-control-row" style="margin-top:10px">
+                ${hasHiddenSteps ? `
+                    <button class="back" onclick="setWorkflowTimelineLimit(${ruleId}, ${visibleStepsCount + 5})">
+                        Показать ещё
+                    </button>
+                ` : ""}
+                ${visibleLimit > 5 ? `
+                    <button class="back" onclick="setWorkflowTimelineLimit(${ruleId}, 5)">
+                        Свернуть
+                    </button>
+                ` : ""}
+            </div>
+        ` : ""}
     `;
 }
 
