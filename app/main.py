@@ -12453,7 +12453,7 @@ async def automation_page(
         health_message = "Автоматизация работает, но есть события, которые требуют проверки."
     else:
         health_status = "ok"
-        health_title = "OK"
+        health_title = "Стабильно"
         health_message = "Автоматизация работает стабильно."
 
     automation_stats = {
@@ -13848,9 +13848,9 @@ async def automation_rule_detail(request: Request, rule_id: int):
         a3_recommendation = "Проверьте последние события цепочки и повторите пропущенные."
 
     else:
-        diagnostic_title = "OK"
+        diagnostic_title = "Стабильно"
         diagnostic_message = "Правило выглядит рабочим."
-        graph_status = "OK"
+        graph_status = "Стабильно"
         graph_status_color = "#16a34a"
         a3_recommendation = "Правило работает стабильно. Продолжайте мониторинг."
 
