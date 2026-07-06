@@ -35466,6 +35466,7 @@ def api_a3_approval_history(request: Request):
         date_from=filters["date_from"],
         date_to=filters["date_to"],
         action_type_filter=filters["action_type"],
+        decided_by_filter=filters["decided_by"],
     )
     summary = {
         "total": len(items),
@@ -35479,6 +35480,10 @@ def api_a3_approval_history(request: Request):
             "Все действия"
             if filters["action_type"] == "all"
             else action_label(filters["action_type"])
+        ),
+        "decided_by": filters["decided_by"],
+        "decided_by_label": get_a3_approval_actor_label(
+            filters["decided_by"]
         ),
     }
 
@@ -35509,6 +35514,7 @@ def api_a3_approval_history_export(request: Request):
         date_from=filters["date_from"],
         date_to=filters["date_to"],
         action_type_filter=filters["action_type"],
+        decided_by_filter=filters["decided_by"],
     )
 
     output = io.StringIO()
@@ -35573,6 +35579,9 @@ def get_a3_approval_history_filters(request: Request) -> dict:
         "action_type": get_a3_approval_action_type_filter_value(
             query_params.get("action_type")
         ),
+        "decided_by": get_a3_approval_actor_filter_value(
+            query_params.get("decided_by")
+        ),
         "date_from": get_a3_approval_date_filter_value(
             query_params.get("date_from")
         ),
@@ -35601,6 +35610,34 @@ def get_a3_approval_action_type_filter_value(value):
 
     if value not in {"all", "disable_rule", "retry_events", "recovery_cycle"}:
         return "all"
+
+    return value
+
+
+def get_a3_approval_actor_filter_value(value):
+    value = str(value or "").strip()[:80]
+
+    if not value:
+        return None
+
+    cleaned = "".join(
+        char
+        for char in value
+        if char.isalnum() or char in "._-@"
+    )
+
+    if cleaned != value:
+        return None
+
+    return cleaned
+
+
+def get_a3_approval_actor_label(value):
+    if not value:
+        return "Все пользователи"
+
+    if value == "system":
+        return "Система"
 
     return value
 

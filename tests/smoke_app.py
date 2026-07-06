@@ -556,9 +556,16 @@ async def assert_automation_page():
     assert "buildA3ApprovalHistoryQuery" in html
     assert "a3ApprovalHistoryActionType" in html
     assert "setA3ApprovalHistoryActionType" in html
+    assert "a3ApprovalHistoryDecidedBy" in html
+    assert "setA3ApprovalHistoryActorFilter" in html
+    assert "clearA3ApprovalHistoryActorFilter" in html
+    assert "a3-approval-decided-by" in html
     assert "setA3ApprovalHistoryDateFilter" in html
     assert "clearA3ApprovalHistoryDateFilter" in html
     assert "a3-approval-date-from" in html
+    assert "Кто решил" in html
+    assert "Показать автора" in html
+    assert "Сбросить автора" in html
     assert "Все действия" in html
     assert "Отключить правило" in html
     assert "Повторить события" in html
@@ -16007,9 +16014,16 @@ async def assert_a3_workflow_center():
     assert "buildWorkflowApprovalHistoryQuery" in body
     assert "workflowApprovalHistoryActionType" in body
     assert "setWorkflowApprovalHistoryActionType" in body
+    assert "workflowApprovalHistoryDecidedBy" in body
+    assert "setWorkflowApprovalHistoryActorFilter" in body
+    assert "clearWorkflowApprovalHistoryActorFilter" in body
+    assert "workflow-approval-decided-by" in body
     assert "setWorkflowApprovalHistoryDateFilter" in body
     assert "clearWorkflowApprovalHistoryDateFilter" in body
     assert "workflow-approval-date-from" in body
+    assert "Кто решил" in body
+    assert "Показать автора" in body
+    assert "Сбросить автора" in body
     assert "Все действия" in body
     assert "Отключить правило" in body
     assert "Повторить события" in body
@@ -16741,6 +16755,11 @@ async def assert_a3_api_layer():
     assert invalid_filter_history["summary"]["filter"] == "all"
     assert invalid_filter_history["summary"]["action_type"] == "all"
     assert invalid_filter_history["summary"]["action_label"] == "Все действия"
+    assert invalid_filter_history["summary"]["decided_by"] is None
+    assert (
+        invalid_filter_history["summary"]["decided_by_label"]
+        == "Все пользователи"
+    )
     assert invalid_filter_history["summary"]["date_from"] is None
     assert invalid_filter_history["summary"]["date_to"] is None
 
@@ -16774,6 +16793,33 @@ async def assert_a3_api_layer():
     )
     assert invalid_action_filtered_history["summary"]["action_type"] == "all"
 
+    actor_filtered_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "decided_by=owner2",
+        )
+    )
+    assert actor_filtered_history["summary"]["decided_by"] == "owner2"
+    assert actor_filtered_history["summary"]["decided_by_label"] == "owner2"
+    assert any(
+        item["action_id"] == approve_action_id
+        for item in actor_filtered_history["items"]
+    )
+    assert all(
+        item["decided_by"] == "owner2"
+        for item in actor_filtered_history["items"]
+    )
+
+    invalid_actor_filtered_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "decided_by=%3Cbad%3E",
+        )
+    )
+    assert invalid_actor_filtered_history["summary"]["decided_by"] is None
+
     today_filter = datetime.now().strftime("%Y-%m-%d")
     dated_history = crm.api_a3_approval_history(
         make_asgi_request(
@@ -16782,6 +16828,7 @@ async def assert_a3_api_layer():
             (
                 "decision=approved"
                 "&action_type=disable_rule"
+                "&decided_by=owner2"
                 f"&date_from={today_filter}"
                 f"&date_to={today_filter}"
             ),
@@ -16789,6 +16836,7 @@ async def assert_a3_api_layer():
     )
     assert dated_history["summary"]["filter"] == "approved"
     assert dated_history["summary"]["action_type"] == "disable_rule"
+    assert dated_history["summary"]["decided_by"] == "owner2"
     assert dated_history["summary"]["date_from"] == today_filter
     assert dated_history["summary"]["date_to"] == today_filter
     assert any(
@@ -16817,6 +16865,7 @@ async def assert_a3_api_layer():
             (
                 "decision=approved"
                 "&action_type=disable_rule"
+                "&decided_by=owner2"
                 f"&date_from={today_filter}"
                 f"&date_to={today_filter}"
             ),

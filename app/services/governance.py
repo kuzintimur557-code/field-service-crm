@@ -216,6 +216,7 @@ def get_approval_history(
     date_from=None,
     date_to=None,
     action_type_filter="all",
+    decided_by_filter=None,
 ):
     require_company_id(company_id)
 
@@ -246,6 +247,10 @@ def get_approval_history(
     if action_type_filter != "all":
         where_sql += " AND autonomous_action_queue.action_type=?"
         params.append(action_type_filter)
+
+    if decided_by_filter:
+        where_sql += " AND autonomous_action_approvals.decided_by=?"
+        params.append(decided_by_filter)
 
     rows = c.execute("""
         SELECT

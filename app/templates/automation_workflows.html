@@ -165,6 +165,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 let chainFilter = "all";
 let workflowApprovalHistoryFilter = "all";
 let workflowApprovalHistoryActionType = "all";
+let workflowApprovalHistoryDecidedBy = "";
 let workflowApprovalHistoryDateFrom = "";
 let workflowApprovalHistoryDateTo = "";
 
@@ -172,6 +173,10 @@ function buildWorkflowApprovalHistoryQuery() {
     const params = new URLSearchParams();
     params.set("decision", workflowApprovalHistoryFilter);
     params.set("action_type", workflowApprovalHistoryActionType);
+
+    if (workflowApprovalHistoryDecidedBy) {
+        params.set("decided_by", workflowApprovalHistoryDecidedBy);
+    }
 
     if (workflowApprovalHistoryDateFrom) {
         params.set("date_from", workflowApprovalHistoryDateFrom);
@@ -338,6 +343,17 @@ function setWorkflowApprovalHistoryActionType(actionType) {
     loadWorkflowApprovalHistory();
 }
 
+function setWorkflowApprovalHistoryActorFilter() {
+    workflowApprovalHistoryDecidedBy =
+        document.getElementById("workflow-approval-decided-by")?.value || "";
+    loadWorkflowApprovalHistory();
+}
+
+function clearWorkflowApprovalHistoryActorFilter() {
+    workflowApprovalHistoryDecidedBy = "";
+    loadWorkflowApprovalHistory();
+}
+
 function exportWorkflowApprovalHistory() {
     window.location.href =
         "/api/a3/approval-history/export?" + buildWorkflowApprovalHistoryQuery();
@@ -383,6 +399,16 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
                     Повторить события
                 </option>
             </select>
+            <input id="workflow-approval-decided-by"
+                   type="text"
+                   placeholder="Кто решил"
+                   value="${workflowApprovalHistoryDecidedBy}">
+            <button class="back" onclick="setWorkflowApprovalHistoryActorFilter()">
+                Показать автора
+            </button>
+            <button class="back" onclick="clearWorkflowApprovalHistoryActorFilter()">
+                Сбросить автора
+            </button>
             <input id="workflow-approval-date-from"
                    type="date"
                    value="${workflowApprovalHistoryDateFrom}">
@@ -414,6 +440,11 @@ function renderWorkflowApprovalHistorySummary(summary) {
             ${summary.action_label && summary.action_type !== "all" ? `
                 <span class="pill">
                     Действие: ${summary.action_label}
+                </span>
+            ` : ""}
+            ${summary.decided_by ? `
+                <span class="pill">
+                    Кто решил: ${summary.decided_by_label}
                 </span>
             ` : ""}
         </div>
