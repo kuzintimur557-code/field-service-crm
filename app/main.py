@@ -35539,7 +35539,12 @@ def api_a3_approval_history_export(request: Request):
     output = io.StringIO()
     output.write("\ufeff")
     writer = csv.writer(output)
-    writer.writerows(build_a3_approval_export_filter_rows(filters))
+    writer.writerows(
+        build_a3_approval_export_filter_rows(
+            filters,
+            items_count=len(items),
+        )
+    )
     writer.writerow([
         "ID решения",
         "ID действия",
@@ -35602,9 +35607,17 @@ def build_a3_approval_export_filename(filters):
     return "_".join(filename_parts) + ".csv"
 
 
-def build_a3_approval_export_filter_rows(filters):
+def build_a3_approval_export_filter_rows(filters, items_count=None):
     return [
         ["Фильтры экспорта"],
+        [
+            "Записей",
+            items_count if items_count is not None else "Не считалось",
+        ],
+        [
+            "Лимит",
+            f"Последние {APPROVAL_HISTORY_LIMIT} решений",
+        ],
         [
             "Решение",
             get_a3_approval_decision_label(filters["decision"]),
