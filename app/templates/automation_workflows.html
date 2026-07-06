@@ -1153,6 +1153,7 @@ function pauseReplayChainTimeline(ruleId) {
 
     if (session) {
         session.textContent = state.paused ? "Сессия: пауза" : "Сессия: активно";
+        session.className = state.paused ? "pill warn" : "pill ok";
     }
 }
 
@@ -1179,7 +1180,7 @@ function stopReplayChainTimeline(ruleId) {
 
     if (session) {
         session.textContent = "Сессия: остановлена";
-        session.className = "pill";
+        session.className = "pill off";
     }
 
     if (chainCard) {

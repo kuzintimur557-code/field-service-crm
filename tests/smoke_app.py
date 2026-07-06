@@ -16004,6 +16004,8 @@ async def assert_a3_workflow_center():
     assert "data-timeline-level" in body
     assert "Сессия: нет" in body
     assert "Сессия: активно" in body
+    assert 'session.className = state.paused ? "pill warn" : "pill ok"' in body
+    assert 'session.className = "pill off"' in body
     assert "chain.replaying" in body
     assert "Диагностика цепочки" in body
     assert "handleDebugAction" in body
