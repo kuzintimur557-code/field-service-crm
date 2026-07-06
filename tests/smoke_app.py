@@ -16004,6 +16004,7 @@ async def assert_a3_workflow_center():
     assert "Очередь подтверждений" in body
     assert "workflow-approval-queue" in body
     assert "workflow-approval-history" in body
+    assert ".back.off" in body
     assert "loadWorkflowApprovalQueue" in body
     assert "loadWorkflowApprovalHistory" in body
     assert "approveWorkflowAction" in body
@@ -16029,6 +16030,8 @@ async def assert_a3_workflow_center():
     assert "item.action_label" in body
     assert "item.target_label" in body
     assert "setWorkflowApprovalHistoryFilter" in body
+    assert 'activeFilter === "approved" ? "" : "off"' in body
+    assert 'activeFilter === "rejected" ? "" : "off"' in body
     assert "buildWorkflowApprovalHistoryQuery" in body
     assert "workflowApprovalHistoryActionType" in body
     assert "setWorkflowApprovalHistoryActionType" in body

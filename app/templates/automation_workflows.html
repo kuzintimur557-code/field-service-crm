@@ -14,6 +14,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;over
 .header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}
 .card{background:white;padding:18px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:14px}
 .back{display:inline-flex;align-items:center;justify-content:center;min-height:42px;max-width:100%;padding:10px 14px;border-radius:14px;background:#111827;color:white;text-align:center;line-height:1.2;text-decoration:none;font-weight:900;border:0;cursor:pointer;white-space:normal}
+.back.off{background:#f3f4f6;color:#374151;border:1px solid #d1d5db}
 h1{margin:0 0 8px;font-size:30px;line-height:1.12;overflow-wrap:anywhere}
 h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 .meta{color:#6b7280;font-weight:800;line-height:1.45;overflow-wrap:anywhere}
@@ -447,13 +448,16 @@ function getWorkflowApprovalHistoryActiveFilterCount() {
 function renderWorkflowApprovalHistoryFilters(activeFilter) {
     return `
         <div class="workflow-card-actions">
-            <button class="back" onclick="setWorkflowApprovalHistoryFilter('all')">
+            <button class="back ${activeFilter === "all" ? "" : "off"}"
+                    onclick="setWorkflowApprovalHistoryFilter('all')">
                 Все решения
             </button>
-            <button class="back" onclick="setWorkflowApprovalHistoryFilter('approved')">
+            <button class="back ${activeFilter === "approved" ? "" : "off"}"
+                    onclick="setWorkflowApprovalHistoryFilter('approved')">
                 Одобренные
             </button>
-            <button class="back" onclick="setWorkflowApprovalHistoryFilter('rejected')">
+            <button class="back ${activeFilter === "rejected" ? "" : "off"}"
+                    onclick="setWorkflowApprovalHistoryFilter('rejected')">
                 Отклонённые
             </button>
             <button class="back" onclick="exportWorkflowApprovalHistory()">
