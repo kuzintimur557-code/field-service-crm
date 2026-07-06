@@ -1460,7 +1460,7 @@ function renderChainTimeline(ruleId, timeline) {
                         </div>
                         <div class="meta">
                             <div>${step.created_at || ""}</div>
-                            <div>#${step.event_id || "-"} · ${workflowSessionStatusLabel(step.status)}</div>
+                            <div>#${step.event_id || "-"} · ${step.status_label || workflowSessionStatusLabel(step.status)}</div>
                         </div>
                     </div>
                     `;

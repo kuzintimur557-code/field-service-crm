@@ -2205,6 +2205,10 @@ async def assert_automation_page():
     assert "total" in workflow_timeline["timeline"]["summary"]
     assert "failed" in workflow_timeline["timeline"]["summary"]
     assert "steps" in workflow_timeline["timeline"]
+    if workflow_timeline["timeline"]["steps"]:
+        step = workflow_timeline["timeline"]["steps"][0]
+        assert "status_label" in step
+        assert step["status_label"] in {"Выполнено", "Пропущено", "Ошибка", "Ожидает"}
     if workflow_timeline["timeline"]["sessions"]:
         session = workflow_timeline["timeline"]["sessions"][0]
         assert "duration_seconds" in session
@@ -16155,7 +16159,7 @@ async def assert_a3_workflow_center():
     assert "data-timeline-filter" in body
     assert "Фильтр:" in body
     assert "Показано событий:" in body
-    assert "workflowSessionStatusLabel(step.status)" in body
+    assert "step.status_label || workflowSessionStatusLabel(step.status)" in body
     assert "По выбранному фильтру событий нет" in body
 
     public_timeline_response = crm.api_a3_workflow_timeline(

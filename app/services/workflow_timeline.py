@@ -190,6 +190,17 @@ def build_timeline_summary(events):
     return summary
 
 
+def _event_status_label(status):
+    labels = {
+        "done": "Выполнено",
+        "skipped": "Пропущено",
+        "failed": "Ошибка",
+        "pending": "Ожидает",
+    }
+
+    return labels.get(status or "pending", "Ожидает")
+
+
 def build_timeline_sessions(events):
     sessions = []
     session_map = {}
@@ -273,6 +284,7 @@ def build_timeline_steps(events):
             "label": label,
             "level": level,
             "status": status,
+            "status_label": _event_status_label(status),
             "message": event.get("message") or "",
             "created_at": event.get("created_at"),
             "processed_at": event.get("processed_at"),
