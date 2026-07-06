@@ -550,6 +550,11 @@ async def assert_automation_page():
     assert "Отклонено:" in html
     assert "decision_label" in html
     assert "decided_by_label" in html
+    assert "setA3ApprovalHistoryFilter" in html
+    assert "Все решения" in html
+    assert "Одобренные" in html
+    assert "Отклонённые" in html
+    assert "/api/a3/approval-history?decision=" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -15980,6 +15985,11 @@ async def assert_a3_workflow_center():
     assert "Одобрено:" in body
     assert "Отклонено:" in body
     assert "decision_label" in body
+    assert "setWorkflowApprovalHistoryFilter" in body
+    assert "Все решения" in body
+    assert "Одобренные" in body
+    assert "Отклонённые" in body
+    assert "/api/a3/approval-history?decision=" in body
     assert "Нет действий, ожидающих подтверждения" in body
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
@@ -16644,6 +16654,45 @@ async def assert_a3_api_layer():
         and item["target_active"] == 0
         for item in approval_history["items"]
     )
+
+    approved_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "decision=approved",
+        )
+    )
+    assert approved_history["summary"]["filter"] == "approved"
+    assert approved_history["summary"]["approved"] >= 1
+    assert approved_history["summary"]["rejected"] == 0
+    assert all(
+        item["decision"] == "approved"
+        for item in approved_history["items"]
+    )
+
+    rejected_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "decision=rejected",
+        )
+    )
+    assert rejected_history["summary"]["filter"] == "rejected"
+    assert rejected_history["summary"]["approved"] == 0
+    assert rejected_history["summary"]["rejected"] >= 1
+    assert all(
+        item["decision"] == "rejected"
+        for item in rejected_history["items"]
+    )
+
+    invalid_filter_history = crm.api_a3_approval_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/approval-history",
+            "decision=bad",
+        )
+    )
+    assert invalid_filter_history["summary"]["filter"] == "all"
 
     conn = connect()
     c = conn.cursor()

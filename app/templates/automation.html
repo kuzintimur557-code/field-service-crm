@@ -1664,9 +1664,14 @@ setInterval(loadA3ApprovalQueue, 30000);
 </div>
 
 <script>
+let a3ApprovalHistoryFilter = "all";
+
 async function loadA3ApprovalHistory() {
     try {
-        const response = await fetch("/api/a3/approval-history");
+        const response = await fetch(
+            "/api/a3/approval-history?decision="
+            + encodeURIComponent(a3ApprovalHistoryFilter)
+        );
         const data = await response.json();
 
         const container = document.getElementById("a3-approval-history");
@@ -1678,6 +1683,7 @@ async function loadA3ApprovalHistory() {
 
         if (!items.length) {
             container.innerHTML = `
+                ${renderA3ApprovalHistoryFilters(data.summary?.filter || a3ApprovalHistoryFilter)}
                 ${renderA3ApprovalHistorySummary(summary)}
                 <div class="pill">
                     История подтверждений пуста
@@ -1686,7 +1692,9 @@ async function loadA3ApprovalHistory() {
             return;
         }
 
-        container.innerHTML = renderA3ApprovalHistorySummary(summary);
+        container.innerHTML =
+            renderA3ApprovalHistoryFilters(data.summary?.filter || a3ApprovalHistoryFilter)
+            + renderA3ApprovalHistorySummary(summary);
 
         for (const item of items.slice(0, 20)) {
             const card = document.createElement("div");
@@ -1755,6 +1763,30 @@ async function loadA3ApprovalHistory() {
     } catch (err) {
         console.error("Ошибка загрузки истории подтверждений", err);
     }
+}
+
+function setA3ApprovalHistoryFilter(filter) {
+    a3ApprovalHistoryFilter = filter || "all";
+    loadA3ApprovalHistory();
+}
+
+function renderA3ApprovalHistoryFilters(activeFilter) {
+    return `
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn ${activeFilter === "all" ? "" : "off"}"
+                    onclick="setA3ApprovalHistoryFilter('all')">
+                Все решения
+            </button>
+            <button class="btn ${activeFilter === "approved" ? "" : "off"}"
+                    onclick="setA3ApprovalHistoryFilter('approved')">
+                Одобренные
+            </button>
+            <button class="btn ${activeFilter === "rejected" ? "" : "off"}"
+                    onclick="setA3ApprovalHistoryFilter('rejected')">
+                Отклонённые
+            </button>
+        </div>
+    `;
 }
 
 function renderA3ApprovalHistorySummary(summary) {

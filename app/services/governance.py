@@ -187,11 +187,21 @@ def get_approval_queue(company_id):
     return items
 
 
-def get_approval_history(company_id):
+def get_approval_history(company_id, decision_filter="all"):
     require_company_id(company_id)
+
+    if decision_filter not in {"all", "approved", "rejected"}:
+        decision_filter = "all"
 
     conn = connect()
     c = conn.cursor()
+
+    where_sql = "WHERE autonomous_action_approvals.company_id=?"
+    params = [company_id]
+
+    if decision_filter != "all":
+        where_sql += " AND autonomous_action_approvals.decision=?"
+        params.append(decision_filter)
 
     rows = c.execute("""
         SELECT
@@ -211,10 +221,10 @@ def get_approval_history(company_id):
              autonomous_action_approvals.company_id
          AND automation_rules.id = autonomous_action_queue.target_id
          AND autonomous_action_queue.target_type='automation_rule'
-        WHERE autonomous_action_approvals.company_id=?
+        {where_sql}
         ORDER BY autonomous_action_approvals.id DESC
         LIMIT 100
-    """, (company_id,)).fetchall()
+    """.format(where_sql=where_sql), params).fetchall()
 
     conn.close()
 

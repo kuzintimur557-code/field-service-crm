@@ -35457,11 +35457,18 @@ def api_a3_approval_history(request: Request):
     if not company_id:
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    items = get_approval_history(company_id)
+    query_params = getattr(request, "query_params", {}) or {}
+    decision_filter = query_params.get("decision") or "all"
+
+    if decision_filter not in {"all", "approved", "rejected"}:
+        decision_filter = "all"
+
+    items = get_approval_history(company_id, decision_filter=decision_filter)
     summary = {
         "total": len(items),
         "approved": 0,
         "rejected": 0,
+        "filter": decision_filter,
     }
 
     for item in items:

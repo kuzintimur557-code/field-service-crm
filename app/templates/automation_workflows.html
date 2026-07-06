@@ -163,6 +163,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 
 <script>
 let chainFilter = "all";
+let workflowApprovalHistoryFilter = "all";
 
 function setChainFilter(filter) {
     chainFilter = filter;
@@ -265,13 +266,17 @@ async function loadWorkflowApprovalHistory() {
     }
 
     try {
-        const response = await fetch("/api/a3/approval-history");
+        const response = await fetch(
+            "/api/a3/approval-history?decision="
+            + encodeURIComponent(workflowApprovalHistoryFilter)
+        );
         const data = await response.json();
         const items = data.items || [];
         const summary = data.summary || {};
 
         if (!items.length) {
             container.innerHTML = `
+                ${renderWorkflowApprovalHistoryFilters(data.summary?.filter || workflowApprovalHistoryFilter)}
                 ${renderWorkflowApprovalHistorySummary(summary)}
                 <div class="meta">История решений пока пустая</div>
             `;
@@ -279,6 +284,7 @@ async function loadWorkflowApprovalHistory() {
         }
 
         container.innerHTML = `
+            ${renderWorkflowApprovalHistoryFilters(data.summary?.filter || workflowApprovalHistoryFilter)}
             ${renderWorkflowApprovalHistorySummary(summary)}
             ${items.slice(0, 3).map(item => {
             const decision = item.decision_label || (
@@ -302,6 +308,28 @@ async function loadWorkflowApprovalHistory() {
         console.error(err);
         container.innerHTML = `<div class="meta">Не удалось загрузить историю решений</div>`;
     }
+}
+
+function setWorkflowApprovalHistoryFilter(filter) {
+    workflowApprovalHistoryFilter = filter || "all";
+    loadWorkflowApprovalHistory();
+}
+
+function renderWorkflowApprovalHistoryFilters(activeFilter) {
+    return `
+        <div class="workflow-card-actions">
+            <button class="back" onclick="setWorkflowApprovalHistoryFilter('all')">
+                Все решения
+            </button>
+            <button class="back" onclick="setWorkflowApprovalHistoryFilter('approved')">
+                Одобренные
+            </button>
+            <button class="back" onclick="setWorkflowApprovalHistoryFilter('rejected')">
+                Отклонённые
+            </button>
+            <span class="pill">${activeFilter === "approved" ? "Фильтр: одобрено" : activeFilter === "rejected" ? "Фильтр: отклонено" : "Фильтр: все"}</span>
+        </div>
+    `;
 }
 
 function renderWorkflowApprovalHistorySummary(summary) {
