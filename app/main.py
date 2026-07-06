@@ -35572,7 +35572,8 @@ def build_a3_approval_export_filename(filters):
 
 
 def build_a3_approval_export_filter_rows(filters, items_count=None):
-    return [
+    active_filter_labels = build_a3_approval_active_filter_labels(filters)
+    rows = [
         ["Фильтры экспорта"],
         [
             "Записей",
@@ -35582,6 +35583,19 @@ def build_a3_approval_export_filter_rows(filters, items_count=None):
             "Лимит",
             f"Последние {APPROVAL_HISTORY_LIMIT} решений",
         ],
+        [
+            "Активных фильтров",
+            len(active_filter_labels),
+        ],
+    ]
+
+    if active_filter_labels:
+        for label in active_filter_labels:
+            rows.append(["Активный фильтр", label])
+    else:
+        rows.append(["Активные фильтры", "Нет"])
+
+    rows.extend([
         [
             "Решение",
             get_a3_approval_decision_label(filters["decision"]),
@@ -35618,7 +35632,9 @@ def build_a3_approval_export_filter_rows(filters, items_count=None):
             ),
         ],
         [],
-    ]
+    ])
+
+    return rows
 
 
 def build_a3_approval_history_summary(items, filters):
