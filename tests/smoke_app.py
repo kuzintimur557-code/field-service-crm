@@ -2248,6 +2248,21 @@ async def assert_automation_page():
     assert invalid_filtered_workflow_timeline["timeline"]["status_filter"] == "all"
     assert invalid_filtered_workflow_timeline["timeline"]["status_filter_label"] == "Все"
 
+    limited_workflow_timeline = crm.api_a3_workflow_timeline(
+        make_request("owner2"),
+        rule["id"],
+        limit=5,
+    )
+    assert limited_workflow_timeline["timeline"]["limit"] == 5
+    assert len(limited_workflow_timeline["timeline"]["items"]) <= 5
+
+    oversized_workflow_timeline = crm.api_a3_workflow_timeline(
+        make_request("owner2"),
+        rule["id"],
+        limit=500,
+    )
+    assert oversized_workflow_timeline["timeline"]["limit"] == 100
+
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
     assert workflows_graph["ok"] is True
     assert workflows_graph["count"] >= 1
@@ -16185,7 +16200,10 @@ async def assert_a3_workflow_center():
     assert "session.status_label || workflowSessionStatusLabel(session.status)" in body
     assert "filterWorkflowTimeline" in body
     assert "setWorkflowTimelineLimit" in body
-    assert "status_filter=${encodeURIComponent(requestedStatusFilter)}" in body
+    assert "new URLSearchParams()" in body
+    assert 'params.set("status_filter", requestedStatusFilter)' in body
+    assert 'params.set("limit", String(requestedLimit))' in body
+    assert "loadedLimit" in body
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "workflowTimelineFilterLabel" in body
     assert "workflowTimelineSummary" in body

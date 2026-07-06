@@ -1057,7 +1057,24 @@ function setWorkflowTimelineLimit(ruleId, visibleLimit) {
         return;
     }
 
-    state.visibleLimit = Math.max(5, Number(visibleLimit || 5));
+    const timeline = state.timeline || {};
+    const sessions = timeline.sessions || [];
+    const selectedIndex = state.selectedSessionIndex || 0;
+    const statusFilter = state.selectedStatusFilter || "all";
+    const activeSession = sessions[selectedIndex] || sessions[0] || null;
+    const sessionSteps = activeSession ? (activeSession.steps || []) : (timeline.steps || []);
+    const steps = statusFilter === "all"
+        ? sessionSteps
+        : sessionSteps.filter(step => step.status === statusFilter);
+    const nextVisibleLimit = Math.max(5, Number(visibleLimit || 5));
+
+    state.visibleLimit = nextVisibleLimit;
+
+    if (timeline.has_more && nextVisibleLimit > steps.length) {
+        loadChainTimeline(ruleId, statusFilter, nextVisibleLimit);
+        return;
+    }
+
     renderChainTimeline(ruleId, state.timeline);
 }
 
@@ -1317,7 +1334,7 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
 }
 
 
-async function loadChainTimeline(ruleId, statusFilter = null) {
+async function loadChainTimeline(ruleId, statusFilter = null, limit = null) {
     const container = document.getElementById(`timeline-${ruleId}`);
 
     if (!container) {
@@ -1327,18 +1344,29 @@ async function loadChainTimeline(ruleId, statusFilter = null) {
     try {
         const currentState = a3TimelineState[ruleId] || {};
         const requestedStatusFilter = statusFilter || currentState.selectedStatusFilter || "all";
-        const query = requestedStatusFilter === "all"
-            ? ""
-            : `?status_filter=${encodeURIComponent(requestedStatusFilter)}`;
+        const requestedLimit = Number(limit || currentState.loadedLimit || currentState.timeline?.limit || 20);
+        const params = new URLSearchParams();
+
+        if (requestedStatusFilter !== "all") {
+            params.set("status_filter", requestedStatusFilter);
+        }
+
+        if (requestedLimit !== 20) {
+            params.set("limit", String(requestedLimit));
+        }
+
+        const query = params.toString() ? `?${params.toString()}` : "";
         const response = await fetch(`/api/a3/workflow/rules/${ruleId}/timeline${query}`);
         const data = await response.json();
         const timeline = data.timeline || {};
+        const nextVisibleLimit = limit ? Math.max(5, Number(limit)) : 5;
 
         a3TimelineState[ruleId] = {
             timeline,
             selectedSessionIndex: 0,
             selectedStatusFilter: timeline.status_filter || requestedStatusFilter,
-            visibleLimit: 5,
+            visibleLimit: nextVisibleLimit,
+            loadedLimit: Number(timeline.limit || requestedLimit || 20),
         };
 
         renderChainTimeline(ruleId, timeline);
@@ -1377,6 +1405,7 @@ function renderChainTimeline(ruleId, timeline) {
     const visibleLimit = Number(state.visibleLimit || 5);
     const visibleStepsCount = Math.min(steps.length, visibleLimit);
     const hasHiddenSteps = steps.length > visibleStepsCount;
+    const canLoadMoreSteps = Boolean(timeline.has_more);
 
     if (!sessionSteps.length) {
         container.innerHTML = `
@@ -1494,9 +1523,9 @@ function renderChainTimeline(ruleId, timeline) {
                 <div class="meta">По выбранному фильтру событий нет</div>
             `}
         </div>
-        ${steps.length > 5 ? `
+        ${steps.length > 5 || canLoadMoreSteps ? `
             <div class="timeline-control-row" style="margin-top:10px">
-                ${hasHiddenSteps ? `
+                ${hasHiddenSteps || canLoadMoreSteps ? `
                     <button class="back" onclick="setWorkflowTimelineLimit(${ruleId}, ${visibleStepsCount + 5})">
                         Показать ещё
                     </button>

@@ -35919,6 +35919,7 @@ def api_a3_workflow_timeline(
     request: Request,
     rule_id: int,
     status_filter: str = "all",
+    limit: int = 20,
 ):
     company_id = get_a3_company_id(request)
 
@@ -35928,6 +35929,7 @@ def api_a3_workflow_timeline(
     timeline = get_workflow_timeline(
         company_id=company_id,
         rule_id=rule_id,
+        limit=limit,
         status_filter=status_filter,
     )
 

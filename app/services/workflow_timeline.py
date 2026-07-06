@@ -4,6 +4,8 @@ from app.database import connect
 
 
 TIMELINE_STATUS_FILTERS = {"all", "done", "skipped", "failed", "pending"}
+MIN_TIMELINE_LIMIT = 5
+MAX_TIMELINE_LIMIT = 100
 
 
 def require_company_id(company_id):
@@ -32,8 +34,24 @@ def timeline_status_filter_label(status_filter):
     return labels.get(status_filter or "all", "Все")
 
 
+def normalize_timeline_limit(limit):
+    try:
+        value = int(limit)
+    except (TypeError, ValueError):
+        return 20
+
+    if value < MIN_TIMELINE_LIMIT:
+        return MIN_TIMELINE_LIMIT
+
+    if value > MAX_TIMELINE_LIMIT:
+        return MAX_TIMELINE_LIMIT
+
+    return value
+
+
 def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
     require_company_id(company_id)
+    limit = normalize_timeline_limit(limit)
     status_filter = normalize_timeline_status_filter(status_filter)
 
     conn = connect()
