@@ -1342,10 +1342,15 @@ async function loadChainTimeline(ruleId, statusFilter = null, limit = null) {
     }
 
     try {
+        const progress = document.getElementById(`timeline-progress-${ruleId}`);
         const currentState = a3TimelineState[ruleId] || {};
         const requestedStatusFilter = statusFilter || currentState.selectedStatusFilter || "all";
         const requestedLimit = Number(limit || currentState.loadedLimit || currentState.timeline?.limit || 20);
         const params = new URLSearchParams();
+
+        if (progress) {
+            progress.textContent = "Загрузка истории...";
+        }
 
         if (requestedStatusFilter !== "all") {
             params.set("status_filter", requestedStatusFilter);

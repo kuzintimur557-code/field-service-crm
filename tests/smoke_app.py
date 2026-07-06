@@ -16204,6 +16204,7 @@ async def assert_a3_workflow_center():
     assert 'params.set("status_filter", requestedStatusFilter)' in body
     assert 'params.set("limit", String(requestedLimit))' in body
     assert "loadedLimit" in body
+    assert 'progress.textContent = "Загрузка истории..."' in body
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "workflowTimelineFilterLabel" in body
     assert "workflowTimelineSummary" in body
