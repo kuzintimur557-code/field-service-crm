@@ -15,6 +15,7 @@ from app.services.autonomous_actions import (
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
+    APPROVAL_HISTORY_LIMIT,
     action_label,
     ensure_governance_settings,
     get_governance_settings,
@@ -35473,8 +35474,8 @@ def api_a3_approval_history(request: Request):
         "total": len(items),
         "approved": 0,
         "rejected": 0,
-        "history_limit": 100,
-        "history_limit_label": "Последние 100 решений",
+        "history_limit": APPROVAL_HISTORY_LIMIT,
+        "history_limit_label": f"Последние {APPROVAL_HISTORY_LIMIT} решений",
         "filter": filters["decision"],
         "date_from": filters["date_from"],
         "date_to": filters["date_to"],

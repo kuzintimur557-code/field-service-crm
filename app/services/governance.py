@@ -4,6 +4,8 @@ import json
 from app.database import connect
 
 
+APPROVAL_HISTORY_LIMIT = 100
+
 ACTION_LABELS = {
     "retry_events": "Повторить события",
     "disable_rule": "Отключить правило",
@@ -257,6 +259,8 @@ def get_approval_history(
         where_sql += " AND autonomous_action_queue.target_id=?"
         params.append(target_id_filter)
 
+    params_with_limit = [*params, APPROVAL_HISTORY_LIMIT]
+
     rows = c.execute("""
         SELECT
             autonomous_action_approvals.*,
@@ -277,8 +281,8 @@ def get_approval_history(
          AND autonomous_action_queue.target_type='automation_rule'
         {where_sql}
         ORDER BY autonomous_action_approvals.id DESC
-        LIMIT 100
-    """.format(where_sql=where_sql), params).fetchall()
+        LIMIT ?
+    """.format(where_sql=where_sql), params_with_limit).fetchall()
 
     conn.close()
 
