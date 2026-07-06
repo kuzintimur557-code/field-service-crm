@@ -389,6 +389,25 @@ function clearWorkflowApprovalHistoryDateFilter() {
     loadWorkflowApprovalHistory();
 }
 
+function formatWorkflowApprovalHistoryDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+}
+
+function setWorkflowApprovalHistoryQuickPeriod(days) {
+    const endDate = new Date();
+    const startDate = new Date(endDate);
+
+    startDate.setDate(startDate.getDate() - Math.max(days - 1, 0));
+
+    workflowApprovalHistoryDateFrom = formatWorkflowApprovalHistoryDate(startDate);
+    workflowApprovalHistoryDateTo = formatWorkflowApprovalHistoryDate(endDate);
+    loadWorkflowApprovalHistory();
+}
+
 function resetWorkflowApprovalHistoryFilters() {
     workflowApprovalHistoryFilter = "all";
     workflowApprovalHistoryActionType = "all";
@@ -478,6 +497,15 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
             <input id="workflow-approval-date-to"
                    type="date"
                    value="${workflowApprovalHistoryDateTo}">
+            <button class="back" onclick="setWorkflowApprovalHistoryQuickPeriod(1)">
+                Сегодня
+            </button>
+            <button class="back" onclick="setWorkflowApprovalHistoryQuickPeriod(7)">
+                7 дней
+            </button>
+            <button class="back" onclick="setWorkflowApprovalHistoryQuickPeriod(30)">
+                30 дней
+            </button>
             <button class="back" onclick="setWorkflowApprovalHistoryDateFilter()">
                 Показать период
             </button>

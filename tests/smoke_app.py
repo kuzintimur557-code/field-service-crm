@@ -566,6 +566,8 @@ async def assert_automation_page():
     assert "a3-approval-target-id" in html
     assert "setA3ApprovalHistoryDateFilter" in html
     assert "clearA3ApprovalHistoryDateFilter" in html
+    assert "formatA3ApprovalHistoryDate" in html
+    assert "setA3ApprovalHistoryQuickPeriod" in html
     assert "resetA3ApprovalHistoryFilters" in html
     assert "getA3ApprovalHistoryActiveFilterCount" in html
     assert "a3-approval-date-from" in html
@@ -578,6 +580,9 @@ async def assert_automation_page():
     assert "Все действия" in html
     assert "Отключить правило" in html
     assert "Повторить события" in html
+    assert "Сегодня" in html
+    assert "7 дней" in html
+    assert "30 дней" in html
     assert "Показать период" in html
     assert "Сбросить период" in html
     assert "Сбросить все фильтры" in html
@@ -16035,6 +16040,8 @@ async def assert_a3_workflow_center():
     assert "workflow-approval-target-id" in body
     assert "setWorkflowApprovalHistoryDateFilter" in body
     assert "clearWorkflowApprovalHistoryDateFilter" in body
+    assert "formatWorkflowApprovalHistoryDate" in body
+    assert "setWorkflowApprovalHistoryQuickPeriod" in body
     assert "resetWorkflowApprovalHistoryFilters" in body
     assert "getWorkflowApprovalHistoryActiveFilterCount" in body
     assert "workflow-approval-date-from" in body
@@ -16047,6 +16054,9 @@ async def assert_a3_workflow_center():
     assert "Все действия" in body
     assert "Отключить правило" in body
     assert "Повторить события" in body
+    assert "Сегодня" in body
+    assert "7 дней" in body
+    assert "30 дней" in body
     assert "Показать период" in body
     assert "Сбросить период" in body
     assert "Сбросить все фильтры" in body
