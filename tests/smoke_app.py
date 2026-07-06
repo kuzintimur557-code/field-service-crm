@@ -550,6 +550,8 @@ async def assert_automation_page():
     assert "Отклонено:" in html
     assert "decision_label" in html
     assert "decided_by_label" in html
+    assert "item.action_label" in html
+    assert "item.target_label" in html
     assert "setA3ApprovalHistoryFilter" in html
     assert "Все решения" in html
     assert "Одобренные" in html
@@ -15988,6 +15990,8 @@ async def assert_a3_workflow_center():
     assert "Одобрено:" in body
     assert "Отклонено:" in body
     assert "decision_label" in body
+    assert "item.action_label" in body
+    assert "item.target_label" in body
     assert "setWorkflowApprovalHistoryFilter" in body
     assert "Все решения" in body
     assert "Одобренные" in body
@@ -16612,6 +16616,14 @@ async def assert_a3_api_layer():
         == "A3 disabled unhealthy smoke"
     )
     assert approval_queue_items[approve_action_id]["target_active"] == 0
+    assert (
+        approval_queue_items[approve_action_id]["action_label"]
+        == "Отключить правило"
+    )
+    assert (
+        approval_queue_items[approve_action_id]["target_label"]
+        == "Правило автоматизации"
+    )
     assert approval_queue_items[approve_action_id]["can_bulk_approve"] is True
     assert approval_queue_items[approve_action_id]["can_bulk_reject"] is False
 
@@ -16652,6 +16664,8 @@ async def assert_a3_api_layer():
         and item["decided_by_label"] == "owner2"
         and item["target_name"] == "A3 disabled unhealthy smoke"
         and item["target_active"] == 0
+        and item["action_label"] == "Отключить правило"
+        and item["target_label"] == "Правило автоматизации"
         for item in approval_history["items"]
     )
     assert any(
@@ -16716,6 +16730,8 @@ async def assert_a3_api_layer():
     approved_export_body = approved_export.body.decode("utf-8")
     assert "ID решения,ID действия,Решение" in approved_export_body
     assert "Одобрено" in approved_export_body
+    assert "Отключить правило" in approved_export_body
+    assert "Правило автоматизации" in approved_export_body
     assert "Отклонено" not in approved_export_body
     assert "A3 disabled unhealthy smoke" in approved_export_body
     assert "a3_approval_history_approved.csv" in (

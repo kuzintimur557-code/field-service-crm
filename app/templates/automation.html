@@ -1531,11 +1531,11 @@ async function loadA3ApprovalQueue() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${a3ActionLabel(item.action_type)}
+                            ${item.action_label || a3ActionLabel(item.action_type)}
                         </div>
 
                         <div style="margin-top:8px;color:#374151">
-                            ${a3TargetLabel(item.target_type)}
+                            ${item.target_label || a3TargetLabel(item.target_type)}
                             #${item.target_id || "-"}
                         </div>
 
@@ -1721,11 +1721,11 @@ async function loadA3ApprovalHistory() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${a3ActionLabel(item.action_type)}
+                            ${item.action_label || a3ActionLabel(item.action_type)}
                         </div>
 
                         <div style="margin-top:8px;color:#374151">
-                            ${a3TargetLabel(item.target_type)}
+                            ${item.target_label || a3TargetLabel(item.target_type)}
                             #${item.target_id || "-"}
                         </div>
 

@@ -4,9 +4,30 @@ import json
 from app.database import connect
 
 
+ACTION_LABELS = {
+    "retry_events": "Повторить события",
+    "disable_rule": "Отключить правило",
+    "recovery_cycle": "Запустить восстановление",
+}
+
+TARGET_LABELS = {
+    "automation_rule": "Правило автоматизации",
+    "automation_event": "Событие автоматизации",
+    "autonomous_action": "AI-действие",
+}
+
+
 def require_company_id(company_id):
     if not company_id:
         raise ValueError("company_id is required")
+
+
+def action_label(action_type):
+    return ACTION_LABELS.get(action_type, action_type or "-")
+
+
+def target_label(target_type):
+    return TARGET_LABELS.get(target_type, target_type or "-")
 
 
 def get_governance_settings(company_id):
@@ -176,6 +197,8 @@ def get_approval_queue(company_id):
 
         item["target_name"] = target_rule.get("name") or ""
         item["target_active"] = target_rule.get("active")
+        item["action_label"] = action_label(item.get("action_type"))
+        item["target_label"] = target_label(item.get("target_type"))
         item["approval_safety"] = "safe" if safe else "unsafe"
         item["approval_safety_reason"] = reason
         item["approval_safety_label"] = label
@@ -239,6 +262,8 @@ def get_approval_history(company_id, decision_filter="all"):
             "approved": "Одобрено",
             "rejected": "Отклонено",
         }.get(decision, decision or "Решение не указано")
+        item["action_label"] = action_label(item.get("action_type"))
+        item["target_label"] = target_label(item.get("target_type"))
         item["decided_by_label"] = (
             "Система" if decided_by == "system" else decided_by
         )

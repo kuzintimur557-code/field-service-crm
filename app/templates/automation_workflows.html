@@ -215,10 +215,10 @@ async function loadWorkflowApprovalQueue() {
                 <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900">
-                            ${workflowApprovalActionLabel(item.action_type)}
+                            ${item.action_label || workflowApprovalActionLabel(item.action_type)}
                         </div>
                         <div class="meta" style="margin-top:6px">
-                            ${workflowApprovalTargetLabel(item.target_type)} #${item.target_id || "-"} · ${item.created_at || ""}
+                            ${item.target_label || workflowApprovalTargetLabel(item.target_type)} #${item.target_id || "-"} · ${item.created_at || ""}
                         </div>
                         ${item.target_name ? `
                             <div class="meta" style="margin-top:6px">
@@ -295,8 +295,8 @@ async function loadWorkflowApprovalHistory() {
             return `
                 <div class="meta">
                     <span class="pill ${cls}">${decision}</span>
-                    ${workflowApprovalActionLabel(item.action_type)}
-                    для ${workflowApprovalTargetLabel(item.target_type)}
+                    ${item.action_label || workflowApprovalActionLabel(item.action_type)}
+                    для ${item.target_label || workflowApprovalTargetLabel(item.target_type)}
                     #${item.target_id || "-"}
                     ${item.target_name ? "· Правило: " + item.target_name : ""}
                     · ${item.created_at || ""}
