@@ -16393,6 +16393,8 @@ async def assert_a3_workflow_center():
     assert "session.summary_label || \"Сводка недоступна\"" in body
     assert "filterWorkflowTimeline" in body
     assert "setWorkflowTimelineLimit" in body
+    assert "nextVisibleStepsCount" in body
+    assert "loadMoreLabel" in body
     assert "new URLSearchParams()" in body
     assert "stopReplayChainTimeline(ruleId);" in body
     assert 'params.set("status_filter", requestedStatusFilter)' in body
@@ -16427,6 +16429,7 @@ async def assert_a3_workflow_center():
     assert "Событие #" in body
     assert "event_rule_id=${rule.id}" in body
     assert "Показать ещё" in body
+    assert "Загрузить ещё события" in body
     assert "Свернуть" in body
     assert "По выбранному фильтру событий нет" in body
 

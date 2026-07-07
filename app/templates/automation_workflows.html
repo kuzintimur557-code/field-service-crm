@@ -1818,6 +1818,11 @@ function renderChainTimeline(ruleId, timeline) {
     const visibleStepsCount = Math.min(steps.length, visibleLimit);
     const hasHiddenSteps = steps.length > visibleStepsCount;
     const canLoadMoreSteps = Boolean(timeline.has_more);
+    const nextVisibleStepsCount = Math.min(steps.length, visibleStepsCount + 5);
+    const nextTimelineLimit = hasHiddenSteps ? nextVisibleStepsCount : visibleStepsCount + 5;
+    const loadMoreLabel = hasHiddenSteps
+        ? `Показать ещё ${Math.max(nextVisibleStepsCount - visibleStepsCount, 1)}`
+        : "Загрузить ещё события";
 
     if (!sessionSteps.length) {
         container.innerHTML = `
@@ -1959,8 +1964,8 @@ function renderChainTimeline(ruleId, timeline) {
         ${steps.length > 5 || canLoadMoreSteps ? `
             <div class="timeline-control-row" style="margin-top:10px">
                 ${hasHiddenSteps || canLoadMoreSteps ? `
-                    <button class="back" onclick="setWorkflowTimelineLimit(${ruleId}, ${visibleStepsCount + 5})">
-                        Показать ещё
+                    <button class="back" onclick="setWorkflowTimelineLimit(${ruleId}, ${nextTimelineLimit})">
+                        ${loadMoreLabel}
                     </button>
                 ` : ""}
                 ${visibleLimit > 5 ? `
