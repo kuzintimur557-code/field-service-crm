@@ -119,6 +119,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
         <button class="back" data-chain-filter="disabled" onclick="setChainFilter('disabled')">Выключенные</button>
         <button class="back" data-chain-filter="problematic" onclick="setChainFilter('problematic')">Проблемные</button>
         <button class="back" data-chain-filter="empty" onclick="setChainFilter('empty')">Без действий</button>
+        <button class="back off" onclick="refreshWorkflowCenter()">Обновить цепочки</button>
     </div>
     <div class="search-row">
         <input id="workflow-chain-search" type="text"
@@ -245,6 +246,12 @@ function resetChainSearch() {
     }
 
     loadChains();
+}
+
+async function refreshWorkflowCenter() {
+    await loadChains();
+    await loadWorkflowApprovalQueue();
+    await loadWorkflowApprovalHistory();
 }
 
 function chainFilterLabel(filter) {

@@ -16120,6 +16120,8 @@ async def assert_a3_workflow_center():
     assert "window.setTimeout" in body
     assert "window.clearTimeout" in body
     assert "resetChainSearch" in body
+    assert "refreshWorkflowCenter" in body
+    assert "Обновить цепочки" in body
     assert "data-chain-filter=" in body
     assert "chainFilterLabel" in body
     assert "updateChainFilterButtons" in body
