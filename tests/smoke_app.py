@@ -16111,6 +16111,14 @@ async def assert_a3_workflow_center():
     assert 'class="mobile-nav"' in body
     assert 'class="header-actions"' in body
     assert 'class="filter-actions"' in body
+    assert 'id="workflow-chain-search"' in body
+    assert "setChainSearch" in body
+    assert "resetChainSearch" in body
+    assert "data-chain-filter=" in body
+    assert "chainFilterLabel" in body
+    assert "updateChainFilterButtons" in body
+    assert "Поиск: \" + (searchValue || \"без поиска\")" in body
+    assert "По выбранному фильтру или поиску цепочки не найдены" in body
     assert "workflow-card-actions" in body
     assert "chain-actions" in body
     assert "timeline-control-row" in body

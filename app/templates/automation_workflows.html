@@ -14,6 +14,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;over
 .header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}
 .card{background:white;padding:18px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:14px}
 .back{display:inline-flex;align-items:center;justify-content:center;min-height:42px;max-width:100%;padding:10px 14px;border-radius:14px;background:#111827;color:white;text-align:center;line-height:1.2;text-decoration:none;font-weight:900;border:0;cursor:pointer;white-space:normal}
+.back.active{background:#2563eb}
 .back.off{background:#f3f4f6;color:#374151;border:1px solid #d1d5db}
 h1{margin:0 0 8px;font-size:30px;line-height:1.12;overflow-wrap:anywhere}
 h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
@@ -27,6 +28,8 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 .pill.off{background:#fee2e2;color:#991b1b}
 .graph-box{margin-top:12px;padding:10px;border-radius:18px;background:white;border:1px solid #e5e7eb;overflow-x:auto;overflow-y:hidden}
 .header-actions,.filter-actions,.workflow-card-actions,.chain-actions,.timeline-control-row,.problem-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-top:12px}
+.search-row input{width:100%;min-height:42px;padding:10px 12px;border:1px solid #d1d5db;border-radius:14px;background:white;color:#111827;font-weight:900}
 .workflow-card-actions select{min-height:42px;max-width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:14px;background:white;color:#111827;font-weight:900}
 .debug-action-row{display:flex;gap:8px;flex-wrap:wrap}
 .timeline-step{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px}
@@ -81,7 +84,9 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
     .problem-actions a,.problem-actions button,
     .debug-action-row button,
     .filter-actions button,
+    .search-row button,
     .header-actions a{width:100%}
+    .search-row{grid-template-columns:1fr}
     .timeline-step{display:grid;grid-template-columns:1fr}
     .graph-box svg{min-width:640px}
 }
@@ -109,11 +114,18 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 <div class="card">
     <h2>Фильтры цепочек</h2>
     <div class="filter-actions">
-        <button class="back" onclick="setChainFilter('all')">Все</button>
-        <button class="back" onclick="setChainFilter('active')">Активные</button>
-        <button class="back" onclick="setChainFilter('disabled')">Выключенные</button>
-        <button class="back" onclick="setChainFilter('problematic')">Проблемные</button>
-        <button class="back" onclick="setChainFilter('empty')">Без действий</button>
+        <button class="back" data-chain-filter="all" onclick="setChainFilter('all')">Все</button>
+        <button class="back" data-chain-filter="active" onclick="setChainFilter('active')">Активные</button>
+        <button class="back" data-chain-filter="disabled" onclick="setChainFilter('disabled')">Выключенные</button>
+        <button class="back" data-chain-filter="problematic" onclick="setChainFilter('problematic')">Проблемные</button>
+        <button class="back" data-chain-filter="empty" onclick="setChainFilter('empty')">Без действий</button>
+    </div>
+    <div class="search-row">
+        <input id="workflow-chain-search" type="text"
+               placeholder="Найти цепочку по названию, ID, триггеру или состоянию"
+               aria-label="Поиск цепочек автоматизации"
+               oninput="setChainSearch(this.value)">
+        <button class="back" onclick="resetChainSearch()">Сбросить поиск</button>
     </div>
 </div>
 
@@ -167,6 +179,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 
 <script>
 let chainFilter = "all";
+let chainSearch = "";
 let workflowApprovalHistoryFilter = "all";
 let workflowApprovalHistoryActionType = "all";
 let workflowApprovalHistoryTargetType = "all";
@@ -203,6 +216,40 @@ function buildWorkflowApprovalHistoryQuery() {
 function setChainFilter(filter) {
     chainFilter = filter;
     loadChains();
+}
+
+function setChainSearch(value) {
+    chainSearch = value || "";
+    loadChains();
+}
+
+function resetChainSearch() {
+    chainSearch = "";
+    const input = document.getElementById("workflow-chain-search");
+
+    if (input) {
+        input.value = "";
+    }
+
+    loadChains();
+}
+
+function chainFilterLabel(filter) {
+    const labels = {
+        all: "Все",
+        active: "Активные",
+        disabled: "Выключенные",
+        problematic: "Проблемные",
+        empty: "Без действий",
+    };
+
+    return labels[filter] || "Все";
+}
+
+function updateChainFilterButtons() {
+    document.querySelectorAll("[data-chain-filter]").forEach(button => {
+        button.classList.toggle("active", button.dataset.chainFilter === chainFilter);
+    });
 }
 
 function workflowApprovalActionLabel(actionType) {
@@ -712,6 +759,7 @@ function renderChainGraph(chain) {
 async function loadChains() {
     const list = document.getElementById("chains-list");
     const summary = document.getElementById("chains-summary");
+    const searchValue = chainSearch.trim().toLowerCase();
 
     try {
         const [response, approvalResponse] = await Promise.all([
@@ -732,14 +780,25 @@ async function loadChains() {
             const events = chain.events || [];
             const trigger = chain.trigger || {};
             const debug = chain.debug || {};
+            const state = chain.health || {};
+            const searchText = [
+                rule.id,
+                rule.name,
+                rule.trigger_key,
+                trigger.label,
+                rule.conditions?.label,
+                state.title,
+                state.status,
+                (actions || []).map(action => action.label || action.action_key).join(" "),
+            ].join(" ").toLowerCase();
 
             if (chainFilter === "active" && !rule.active) continue;
             if (chainFilter === "disabled" && rule.active) continue;
             if (chainFilter === "problematic" && rule.active && actions.length > 0) continue;
             if (chainFilter === "empty" && actions.length > 0) continue;
+            if (searchValue && !searchText.includes(searchValue)) continue;
 
             const [label, cls] = getChainStatus(rule, actions);
-            const state = chain.health || {};
 
             chain.playback = {
                 active_step: 1
@@ -931,12 +990,17 @@ async function loadChains() {
             rendered += 1;
         }
 
-        summary.textContent = "Всего цепочек: " + chains.length + ". Показано: " + rendered + ". Ждёт подтверждения: " + approvalCount + ".";
+        updateChainFilterButtons();
+        summary.textContent = "Всего цепочек: " + chains.length
+            + ". Фильтр: " + chainFilterLabel(chainFilter)
+            + ". Поиск: " + (searchValue || "без поиска")
+            + ". Показано: " + rendered
+            + ". Ждёт подтверждения: " + approvalCount + ".";
         updateReplayRuntimeSummary();
         renderProblemChains(chains);
 
         if (!rendered) {
-            list.innerHTML = '<div class="card empty">По выбранному фильтру цепочки не найдены</div>';
+            list.innerHTML = '<div class="card empty">По выбранному фильтру или поиску цепочки не найдены</div>';
         }
     } catch (err) {
         console.error(err);
