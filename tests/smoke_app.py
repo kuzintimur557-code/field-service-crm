@@ -2237,6 +2237,11 @@ async def assert_automation_page():
     assert "remaining_count" in workflow_timeline["timeline"]
     assert "loaded_label" in workflow_timeline["timeline"]
     assert workflow_timeline["timeline"]["loaded_label"].startswith("Показано:")
+    assert "load_state_label" in workflow_timeline["timeline"]
+    assert workflow_timeline["timeline"]["load_state_label"] in {
+        "Есть ещё события",
+        "Загружены все события",
+    }
     assert "limit" in workflow_timeline["timeline"]
     assert "has_more" in workflow_timeline["timeline"]
     assert workflow_timeline["timeline"]["status_filter"] == "all"
@@ -16409,6 +16414,8 @@ async def assert_a3_workflow_center():
     assert "Скачать CSV по фильтру" in body
     assert "workflowTimelineSummary" in body
     assert "timeline?.loaded_label" in body
+    assert "timeline?.load_state_label" in body
+    assert "Загружены все события" in body
     assert "Всего событий в истории:" in body
     assert "Осталось:" in body
     assert "data-timeline-filter" in body

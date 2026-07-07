@@ -121,6 +121,7 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
         if has_more
         else f"Показано: {loaded_count}"
     )
+    load_state_label = "Есть ещё события" if has_more else "Загружены все события"
     status_filter_label = timeline_status_filter_label(status_filter)
     status_filter_count_label = f"Фильтр: {status_filter_label} · Найдено событий: {total_events}"
 
@@ -134,6 +135,7 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
         "loaded_count": loaded_count,
         "remaining_count": remaining_count,
         "loaded_label": loaded_label,
+        "load_state_label": load_state_label,
         "limit": limit,
         "has_more": has_more,
         "summary": build_timeline_summary(items),

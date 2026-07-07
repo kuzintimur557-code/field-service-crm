@@ -1457,6 +1457,7 @@ function workflowTimelineSummary(summary, timeline) {
     return [
         `Всего событий в истории: ${totalInHistory}`,
         loadedLabel,
+        timeline?.load_state_label || "Загружены все события",
         `Состояние: ${summary.state_label || "-"}`,
         summary.latest_event_label || "Последнее событие: нет",
         summary.problem_label || "Проблемных событий: 0",
