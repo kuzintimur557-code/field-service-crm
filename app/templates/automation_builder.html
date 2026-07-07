@@ -14,6 +14,7 @@
         .meta{color:#6b7280;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
         .card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 10px 25px rgba(15,23,42,.08);margin-bottom:16px}
         .back{display:inline-flex;align-items:center;justify-content:center;min-height:42px;max-width:100%;padding:10px 14px;border-radius:999px;text-align:center;line-height:1.2;text-decoration:none;font-weight:900;background:#111827;color:#fff;border:0;cursor:pointer;white-space:normal}
+        .back.active{background:#2563eb}
         .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
         .chain{border:1px solid #e5e7eb;border-radius:16px;padding:16px;background:#fff}
         .chain.disabled{opacity:.72}
@@ -28,6 +29,8 @@
         .pill.off{background:#fee2e2;color:#991b1b}
         .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
         .filters{display:flex;gap:8px;flex-wrap:wrap}
+        .search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:12px}
+        .full-width{grid-column:1/-1}
         .header-actions,.inline-pills{display:flex;gap:10px;flex-wrap:wrap}
         .chain-heading{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
         .condition-form{display:grid;gap:8px;margin-top:10px}
@@ -41,6 +44,7 @@
             .header{display:grid;grid-template-columns:1fr}
             .header-actions,.filters,.actions,.inline-pills,.chain-heading{display:grid;grid-template-columns:1fr}
             .header-actions a,.filters button,.actions a,.actions button,.inline-pills a,.inline-pills button{width:100%}
+            .search-row{grid-template-columns:1fr}
             .card,.chain{border-radius:16px;padding:16px}
             .grid{grid-template-columns:1fr}
             .back{width:100%}
@@ -114,14 +118,21 @@
             <span class="pill">С условиями: {{ builder_stats.with_conditions }}</span>
         </div>
         <div class="filters">
-            <button class="back" type="button" onclick="filterBuilderChains('all')">Все</button>
-            <button class="back" type="button" onclick="filterBuilderChains('active')">Активные</button>
-            <button class="back" type="button" onclick="filterBuilderChains('disabled')">Выключенные</button>
-            <button class="back" type="button" onclick="filterBuilderChains('empty')">Без действий</button>
-            <button class="back" type="button" onclick="filterBuilderChains('conditions')">С условиями</button>
+            <button class="back" type="button" data-builder-filter="all" onclick="filterBuilderChains('all')">Все</button>
+            <button class="back" type="button" data-builder-filter="active" onclick="filterBuilderChains('active')">Активные</button>
+            <button class="back" type="button" data-builder-filter="disabled" onclick="filterBuilderChains('disabled')">Выключенные</button>
+            <button class="back" type="button" data-builder-filter="empty" onclick="filterBuilderChains('empty')">Без действий</button>
+            <button class="back" type="button" data-builder-filter="conditions" onclick="filterBuilderChains('conditions')">С условиями</button>
+        </div>
+        <div class="search-row">
+            <input id="builder-search" type="text"
+                   placeholder="Найти цепочку по названию, ID, триггеру или условию"
+                   aria-label="Поиск цепочек автоматизации"
+                   oninput="filterBuilderChains(currentBuilderFilter)">
+            <button class="back" type="button" onclick="resetBuilderSearch()">Сбросить поиск</button>
         </div>
         <div id="builder-filter-status" class="meta" style="margin-top:10px">
-            Фильтр: Все · Показано: {{ builder_stats.total }}
+            Фильтр: Все · Поиск: без поиска · Показано: {{ builder_stats.total }}
         </div>
     </div>
 
@@ -172,7 +183,8 @@
              data-builder-chain="1"
              data-active="{% if rule['active'] %}1{% else %}0{% endif %}"
              data-action-count="{{ rule_actions|length }}"
-             data-has-conditions="{% if rule['has_conditions'] %}1{% else %}0{% endif %}">
+             data-has-conditions="{% if rule['has_conditions'] %}1{% else %}0{% endif %}"
+             data-builder-search="{{ (rule['name'] ~ ' #' ~ rule['id'] ~ ' ' ~ rule['trigger_key'] ~ ' ' ~ trigger_labels.get(rule['trigger_key'], rule['trigger_key']) ~ ' ' ~ rule['condition_label'])|lower|e }}">
             <div class="chain-heading">
                 <div>
                     <h2>{{ rule["name"] }}</h2>
@@ -513,10 +525,21 @@
             </div>
         </div>
         {% endfor %}
+        <div id="builder-empty-state" class="card full-width" style="display:none">
+            <h2>Ничего не найдено</h2>
+            <div class="meta">Измените фильтр или очистите поиск, чтобы снова увидеть цепочки.</div>
+            <div class="actions">
+                <button class="back" type="button" onclick="resetBuilderSearch()">Очистить поиск</button>
+                <button class="back" type="button" onclick="filterBuilderChains('all')">Показать все</button>
+            </div>
+        </div>
     </div>
 </div>
 <script>
+let currentBuilderFilter = "all";
+
 function filterBuilderChains(filter) {
+    currentBuilderFilter = filter || currentBuilderFilter || "all";
     const labels = {
         all: "Все",
         active: "Активные",
@@ -524,22 +547,34 @@ function filterBuilderChains(filter) {
         empty: "Без действий",
         conditions: "С условиями",
     };
+    const searchInput = document.getElementById("builder-search");
+    const searchValue = searchInput ? searchInput.value.trim().toLowerCase() : "";
+    const cards = document.querySelectorAll("[data-builder-chain]");
     let shown = 0;
 
-    document.querySelectorAll("[data-builder-chain]").forEach(card => {
+    document.querySelectorAll("[data-builder-filter]").forEach(button => {
+        button.classList.toggle("active", button.dataset.builderFilter === currentBuilderFilter);
+    });
+
+    cards.forEach(card => {
         const active = card.dataset.active === "1";
         const actionCount = Number(card.dataset.actionCount || 0);
         const hasConditions = card.dataset.hasConditions === "1";
+        const searchText = `${card.dataset.builderSearch || ""} ${card.textContent || ""}`.toLowerCase();
         let visible = true;
 
-        if (filter === "active") {
+        if (currentBuilderFilter === "active") {
             visible = active;
-        } else if (filter === "disabled") {
+        } else if (currentBuilderFilter === "disabled") {
             visible = !active;
-        } else if (filter === "empty") {
+        } else if (currentBuilderFilter === "empty") {
             visible = actionCount === 0;
-        } else if (filter === "conditions") {
+        } else if (currentBuilderFilter === "conditions") {
             visible = hasConditions;
+        }
+
+        if (searchValue) {
+            visible = visible && searchText.includes(searchValue);
         }
 
         card.style.display = visible ? "" : "none";
@@ -550,10 +585,25 @@ function filterBuilderChains(filter) {
     });
 
     const status = document.getElementById("builder-filter-status");
+    const emptyState = document.getElementById("builder-empty-state");
 
     if (status) {
-        status.textContent = `Фильтр: ${labels[filter] || "Все"} · Показано: ${shown}`;
+        status.textContent = `Фильтр: ${labels[currentBuilderFilter] || "Все"} · Поиск: ${searchValue || "без поиска"} · Показано: ${shown}`;
     }
+
+    if (emptyState) {
+        emptyState.style.display = cards.length > 0 && shown === 0 ? "" : "none";
+    }
+}
+
+function resetBuilderSearch() {
+    const searchInput = document.getElementById("builder-search");
+
+    if (searchInput) {
+        searchInput.value = "";
+    }
+
+    filterBuilderChains(currentBuilderFilter);
 }
 
 filterBuilderChains("all");
