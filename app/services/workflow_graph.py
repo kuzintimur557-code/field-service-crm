@@ -335,6 +335,17 @@ def _workflow_debug(rule, actions, latest_problem_event):
     }
 
 
+def _workflow_stats_summary(total_events, done_count, skipped_count, pending_count, failed_count, success_rate):
+    return (
+        f"Событий: {total_events} · "
+        f"Выполнено: {done_count} · "
+        f"Пропущено: {skipped_count} · "
+        f"Ожидает: {pending_count} · "
+        f"Ошибки: {failed_count} · "
+        f"Успешность: {success_rate}%"
+    )
+
+
 def get_rule_workflow_graph(company_id, rule_id):
     require_company_id(company_id)
 
@@ -497,6 +508,14 @@ def get_rule_workflow_graph(company_id, rule_id):
             "pending": pending_count,
             "failed": failed_count,
             "success_rate": success_rate,
+            "summary_label": _workflow_stats_summary(
+                total_events,
+                done_count,
+                skipped_count,
+                pending_count,
+                failed_count,
+                success_rate,
+            ),
         },
     }
 
