@@ -16285,11 +16285,19 @@ async def assert_a3_workflow_center():
     assert "Обновление подтверждений..." in body
     assert "Подтверждения обновлены:" in body
     assert "approveWorkflowAction" in body
+    assert "approval_action_approve_failed" in body
+    assert "Не удалось одобрить действие" in body
     assert "rejectWorkflowAction" in body
+    assert "approval_action_reject_failed" in body
+    assert "Не удалось отклонить действие" in body
     assert "approveSafeWorkflowActions" in body
     assert "Одобрить безопасные" in body
+    assert "approval_safe_actions_failed" in body
+    assert "Не удалось одобрить безопасные действия" in body
     assert "rejectUnsafeWorkflowActions" in body
     assert "Отклонить небезопасные" in body
+    assert "approval_unsafe_actions_failed" in body
+    assert "Не удалось отклонить небезопасные действия" in body
     assert "approval_safety_label" in body
     assert "Требует проверки" in body
     assert "automation_event: \"Событие автоматизации\"" in body

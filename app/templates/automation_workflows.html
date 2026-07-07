@@ -775,51 +775,91 @@ function renderWorkflowApprovalHistorySummary(summary) {
 }
 
 async function approveWorkflowAction(actionId) {
-    await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {method:"POST"});
-    await loadWorkflowApprovalQueue();
-    await loadWorkflowApprovalHistory();
-    loadChains();
-    alert("Действие одобрено");
+    try {
+        const response = await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {method:"POST"});
+
+        if (!response.ok) {
+            throw new Error("approval_action_approve_failed");
+        }
+
+        await loadWorkflowApprovalQueue();
+        await loadWorkflowApprovalHistory();
+        loadChains();
+        alert("Действие одобрено");
+    } catch (err) {
+        console.error(err);
+        alert("Не удалось одобрить действие");
+    }
 }
 
 async function rejectWorkflowAction(actionId) {
-    await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {method:"POST"});
-    await loadWorkflowApprovalQueue();
-    await loadWorkflowApprovalHistory();
-    loadChains();
-    alert("Действие отклонено");
+    try {
+        const response = await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {method:"POST"});
+
+        if (!response.ok) {
+            throw new Error("approval_action_reject_failed");
+        }
+
+        await loadWorkflowApprovalQueue();
+        await loadWorkflowApprovalHistory();
+        loadChains();
+        alert("Действие отклонено");
+    } catch (err) {
+        console.error(err);
+        alert("Не удалось отклонить действие");
+    }
 }
 
 async function approveSafeWorkflowActions() {
-    const response = await fetch("/api/a3/autonomous-actions/approve-safe", {
-        method: "POST"
-    });
-    const data = await response.json();
+    try {
+        const response = await fetch("/api/a3/autonomous-actions/approve-safe", {
+            method: "POST"
+        });
 
-    await loadWorkflowApprovalQueue();
-    await loadWorkflowApprovalHistory();
-    loadChains();
+        if (!response.ok) {
+            throw new Error("approval_safe_actions_failed");
+        }
 
-    alert(
-        "Одобрено: " + (data.approved || 0)
-        + ". Пропущено: " + (data.skipped || 0)
-    );
+        const data = await response.json();
+
+        await loadWorkflowApprovalQueue();
+        await loadWorkflowApprovalHistory();
+        loadChains();
+
+        alert(
+            "Одобрено: " + (data.approved || 0)
+            + ". Пропущено: " + (data.skipped || 0)
+        );
+    } catch (err) {
+        console.error(err);
+        alert("Не удалось одобрить безопасные действия");
+    }
 }
 
 async function rejectUnsafeWorkflowActions() {
-    const response = await fetch("/api/a3/autonomous-actions/reject-unsafe", {
-        method: "POST"
-    });
-    const data = await response.json();
+    try {
+        const response = await fetch("/api/a3/autonomous-actions/reject-unsafe", {
+            method: "POST"
+        });
 
-    await loadWorkflowApprovalQueue();
-    await loadWorkflowApprovalHistory();
-    loadChains();
+        if (!response.ok) {
+            throw new Error("approval_unsafe_actions_failed");
+        }
 
-    alert(
-        "Отклонено: " + (data.rejected || 0)
-        + ". Пропущено: " + (data.skipped || 0)
-    );
+        const data = await response.json();
+
+        await loadWorkflowApprovalQueue();
+        await loadWorkflowApprovalHistory();
+        loadChains();
+
+        alert(
+            "Отклонено: " + (data.rejected || 0)
+            + ". Пропущено: " + (data.skipped || 0)
+        );
+    } catch (err) {
+        console.error(err);
+        alert("Не удалось отклонить небезопасные действия");
+    }
 }
 
 function getChainStatus(rule, actions) {
