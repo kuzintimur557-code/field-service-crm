@@ -172,13 +172,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     <option value="team" {% if settings["plan"] == "team" %}selected{% endif %}>Команда — без 1С</option>
     <option value="business" {% if settings["plan"] == "business" %}selected{% endif %}>Бизнес — звонки без 1С</option>
     <option value="business_1c" {% if settings["plan"] == "business_1c" %}selected{% endif %}>Бизнес + 1С</option>
-    <option value="enterprise_1c" {% if settings["plan"] == "enterprise_1c" %}selected{% endif %}>Корпоративный + 1С + AI-звонки</option>
+    <option value="enterprise_1c" {% if settings["plan"] == "enterprise_1c" %}selected{% endif %}>Корпоративный + 1С + ИИ-звонки</option>
 </select>
 
 <div class="plan-status">
     1С: {% if settings["one_c_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}<br>
     Звонки: {% if settings["calls_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}<br>
-    AI-анализ звонков: {% if settings["ai_calls_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}
+    ИИ-анализ звонков: {% if settings["ai_calls_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}
 </div>
 
 <button type="submit">Сохранить настройки</button>
