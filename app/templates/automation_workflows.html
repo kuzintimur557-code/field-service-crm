@@ -1094,13 +1094,13 @@ function updateReplayRuntimeSummary() {
 
     container.innerHTML = `
         <span class="pill ${activeCount ? "ok" : ""}">
-            Replay активно: ${activeCount}
+            Воспроизведение активно: ${activeCount}
         </span>
         <span class="pill ${pausedCount ? "warn" : ""}">
-            Replay на паузе: ${pausedCount}
+            Воспроизведение на паузе: ${pausedCount}
         </span>
         <span class="pill">
-            Всего replay-сессий: ${sessions.length}
+            Всего сессий воспроизведения: ${sessions.length}
         </span>
     `;
 }
@@ -1122,7 +1122,7 @@ function resetReplayActiveEventLink(ruleId) {
 
     link.href = "#";
     link.textContent = "Активное событие";
-    link.title = "Replay ещё не выбрал событие";
+    link.title = "Воспроизведение ещё не выбрало событие";
     link.classList.add("off");
     link.onclick = () => false;
 }
@@ -1136,7 +1136,7 @@ function updateReplayActiveEventLink(ruleId, eventId, eventStatus) {
 
     link.href = `/automation/events/${eventId}`;
     link.textContent = `Открыть событие #${eventId}`;
-    link.title = eventStatus ? `Статус: ${eventStatus}` : "Открыть событие replay";
+    link.title = eventStatus ? `Статус: ${eventStatus}` : "Открыть событие воспроизведения";
     link.classList.remove("off");
     link.onclick = null;
 }

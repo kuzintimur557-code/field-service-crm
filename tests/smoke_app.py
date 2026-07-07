@@ -16132,9 +16132,9 @@ async def assert_a3_workflow_center():
     assert "scroll-margin-top:20px" in body
     assert "replay-runtime-summary" in body
     assert "updateReplayRuntimeSummary" in body
-    assert "Replay активно:" in body
-    assert "Replay на паузе:" in body
-    assert "Всего replay-сессий:" in body
+    assert "Воспроизведение активно:" in body
+    assert "Воспроизведение на паузе:" in body
+    assert "Всего сессий воспроизведения:" in body
     assert "problem-card" in body
     assert ".container{padding:16px 14px 92px}" in body
     assert "overflow-x:hidden" in body
@@ -16161,6 +16161,8 @@ async def assert_a3_workflow_center():
     assert "resetReplayActiveEventLink" in body
     assert "updateReplayActiveEventLink" in body
     assert "Открыть событие #" in body
+    assert "Воспроизведение ещё не выбрало событие" in body
+    assert "Открыть событие воспроизведения" in body
     assert "replayStepLevelLabel" in body
     assert "workflowTimelineStepAttentionLabel" in body
     assert "workflowReplaySessionSummary" in body
