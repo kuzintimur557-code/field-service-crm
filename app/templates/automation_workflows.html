@@ -160,6 +160,9 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
         </div>
     </div>
 
+    <div id="workflow-approval-refresh-status" class="meta" style="margin-top:10px">
+        Подтверждения обновляются автоматически
+    </div>
     <div id="workflow-approval-queue" style="display:flex;flex-direction:column;gap:10px;margin-top:18px"></div>
     <div style="font-weight:900;margin-top:18px;margin-bottom:8px">Последние решения</div>
     <div id="workflow-approval-history" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -277,8 +280,22 @@ async function refreshWorkflowCenter() {
 }
 
 async function refreshWorkflowApprovals() {
+    const status = document.getElementById("workflow-approval-refresh-status");
+
+    if (status) {
+        status.textContent = "Обновление подтверждений...";
+    }
+
     await loadWorkflowApprovalQueue();
     await loadWorkflowApprovalHistory();
+
+    if (status) {
+        const updatedAt = new Date().toLocaleTimeString("ru-RU", {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+        status.textContent = `Подтверждения обновлены: ${updatedAt}`;
+    }
 }
 
 function chainFilterLabel(filter) {

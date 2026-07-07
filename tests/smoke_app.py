@@ -16259,6 +16259,10 @@ async def assert_a3_workflow_center():
     assert "loadWorkflowApprovalHistory" in body
     assert "refreshWorkflowApprovals" in body
     assert "Обновить подтверждения" in body
+    assert "workflow-approval-refresh-status" in body
+    assert "Подтверждения обновляются автоматически" in body
+    assert "Обновление подтверждений..." in body
+    assert "Подтверждения обновлены:" in body
     assert "approveWorkflowAction" in body
     assert "rejectWorkflowAction" in body
     assert "approveSafeWorkflowActions" in body
