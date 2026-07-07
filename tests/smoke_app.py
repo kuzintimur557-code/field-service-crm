@@ -883,6 +883,7 @@ async def assert_automation_page():
     assert "builder-empty-state" in builder_html
     assert "Ничего не найдено" in builder_html
     assert "resetBuilderSearch" in builder_html
+    assert "showAllBuilderChains" in builder_html
     assert "data-builder-filter=" in builder_html
     assert "data-builder-search=" in builder_html
     assert 'filterBuilderChains("all")' in builder_html

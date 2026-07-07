@@ -530,7 +530,7 @@
             <div class="meta">Измените фильтр или очистите поиск, чтобы снова увидеть цепочки.</div>
             <div class="actions">
                 <button class="back" type="button" onclick="resetBuilderSearch()">Очистить поиск</button>
-                <button class="back" type="button" onclick="filterBuilderChains('all')">Показать все</button>
+                <button class="back" type="button" onclick="showAllBuilderChains()">Показать все</button>
             </div>
         </div>
     </div>
@@ -604,6 +604,16 @@ function resetBuilderSearch() {
     }
 
     filterBuilderChains(currentBuilderFilter);
+}
+
+function showAllBuilderChains() {
+    const searchInput = document.getElementById("builder-search");
+
+    if (searchInput) {
+        searchInput.value = "";
+    }
+
+    filterBuilderChains("all");
 }
 
 filterBuilderChains("all");
