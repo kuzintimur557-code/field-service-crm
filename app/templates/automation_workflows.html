@@ -435,6 +435,8 @@ async function loadWorkflowApprovalQueue() {
         return;
     }
 
+    container.innerHTML = `<div class="meta">Загрузка очереди подтверждений...</div>`;
+
     try {
         const response = await fetch("/api/a3/approval-queue");
 
@@ -510,6 +512,8 @@ async function loadWorkflowApprovalHistory() {
     if (!container) {
         return;
     }
+
+    container.innerHTML = `<div class="meta">Загрузка истории решений...</div>`;
 
     try {
         const response = await fetch(

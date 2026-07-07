@@ -16295,6 +16295,7 @@ async def assert_a3_workflow_center():
     assert "automation_event: \"Событие автоматизации\"" in body
     assert "autonomous_action: \"ИИ-действие\"" in body
     assert "renderWorkflowApprovalSummary" in body
+    assert "Загрузка очереди подтверждений..." in body
     assert "approval_queue_load_failed" in body
     assert "Можно подтвердить:" in body
     assert "Небезопасные:" in body
@@ -16302,6 +16303,7 @@ async def assert_a3_workflow_center():
     assert "Правило:" in body
     assert "item.target_name" in body
     assert "renderWorkflowApprovalHistorySummary" in body
+    assert "Загрузка истории решений..." in body
     assert "approval_history_load_failed" in body
     assert "Всего решений:" in body
     assert "Одобрено:" in body
