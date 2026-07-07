@@ -120,6 +120,9 @@
             <button class="back" type="button" onclick="filterBuilderChains('empty')">Без действий</button>
             <button class="back" type="button" onclick="filterBuilderChains('conditions')">С условиями</button>
         </div>
+        <div id="builder-filter-status" class="meta" style="margin-top:10px">
+            Фильтр: Все · Показано: {{ builder_stats.total }}
+        </div>
     </div>
 
     <div class="card">
@@ -514,6 +517,15 @@
 </div>
 <script>
 function filterBuilderChains(filter) {
+    const labels = {
+        all: "Все",
+        active: "Активные",
+        disabled: "Выключенные",
+        empty: "Без действий",
+        conditions: "С условиями",
+    };
+    let shown = 0;
+
     document.querySelectorAll("[data-builder-chain]").forEach(card => {
         const active = card.dataset.active === "1";
         const actionCount = Number(card.dataset.actionCount || 0);
@@ -531,8 +543,20 @@ function filterBuilderChains(filter) {
         }
 
         card.style.display = visible ? "" : "none";
+
+        if (visible) {
+            shown += 1;
+        }
     });
+
+    const status = document.getElementById("builder-filter-status");
+
+    if (status) {
+        status.textContent = `Фильтр: ${labels[filter] || "Все"} · Показано: ${shown}`;
+    }
 }
+
+filterBuilderChains("all");
 
 function syncConditionInputs(form) {
     form.querySelectorAll("[data-condition-mode]").forEach(modeSelect => {

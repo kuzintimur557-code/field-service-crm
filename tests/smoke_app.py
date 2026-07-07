@@ -876,6 +876,9 @@ async def assert_automation_page():
     assert "Без действий:" in builder_html
     assert "С условиями:" in builder_html
     assert "filterBuilderChains" in builder_html
+    assert "builder-filter-status" in builder_html
+    assert "Показано:" in builder_html
+    assert 'filterBuilderChains("all")' in builder_html
     assert 'data-builder-chain="1"' in builder_html
     assert "data-has-conditions=" in builder_html
     assert "Без действий" in builder_html
