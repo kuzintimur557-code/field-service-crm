@@ -2242,6 +2242,10 @@ async def assert_automation_page():
         "Есть ещё события",
         "Загружены все события",
     }
+    assert "range_start" in workflow_timeline["timeline"]
+    assert "range_end" in workflow_timeline["timeline"]
+    assert "range_label" in workflow_timeline["timeline"]
+    assert workflow_timeline["timeline"]["range_label"].startswith("История:")
     assert "limit" in workflow_timeline["timeline"]
     assert "has_more" in workflow_timeline["timeline"]
     assert workflow_timeline["timeline"]["status_filter"] == "all"
@@ -16446,7 +16450,9 @@ async def assert_a3_workflow_center():
     assert "workflowTimelineSummary" in body
     assert "timeline?.loaded_label" in body
     assert "timeline?.load_state_label" in body
+    assert "timeline?.range_label" in body
     assert "Загружены все события" in body
+    assert "История: событий нет" in body
     assert "Всего событий в истории:" in body
     assert "Осталось:" in body
     assert "data-timeline-filter" in body

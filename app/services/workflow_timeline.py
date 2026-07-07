@@ -49,6 +49,24 @@ def normalize_timeline_limit(limit):
     return value
 
 
+def timeline_range(items):
+    if not items:
+        return {
+            "range_start": None,
+            "range_end": None,
+            "range_label": "История: событий нет",
+        }
+
+    newest = items[0].get("created_at") or "-"
+    oldest = items[-1].get("created_at") or "-"
+
+    return {
+        "range_start": oldest,
+        "range_end": newest,
+        "range_label": f"История: с {oldest} по {newest}",
+    }
+
+
 def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
     require_company_id(company_id)
     limit = normalize_timeline_limit(limit)
@@ -124,6 +142,7 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
     load_state_label = "Есть ещё события" if has_more else "Загружены все события"
     status_filter_label = timeline_status_filter_label(status_filter)
     status_filter_count_label = f"Фильтр: {status_filter_label} · Найдено событий: {total_events}"
+    range_info = timeline_range(items)
 
     return {
         "rule_id": rule_id,
@@ -136,6 +155,9 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
         "remaining_count": remaining_count,
         "loaded_label": loaded_label,
         "load_state_label": load_state_label,
+        "range_start": range_info["range_start"],
+        "range_end": range_info["range_end"],
+        "range_label": range_info["range_label"],
         "limit": limit,
         "has_more": has_more,
         "summary": build_timeline_summary(items),
