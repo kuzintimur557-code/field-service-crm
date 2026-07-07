@@ -877,7 +877,10 @@ async def assert_automation_page():
     assert "С условиями:" in builder_html
     assert "filterBuilderChains" in builder_html
     assert 'data-builder-chain="1"' in builder_html
+    assert "data-has-conditions=" in builder_html
     assert "Без действий" in builder_html
+    assert "С условиями" in builder_html
+    assert "filter === \"conditions\"" in builder_html
     assert "SLA → уведомление" in builder_html
     assert "Просрочка → Telegram" in builder_html
     assert "Ежедневная AI-сводка" in builder_html

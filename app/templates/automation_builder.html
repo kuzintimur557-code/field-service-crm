@@ -118,6 +118,7 @@
             <button class="back" type="button" onclick="filterBuilderChains('active')">Активные</button>
             <button class="back" type="button" onclick="filterBuilderChains('disabled')">Выключенные</button>
             <button class="back" type="button" onclick="filterBuilderChains('empty')">Без действий</button>
+            <button class="back" type="button" onclick="filterBuilderChains('conditions')">С условиями</button>
         </div>
     </div>
 
@@ -167,7 +168,8 @@
         <div class="chain {% if not rule['active'] %}disabled{% endif %}"
              data-builder-chain="1"
              data-active="{% if rule['active'] %}1{% else %}0{% endif %}"
-             data-action-count="{{ rule_actions|length }}">
+             data-action-count="{{ rule_actions|length }}"
+             data-has-conditions="{% if rule['has_conditions'] %}1{% else %}0{% endif %}">
             <div class="chain-heading">
                 <div>
                     <h2>{{ rule["name"] }}</h2>
@@ -515,6 +517,7 @@ function filterBuilderChains(filter) {
     document.querySelectorAll("[data-builder-chain]").forEach(card => {
         const active = card.dataset.active === "1";
         const actionCount = Number(card.dataset.actionCount || 0);
+        const hasConditions = card.dataset.hasConditions === "1";
         let visible = true;
 
         if (filter === "active") {
@@ -523,6 +526,8 @@ function filterBuilderChains(filter) {
             visible = !active;
         } else if (filter === "empty") {
             visible = actionCount === 0;
+        } else if (filter === "conditions") {
+            visible = hasConditions;
         }
 
         card.style.display = visible ? "" : "none";

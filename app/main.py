@@ -12907,6 +12907,14 @@ async def automation_builder_page(request: Request):
         rule_data["condition_secondary_mode"] = condition_secondary_mode
         rule_data["condition_tertiary_mode"] = condition_tertiary_mode
         rule_data["condition_operator"] = condition_operator
+        rule_data["has_conditions"] = any(
+            mode != "none"
+            for mode in (
+                condition_mode,
+                condition_secondary_mode,
+                condition_tertiary_mode,
+            )
+        )
         rule_data["condition_value"] = (
             condition_value
             if condition_mode in ("price_high", "client_many_tasks")
@@ -13030,7 +13038,7 @@ async def automation_builder_page(request: Request):
         "with_conditions": len([
             rule
             for rule in rules_view
-            if rule.get("condition_mode") != "none"
+            if rule.get("has_conditions")
         ]),
     }
 
