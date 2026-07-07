@@ -2241,6 +2241,10 @@ async def assert_automation_page():
     assert "has_more" in workflow_timeline["timeline"]
     assert workflow_timeline["timeline"]["status_filter"] == "all"
     assert workflow_timeline["timeline"]["status_filter_label"] == "Все"
+    assert "status_filter_count_label" in workflow_timeline["timeline"]
+    assert workflow_timeline["timeline"]["status_filter_count_label"].startswith(
+        "Фильтр: Все"
+    )
     assert "summary" in workflow_timeline["timeline"]
     assert "total" in workflow_timeline["timeline"]["summary"]
     assert "failed" in workflow_timeline["timeline"]["summary"]
@@ -16381,6 +16385,7 @@ async def assert_a3_workflow_center():
     assert 'progress.textContent = "Загрузка истории..."' in body
     assert "refreshedProgress" in body
     assert "История обновлена:" in body
+    assert "timeline.status_filter_count_label" in body
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "Состояние: ${summary.state_label || \"-\"}" in body
     assert 'summary.latest_event_label || "Последнее событие: нет"' in body
