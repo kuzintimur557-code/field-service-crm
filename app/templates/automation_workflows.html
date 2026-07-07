@@ -120,6 +120,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
         <button class="back" data-chain-filter="problematic" onclick="setChainFilter('problematic')">Проблемные</button>
         <button class="back" data-chain-filter="empty" onclick="setChainFilter('empty')">Без действий</button>
         <button class="back off" onclick="refreshWorkflowCenter()">Обновить цепочки</button>
+        <button class="back" onclick="showAllWorkflowChains()">Показать все</button>
     </div>
     <div class="search-row">
         <input id="workflow-chain-search" type="text"
@@ -239,6 +240,24 @@ function resetChainSearch() {
         window.clearTimeout(chainSearchTimer);
         chainSearchTimer = null;
     }
+    const input = document.getElementById("workflow-chain-search");
+
+    if (input) {
+        input.value = "";
+    }
+
+    loadChains();
+}
+
+function showAllWorkflowChains() {
+    chainFilter = "all";
+    chainSearch = "";
+
+    if (chainSearchTimer) {
+        window.clearTimeout(chainSearchTimer);
+        chainSearchTimer = null;
+    }
+
     const input = document.getElementById("workflow-chain-search");
 
     if (input) {
