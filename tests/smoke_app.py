@@ -884,6 +884,10 @@ async def assert_automation_page():
     assert "Ничего не найдено" in builder_html
     assert "resetBuilderSearch" in builder_html
     assert "showAllBuilderChains" in builder_html
+    assert "builderSearchTimer" in builder_html
+    assert "queueBuilderFilter" in builder_html
+    assert "window.setTimeout" in builder_html
+    assert "window.clearTimeout" in builder_html
     assert "data-builder-filter=" in builder_html
     assert "data-builder-search=" in builder_html
     assert 'filterBuilderChains("all")' in builder_html

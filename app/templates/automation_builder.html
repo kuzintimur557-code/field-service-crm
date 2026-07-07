@@ -128,7 +128,7 @@
             <input id="builder-search" type="text"
                    placeholder="Найти цепочку по названию, ID, триггеру или условию"
                    aria-label="Поиск цепочек автоматизации"
-                   oninput="filterBuilderChains(currentBuilderFilter)">
+                   oninput="queueBuilderFilter()">
             <button class="back" type="button" onclick="resetBuilderSearch()">Сбросить поиск</button>
         </div>
         <div id="builder-filter-status" class="meta" style="margin-top:10px">
@@ -537,6 +537,17 @@
 </div>
 <script>
 let currentBuilderFilter = "all";
+let builderSearchTimer = null;
+
+function queueBuilderFilter() {
+    if (builderSearchTimer) {
+        window.clearTimeout(builderSearchTimer);
+    }
+
+    builderSearchTimer = window.setTimeout(() => {
+        filterBuilderChains(currentBuilderFilter);
+    }, 120);
+}
 
 function filterBuilderChains(filter) {
     currentBuilderFilter = filter || currentBuilderFilter || "all";
@@ -599,6 +610,11 @@ function filterBuilderChains(filter) {
 function resetBuilderSearch() {
     const searchInput = document.getElementById("builder-search");
 
+    if (builderSearchTimer) {
+        window.clearTimeout(builderSearchTimer);
+        builderSearchTimer = null;
+    }
+
     if (searchInput) {
         searchInput.value = "";
     }
@@ -608,6 +624,11 @@ function resetBuilderSearch() {
 
 function showAllBuilderChains() {
     const searchInput = document.getElementById("builder-search");
+
+    if (builderSearchTimer) {
+        window.clearTimeout(builderSearchTimer);
+        builderSearchTimer = null;
+    }
 
     if (searchInput) {
         searchInput.value = "";
