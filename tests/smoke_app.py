@@ -3788,6 +3788,7 @@ async def assert_automation_runner(task):
     assert 'name="event_search" value="happened"' in event_search_html
     assert "SLA event happened" in event_search_html
     assert 'href="/automation/events/export?event_filter=done&amp;event_search=happened"' in event_search_html
+    assert 'href="/automation?event_filter=done&amp;event_search=happened"' in event_search_html
 
     event_search_export_response = await crm.automation_events_export(
         make_request("owner2"),

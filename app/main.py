@@ -12349,11 +12349,6 @@ async def automation_page(
         if event_export_params
         else ""
     )
-    event_rule_query_suffix = (
-        f"&event_rule_id={selected_event_rule_id}"
-        if selected_event_rule_id
-        else ""
-    )
     event_all_params = {}
     if selected_rule_filter:
         event_all_params["rule_filter"] = selected_rule_filter
@@ -12370,11 +12365,29 @@ async def automation_page(
     if selected_event_rule_id:
         event_all_params["event_rule_id"] = selected_event_rule_id
 
-    event_all_query = (
-        "?" + urlencode(event_all_params)
-        if event_all_params
-        else ""
-    )
+    base_event_link_params = dict(event_all_params)
+
+    def build_event_filter_href(status_key: str) -> str:
+        params = {}
+
+        if status_key:
+            params["event_filter"] = status_key
+
+        params.update(base_event_link_params)
+
+        return "/automation" + (
+            "?" + urlencode(params)
+            if params
+            else ""
+        )
+
+    event_filter_links = [
+        {"key": "", "label": "Все", "href": build_event_filter_href("")},
+        {"key": "pending", "label": "Ожидает", "href": build_event_filter_href("pending")},
+        {"key": "done", "label": "Выполнено", "href": build_event_filter_href("done")},
+        {"key": "skipped", "label": "Пропущено", "href": build_event_filter_href("skipped")},
+        {"key": "failed", "label": "Ошибка", "href": build_event_filter_href("failed")},
+    ]
 
     conn = connect()
     c = conn.cursor()
@@ -12589,8 +12602,7 @@ async def automation_page(
             "selected_event_rule_id": selected_event_rule_id,
             "selected_event_rule_name": selected_event_rule_name,
             "event_export_query": event_export_query,
-            "event_all_query": event_all_query,
-            "event_rule_query_suffix": event_rule_query_suffix,
+            "event_filter_links": event_filter_links,
             "automation_stats": automation_stats,
             "features": get_company_features(company_id)
         }
