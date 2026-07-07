@@ -913,6 +913,7 @@ async function loadChains() {
                     <button class="back" onclick="replayChainTimeline(${rule.id})">Воспроизвести</button>
                     <button id="replay-pause-${rule.id}" class="back" onclick="pauseReplayChainTimeline(${rule.id})">Пауза</button>
                     <button class="back" onclick="stopReplayChainTimeline(${rule.id})">Остановить</button>
+                    <a id="replay-active-event-${rule.id}" class="back off" href="#" onclick="return false;">Активное событие</a>
                     <select id="replay-speed-${rule.id}" class="back" style="width:auto;border:0">
                         <option value="1100">Скорость: медленно</option>
                         <option value="850" selected>Скорость: обычно</option>
@@ -976,6 +977,34 @@ function clearReplayRows(rows) {
         row.style.background = "transparent";
         row.style.borderRadius = "12px";
     });
+}
+
+function resetReplayActiveEventLink(ruleId) {
+    const link = document.getElementById(`replay-active-event-${ruleId}`);
+
+    if (!link) {
+        return;
+    }
+
+    link.href = "#";
+    link.textContent = "Активное событие";
+    link.title = "Replay ещё не выбрал событие";
+    link.classList.add("off");
+    link.onclick = () => false;
+}
+
+function updateReplayActiveEventLink(ruleId, eventId, eventStatus) {
+    const link = document.getElementById(`replay-active-event-${ruleId}`);
+
+    if (!link || !eventId || eventId === "-") {
+        return;
+    }
+
+    link.href = `/automation/events/${eventId}`;
+    link.textContent = `Открыть событие #${eventId}`;
+    link.title = eventStatus ? `Статус: ${eventStatus}` : "Открыть событие replay";
+    link.classList.remove("off");
+    link.onclick = null;
 }
 
 function replayStepStyle(level) {
@@ -1215,6 +1244,7 @@ function replayChainTimeline(ruleId) {
 
     stopReplayChainTimeline(ruleId);
     clearReplayRows(rows);
+    resetReplayActiveEventLink(ruleId);
 
     const delay = Number(speed?.value || 850);
     const replaySummary = workflowReplaySessionSummary(rows);
@@ -1261,6 +1291,8 @@ function replayChainTimeline(ruleId) {
         if (progress) {
             progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length} · Событие #${eventId} · ${eventStatus}`;
         }
+
+        updateReplayActiveEventLink(ruleId, eventId, eventStatus);
 
         if (session) {
             session.textContent = `Сессия: активно · шаг ${state.index + 1} / ${rows.length} · ${state.summary.label}`;
@@ -1349,6 +1381,7 @@ function stopReplayChainTimeline(ruleId) {
 
     clearInterval(state.timer);
     clearReplayRows(state.rows);
+    resetReplayActiveEventLink(ruleId);
 
     if (state.progress) {
         state.progress.textContent = "Воспроизведение остановлено";

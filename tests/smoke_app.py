@@ -16118,6 +16118,11 @@ async def assert_a3_workflow_center():
     assert "Обновить историю" in body
     assert "Воспроизвести" in body
     assert "Воспроизведение:" in body
+    assert "Активное событие" in body
+    assert "replay-active-event-" in body
+    assert "resetReplayActiveEventLink" in body
+    assert "updateReplayActiveEventLink" in body
+    assert "Открыть событие #" in body
     assert "replayStepLevelLabel" in body
     assert "workflowTimelineStepAttentionLabel" in body
     assert "workflowReplaySessionSummary" in body
