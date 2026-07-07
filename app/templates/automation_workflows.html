@@ -2238,6 +2238,9 @@ function renderProblemChains(chains) {
                         <span class="pill off">Оценка: ${state.score || 0}</span>
                         <span class="pill off">Диагностика: ${debug.reason || "Требует проверки"}</span>
                     </div>
+                    <div class="meta" style="margin-top:8px;font-weight:800">
+                        ${debug.summary_label || "Диагностика: требуется проверка"}
+                    </div>
 
                     <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
                         ${[...(state.issues || []), ...(debug.issues || [])].slice(0, 3).map(issue => `
