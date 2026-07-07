@@ -1444,6 +1444,8 @@ async function loadChainTimeline(ruleId, statusFilter = null, limit = null) {
         return;
     }
 
+    stopReplayChainTimeline(ruleId);
+
     try {
         const progress = document.getElementById(`timeline-progress-${ruleId}`);
         const currentState = a3TimelineState[ruleId] || {};

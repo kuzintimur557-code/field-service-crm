@@ -16266,6 +16266,7 @@ async def assert_a3_workflow_center():
     assert "filterWorkflowTimeline" in body
     assert "setWorkflowTimelineLimit" in body
     assert "new URLSearchParams()" in body
+    assert "stopReplayChainTimeline(ruleId);" in body
     assert 'params.set("status_filter", requestedStatusFilter)' in body
     assert 'params.set("limit", String(requestedLimit))' in body
     assert "loadedLimit" in body
