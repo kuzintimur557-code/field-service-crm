@@ -16203,6 +16203,7 @@ async def assert_a3_workflow_center():
     assert "overflow-x:hidden" in body
     assert "Условие:" in body
     assert "/api/a3/workflows/graph" in body
+    assert "workflow_center_load_failed" in body
     assert "Фильтры" in body
     assert "Проблемные цепочки" in body
     assert "Рекомендации ИИ" in body
@@ -16289,12 +16290,14 @@ async def assert_a3_workflow_center():
     assert "automation_event: \"Событие автоматизации\"" in body
     assert "autonomous_action: \"ИИ-действие\"" in body
     assert "renderWorkflowApprovalSummary" in body
+    assert "approval_queue_load_failed" in body
     assert "Можно подтвердить:" in body
     assert "Небезопасные:" in body
     assert "Защищённые:" in body
     assert "Правило:" in body
     assert "item.target_name" in body
     assert "renderWorkflowApprovalHistorySummary" in body
+    assert "approval_history_load_failed" in body
     assert "Всего решений:" in body
     assert "Одобрено:" in body
     assert "Отклонено:" in body

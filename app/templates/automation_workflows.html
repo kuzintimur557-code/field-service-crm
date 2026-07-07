@@ -437,6 +437,11 @@ async function loadWorkflowApprovalQueue() {
 
     try {
         const response = await fetch("/api/a3/approval-queue");
+
+        if (!response.ok) {
+            throw new Error("approval_queue_load_failed");
+        }
+
         const data = await response.json();
         const items = data.items || [];
         const summary = data.summary || {};
@@ -510,6 +515,11 @@ async function loadWorkflowApprovalHistory() {
         const response = await fetch(
             "/api/a3/approval-history?" + buildWorkflowApprovalHistoryQuery()
         );
+
+        if (!response.ok) {
+            throw new Error("approval_history_load_failed");
+        }
+
         const data = await response.json();
         const items = data.items || [];
         const summary = data.summary || {};
@@ -925,6 +935,11 @@ async function loadChains() {
             fetch("/api/a3/workflows/graph"),
             fetch("/api/a3/approval-queue"),
         ]);
+
+        if (!response.ok || !approvalResponse.ok) {
+            throw new Error("workflow_center_load_failed");
+        }
+
         const data = await response.json();
         const approvalData = await approvalResponse.json();
         const chains = data.workflows || data.items || [];
