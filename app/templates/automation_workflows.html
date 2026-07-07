@@ -345,7 +345,7 @@ function workflowApprovalTargetLabel(targetType) {
     const labels = {
         automation_rule: "Правило автоматизации",
         automation_event: "Событие автоматизации",
-        autonomous_action: "AI-действие",
+        autonomous_action: "ИИ-действие",
     };
 
     return labels[targetType] || targetType || "-";
@@ -602,7 +602,7 @@ function renderWorkflowApprovalHistoryFilters(activeFilter) {
                     События
                 </option>
                 <option value="autonomous_action" ${workflowApprovalHistoryTargetType === "autonomous_action" ? "selected" : ""}>
-                    AI-действия
+                    ИИ-действия
                 </option>
             </select>
             <input id="workflow-approval-decided-by"
@@ -941,7 +941,7 @@ async function loadChains() {
                 </div>
 
                 <div style="margin-top:14px;padding:14px;border-radius:16px;background:#ffffff;border:1px solid #e5e7eb">
-                    <div style="font-weight:900;margin-bottom:10px">Рекомендации AI</div>
+                    <div style="font-weight:900;margin-bottom:10px">Рекомендации ИИ</div>
                     <div style="display:flex;flex-direction:column;gap:8px">
                         ${(state.recommendations || []).slice(0, 3).map(rec => `
                             <div class="meta">• ${rec}</div>
@@ -1018,7 +1018,7 @@ async function loadChains() {
                     </div>
 
                     <div style="margin-top:12px">
-                        <div style="font-weight:900;margin-bottom:8px">AI-рекомендации диагностики</div>
+                        <div style="font-weight:900;margin-bottom:8px">ИИ-рекомендации диагностики</div>
                         <div style="display:flex;flex-direction:column;gap:7px">
                             ${(debug.ai_recommendations || []).slice(0, 3).map(rec => `
                                 <div class="meta">• ${rec}</div>

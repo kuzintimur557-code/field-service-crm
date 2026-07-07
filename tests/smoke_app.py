@@ -894,7 +894,7 @@ async def assert_automation_page():
     assert "currentBuilderFilter === \"conditions\"" in builder_html
     assert "SLA → уведомление" in builder_html
     assert "Просрочка → Telegram" in builder_html
-    assert "Ежедневная AI-сводка" in builder_html
+    assert "Ежедневная ИИ-сводка" in builder_html
     assert 'name="trigger_key" value="sla_overdue"' in builder_html
     assert 'name="action_key" value="telegram_alert"' in builder_html
     assert 'name="action_key" value="ai_digest"' in builder_html
@@ -16148,7 +16148,7 @@ async def assert_a3_workflow_center():
     assert "/api/a3/workflows/graph" in body
     assert "Фильтры" in body
     assert "Проблемные цепочки" in body
-    assert "AI-рекомендации" in body
+    assert "Рекомендации ИИ" in body
     assert "Состояние:" in body
     assert "Запустить" in body
     assert "Повторить" in body
@@ -16197,7 +16197,7 @@ async def assert_a3_workflow_center():
     assert "/enable" in body
     assert "/retry-skipped" in body
     assert "Повтор пропущенных событий отправлен" in body
-    assert "AI-рекомендации диагностики" in body
+    assert "ИИ-рекомендации диагностики" in body
     assert "Диагностика:" in body
     assert "Диагноз" in body
     assert "Следующий шаг:" in body
@@ -16222,7 +16222,7 @@ async def assert_a3_workflow_center():
     assert "approval_safety_label" in body
     assert "Требует проверки" in body
     assert "automation_event: \"Событие автоматизации\"" in body
-    assert "autonomous_action: \"AI-действие\"" in body
+    assert "autonomous_action: \"ИИ-действие\"" in body
     assert "renderWorkflowApprovalSummary" in body
     assert "Можно подтвердить:" in body
     assert "Небезопасные:" in body
@@ -16270,7 +16270,7 @@ async def assert_a3_workflow_center():
     assert "Сбросить цель" in body
     assert "Все действия" in body
     assert "Все цели" in body
-    assert "AI-действия" in body
+    assert "ИИ-действия" in body
     assert "activeFilterLabels.map" in body
     assert "Отключить правило" in body
     assert "Повторить события" in body
