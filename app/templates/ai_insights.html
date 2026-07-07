@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>AI-инсайты</title>
+    <title>ИИ-инсайты</title>
     <style>
         * { box-sizing:border-box; }
         body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#111827; overflow-x:hidden; }
@@ -52,16 +52,16 @@
 
     <div class="top">
         <div>
-            <h1>AI-инсайты</h1>
+            <h1>ИИ-инсайты</h1>
             <p class="label">Рекомендации и риски по бизнесу</p>
         </div>
 
         <div class="top-actions">
-            <a href="/ai/assistant" class="btn">AI-помощник</a>
+            <a href="/ai/assistant" class="btn">ИИ-помощник</a>
 
             <form method="post" action="/ai/insights/digest" style="margin:0;">
                 <button type="submit" class="btn">
-                    Создать AI-сводку
+                    Создать ИИ-сводку
                 </button>
             </form>
 
@@ -70,7 +70,7 @@
     </div>
 
     <div class="card insight {{ risk_level }}" style="margin-bottom:24px;">
-        <h2>AI-оценка риска</h2>
+        <h2>ИИ-оценка риска</h2>
 
         <div class="value {{ risk_level }}">{{ risk_score }}/100</div>
 
@@ -79,13 +79,13 @@
         </p>
 
         <p class="label">
-            AI оценка рисков компании по просрочкам, неоплатам и эффективности сотрудников.
+            ИИ-оценка рисков компании по просрочкам, неоплатам и эффективности сотрудников.
         </p>
     </div>
 
     {% if request.query_params.get("digest") %}
     <div class="card insight success" style="margin-bottom:24px;">
-        <h3>AI-сводка создана</h3>
+        <h3>ИИ-сводка создана</h3>
         <p>Уведомление добавлено в центр уведомлений.</p>
     </div>
     {% endif %}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI-помощник</title>
+<title>ИИ-помощник</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -48,28 +48,28 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 
 <div class="header">
     <div>
-        <h1>AI-помощник</h1>
+        <h1>ИИ-помощник</h1>
         <div class="meta">Короткий список действий для владельца на основе текущих рисков.</div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
         <form method="post" action="/ai/insights/digest" style="margin:0">
-            <button class="btn" type="submit" style="border:0;cursor:pointer">Создать AI-сводку</button>
+            <button class="btn" type="submit" style="border:0;cursor:pointer">Создать ИИ-сводку</button>
         </form>
-        <a class="btn" href="/ai/insights">AI-инсайты</a>
+        <a class="btn" href="/ai/insights">ИИ-инсайты</a>
         <a class="btn" href="/">← Главное меню</a>
     </div>
 </div>
 
 {% if request.query_params.get("digest") %}
 <div class="card priority success">
-    <h2>AI-сводка создана</h2>
+    <h2>ИИ-сводка создана</h2>
     <div class="meta">Уведомление добавлено в центр уведомлений.</div>
 </div>
 {% endif %}
 
 {% if request.query_params.get("digest_rules") %}
 <div class="card priority success">
-    <h2>Автоматические AI-сводки настроены</h2>
+    <h2>Автоматические ИИ-сводки настроены</h2>
     <div class="meta">Создано правил: {{ request.query_params.get("digest_rules") or "0" }}</div>
 </div>
 {% endif %}
@@ -77,7 +77,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 {% if request.query_params.get("note_created") %}
 <div class="card priority success">
     <h2>Заметка сохранена</h2>
-    <div class="meta">Решение добавлено в историю AI-помощника.</div>
+    <div class="meta">Решение добавлено в историю ИИ-помощника.</div>
 </div>
 {% endif %}
 
@@ -104,7 +104,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
 
 {% if request.query_params.get("follow_up_notifications") %}
 <div class="card priority success">
-    <h2>AI контроль отправлен в уведомления</h2>
+    <h2>ИИ-контроль отправлен в уведомления</h2>
     <div class="meta">Создано уведомлений: {{ request.query_params.get("follow_up_notifications") or "0" }}</div>
 </div>
 {% endif %}
@@ -127,15 +127,15 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
         <div class="stat-value">{{ metrics["worker_count"] }}</div>
     </div>
     <div class="stat">
-        <div class="stat-title">AI к контролю</div>
+        <div class="stat-title">ИИ к контролю</div>
         <div class="stat-value">{{ metrics["ai_notes_due"] }}</div>
     </div>
     <div class="stat">
-        <div class="stat-title">AI срочно</div>
+        <div class="stat-title">ИИ срочно</div>
         <div class="stat-value">{{ metrics["ai_notes_urgent"] }}</div>
     </div>
     <div class="stat">
-        <div class="stat-title">AI активные</div>
+        <div class="stat-title">ИИ активные</div>
         <div class="stat-value">{{ metrics["ai_notes_active"] }}</div>
     </div>
 </div>
@@ -205,7 +205,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 {% if selected_note_filter %}
                 <input type="hidden" name="note_filter" value="{{ selected_note_filter }}">
                 {% endif %}
-                <input name="note_search" placeholder="Поиск по AI заметкам" value="{{ selected_note_search or '' }}">
+                <input name="note_search" placeholder="Поиск по ИИ-заметкам" value="{{ selected_note_search or '' }}">
                 <button class="btn" type="submit" style="border:0;cursor:pointer;margin-top:10px">Найти</button>
                 {% if selected_note_search %}
                 <a class="btn" href="/ai/assistant{% if selected_note_filter %}?note_filter={{ selected_note_filter }}{% endif %}" style="margin-top:10px;background:#6b7280">Сбросить поиск</a>
@@ -341,15 +341,15 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
         </form>
 
         <form method="post" action="/ai/assistant/follow-ups/notify" style="margin-top:10px">
-            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#7c3aed">Уведомить по AI контролю</button>
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#7c3aed">Уведомить по ИИ-контролю</button>
         </form>
 
         <form method="post" action="/automation/ai-digest/run" style="margin-top:10px">
-            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#2563eb">Запустить AI-планировщик</button>
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#2563eb">Запустить ИИ-планировщик</button>
         </form>
 
         <form method="post" action="/ai/assistant/setup-digests" style="margin-top:10px">
-            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#16a34a">Настроить дневные и недельные AI-сводки</button>
+            <button class="btn" type="submit" style="border:0;cursor:pointer;width:100%;background:#16a34a">Настроить дневные и недельные ИИ-сводки</button>
         </form>
     </div>
 
@@ -382,7 +382,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
     </div>
 
     <div class="card">
-        <h2>Журнал AI-помощника</h2>
+        <h2>Журнал ИИ-помощника</h2>
         <a class="btn" href="/ai/assistant/events/export{% if selected_event_filter %}?event_filter={{ selected_event_filter }}{% endif %}" style="margin-bottom:14px;background:#16a34a">Скачать CSV</a>
         <div class="filters">
             <a href="/ai/assistant" class="{% if not selected_event_filter %}active{% endif %}">Все</a>
@@ -412,7 +412,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="meta">Событий AI-помощника пока нет</td>
+                    <td colspan="4" class="meta">Событий ИИ-помощника пока нет</td>
                 </tr>
                 {% endfor %}
             </tbody>

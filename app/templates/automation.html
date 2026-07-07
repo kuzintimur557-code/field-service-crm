@@ -100,9 +100,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 
 {% if request.query_params.get("scheduler") == "1" %}
 <div class="notice ok">
-    AI-планировщик: дневных {{ request.query_params.get("daily") or "0" }},
+    ИИ-планировщик: дневных {{ request.query_params.get("daily") or "0" }},
     недельных {{ request.query_params.get("weekly") or "0" }},
-    AI-контроль {{ request.query_params.get("follow_ups") or "0" }},
+    ИИ-контроль {{ request.query_params.get("follow_ups") or "0" }},
     пропущено {{ request.query_params.get("skipped") or "0" }}
 </div>
 {% endif %}
@@ -239,7 +239,7 @@ function a3TargetLabel(targetType) {
     const labels = {
         automation_rule: "Правило автоматизации",
         automation_event: "Событие автоматизации",
-        autonomous_action: "AI-действие"
+        autonomous_action: "ИИ-действие"
     };
     return labels[targetType] || targetType || "-";
 }
@@ -414,7 +414,7 @@ async function loadA3SystemHealth() {
                 div.style.marginBottom = "8px";
                 div.style.background = "#eef2ff";
                 div.style.color = "#3730a3";
-                div.textContent = "AI: " + recommendation;
+                div.textContent = "ИИ: " + recommendation;
                 warningsEl.appendChild(div);
             }
         }
@@ -451,10 +451,10 @@ setInterval(loadA3SystemHealth, 30000);
 
 
 <div class="card">
-<h2>AI-планировщик</h2>
-<div class="meta">Ручной запуск дневных и недельных AI-сводок, а также AI-контроля. Повторный запуск за тот же день или неделю не создаёт дубли.</div>
+<h2>ИИ-планировщик</h2>
+<div class="meta">Ручной запуск дневных и недельных ИИ-сводок, а также ИИ-контроля. Повторный запуск за тот же день или неделю не создаёт дубли.</div>
 <form method="post" action="/automation/ai-digest/run" style="margin-top:14px">
-    <button type="submit">Запустить AI-планировщик</button>
+    <button type="submit">Запустить ИИ-планировщик</button>
 </form>
 </div>
 
@@ -576,12 +576,12 @@ setInterval(loadA3Analytics, 30000);
         <div>
             <h2 style="margin-bottom:8px">A3 Операционные инсайты</h2>
             <div class="meta">
-                AI-мониторинг системы и интеллект автоматизации.
+                ИИ-мониторинг системы и интеллект автоматизации.
             </div>
         </div>
 
         <div class="pill">
-            Центр AI-операций
+            Центр ИИ-операций
         </div>
     </div>
 
@@ -818,7 +818,7 @@ setInterval(loadA3RecoveryHistory, 30000);
         <div>
             <h2 style="margin-bottom:8px">A3 Лента операций</h2>
             <div class="meta">
-                Единая лента AI-операций и автономных событий.
+                Единая лента ИИ-операций и автономных событий.
             </div>
         </div>
 
@@ -932,12 +932,12 @@ setInterval(loadA3OpsTimeline, 30000);
         <div>
             <h2 style="margin-bottom:8px">A3 Прогнозирование</h2>
             <div class="meta">
-                Прогнозирование рисков и AI-мониторинг.
+                Прогнозирование рисков и ИИ-мониторинг.
             </div>
         </div>
 
         <div class="pill">
-            AI-прогнозы
+            ИИ-прогнозы
         </div>
     </div>
 
@@ -1029,7 +1029,7 @@ setInterval(loadA3PredictiveSignals, 30000);
         </div>
 
         <div class="pill">
-            AI-решения
+            ИИ-решения
         </div>
     </div>
 
@@ -1053,7 +1053,7 @@ async function loadA3DecisionEngine() {
         if (!items.length) {
             container.innerHTML = `
                 <div class="pill">
-                    Нет AI-инсайтов
+                    Нет ИИ-инсайтов
                 </div>
             `;
             return;
@@ -1136,7 +1136,7 @@ setInterval(loadA3DecisionEngine, 30000);
         <div>
             <h2 style="margin-bottom:8px">A3 Автономные действия</h2>
             <div class="meta">
-                Очередь автономных AI-действий.
+                Очередь автономных ИИ-действий.
             </div>
         </div>
 
@@ -1252,13 +1252,13 @@ setInterval(loadA3AutonomousActions, 30000);
         <div>
             <h2 style="margin-bottom:8px">A3 Автономное выполнение</h2>
             <div class="meta">
-                Выполнение AI-действий и задач восстановления.
+                Выполнение ИИ-действий и задач восстановления.
             </div>
         </div>
 
         <button id="a3-process-autonomous-actions"
                 class="btn">
-            Выполнить AI-действия
+            Выполнить ИИ-действия
         </button>
     </div>
 
@@ -1281,7 +1281,7 @@ async function processA3AutonomousActions() {
 
         status.innerHTML = `
             <div class="pill">
-                Запущен AI-движок выполнения...
+                Запущен ИИ-движок выполнения...
             </div>
         `;
 
@@ -1303,7 +1303,7 @@ async function processA3AutonomousActions() {
                 </div>
 
                 <div class="pill">
-                    AI-выполнение завершено
+                    ИИ-выполнение завершено
                 </div>
             </div>
         `;
@@ -1317,12 +1317,12 @@ async function processA3AutonomousActions() {
 
         status.innerHTML = `
             <div class="pill off">
-                Ошибка AI-выполнения
+                Ошибка ИИ-выполнения
             </div>
         `;
     } finally {
         button.disabled = false;
-        button.textContent = "Выполнить AI-действия";
+        button.textContent = "Выполнить ИИ-действия";
     }
 }
 
@@ -1473,7 +1473,7 @@ setInterval(loadA3GovernanceSettings, 30000);
             <h2 style="margin-bottom:8px">A3 Подтверждения</h2>
 
             <div class="meta">
-                Действия AI, требующие ручного подтверждения.
+                Действия ИИ, требующие ручного подтверждения.
             </div>
         </div>
 
@@ -1654,7 +1654,7 @@ setInterval(loadA3ApprovalQueue, 30000);
             <h2 style="margin-bottom:8px">A3 История подтверждений</h2>
 
             <div class="meta">
-                История решений по автономным AI-действиям.
+                История решений по автономным ИИ-действиям.
             </div>
         </div>
 
@@ -1930,7 +1930,7 @@ function renderA3ApprovalHistoryFilters(activeFilter) {
                     События
                 </option>
                 <option value="autonomous_action" ${a3ApprovalHistoryTargetType === "autonomous_action" ? "selected" : ""}>
-                    AI-действия
+                    ИИ-действия
                 </option>
             </select>
             <input id="a3-approval-decided-by"

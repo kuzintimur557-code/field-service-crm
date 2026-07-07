@@ -519,14 +519,14 @@ async def assert_automation_page():
     assert "Состояние автоматизации" in html
     assert any(status in html for status in ("Стабильно", "Нужно внимание", "Проблема"))
     assert ">OK<" not in html
-    assert "AI-планировщик" in html
-    assert "AI-контроля" in html
+    assert "ИИ-планировщик" in html
+    assert "ИИ-контроля" in html
     assert 'action="/automation/ai-digest/run"' in html
     assert 'href="/automation/rules/export"' in html
     assert 'href="/automation/events/export"' in html
     assert "Показано событий:" in html
     assert "Плановый запуск" in html
-    assert "дневных и недельных AI-сводок" in html
+    assert "дневных и недельных ИИ-сводок" in html
     assert "AUTOMATION_CRON_SECRET" in html
     assert "заголовком x-automation-secret" in html
     assert "POST /automation/cron/ai-digest" in html
@@ -539,7 +539,7 @@ async def assert_automation_page():
     assert "/api/a3/autonomous-actions/reject-unsafe" in html
     assert "approval_safety_label" in html
     assert "Требует проверки" in html
-    assert "autonomous_action: \"AI-действие\"" in html
+    assert "autonomous_action: \"ИИ-действие\"" in html
     assert "renderA3ApprovalSummary" in html
     assert "Можно подтвердить:" in html
     assert "Небезопасные:" in html
@@ -589,7 +589,7 @@ async def assert_automation_page():
     assert "Сбросить цель" in html
     assert "Все действия" in html
     assert "Все цели" in html
-    assert "AI-действия" in html
+    assert "ИИ-действия" in html
     assert "activeFilterLabels.map" in html
     assert "Отключить правило" in html
     assert "Повторить события" in html
@@ -4160,12 +4160,12 @@ async def assert_ai_assistant_page():
     response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert response.status_code == 200
     html = response.body.decode("utf-8")
-    assert "AI-помощник" in html
+    assert "ИИ-помощник" in html
     assert "Что сделать сейчас" in html
     assert "Порядок работы" in html
-    assert "AI-инсайты" in html
+    assert "ИИ-инсайты" in html
     assert 'action="/ai/insights/digest"' in html
-    assert "Создать AI-сводку" in html
+    assert "Создать ИИ-сводку" in html
     assert "Быстрые действия" in html
     assert 'action="/overdue/reminders"' in html
     assert 'action="/sla/reminders"' in html
@@ -4173,11 +4173,11 @@ async def assert_ai_assistant_page():
     assert 'action="/automation/ai-digest/run"' in html
     assert 'action="/ai/assistant/setup-digests"' in html
     assert "Запустить SLA-напоминания" in html
-    assert "Запустить AI-планировщик" in html
-    assert "Настроить дневные и недельные AI-сводки" in html
+    assert "Запустить ИИ-планировщик" in html
+    assert "Настроить дневные и недельные ИИ-сводки" in html
     assert "История действий" in html
     assert "Выполнено" in html
-    assert "Журнал AI-помощника" in html
+    assert "Журнал ИИ-помощника" in html
     assert 'href="/ai/assistant/events/export"' in html
     assert 'href="/ai/assistant?event_filter=created"' in html
     assert 'href="/ai/assistant?event_filter=notification_sent"' in html
@@ -4191,9 +4191,9 @@ async def assert_ai_assistant_page():
     assert 'name="follow_up_date"' in html
     assert "Срочно" in html
     assert "Не оплачено" in html
-    assert "AI к контролю" in html
-    assert "AI срочно" in html
-    assert "AI активные" in html
+    assert "ИИ к контролю" in html
+    assert "ИИ срочно" in html
+    assert "ИИ активные" in html
 
     empty_note_response = await crm.add_ai_assistant_note(
         make_form_request(
@@ -4224,7 +4224,7 @@ async def assert_ai_assistant_page():
     notes_html = notes_response.body.decode("utf-8")
     assert "Проверить AI assistant рекомендацию" in notes_html
     assert "/create-task?ai_note_id=" in notes_html
-    assert "AI к контролю" in notes_html
+    assert "ИИ к контролю" in notes_html
 
     urgent_filter_response = await crm.ai_assistant_page(
         make_asgi_request("owner2", "/ai/assistant"),
@@ -4241,7 +4241,7 @@ async def assert_ai_assistant_page():
     )
     assert search_response.status_code == 200
     search_html = search_response.body.decode("utf-8")
-    assert 'name="note_search" placeholder="Поиск по AI заметкам" value="рекомендацию"' in search_html
+    assert 'name="note_search" placeholder="Поиск по ИИ-заметкам" value="рекомендацию"' in search_html
     assert "Проверить AI assistant рекомендацию" in search_html
 
     conn = connect()
@@ -4657,11 +4657,11 @@ async def assert_ai_insights_page():
     response = await crm.ai_insights_page(make_asgi_request("owner2", "/ai/insights"))
     assert response.status_code == 200
     html = response.body.decode("utf-8")
-    assert "AI-инсайты" in html
-    assert "AI-оценка риска" in html
+    assert "ИИ-инсайты" in html
+    assert "ИИ-оценка риска" in html
     assert "Еженедельная сводка" in html
     assert "Рекомендации" in html
-    assert "Создать AI-сводку" in html
+    assert "Создать ИИ-сводку" in html
     assert 'action="/ai/insights/digest"' in html
     assert 'class="mobile-nav"' in html
     assert ".container { padding:0 0 92px; }" in html
@@ -4679,8 +4679,8 @@ async def assert_more_page():
     assert "Ещё" in html
     assert "Главная" in html
     assert "Мой профиль" in html
-    assert "AI-инсайты" in html
-    assert "AI-помощник" in html
+    assert "ИИ-инсайты" in html
+    assert "ИИ-помощник" in html
     assert 'class="mobile-nav"' in html
     assert ".container{padding:16px 14px 92px}" in html
     assert "☰ Ещё" not in html
