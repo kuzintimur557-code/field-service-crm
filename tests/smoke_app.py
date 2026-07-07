@@ -16352,6 +16352,8 @@ async def assert_a3_workflow_center():
     assert 'rejected: "Отклонено"' in body
     assert "workflowExecutionStateLabel" in body
     assert "workflowSessionCounters" in body
+    assert "workflowTimelineStateClass" in body
+    assert "Состояние истории:" in body
     assert "Состояние:" in body
     assert "Длительность:" in body
     assert "selectWorkflowSession" in body

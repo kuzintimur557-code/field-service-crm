@@ -1391,6 +1391,18 @@ function workflowTimelineSummary(summary, timeline) {
     ].join(" · ");
 }
 
+function workflowTimelineStateClass(state) {
+    const classes = {
+        problem: "pill off",
+        warning: "pill warn",
+        active: "pill warn",
+        finished: "pill ok",
+        empty: "pill",
+    };
+
+    return classes[state] || "pill";
+}
+
 function replayChainTimeline(ruleId) {
     const container = document.getElementById(`timeline-${ruleId}`);
 
@@ -1741,6 +1753,9 @@ function renderChainTimeline(ruleId, timeline) {
         </div>
         <div class="meta" style="margin-bottom:8px">
             ${workflowTimelineSummary(summary, timeline)}
+        </div>
+        <div class="${workflowTimelineStateClass(summary.state)}" style="margin-bottom:10px">
+            Состояние истории: ${summary.state_label || "-"}
         </div>
         <div style="font-weight:900;margin-bottom:8px">Сессии выполнения</div>
         <div class="meta" style="margin-bottom:8px">
