@@ -224,6 +224,17 @@ def _session_execution_state(session):
     return "finished"
 
 
+def _session_summary_label(session):
+    parts = [
+        f"Выполнено: {session['done']}",
+        f"Пропущено: {session['skipped']}",
+        f"Ошибки: {session['failed']}",
+        f"Ожидает: {session['pending']}",
+    ]
+
+    return " · ".join(parts)
+
+
 def build_timeline_summary(events):
     summary = {
         "total": len(events),
@@ -326,6 +337,7 @@ def build_timeline_sessions(events):
         session["duration_label"] = _format_duration(duration_seconds)
         session["execution_state"] = _session_execution_state(session)
         session["execution_state_label"] = _execution_state_label(session["execution_state"])
+        session["summary_label"] = _session_summary_label(session)
 
         if session["failed"]:
             session["status"] = "failed"
