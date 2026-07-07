@@ -16115,8 +16115,11 @@ async def assert_a3_workflow_center():
     assert "Воспроизведение:" in body
     assert "replayStepLevelLabel" in body
     assert "workflowTimelineStepAttentionLabel" in body
+    assert "workflowReplaySessionSummary" in body
     assert "Требует внимания" in body
     assert "Ошибка выполнения" in body
+    assert "Ошибок:" in body
+    assert "Без проблем" in body
     assert 'warning: "Предупреждение"' in body
     assert "${levelLabel}" in body
     assert "timeline-progress-" in body
@@ -16126,8 +16129,11 @@ async def assert_a3_workflow_center():
     assert "data-timeline-level" in body
     assert "Сессия: нет" in body
     assert "Сессия: активно" in body
-    assert 'session.className = state.paused ? "pill warn" : "pill ok"' in body
-    assert 'session.className = "pill ok"' in body
+    assert "Сессия: пауза" in body
+    assert "Сессия: завершена" in body
+    assert "Сессия: остановлена" in body
+    assert 'session.className = state.paused ? "pill warn" : (state.summary?.className || "pill ok")' in body
+    assert 'className: "pill ok"' in body
     assert 'session.className = "pill off"' in body
     assert "chain.replaying" in body
     assert "Диагностика цепочки" in body

@@ -993,6 +993,31 @@ function workflowTimelineStepAttentionLabel(level) {
     return labels[level] || "";
 }
 
+function workflowReplaySessionSummary(rows) {
+    const levels = Array.from(rows).map(row => row.dataset.timelineLevel || "pending");
+    const criticalCount = levels.filter(level => level === "critical").length;
+    const warningCount = levels.filter(level => level === "warning").length;
+
+    if (criticalCount) {
+        return {
+            label: `Ошибок: ${criticalCount}`,
+            className: "pill off",
+        };
+    }
+
+    if (warningCount) {
+        return {
+            label: `Требует внимания: ${warningCount}`,
+            className: "pill warn",
+        };
+    }
+
+    return {
+        label: "Без проблем",
+        className: "pill ok",
+    };
+}
+
 function workflowSessionStatusLabel(status) {
     const labels = {
         done: "Выполнено",
@@ -1166,12 +1191,14 @@ function replayChainTimeline(ruleId) {
     clearReplayRows(rows);
 
     const delay = Number(speed?.value || 850);
+    const replaySummary = workflowReplaySessionSummary(rows);
 
     a3ReplayState[ruleId] = {
         index: 0,
         paused: false,
         rows,
         progress,
+        summary: replaySummary,
         timer: null,
     };
 
@@ -1180,8 +1207,8 @@ function replayChainTimeline(ruleId) {
     }
 
     if (session) {
-        session.textContent = "Сессия: активно";
-        session.className = "pill ok";
+        session.textContent = `Сессия: активно · шаг 0 / ${rows.length} · ${replaySummary.label}`;
+        session.className = replaySummary.className;
     }
 
     if (chainCard) {
@@ -1207,6 +1234,11 @@ function replayChainTimeline(ruleId) {
             progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length} · Событие #${eventId} · ${eventStatus}`;
         }
 
+        if (session) {
+            session.textContent = `Сессия: активно · шаг ${state.index + 1} / ${rows.length} · ${state.summary.label}`;
+            session.className = state.summary.className;
+        }
+
         if (active) {
             active.style.outline = style.outline;
             active.style.background = style.background;
@@ -1230,8 +1262,8 @@ function replayChainTimeline(ruleId) {
                 }
 
                 if (session) {
-                    session.textContent = "Сессия: завершена";
-                    session.className = "pill ok";
+                    session.textContent = `Сессия: завершена · шаг ${rows.length} / ${rows.length} · ${state.summary.label}`;
+                    session.className = state.summary.className;
                 }
 
                 if (chainCard) {
@@ -1264,8 +1296,13 @@ function pauseReplayChainTimeline(ruleId) {
     }
 
     if (session) {
-        session.textContent = state.paused ? "Сессия: пауза" : "Сессия: активно";
-        session.className = state.paused ? "pill warn" : "pill ok";
+        const currentStep = Math.max(state.index, 1);
+        const summaryLabel = state.summary?.label ? ` · ${state.summary.label}` : "";
+
+        session.textContent = state.paused
+            ? `Сессия: пауза · шаг ${currentStep} / ${state.rows.length}${summaryLabel}`
+            : `Сессия: активно · шаг ${currentStep} / ${state.rows.length}${summaryLabel}`;
+        session.className = state.paused ? "pill warn" : (state.summary?.className || "pill ok");
     }
 }
 
@@ -1291,7 +1328,9 @@ function stopReplayChainTimeline(ruleId) {
     }
 
     if (session) {
-        session.textContent = "Сессия: остановлена";
+        const summaryLabel = state.summary?.label ? ` · ${state.summary.label}` : "";
+
+        session.textContent = `Сессия: остановлена${summaryLabel}`;
         session.className = "pill off";
     }
 
