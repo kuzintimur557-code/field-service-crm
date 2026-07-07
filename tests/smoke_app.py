@@ -2391,7 +2391,7 @@ async def assert_automation_page():
 
     assert ai_digest_builder_action is not None
     assert "owner2" in ai_digest_builder_action["payload_json"]
-    assert "AI-сводка по бизнесу" in ai_digest_builder_action["payload_json"]
+    assert "ИИ-сводка по бизнесу" in ai_digest_builder_action["payload_json"]
 
     invalid_create_task_action_response = await crm.create_rule_action(
         make_form_request(
@@ -3932,7 +3932,7 @@ async def assert_automation_runner(task):
             "owner2",
             "/automation/rules",
             {
-                "name": "AI digest runner rule",
+                "name": "Правило ИИ-сводки",
                 "trigger_key": "weekly_digest",
                 "action_key": "ai_digest",
                 "target_username": "owner2",
@@ -3988,7 +3988,7 @@ async def assert_automation_runner(task):
     FROM notifications
     WHERE company_id=2
       AND username='owner2'
-      AND title='🤖 AI-сводка'
+      AND title='🤖 ИИ-сводка'
     ORDER BY id DESC
     """).fetchone()
 
@@ -3997,18 +3997,18 @@ async def assert_automation_runner(task):
     assert ai_digest_event is not None
     assert ai_digest_event["status"] == "done"
     assert ai_digest_notification is not None
-    assert "AI-сводка по бизнесу" in ai_digest_notification["message"]
+    assert "ИИ-сводка по бизнесу" in ai_digest_notification["message"]
     assert ai_digest_notification["link"] == "/ai/insights"
     assert sent_telegram_messages
     assert sent_telegram_messages[-1][0] == "chat-owner2"
-    assert "AI-сводка по бизнесу" in sent_telegram_messages[-1][1]
+    assert "ИИ-сводка по бизнесу" in sent_telegram_messages[-1][1]
 
     daily_digest_response = await crm.create_automation_rule(
         make_form_request(
             "owner2",
             "/automation/rules",
             {
-                "name": "Daily AI digest runner rule",
+                "name": "Ежедневное правило ИИ-сводки",
                 "trigger_key": "daily_digest",
                 "action_key": "ai_digest",
                 "target_username": "owner2",
@@ -4046,7 +4046,7 @@ async def assert_automation_runner(task):
     FROM automation_events
     WHERE company_id=2
       AND trigger_key='daily_digest'
-      AND message='Ежедневная AI-сводка 2026-05-25'
+      AND message='Ежедневная ИИ-сводка 2026-05-25'
     ORDER BY id DESC
     """).fetchone()
 
@@ -4055,7 +4055,7 @@ async def assert_automation_runner(task):
     FROM automation_events
     WHERE company_id=2
       AND trigger_key='weekly_digest'
-      AND message='Еженедельная AI-сводка 2026-W22'
+      AND message='Еженедельная ИИ-сводка 2026-W22'
     ORDER BY id DESC
     """).fetchone()
 
@@ -4210,7 +4210,7 @@ async def assert_ai_assistant_page():
             "owner2",
             "/ai/assistant/notes",
             {
-                "note": "Проверить AI assistant рекомендацию",
+                "note": "Проверить рекомендацию ИИ-помощника",
                 "priority": "urgent",
                 "follow_up_date": "2026-05-26",
             },
@@ -4222,7 +4222,7 @@ async def assert_ai_assistant_page():
     notes_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert notes_response.status_code == 200
     notes_html = notes_response.body.decode("utf-8")
-    assert "Проверить AI assistant рекомендацию" in notes_html
+    assert "Проверить рекомендацию ИИ-помощника" in notes_html
     assert "/create-task?ai_note_id=" in notes_html
     assert "ИИ к контролю" in notes_html
 
@@ -4232,7 +4232,7 @@ async def assert_ai_assistant_page():
     )
     assert urgent_filter_response.status_code == 200
     urgent_filter_html = urgent_filter_response.body.decode("utf-8")
-    assert "Проверить AI assistant рекомендацию" in urgent_filter_html
+    assert "Проверить рекомендацию ИИ-помощника" in urgent_filter_html
     assert 'href="/ai/assistant?note_filter=urgent" class="active"' in urgent_filter_html
 
     search_response = await crm.ai_assistant_page(
@@ -4242,7 +4242,7 @@ async def assert_ai_assistant_page():
     assert search_response.status_code == 200
     search_html = search_response.body.decode("utf-8")
     assert 'name="note_search" placeholder="Поиск по ИИ-заметкам" value="рекомендацию"' in search_html
-    assert "Проверить AI assistant рекомендацию" in search_html
+    assert "Проверить рекомендацию ИИ-помощника" in search_html
 
     conn = connect()
     c = conn.cursor()
@@ -4256,7 +4256,7 @@ async def assert_ai_assistant_page():
     conn.close()
 
     assert saved_note is not None
-    assert saved_note["note"] == "Проверить AI assistant рекомендацию"
+    assert saved_note["note"] == "Проверить рекомендацию ИИ-помощника"
     assert saved_note["priority"] == "urgent"
     assert saved_note["follow_up_date"] == "2026-05-26"
     assert saved_note["is_done"] == 0
@@ -4275,11 +4275,11 @@ async def assert_ai_assistant_page():
     conn.close()
 
     assert created_event is not None
-    assert created_event["details"] == "Проверить AI assistant рекомендацию"
+    assert created_event["details"] == "Проверить рекомендацию ИИ-помощника"
 
     digest_message = crm.build_ai_digest_message(2)
     assert "Активные заметки владельца" in digest_message
-    assert "Срочно: Проверить AI assistant рекомендацию" in digest_message
+    assert "Срочно: Проверить рекомендацию ИИ-помощника" in digest_message
     assert "контроль: 2026-05-26" in digest_message
 
     conn = connect()
@@ -4310,7 +4310,7 @@ async def assert_ai_assistant_page():
     )
     assert sent_follow_up_telegram_messages
     assert sent_follow_up_telegram_messages[-1][0] == "chat-owner2"
-    assert "Проверить AI assistant рекомендацию" in sent_follow_up_telegram_messages[-1][1]
+    assert "Проверить рекомендацию ИИ-помощника" in sent_follow_up_telegram_messages[-1][1]
 
     conn = connect()
     c = conn.cursor()
@@ -4321,11 +4321,11 @@ async def assert_ai_assistant_page():
       AND username='owner2'
       AND title=?
     ORDER BY id DESC
-    """, (f"AI контроль: заметка #{saved_note['id']}",)).fetchone()
+    """, (f"ИИ-контроль: заметка #{saved_note['id']}",)).fetchone()
     conn.close()
 
     assert follow_up_notification is not None
-    assert follow_up_notification["message"] == "Проверить AI assistant рекомендацию"
+    assert follow_up_notification["message"] == "Проверить рекомендацию ИИ-помощника"
     assert follow_up_notification["link"] == "/ai/assistant"
 
     conn = connect()
@@ -4409,7 +4409,7 @@ async def assert_ai_assistant_page():
             "owner2",
             "/ai/assistant/notes",
             {
-                "note": "Автоматический AI контроль",
+                "note": "Автоматический ИИ-контроль",
                 "priority": "normal",
                 "follow_up_date": "2026-05-26",
             },
@@ -4430,7 +4430,7 @@ async def assert_ai_assistant_page():
     FROM notifications
     WHERE company_id=2
       AND username='owner2'
-      AND message='Автоматический AI контроль'
+      AND message='Автоматический ИИ-контроль'
     ORDER BY id DESC
     """).fetchone()
     conn.close()
@@ -4444,7 +4444,7 @@ async def assert_ai_assistant_page():
     assert ai_note_task_response.status_code == 200
     ai_note_task_html = ai_note_task_response.body.decode("utf-8")
     assert f'name="ai_note_id" value="{saved_note["id"]}"' in ai_note_task_html
-    assert "Проверить AI assistant рекомендацию</textarea>" in ai_note_task_html
+    assert "Проверить рекомендацию ИИ-помощника</textarea>" in ai_note_task_html
 
     done_response = await crm.complete_ai_assistant_note(
         make_form_request(
@@ -4516,7 +4516,7 @@ async def assert_ai_assistant_page():
     completed_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert completed_page_response.status_code == 200
     completed_html = completed_page_response.body.decode("utf-8")
-    assert "Проверить AI assistant рекомендацию" in completed_html
+    assert "Проверить рекомендацию ИИ-помощника" in completed_html
     assert "Без заявки" in completed_html
 
     completed_search_response = await crm.ai_assistant_page(
@@ -4525,14 +4525,14 @@ async def assert_ai_assistant_page():
     )
     assert completed_search_response.status_code == 200
     completed_search_html = completed_search_response.body.decode("utf-8")
-    assert "Проверить AI assistant рекомендацию" in completed_search_html
+    assert "Проверить рекомендацию ИИ-помощника" in completed_search_html
     assert "Выполненные решения" in completed_search_html
 
     task_note_response = await crm.add_ai_assistant_note(
         make_form_request(
             "owner2",
             "/ai/assistant/notes",
-            {"note": "Создать заявку из AI заметки"},
+            {"note": "Создать заявку из ИИ-заметки"},
         )
     )
     assert task_note_response.status_code == 302
@@ -4544,7 +4544,7 @@ async def assert_ai_assistant_page():
     FROM ai_assistant_notes
     WHERE company_id=2
       AND username='owner2'
-      AND note='Создать заявку из AI заметки'
+      AND note='Создать заявку из ИИ-заметки'
     ORDER BY id DESC
     """).fetchone()
     conn.close()
@@ -4562,10 +4562,10 @@ async def assert_ai_assistant_page():
                 "owner2",
                 "/create-task",
                 {
-                    "client": "AI client",
+                    "client": "ИИ клиент",
                     "phone": "+70000000001",
-                    "address": "AI address",
-                    "description": "Создать заявку из AI заметки",
+                    "address": "ИИ адрес",
+                    "description": "Создать заявку из ИИ-заметки",
                     "task_date": "2026-05-26",
                     "ai_note_id": str(task_note["id"]),
                     "priority": "Обычный",
@@ -4598,7 +4598,7 @@ async def assert_ai_assistant_page():
     linked_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert linked_page_response.status_code == 200
     linked_html = linked_page_response.body.decode("utf-8")
-    assert "Создать заявку из AI заметки" in linked_html
+    assert "Создать заявку из ИИ-заметки" in linked_html
     assert f"/task/{linked_note['created_task_id']}" in linked_html
 
     conn = connect()

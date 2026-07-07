@@ -130,7 +130,7 @@ def _ai_debug_recommendations(rule, actions, latest_problem_event):
 
     if not actions:
         recommendations.append(
-            "У правила нет действий. Добавьте уведомление, Telegram-сообщение или AI-сводку, иначе цепочка ничего не выполнит."
+            "У правила нет действий. Добавьте уведомление, Telegram-сообщение или ИИ-сводку, иначе цепочка ничего не выполнит."
         )
 
     if latest_problem_event:

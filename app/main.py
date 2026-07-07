@@ -258,8 +258,8 @@ def ui_text(value):
     text = str(value or "")
     replacements = {
         "Automation:": "Автоматизация:",
-        "AI daily digest": "Ежедневная AI-сводка",
-        "AI weekly digest": "Еженедельная AI-сводка",
+        "AI daily digest": "Ежедневная ИИ-сводка",
+        "AI weekly digest": "Еженедельная ИИ-сводка",
         "Deadline": "Срок",
         "deadline": "срок",
     }
@@ -312,14 +312,14 @@ AUTOMATION_TRIGGERS = [
     ("unpaid_task", "Нет оплаты"),
     ("worker_overload", "Перегрузка сотрудника"),
     ("new_client", "Новый клиент"),
-    ("daily_digest", "Ежедневная AI-сводка"),
-    ("weekly_digest", "Еженедельная AI-сводка")
+    ("daily_digest", "Ежедневная ИИ-сводка"),
+    ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
 
 AUTOMATION_ACTIONS = [
     ("notification", "Создать уведомление"),
     ("telegram_alert", "Telegram-уведомление"),
-    ("ai_digest", "AI-сводка"),
+    ("ai_digest", "ИИ-сводка"),
     ("email", "Электронная почта"),
     ("create_task", "Создать задачу")
 ]
@@ -345,7 +345,7 @@ FEATURE_DEFINITIONS = [
     ("workload", "Загрузка", "Загрузка исполнителей"),
     ("notifications", "Уведомления", "Центр уведомлений"),
     ("automation", "Автоматизация", "Правила, триггеры и действия"),
-    ("ai_insights", "AI-инсайты", "AI-рекомендации и бизнес-инсайты"),
+    ("ai_insights", "ИИ-инсайты", "ИИ-рекомендации и бизнес-инсайты"),
     ("calls", "Звонки", "История и будущая телефония"),
     ("one_c", "1С", "Интеграция с 1С"),
     ("custom_fields", "Поля компании", "Настраиваемые поля")
@@ -1445,7 +1445,7 @@ def create_ai_follow_up_notifications(company_id, username, now_dt=None):
     """, (company_id, today_key)).fetchall()
 
     for note in due_notes:
-        title = f"AI контроль: заметка #{note['id']}"
+        title = f"ИИ-контроль: заметка #{note['id']}"
         message = note["note"]
         duplicate_count = c.execute("""
         SELECT COUNT(*)
@@ -1625,7 +1625,7 @@ def build_ai_digest_message(company_id, cursor=None):
         conn.close()
 
     message_lines = [
-        "AI-сводка по бизнесу",
+        "ИИ-сводка по бизнесу",
         f"Просроченные {settings['task_label'] or 'задачи'}: {overdue_tasks}",
         f"Неоплаченная сумма: ₽{round(float(unpaid_total or 0), 1)}"
     ]
@@ -1862,15 +1862,15 @@ def build_owner_ai_assistant_context(company_id, note_filter="", note_search="",
         priorities.append({
             "level": "success",
             "title": "Критичных действий сейчас нет",
-            "reason": "AI-помощник не видит срочных просрочек, перегруза или кассового риска.",
-            "action": "Смотреть AI-инсайты",
+            "reason": "ИИ-помощник не видит срочных просрочек, перегруза или кассового риска.",
+            "action": "Смотреть ИИ-инсайты",
             "link": "/ai/insights"
         })
 
     next_steps = [
         "Проверьте самый старый риск первым.",
         "Назначьте ответственного и дату следующего действия.",
-        "После исправления запустите AI-сводку повторно."
+        "После исправления запустите ИИ-сводку повторно."
     ]
 
     return {
@@ -2171,7 +2171,7 @@ def automation_action_dry_run_preview(action):
     elif action_key == "telegram_alert":
         detail = f"Telegram: {target or 'создатель правила'}"
     elif action_key == "ai_digest":
-        detail = f"AI-сводка для: {target or 'создатель правила'}"
+        detail = f"ИИ-сводка для: {target or 'создатель правила'}"
     elif action_key == "email":
         detail = f"Почта: {target or 'получатель не указан'}"
     elif action_key == "create_task":
@@ -3216,7 +3216,7 @@ def run_automation_event(
                     """, (
                         company_id,
                         target_username,
-                        "🤖 AI-сводка",
+                        "🤖 ИИ-сводка",
                         digest_message,
                         "/ai/insights",
                         now
@@ -3348,7 +3348,7 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
     today_key = now_dt.strftime("%Y-%m-%d")
     iso_year, iso_week, _ = now_dt.isocalendar()
     week_key = f"{iso_year}-W{iso_week:02d}"
-    daily_message = f"Ежедневная AI-сводка {today_key}"
+    daily_message = f"Ежедневная ИИ-сводка {today_key}"
 
     conn = connect()
     c = conn.cursor()
@@ -3377,7 +3377,7 @@ def run_ai_digest_scheduler(company_id, now_dt=None):
       AND message=?
     """, (company_id, daily_message)).fetchone()[0]
 
-    weekly_message = f"Еженедельная AI-сводка {week_key}"
+    weekly_message = f"Еженедельная ИИ-сводка {week_key}"
     weekly_already_sent = c.execute("""
     SELECT COUNT(*)
     FROM automation_events
@@ -3456,8 +3456,8 @@ def ensure_ai_digest_automation_rules(company_id, username):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     created_count = 0
     defaults = [
-        ("daily_digest", "Ежедневная AI-сводка"),
-        ("weekly_digest", "Еженедельная AI-сводка")
+        ("daily_digest", "Ежедневная ИИ-сводка"),
+        ("weekly_digest", "Еженедельная ИИ-сводка")
     ]
 
     conn = connect()
@@ -13668,7 +13668,7 @@ async def create_automation_rule(request: Request):
         target_username = username
 
     if action_key == "ai_digest" and not message:
-        message = "AI-сводка по бизнесу"
+        message = "ИИ-сводка по бизнесу"
 
     payload = {
         "target_username": target_username,
@@ -13948,7 +13948,7 @@ async def automation_rule_detail(request: Request, rule_id: int):
         diagnostic_message = "Правило включено, но не сможет ничего выполнить без action."
         graph_status = "Проблема"
         graph_status_color = "#dc2626"
-        a3_recommendation = "Добавьте хотя бы одно действие: уведомление, Telegram или AI-сводку."
+        a3_recommendation = "Добавьте хотя бы одно действие: уведомление, Telegram или ИИ-сводку."
 
     elif not rule["active"]:
         diagnostic_title = "Правило отключено"
@@ -15013,7 +15013,7 @@ async def automation_diagnostics_page(request: Request):
         problems.append({
             "title": "Есть правила без действий",
             "reason": "Правило включено, но не имеет активного действия.",
-            "action": "Откройте правило и добавьте действие: уведомление, Telegram или AI-сводку."
+            "action": "Откройте правило и добавьте действие: уведомление, Telegram или ИИ-сводку."
         })
 
     if success_rate < 80 and (done_events + skipped_events) > 0:
@@ -15032,9 +15032,9 @@ async def automation_diagnostics_page(request: Request):
 
     if ai_digest_rules:
         problems.append({
-            "title": "Проверьте AI-сводки",
-            "reason": "В системе есть автоматизация AI-сводок.",
-            "action": "Проверьте, что AI-сводки появляются в уведомлениях и в журнале событий."
+            "title": "Проверьте ИИ-сводки",
+            "reason": "В системе есть автоматизация ИИ-сводок.",
+            "action": "Проверьте, что ИИ-сводки появляются в уведомлениях и в журнале событий."
         })
 
     if not problems:
@@ -15272,7 +15272,7 @@ async def create_rule_action(request: Request, rule_id: int):
         target_username = username
 
     if action_key == "ai_digest" and not message:
-        message = "AI-сводка по бизнесу"
+        message = "ИИ-сводка по бизнесу"
 
     if action_key == "create_task" and not message:
         message = f"Автоматическая задача: {rule['name']}"
@@ -26881,7 +26881,7 @@ async def complete_ai_assistant_note(request: Request, note_id: int):
         note_id,
         username,
         "done",
-        "AI заметка выполнена"
+        "ИИ-заметка выполнена"
     )
 
     return RedirectResponse("/ai/assistant?note_done=1", status_code=302)
@@ -27046,7 +27046,7 @@ async def create_ai_insights_digest(request: Request):
     """, (company_id,)).fetchone()[0]
 
     message_lines = [
-        "AI-сводка по бизнесу",
+        "ИИ-сводка по бизнесу",
         f"Просроченные {settings['task_label'] or 'задачи'}: {overdue_tasks}",
         f"Неоплаченная сумма: ₽{round(float(unpaid_total or 0), 1)}"
     ]
@@ -27072,7 +27072,7 @@ async def create_ai_insights_digest(request: Request):
     """, (
         company_id,
         username,
-        "🤖 AI-сводка",
+        "🤖 ИИ-сводка",
         digest_message,
         "/ai/insights",
         datetime.now().strftime("%Y-%m-%d %H:%M")

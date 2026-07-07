@@ -15,7 +15,7 @@ ACTION_LABELS = {
 TARGET_LABELS = {
     "automation_rule": "Правило автоматизации",
     "automation_event": "Событие автоматизации",
-    "autonomous_action": "AI-действие",
+    "autonomous_action": "ИИ-действие",
 }
 
 
