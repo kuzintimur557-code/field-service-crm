@@ -885,6 +885,8 @@ async def assert_automation_page():
     assert 'name="action_key" value="telegram_alert"' in builder_html
     assert 'name="action_key" value="ai_digest"' in builder_html
     assert f"/automation/rules/{rule['id']}" in builder_html
+    assert f"/automation/workflows#workflow-rule-{rule['id']}" in builder_html
+    assert f"/automation?event_rule_id={rule['id']}" in builder_html
 
     conditions_response = await crm.update_automation_rule_conditions(
         make_form_request(

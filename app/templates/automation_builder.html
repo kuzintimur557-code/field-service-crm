@@ -495,8 +495,8 @@
 
             <div class="actions">
                 <a href="/automation/rules/{{ rule['id'] }}" class="back">Редактировать</a>
-                <a href="/automation/workflows" class="back">Открыть выполнение</a>
-                <a href="/automation?rule_search={{ rule['name'] }}" class="back">События</a>
+                <a href="/automation/workflows#workflow-rule-{{ rule['id'] }}" class="back">Открыть выполнение</a>
+                <a href="/automation?event_rule_id={{ rule['id'] }}" class="back">События</a>
             </div>
         </div>
         {% else %}
