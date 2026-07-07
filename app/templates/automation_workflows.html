@@ -181,6 +181,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 <script>
 let chainFilter = "all";
 let chainSearch = "";
+let chainSearchTimer = null;
 let workflowApprovalHistoryFilter = "all";
 let workflowApprovalHistoryActionType = "all";
 let workflowApprovalHistoryTargetType = "all";
@@ -221,11 +222,22 @@ function setChainFilter(filter) {
 
 function setChainSearch(value) {
     chainSearch = value || "";
-    loadChains();
+
+    if (chainSearchTimer) {
+        window.clearTimeout(chainSearchTimer);
+    }
+
+    chainSearchTimer = window.setTimeout(() => {
+        loadChains();
+    }, 180);
 }
 
 function resetChainSearch() {
     chainSearch = "";
+    if (chainSearchTimer) {
+        window.clearTimeout(chainSearchTimer);
+        chainSearchTimer = null;
+    }
     const input = document.getElementById("workflow-chain-search");
 
     if (input) {

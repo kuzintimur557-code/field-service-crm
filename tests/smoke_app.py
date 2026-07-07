@@ -16113,6 +16113,9 @@ async def assert_a3_workflow_center():
     assert 'class="filter-actions"' in body
     assert 'id="workflow-chain-search"' in body
     assert "setChainSearch" in body
+    assert "chainSearchTimer" in body
+    assert "window.setTimeout" in body
+    assert "window.clearTimeout" in body
     assert "resetChainSearch" in body
     assert "data-chain-filter=" in body
     assert "chainFilterLabel" in body
