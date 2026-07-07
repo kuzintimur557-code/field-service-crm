@@ -984,6 +984,15 @@ function replayStepLevelLabel(level) {
     return labels[level] || "Событие";
 }
 
+function workflowTimelineStepAttentionLabel(level) {
+    const labels = {
+        warning: "Требует внимания",
+        critical: "Ошибка выполнения",
+    };
+
+    return labels[level] || "";
+}
+
 function workflowSessionStatusLabel(status) {
     const labels = {
         done: "Выполнено",
@@ -1527,14 +1536,19 @@ function renderChainTimeline(ruleId, timeline) {
         <div style="display:flex;flex-direction:column;gap:8px">
             ${steps.length ? steps.slice(0, visibleLimit).map((step, index) => {
                 let cls = "pill";
+                let attentionCls = "pill";
 
                 if (step.level === "success") {
                     cls += " ok";
                 } else if (step.level === "warning") {
                     cls += " warn";
+                    attentionCls += " warn";
                 } else if (step.level === "critical") {
                     cls += " off";
+                    attentionCls += " off";
                 }
+
+                const attentionLabel = workflowTimelineStepAttentionLabel(step.level);
 
                 return `
                     <div class="timeline-step"
@@ -1549,6 +1563,11 @@ function renderChainTimeline(ruleId, timeline) {
                             <span class="meta">
                                 ${step.message || "Без сообщения"}
                             </span>
+                            ${attentionLabel ? `
+                                <span class="${attentionCls}">
+                                    ${attentionLabel}
+                                </span>
+                            ` : ""}
                         </div>
                         <div class="meta">
                             <div>${step.created_at || ""}</div>
