@@ -416,6 +416,7 @@ def get_rule_workflow_graph(company_id, rule_id):
     pending_count = event_counts.get("pending", 0)
     failed_count = event_counts.get("failed", 0)
     total_events = done_count + skipped_count + pending_count + failed_count
+    problem_count = skipped_count + failed_count
     success_rate = round(done_count / max(done_count + skipped_count + failed_count, 1) * 100, 1)
     conditions = _condition_summary(rule["conditions_json"])
 
@@ -507,6 +508,8 @@ def get_rule_workflow_graph(company_id, rule_id):
             "skipped": skipped_count,
             "pending": pending_count,
             "failed": failed_count,
+            "problem_count": problem_count,
+            "problem_label": f"Проблемных событий: {problem_count}",
             "success_rate": success_rate,
             "summary_label": _workflow_stats_summary(
                 total_events,

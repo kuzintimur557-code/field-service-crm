@@ -1092,6 +1092,7 @@ async function loadChains() {
                     <span id="replay-session-${rule.id}" class="pill">Сессия: нет</span>
                     <span class="pill">Действий: ${actions.length || rule.actions_count || 0}</span>
                     <span class="pill">Событий: ${events.length || rule.events_count || 0}</span>
+                    <span class="pill ${(stats.problem_count || 0) ? "warn" : "ok"}">${stats.problem_label || "Проблемных событий: 0"}</span>
                 </div>
 
                 <div class="graph-box">${renderChainGraph(chain)}</div>

@@ -2196,6 +2196,9 @@ async def assert_automation_page():
         "Только новые заявки",
     }
     assert workflow_graph["stats"]["actions_total"] >= 1
+    assert "problem_count" in workflow_graph["stats"]
+    assert "problem_label" in workflow_graph["stats"]
+    assert workflow_graph["stats"]["problem_label"].startswith("Проблемных событий:")
     assert "summary_label" in workflow_graph["stats"]
     assert workflow_graph["stats"]["summary_label"].startswith("Событий:")
     assert "debug" in workflow_graph
@@ -16220,6 +16223,9 @@ async def assert_a3_workflow_center():
     assert "Условие:" in body
     assert "stats.summary_label" in body
     assert "Статистика: событий пока нет" in body
+    assert "stats.problem_count" in body
+    assert "stats.problem_label" in body
+    assert "Проблемных событий: 0" in body
     assert "/api/a3/workflows/graph" in body
     assert "workflow_center_load_failed" in body
     assert "Фильтры" in body
