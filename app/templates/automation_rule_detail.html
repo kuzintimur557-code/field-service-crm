@@ -71,6 +71,10 @@
                 Скачать CSV
             </a>
 
+            <a href="/automation/workflows#workflow-rule-{{ rule['id'] }}" class="btn" style="background:#7c3aed;">
+                Центр цепочек
+            </a>
+
             <form method="post" action="/automation/rules/{{ rule['id'] }}/retry-skipped" style="margin:0;">
                 <button type="submit" class="btn" style="background:#f59e0b;">Повторить пропущенные</button>
             </form>

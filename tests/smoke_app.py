@@ -2147,6 +2147,8 @@ async def assert_automation_page():
     assert f"/automation?event_rule_id={rule['id']}" in rule_detail_html
     assert "Запустить сейчас" in rule_detail_html
     assert "Повторить пропущенные" in rule_detail_html
+    assert "Центр цепочек" in rule_detail_html
+    assert f"/automation/workflows#workflow-rule-{rule['id']}" in rule_detail_html
     assert f"/automation/rules/{rule['id']}/events/export" in rule_detail_html
 
     workflow_graph = crm.api_a3_workflow_rule_graph(
@@ -16092,6 +16094,8 @@ async def assert_a3_workflow_center():
     assert "workflow-card-actions" in body
     assert "chain-actions" in body
     assert "timeline-control-row" in body
+    assert "workflow-rule-${rule.id}" in body
+    assert "scroll-margin-top:20px" in body
     assert "replay-runtime-summary" in body
     assert "updateReplayRuntimeSummary" in body
     assert "Replay активно:" in body
