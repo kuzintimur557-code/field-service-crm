@@ -16185,6 +16185,8 @@ async def assert_a3_workflow_center():
     assert "updateChainFilterButtons" in body
     assert "workflow-summary-pills" in body
     assert "renderWorkflowSummaryPills" in body
+    assert 'id="workflow-action-status"' in body
+    assert "setWorkflowActionStatus" in body
     assert "isWorkflowProblematic" in body
     assert "Проблемные: ${stats.problematic}" in body
     assert "Поиск: \" + (searchValue || \"без поиска\")" in body
@@ -16265,6 +16267,11 @@ async def assert_a3_workflow_center():
     assert "workflow_rule_enable_failed" in body
     assert "workflow_rule_retry_failed" in body
     assert "workflow_rule_fix_failed" in body
+    assert "Запуск цепочки..." in body
+    assert "Пометка цепочки как проблемной..." in body
+    assert "Включение правила..." in body
+    assert "Повтор пропущенных событий..." in body
+    assert "Пометка цепочки как исправленной..." in body
     assert "Повтор пропущенных событий отправлен" in body
     assert "ИИ-рекомендации диагностики" in body
     assert "Диагностика:" in body
@@ -16290,17 +16297,21 @@ async def assert_a3_workflow_center():
     assert "Обновление подтверждений..." in body
     assert "Подтверждения обновлены:" in body
     assert "approveWorkflowAction" in body
+    assert "Одобрение действия..." in body
     assert "approval_action_approve_failed" in body
     assert "Не удалось одобрить действие" in body
     assert "rejectWorkflowAction" in body
+    assert "Отклонение действия..." in body
     assert "approval_action_reject_failed" in body
     assert "Не удалось отклонить действие" in body
     assert "approveSafeWorkflowActions" in body
     assert "Одобрить безопасные" in body
+    assert "Безопасные действия обработаны" in body
     assert "approval_safe_actions_failed" in body
     assert "Не удалось одобрить безопасные действия" in body
     assert "rejectUnsafeWorkflowActions" in body
     assert "Отклонить небезопасные" in body
+    assert "Небезопасные действия обработаны" in body
     assert "approval_unsafe_actions_failed" in body
     assert "Не удалось отклонить небезопасные действия" in body
     assert "approval_safety_label" in body
@@ -16382,6 +16393,7 @@ async def assert_a3_workflow_center():
     assert "Последние решения" in body
     assert "История решений пока пустая" in body
     assert "requestDangerousFixApproval" in body
+    assert "Отправка действия на подтверждение..." in body
     assert "/api/a3/autonomous-actions/request-approval" in body
     assert "dangerous_fix_approval_request_failed" in body
     assert "/api/a3/autonomous-actions/approve-safe" in body

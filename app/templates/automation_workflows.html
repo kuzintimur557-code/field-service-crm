@@ -139,6 +139,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
     <div id="chains-summary" class="meta">Загрузка сводки цепочек...</div>
     <div id="workflow-summary-pills" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
     <div id="replay-runtime-summary" style="margin-top:8px"></div>
+    <div id="workflow-action-status" class="meta" style="margin-top:8px;font-weight:800"></div>
 </div>
 
 <div class="card">
@@ -200,6 +201,22 @@ let workflowApprovalHistoryDecidedBy = "";
 let workflowApprovalHistoryTargetId = "";
 let workflowApprovalHistoryDateFrom = "";
 let workflowApprovalHistoryDateTo = "";
+
+function setWorkflowActionStatus(message, level = "info") {
+    const status = document.getElementById("workflow-action-status");
+
+    if (!status) {
+        return;
+    }
+
+    const updatedAt = new Date().toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+
+    status.className = level === "error" ? "pill off" : (level === "success" ? "pill ok" : "pill");
+    status.textContent = `${message} · ${updatedAt}`;
+}
 
 function buildWorkflowApprovalHistoryQuery() {
     const params = new URLSearchParams();
@@ -776,6 +793,7 @@ function renderWorkflowApprovalHistorySummary(summary) {
 
 async function approveWorkflowAction(actionId) {
     try {
+        setWorkflowActionStatus("Одобрение действия...");
         const response = await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {method:"POST"});
 
         if (!response.ok) {
@@ -785,15 +803,18 @@ async function approveWorkflowAction(actionId) {
         await loadWorkflowApprovalQueue();
         await loadWorkflowApprovalHistory();
         loadChains();
+        setWorkflowActionStatus("Действие одобрено", "success");
         alert("Действие одобрено");
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось одобрить действие", "error");
         alert("Не удалось одобрить действие");
     }
 }
 
 async function rejectWorkflowAction(actionId) {
     try {
+        setWorkflowActionStatus("Отклонение действия...");
         const response = await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {method:"POST"});
 
         if (!response.ok) {
@@ -803,15 +824,18 @@ async function rejectWorkflowAction(actionId) {
         await loadWorkflowApprovalQueue();
         await loadWorkflowApprovalHistory();
         loadChains();
+        setWorkflowActionStatus("Действие отклонено", "success");
         alert("Действие отклонено");
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось отклонить действие", "error");
         alert("Не удалось отклонить действие");
     }
 }
 
 async function approveSafeWorkflowActions() {
     try {
+        setWorkflowActionStatus("Одобрение безопасных действий...");
         const response = await fetch("/api/a3/autonomous-actions/approve-safe", {
             method: "POST"
         });
@@ -826,18 +850,21 @@ async function approveSafeWorkflowActions() {
         await loadWorkflowApprovalHistory();
         loadChains();
 
+        setWorkflowActionStatus("Безопасные действия обработаны", "success");
         alert(
             "Одобрено: " + (data.approved || 0)
             + ". Пропущено: " + (data.skipped || 0)
         );
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось одобрить безопасные действия", "error");
         alert("Не удалось одобрить безопасные действия");
     }
 }
 
 async function rejectUnsafeWorkflowActions() {
     try {
+        setWorkflowActionStatus("Отклонение небезопасных действий...");
         const response = await fetch("/api/a3/autonomous-actions/reject-unsafe", {
             method: "POST"
         });
@@ -852,12 +879,14 @@ async function rejectUnsafeWorkflowActions() {
         await loadWorkflowApprovalHistory();
         loadChains();
 
+        setWorkflowActionStatus("Небезопасные действия обработаны", "success");
         alert(
             "Отклонено: " + (data.rejected || 0)
             + ". Пропущено: " + (data.skipped || 0)
         );
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось отклонить небезопасные действия", "error");
         alert("Не удалось отклонить небезопасные действия");
     }
 }
@@ -1739,6 +1768,7 @@ function handleDebugAction(actionType, target) {
 
 async function requestDangerousFixApproval(actionType, targetType, targetId, label) {
     try {
+        setWorkflowActionStatus("Отправка действия на подтверждение...");
         const response = await fetch("/api/a3/autonomous-actions/request-approval", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
@@ -1757,11 +1787,13 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
         const data = await response.json();
 
         if (!data.ok && data.reason === "duplicate_pending_action") {
+            setWorkflowActionStatus("Такое действие уже ждёт подтверждения", "error");
             alert("Такое действие уже ждёт подтверждения");
             return;
         }
 
         if (!data.ok) {
+            setWorkflowActionStatus("Не удалось отправить на подтверждение", "error");
             alert("Не удалось отправить на подтверждение");
             return;
         }
@@ -1769,9 +1801,11 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
         loadChains();
         loadWorkflowApprovalQueue();
         loadWorkflowApprovalHistory();
+        setWorkflowActionStatus("Действие отправлено на подтверждение", "success");
         alert("Действие отправлено на подтверждение");
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось отправить на подтверждение", "error");
         alert("Не удалось отправить на подтверждение");
     }
 }
@@ -2035,6 +2069,7 @@ function renderChainTimeline(ruleId, timeline) {
 
 async function runChain(ruleId) {
     try {
+        setWorkflowActionStatus("Запуск цепочки...");
         const response = await fetch(`/automation/rules/${ruleId}/run`, {method:"POST"});
 
         if (!response.ok) {
@@ -2043,15 +2078,18 @@ async function runChain(ruleId) {
 
         await loadChainTimeline(ruleId);
         loadChains();
+        setWorkflowActionStatus("Цепочка запущена", "success");
         alert("Цепочка запущена");
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось запустить цепочку", "error");
         alert("Не удалось запустить цепочку");
     }
 }
 
 async function flagChain(ruleId) {
     try {
+        setWorkflowActionStatus("Пометка цепочки как проблемной...");
         const response = await fetch("/api/a3/ops-timeline", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
@@ -2069,15 +2107,18 @@ async function flagChain(ruleId) {
             throw new Error("workflow_rule_flag_failed");
         }
 
+        setWorkflowActionStatus("Цепочка помечена", "success");
         alert("Цепочка помечена");
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось пометить цепочку", "error");
         alert("Не удалось пометить цепочку");
     }
 }
 
 async function enableChain(ruleId) {
     try {
+        setWorkflowActionStatus("Включение правила...");
         const response = await fetch(`/automation/rules/${ruleId}/enable`, {method:"POST"});
 
         if (!response.ok) {
@@ -2085,15 +2126,18 @@ async function enableChain(ruleId) {
         }
 
         loadChains();
+        setWorkflowActionStatus("Правило включено", "success");
         alert("Правило включено");
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось включить правило", "error");
         alert("Не удалось включить правило");
     }
 }
 
 async function retryChain(ruleId) {
     try {
+        setWorkflowActionStatus("Повтор пропущенных событий...");
         const response = await fetch(`/automation/rules/${ruleId}/retry-skipped`, {method:"POST"});
 
         if (!response.ok) {
@@ -2102,15 +2146,18 @@ async function retryChain(ruleId) {
 
         await loadChainTimeline(ruleId);
         loadChains();
+        setWorkflowActionStatus("Повтор пропущенных событий отправлен", "success");
         alert("Повтор пропущенных событий отправлен");
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось повторить запуск", "error");
         alert("Не удалось повторить запуск");
     }
 }
 
 async function markChainFixed(ruleId) {
     try {
+        setWorkflowActionStatus("Пометка цепочки как исправленной...");
         const response = await fetch("/api/a3/ops-timeline", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
@@ -2128,9 +2175,11 @@ async function markChainFixed(ruleId) {
             throw new Error("workflow_rule_fix_failed");
         }
 
+        setWorkflowActionStatus("Цепочка помечена как исправленная", "success");
         alert("Цепочка помечена как исправленная");
     } catch (err) {
         console.error(err);
+        setWorkflowActionStatus("Не удалось обновить цепочку", "error");
         alert("Не удалось обновить цепочку");
     }
 }
