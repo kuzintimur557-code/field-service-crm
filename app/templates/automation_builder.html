@@ -106,6 +106,13 @@
 
     <div class="card">
         <h2>Фильтры конструктора</h2>
+        <div class="inline-pills" style="margin-bottom:12px">
+            <span class="pill">Всего правил: {{ builder_stats.total }}</span>
+            <span class="pill ok">Активные: {{ builder_stats.active }}</span>
+            <span class="pill off">Выключенные: {{ builder_stats.disabled }}</span>
+            <span class="pill warn">Без действий: {{ builder_stats.empty }}</span>
+            <span class="pill">С условиями: {{ builder_stats.with_conditions }}</span>
+        </div>
         <div class="filters">
             <button class="back" type="button" onclick="filterBuilderChains('all')">Все</button>
             <button class="back" type="button" onclick="filterBuilderChains('active')">Активные</button>

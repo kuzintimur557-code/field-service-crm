@@ -13018,6 +13018,22 @@ async def automation_builder_page(request: Request):
 
         rules_view.append(rule_data)
 
+    builder_stats = {
+        "total": len(rules_view),
+        "active": len([rule for rule in rules_view if rule["active"]]),
+        "disabled": len([rule for rule in rules_view if not rule["active"]]),
+        "empty": len([
+            rule
+            for rule in rules_view
+            if not actions_by_rule.get(rule["id"])
+        ]),
+        "with_conditions": len([
+            rule
+            for rule in rules_view
+            if rule.get("condition_mode") != "none"
+        ]),
+    }
+
     return templates.TemplateResponse(
         request,
         "automation_builder.html",
@@ -13031,6 +13047,7 @@ async def automation_builder_page(request: Request):
             "action_labels": dict(AUTOMATION_ACTIONS),
             "condition_presets": condition_presets,
             "condition_groups": condition_groups,
+            "builder_stats": builder_stats,
             "workers": workers,
             "clients": clients,
             "catalog_items": catalog_items,

@@ -870,6 +870,11 @@ async def assert_automation_page():
     assert 'optgroup label="Дата"' in builder_html
     assert "Быстрые шаблоны" in builder_html
     assert "Фильтры конструктора" in builder_html
+    assert "Всего правил:" in builder_html
+    assert "Активные:" in builder_html
+    assert "Выключенные:" in builder_html
+    assert "Без действий:" in builder_html
+    assert "С условиями:" in builder_html
     assert "filterBuilderChains" in builder_html
     assert 'data-builder-chain="1"' in builder_html
     assert "Без действий" in builder_html
