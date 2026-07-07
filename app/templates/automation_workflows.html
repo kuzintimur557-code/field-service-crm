@@ -1720,6 +1720,16 @@ async function loadChainTimeline(ruleId, statusFilter = null, limit = null) {
         };
 
         renderChainTimeline(ruleId, timeline);
+
+        const refreshedProgress = document.getElementById(`timeline-progress-${ruleId}`);
+
+        if (refreshedProgress) {
+            const updatedAt = new Date().toLocaleTimeString("ru-RU", {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+            refreshedProgress.textContent = `История обновлена: ${updatedAt}`;
+        }
     } catch (err) {
         console.error(err);
 

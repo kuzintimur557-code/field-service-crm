@@ -16377,6 +16377,8 @@ async def assert_a3_workflow_center():
     assert "loadedLimit" in body
     assert "nextSessionIndex" in body
     assert 'progress.textContent = "Загрузка истории..."' in body
+    assert "refreshedProgress" in body
+    assert "История обновлена:" in body
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "Состояние: ${summary.state_label || \"-\"}" in body
     assert 'summary.latest_event_label || "Последнее событие: нет"' in body
