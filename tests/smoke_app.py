@@ -2244,6 +2244,11 @@ async def assert_automation_page():
     assert "failed" in workflow_timeline["timeline"]["summary"]
     assert "state" in workflow_timeline["timeline"]["summary"]
     assert "state_label" in workflow_timeline["timeline"]["summary"]
+    assert "latest_event_at" in workflow_timeline["timeline"]["summary"]
+    assert "latest_event_label" in workflow_timeline["timeline"]["summary"]
+    assert workflow_timeline["timeline"]["summary"]["latest_event_label"].startswith(
+        "Последнее событие:"
+    )
     assert workflow_timeline["timeline"]["summary"]["state"] in {
         "empty",
         "problem",
@@ -16355,6 +16360,7 @@ async def assert_a3_workflow_center():
     assert 'progress.textContent = "Загрузка истории..."' in body
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "Состояние: ${summary.state_label || \"-\"}" in body
+    assert 'summary.latest_event_label || "Последнее событие: нет"' in body
     assert "workflowTimelineFilterLabel" in body
     assert "workflowTimelineEventsUrl" in body
     assert "workflowTimelineEventsExportUrl" in body

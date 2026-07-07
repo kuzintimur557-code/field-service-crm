@@ -244,7 +244,15 @@ def build_timeline_summary(events):
         "pending": 0,
         "state": "empty",
         "state_label": "История пустая",
+        "latest_event_at": None,
+        "latest_event_label": "Последнее событие: нет",
     }
+
+    if events:
+        summary["latest_event_at"] = events[0].get("created_at")
+        summary["latest_event_label"] = (
+            f"Последнее событие: {summary['latest_event_at'] or 'дата неизвестна'}"
+        )
 
     for event in events:
         status = event.get("status") or "pending"
