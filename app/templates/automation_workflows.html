@@ -1101,6 +1101,17 @@ function workflowTimelineEventsUrl(ruleId, statusFilter) {
     return `/automation?${params.toString()}`;
 }
 
+function workflowTimelineEventsExportUrl(ruleId, statusFilter) {
+    const params = new URLSearchParams();
+    params.set("event_rule_id", String(ruleId));
+
+    if (statusFilter && statusFilter !== "all") {
+        params.set("event_filter", statusFilter);
+    }
+
+    return `/automation/events/export?${params.toString()}`;
+}
+
 function workflowTimelineSummary(summary, timeline) {
     if (!summary) {
         return "Всего событий: 0";
@@ -1507,6 +1518,9 @@ function renderChainTimeline(ruleId, timeline) {
         <div class="timeline-control-row" style="margin-bottom:8px">
             <a class="back" href="${workflowTimelineEventsUrl(ruleId, statusFilter)}">
                 Открыть события по фильтру
+            </a>
+            <a class="back" href="${workflowTimelineEventsExportUrl(ruleId, statusFilter)}" style="background:#16a34a">
+                Скачать CSV по фильтру
             </a>
         </div>
 

@@ -3687,6 +3687,7 @@ async def assert_automation_runner(task):
     assert f"Фильтр по правилу: #{event['rule_id']}" in rule_events_html
     assert f'name="event_rule_id" value="{event["rule_id"]}"' in rule_events_html
     assert f'href="/automation?event_rule_id={event["rule_id"]}"' in rule_events_html
+    assert "Сбросить фильтр правила" in rule_events_html
     assert (
         f'href="/automation/events/export?event_rule_id={event["rule_id"]}"'
         in rule_events_html
@@ -16255,7 +16256,9 @@ async def assert_a3_workflow_center():
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "workflowTimelineFilterLabel" in body
     assert "workflowTimelineEventsUrl" in body
+    assert "workflowTimelineEventsExportUrl" in body
     assert "Открыть события по фильтру" in body
+    assert "Скачать CSV по фильтру" in body
     assert "workflowTimelineSummary" in body
     assert "Всего событий в истории:" in body
     assert "Осталось:" in body
