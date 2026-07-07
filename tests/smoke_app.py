@@ -16169,6 +16169,9 @@ async def assert_a3_workflow_center():
     assert "resetChainSearch" in body
     assert "refreshWorkflowCenter" in body
     assert "Обновить цепочки" in body
+    assert 'id="workflow-center-refresh-status"' in body
+    assert "Обновление цепочек..." in body
+    assert "Цепочки обновлены:" in body
     assert "showAllWorkflowChains" in body
     assert "Показать все" in body
     assert "data-chain-filter=" in body

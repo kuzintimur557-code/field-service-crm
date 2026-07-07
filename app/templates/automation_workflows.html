@@ -122,6 +122,9 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
         <button class="back off" onclick="refreshWorkflowCenter()">Обновить цепочки</button>
         <button class="back" onclick="showAllWorkflowChains()">Показать все</button>
     </div>
+    <div id="workflow-center-refresh-status"
+         class="meta"
+         style="margin-top:8px;font-weight:800"></div>
     <div class="search-row">
         <input id="workflow-chain-search" type="text"
                placeholder="Найти цепочку по названию, ID, триггеру или состоянию"
@@ -274,9 +277,23 @@ function showAllWorkflowChains() {
 }
 
 async function refreshWorkflowCenter() {
+    const status = document.getElementById("workflow-center-refresh-status");
+
+    if (status) {
+        status.textContent = "Обновление цепочек...";
+    }
+
     await loadChains();
     await loadWorkflowApprovalQueue();
     await loadWorkflowApprovalHistory();
+
+    if (status) {
+        const updatedAt = new Date().toLocaleTimeString("ru-RU", {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+        status.textContent = `Цепочки обновлены: ${updatedAt}`;
+    }
 }
 
 async function refreshWorkflowApprovals() {
