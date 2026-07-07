@@ -1383,6 +1383,7 @@ function workflowTimelineSummary(summary, timeline) {
         loadedLabel,
         `Состояние: ${summary.state_label || "-"}`,
         summary.latest_event_label || "Последнее событие: нет",
+        summary.problem_label || "Проблемных событий: 0",
         `Выполнено: ${summary.done || 0}`,
         `Пропущено: ${summary.skipped || 0}`,
         `Ошибки: ${summary.failed || 0}`,

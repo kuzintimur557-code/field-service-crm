@@ -2246,6 +2246,12 @@ async def assert_automation_page():
     assert "state_label" in workflow_timeline["timeline"]["summary"]
     assert "latest_event_at" in workflow_timeline["timeline"]["summary"]
     assert "latest_event_label" in workflow_timeline["timeline"]["summary"]
+    assert "problem_count" in workflow_timeline["timeline"]["summary"]
+    assert "problem_label" in workflow_timeline["timeline"]["summary"]
+    assert workflow_timeline["timeline"]["summary"]["problem_count"] >= 0
+    assert workflow_timeline["timeline"]["summary"]["problem_label"].startswith(
+        "Проблемных событий:"
+    )
     assert workflow_timeline["timeline"]["summary"]["latest_event_label"].startswith(
         "Последнее событие:"
     )
@@ -16361,6 +16367,7 @@ async def assert_a3_workflow_center():
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
     assert "Состояние: ${summary.state_label || \"-\"}" in body
     assert 'summary.latest_event_label || "Последнее событие: нет"' in body
+    assert 'summary.problem_label || "Проблемных событий: 0"' in body
     assert "workflowTimelineFilterLabel" in body
     assert "workflowTimelineEventsUrl" in body
     assert "workflowTimelineEventsExportUrl" in body

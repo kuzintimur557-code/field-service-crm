@@ -246,6 +246,8 @@ def build_timeline_summary(events):
         "state_label": "История пустая",
         "latest_event_at": None,
         "latest_event_label": "Последнее событие: нет",
+        "problem_count": 0,
+        "problem_label": "Проблемных событий: 0",
     }
 
     if events:
@@ -261,6 +263,9 @@ def build_timeline_summary(events):
             summary[status] += 1
         else:
             summary["pending"] += 1
+
+    summary["problem_count"] = summary["failed"] + summary["skipped"]
+    summary["problem_label"] = f"Проблемных событий: {summary['problem_count']}"
 
     if summary["failed"]:
         summary["state"] = "problem"
