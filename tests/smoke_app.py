@@ -16260,6 +16260,11 @@ async def assert_a3_workflow_center():
     assert "handleDebugAction" in body
     assert "/enable" in body
     assert "/retry-skipped" in body
+    assert "workflow_rule_run_failed" in body
+    assert "workflow_rule_flag_failed" in body
+    assert "workflow_rule_enable_failed" in body
+    assert "workflow_rule_retry_failed" in body
+    assert "workflow_rule_fix_failed" in body
     assert "Повтор пропущенных событий отправлен" in body
     assert "ИИ-рекомендации диагностики" in body
     assert "Диагностика:" in body

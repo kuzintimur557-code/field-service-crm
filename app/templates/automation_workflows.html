@@ -2025,7 +2025,12 @@ function renderChainTimeline(ruleId, timeline) {
 
 async function runChain(ruleId) {
     try {
-        await fetch(`/automation/rules/${ruleId}/run`, {method:"POST"});
+        const response = await fetch(`/automation/rules/${ruleId}/run`, {method:"POST"});
+
+        if (!response.ok) {
+            throw new Error("workflow_rule_run_failed");
+        }
+
         await loadChainTimeline(ruleId);
         loadChains();
         alert("Цепочка запущена");
@@ -2037,7 +2042,7 @@ async function runChain(ruleId) {
 
 async function flagChain(ruleId) {
     try {
-        await fetch("/api/a3/ops-timeline", {
+        const response = await fetch("/api/a3/ops-timeline", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({
@@ -2050,6 +2055,10 @@ async function flagChain(ruleId) {
             })
         });
 
+        if (!response.ok) {
+            throw new Error("workflow_rule_flag_failed");
+        }
+
         alert("Цепочка помечена");
     } catch (err) {
         console.error(err);
@@ -2059,7 +2068,12 @@ async function flagChain(ruleId) {
 
 async function enableChain(ruleId) {
     try {
-        await fetch(`/automation/rules/${ruleId}/enable`, {method:"POST"});
+        const response = await fetch(`/automation/rules/${ruleId}/enable`, {method:"POST"});
+
+        if (!response.ok) {
+            throw new Error("workflow_rule_enable_failed");
+        }
+
         loadChains();
         alert("Правило включено");
     } catch (err) {
@@ -2070,7 +2084,12 @@ async function enableChain(ruleId) {
 
 async function retryChain(ruleId) {
     try {
-        await fetch(`/automation/rules/${ruleId}/retry-skipped`, {method:"POST"});
+        const response = await fetch(`/automation/rules/${ruleId}/retry-skipped`, {method:"POST"});
+
+        if (!response.ok) {
+            throw new Error("workflow_rule_retry_failed");
+        }
+
         await loadChainTimeline(ruleId);
         loadChains();
         alert("Повтор пропущенных событий отправлен");
@@ -2082,7 +2101,7 @@ async function retryChain(ruleId) {
 
 async function markChainFixed(ruleId) {
     try {
-        await fetch("/api/a3/ops-timeline", {
+        const response = await fetch("/api/a3/ops-timeline", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({
@@ -2094,6 +2113,10 @@ async function markChainFixed(ruleId) {
                 target_id:ruleId
             })
         });
+
+        if (!response.ok) {
+            throw new Error("workflow_rule_fix_failed");
+        }
 
         alert("Цепочка помечена как исправленная");
     } catch (err) {
