@@ -1749,6 +1749,11 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
                 reason: label || "Опасное исправление из диагностики A3",
             })
         });
+
+        if (!response.ok) {
+            throw new Error("dangerous_fix_approval_request_failed");
+        }
+
         const data = await response.json();
 
         if (!data.ok && data.reason === "duplicate_pending_action") {
