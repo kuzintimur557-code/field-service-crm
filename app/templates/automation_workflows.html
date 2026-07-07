@@ -136,7 +136,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 
 <div class="card">
     <h2>Сводка</h2>
-    <div id="chains-summary" class="meta">Загрузка...</div>
+    <div id="chains-summary" class="meta">Загрузка сводки цепочек...</div>
     <div id="workflow-summary-pills" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
     <div id="replay-runtime-summary" style="margin-top:8px"></div>
 </div>
@@ -917,6 +917,9 @@ async function loadChains() {
     const summary = document.getElementById("chains-summary");
     const searchValue = chainSearch.trim().toLowerCase();
 
+    summary.textContent = "Загрузка сводки цепочек...";
+    list.innerHTML = '<div class="card empty">Загрузка цепочек...</div>';
+
     try {
         const [response, approvalResponse] = await Promise.all([
             fetch("/api/a3/workflows/graph"),
@@ -1162,8 +1165,8 @@ async function loadChains() {
         }
     } catch (err) {
         console.error(err);
-        summary.textContent = "Не удалось загрузить цепочки";
-        list.innerHTML = '<div class="card empty">Ошибка загрузки цепочек</div>';
+        summary.textContent = "Не удалось загрузить сводку цепочек";
+        list.innerHTML = '<div class="card empty">Не удалось загрузить список цепочек</div>';
     }
 }
 

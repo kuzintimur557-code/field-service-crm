@@ -16187,6 +16187,10 @@ async def assert_a3_workflow_center():
     assert "workflow-card-actions" in body
     assert "chain-actions" in body
     assert "timeline-control-row" in body
+    assert "Загрузка сводки цепочек..." in body
+    assert "Загрузка цепочек..." in body
+    assert "Не удалось загрузить сводку цепочек" in body
+    assert "Не удалось загрузить список цепочек" in body
     assert "workflow-rule-${rule.id}" in body
     assert "scroll-margin-top:20px" in body
     assert "replay-runtime-summary" in body
