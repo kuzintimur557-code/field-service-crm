@@ -16172,6 +16172,7 @@ async def assert_a3_workflow_center():
     assert 'id="workflow-center-refresh-status"' in body
     assert "Обновление цепочек..." in body
     assert "Цепочки обновлены:" in body
+    assert "Не удалось обновить цепочки" in body
     assert "showAllWorkflowChains" in body
     assert "Показать все" in body
     assert "data-chain-filter=" in body
@@ -16269,6 +16270,7 @@ async def assert_a3_workflow_center():
     assert "refreshWorkflowApprovals" in body
     assert "Обновить подтверждения" in body
     assert "workflow-approval-refresh-status" in body
+    assert "Не удалось обновить подтверждения" in body
     assert "Подтверждения обновляются автоматически" in body
     assert "Обновление подтверждений..." in body
     assert "Подтверждения обновлены:" in body

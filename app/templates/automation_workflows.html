@@ -283,16 +283,24 @@ async function refreshWorkflowCenter() {
         status.textContent = "Обновление цепочек...";
     }
 
-    await loadChains();
-    await loadWorkflowApprovalQueue();
-    await loadWorkflowApprovalHistory();
+    try {
+        await loadChains();
+        await loadWorkflowApprovalQueue();
+        await loadWorkflowApprovalHistory();
 
-    if (status) {
-        const updatedAt = new Date().toLocaleTimeString("ru-RU", {
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-        status.textContent = `Цепочки обновлены: ${updatedAt}`;
+        if (status) {
+            const updatedAt = new Date().toLocaleTimeString("ru-RU", {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+            status.textContent = `Цепочки обновлены: ${updatedAt}`;
+        }
+    } catch (err) {
+        console.error(err);
+
+        if (status) {
+            status.textContent = "Не удалось обновить цепочки";
+        }
     }
 }
 
@@ -303,15 +311,23 @@ async function refreshWorkflowApprovals() {
         status.textContent = "Обновление подтверждений...";
     }
 
-    await loadWorkflowApprovalQueue();
-    await loadWorkflowApprovalHistory();
+    try {
+        await loadWorkflowApprovalQueue();
+        await loadWorkflowApprovalHistory();
 
-    if (status) {
-        const updatedAt = new Date().toLocaleTimeString("ru-RU", {
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-        status.textContent = `Подтверждения обновлены: ${updatedAt}`;
+        if (status) {
+            const updatedAt = new Date().toLocaleTimeString("ru-RU", {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+            status.textContent = `Подтверждения обновлены: ${updatedAt}`;
+        }
+    } catch (err) {
+        console.error(err);
+
+        if (status) {
+            status.textContent = "Не удалось обновить подтверждения";
+        }
     }
 }
 
