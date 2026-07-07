@@ -16092,6 +16092,11 @@ async def assert_a3_workflow_center():
     assert "workflow-card-actions" in body
     assert "chain-actions" in body
     assert "timeline-control-row" in body
+    assert "replay-runtime-summary" in body
+    assert "updateReplayRuntimeSummary" in body
+    assert "Replay активно:" in body
+    assert "Replay на паузе:" in body
+    assert "Всего replay-сессий:" in body
     assert "problem-card" in body
     assert ".container{padding:16px 14px 92px}" in body
     assert "overflow-x:hidden" in body

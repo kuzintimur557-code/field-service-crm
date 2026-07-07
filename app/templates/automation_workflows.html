@@ -120,6 +120,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 <div class="card">
     <h2>Сводка</h2>
     <div id="chains-summary" class="meta">Загрузка...</div>
+    <div id="replay-runtime-summary" style="margin-top:8px"></div>
 </div>
 
 <div class="card">
@@ -929,6 +930,7 @@ async function loadChains() {
         }
 
         summary.textContent = "Всего цепочек: " + chains.length + ". Показано: " + rendered + ". Ждёт подтверждения: " + approvalCount + ".";
+        updateReplayRuntimeSummary();
         renderProblemChains(chains);
 
         if (!rendered) {
@@ -943,6 +945,30 @@ async function loadChains() {
 
 const a3ReplayState = {};
 const a3TimelineState = {};
+
+function updateReplayRuntimeSummary() {
+    const container = document.getElementById("replay-runtime-summary");
+
+    if (!container) {
+        return;
+    }
+
+    const sessions = Object.values(a3ReplayState);
+    const activeCount = sessions.filter(session => !session.paused).length;
+    const pausedCount = sessions.filter(session => session.paused).length;
+
+    container.innerHTML = `
+        <span class="pill ${activeCount ? "ok" : ""}">
+            Replay активно: ${activeCount}
+        </span>
+        <span class="pill ${pausedCount ? "warn" : ""}">
+            Replay на паузе: ${pausedCount}
+        </span>
+        <span class="pill">
+            Всего replay-сессий: ${sessions.length}
+        </span>
+    `;
+}
 
 function clearReplayRows(rows) {
     rows.forEach(row => {
@@ -1215,6 +1241,8 @@ function replayChainTimeline(ruleId) {
         chainCard.classList.add("replaying");
     }
 
+    updateReplayRuntimeSummary();
+
     a3ReplayState[ruleId].timer = setInterval(() => {
         const state = a3ReplayState[ruleId];
 
@@ -1271,6 +1299,7 @@ function replayChainTimeline(ruleId) {
                 }
 
                 delete a3ReplayState[ruleId];
+                updateReplayRuntimeSummary();
             }, 700);
         }
     }, delay);
@@ -1304,6 +1333,8 @@ function pauseReplayChainTimeline(ruleId) {
             : `Сессия: активно · шаг ${currentStep} / ${state.rows.length}${summaryLabel}`;
         session.className = state.paused ? "pill warn" : (state.summary?.className || "pill ok");
     }
+
+    updateReplayRuntimeSummary();
 }
 
 function stopReplayChainTimeline(ruleId) {
@@ -1339,6 +1370,7 @@ function stopReplayChainTimeline(ruleId) {
     }
 
     delete a3ReplayState[ruleId];
+    updateReplayRuntimeSummary();
 }
 
 function handleDebugAction(actionType, target) {
