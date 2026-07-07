@@ -2281,6 +2281,10 @@ async def assert_automation_page():
         assert "summary_label" in session
         assert "Выполнено:" in session["summary_label"]
         assert "Ошибки:" in session["summary_label"]
+        assert "problem_count" in session
+        assert "problem_label" in session
+        assert session["problem_count"] >= 0
+        assert session["problem_label"].startswith("Проблем:")
         assert "date_label" in session
         assert session["label"].startswith("Сессия ")
         assert " · " in session["label"]
@@ -16354,6 +16358,7 @@ async def assert_a3_workflow_center():
     assert "data-session-index" in body
     assert "session.execution_state_label || workflowExecutionStateLabel(session.execution_state)" in body
     assert "session.status_label || workflowSessionStatusLabel(session.status)" in body
+    assert "session.problem_label || \"Проблем: 0\"" in body
     assert "session.summary_label || \"Сводка недоступна\"" in body
     assert "filterWorkflowTimeline" in body
     assert "setWorkflowTimelineLimit" in body
