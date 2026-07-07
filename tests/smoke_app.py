@@ -16412,6 +16412,7 @@ async def assert_a3_workflow_center():
     assert "loadMoreLabel" in body
     assert "new URLSearchParams()" in body
     assert "stopReplayChainTimeline(ruleId);" in body
+    assert "workflow_timeline_load_failed" in body
     assert 'params.set("status_filter", requestedStatusFilter)' in body
     assert 'params.set("limit", String(requestedLimit))' in body
     assert "loadedLimit" in body

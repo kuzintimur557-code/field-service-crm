@@ -1802,6 +1802,11 @@ async function loadChainTimeline(ruleId, statusFilter = null, limit = null) {
 
         const query = params.toString() ? `?${params.toString()}` : "";
         const response = await fetch(`/api/a3/workflow/rules/${ruleId}/timeline${query}`);
+
+        if (!response.ok) {
+            throw new Error("workflow_timeline_load_failed");
+        }
+
         const data = await response.json();
         const timeline = data.timeline || {};
         const nextVisibleLimit = limit ? Math.max(5, Number(limit)) : 5;
