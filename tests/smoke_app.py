@@ -2151,6 +2151,7 @@ async def assert_automation_page():
     assert reset_conditions_response.status_code == 302
 
     assert "Запустить правило" in rule_detail_html
+    assert '<meta name="viewport" content="width=device-width, initial-scale=1.0">' in rule_detail_html
     assert "Визуальная цепочка" in rule_detail_html
     assert "A3 Конструктор цепочки" in rule_detail_html
     assert 'class="pill warn" id="a3-workflow-builder-status"' in rule_detail_html
@@ -2168,6 +2169,7 @@ async def assert_automation_page():
     assert "Запустить сейчас" in rule_detail_html
     assert "Повторить пропущенные" in rule_detail_html
     assert "Центр цепочек" in rule_detail_html
+    assert "/automation/builder" in rule_detail_html
     assert f"/automation/workflows#workflow-rule-{rule['id']}" in rule_detail_html
     assert f"/automation/rules/{rule['id']}/events/export" in rule_detail_html
 

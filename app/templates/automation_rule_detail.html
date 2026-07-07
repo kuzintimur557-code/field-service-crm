@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Правило автоматизации</title>
     <style>
         * { box-sizing:border-box; }
@@ -73,6 +74,10 @@
 
             <a href="/automation/workflows#workflow-rule-{{ rule['id'] }}" class="btn" style="background:#7c3aed;">
                 Центр цепочек
+            </a>
+
+            <a href="/automation/builder" class="btn" style="background:#4f46e5;">
+                Конструктор
             </a>
 
             <form method="post" action="/automation/rules/{{ rule['id'] }}/retry-skipped" style="margin:0;">
