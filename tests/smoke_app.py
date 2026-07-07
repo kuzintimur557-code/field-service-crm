@@ -2160,6 +2160,9 @@ async def assert_automation_page():
     assert "Визуальная цепочка" in rule_detail_html
     assert "A3 Конструктор цепочки" in rule_detail_html
     assert 'class="pill warn" id="a3-workflow-builder-status"' in rule_detail_html
+    assert "Обновить граф" in rule_detail_html
+    assert "Обновление..." in rule_detail_html
+    assert 'onclick="loadA3WorkflowBuilderPreview()"' in rule_detail_html
     assert 'status.className = "pill ok"' in rule_detail_html
     assert 'status.className = "pill off"' in rule_detail_html
     assert 'healthy: "Стабильно"' in rule_detail_html

@@ -202,7 +202,13 @@
                 <div class="label">Триггер → Правило → Действия → События</div>
             </div>
 
-            <div class="pill warn" id="a3-workflow-builder-status">Загрузка</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div class="pill warn" id="a3-workflow-builder-status">Загрузка</div>
+                <button type="button" class="btn" style="background:#111827;"
+                        onclick="loadA3WorkflowBuilderPreview()">
+                    Обновить граф
+                </button>
+            </div>
         </div>
 
         <div id="a3-workflow-builder-preview"
@@ -596,6 +602,11 @@ async function loadA3WorkflowBuilderPreview() {
     const status = document.getElementById("a3-workflow-builder-status");
 
     try {
+        if (status) {
+            status.textContent = "Обновление...";
+            status.className = "pill warn";
+        }
+
         const response = await fetch("/api/a3/workflow/rules/{{ rule['id'] }}/graph");
         const data = await response.json();
 
