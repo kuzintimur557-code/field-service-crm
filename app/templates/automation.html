@@ -2300,7 +2300,14 @@ if (newRuleActionKey) {
 <h2>Последние события</h2>
 <div class="meta" style="margin-top:-8px;margin-bottom:14px">Показано событий: {{ shown_events_count }}</div>
 {% if selected_event_rule_id %}
-<div class="meta" style="margin-top:-6px;margin-bottom:14px">Фильтр по правилу: #{{ selected_event_rule_id }}</div>
+<div class="meta" style="margin-top:-6px;margin-bottom:14px">
+    Фильтр по правилу:
+    {% if selected_event_rule_name %}
+    {{ selected_event_rule_name }} (#{{ selected_event_rule_id }})
+    {% else %}
+    #{{ selected_event_rule_id }}
+    {% endif %}
+</div>
 <a class="back" href="/automation" style="margin-bottom:14px;background:#6b7280">Сбросить фильтр правила</a>
 {% endif %}
 

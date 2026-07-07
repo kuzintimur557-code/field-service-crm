@@ -12457,9 +12457,13 @@ async def automation_page(
 
     rules = []
     unhealthy_rules = []
+    selected_event_rule_name = ""
 
     for rule_row in rule_rows:
         rule = dict(rule_row)
+
+        if selected_event_rule_id and rule.get("id") == selected_event_rule_id:
+            selected_event_rule_name = rule.get("name") or ""
 
         health_issues = []
 
@@ -12583,6 +12587,7 @@ async def automation_page(
             "selected_event_date_from": selected_event_date_from,
             "selected_event_date_to": selected_event_date_to,
             "selected_event_rule_id": selected_event_rule_id,
+            "selected_event_rule_name": selected_event_rule_name,
             "event_export_query": event_export_query,
             "event_all_query": event_all_query,
             "event_rule_query_suffix": event_rule_query_suffix,
