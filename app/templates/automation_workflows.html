@@ -265,6 +265,14 @@ function updateChainFilterButtons() {
     });
 }
 
+function isWorkflowProblematic(rule, actions, health) {
+    return (
+        !rule.active
+        || !actions.length
+        || ["warning", "degraded", "critical"].includes(health.status)
+    );
+}
+
 function renderWorkflowSummaryPills(chains, approvalCount) {
     const container = document.getElementById("workflow-summary-pills");
 
@@ -289,11 +297,7 @@ function renderWorkflowSummaryPills(chains, approvalCount) {
             result.empty += 1;
         }
 
-        if (
-            !rule.active
-            || !actions.length
-            || ["warning", "degraded", "critical"].includes(health.status)
-        ) {
+        if (isWorkflowProblematic(rule, actions, health)) {
             result.problematic += 1;
         }
 
@@ -849,6 +853,7 @@ async function loadChains() {
             const trigger = chain.trigger || {};
             const debug = chain.debug || {};
             const state = chain.health || {};
+            const isProblematic = isWorkflowProblematic(rule, actions, state);
             const searchText = [
                 rule.id,
                 rule.name,
@@ -862,7 +867,7 @@ async function loadChains() {
 
             if (chainFilter === "active" && !rule.active) continue;
             if (chainFilter === "disabled" && rule.active) continue;
-            if (chainFilter === "problematic" && rule.active && actions.length > 0) continue;
+            if (chainFilter === "problematic" && !isProblematic) continue;
             if (chainFilter === "empty" && actions.length > 0) continue;
             if (searchValue && !searchText.includes(searchValue)) continue;
 

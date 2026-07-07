@@ -16122,6 +16122,7 @@ async def assert_a3_workflow_center():
     assert "updateChainFilterButtons" in body
     assert "workflow-summary-pills" in body
     assert "renderWorkflowSummaryPills" in body
+    assert "isWorkflowProblematic" in body
     assert "Проблемные: ${stats.problematic}" in body
     assert "Поиск: \" + (searchValue || \"без поиска\")" in body
     assert "По выбранному фильтру или поиску цепочки не найдены" in body
