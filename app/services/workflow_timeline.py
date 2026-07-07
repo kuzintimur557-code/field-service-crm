@@ -114,6 +114,13 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
 
     items = [dict(row) for row in rows]
     loaded_count = len(items)
+    remaining_count = max(total_events - loaded_count, 0)
+    has_more = total_events > loaded_count
+    loaded_label = (
+        f"Показано: {loaded_count} · Осталось: {remaining_count}"
+        if has_more
+        else f"Показано: {loaded_count}"
+    )
 
     return {
         "rule_id": rule_id,
@@ -122,9 +129,10 @@ def get_workflow_timeline(company_id, rule_id, limit=20, status_filter="all"):
         "items": items,
         "events_total": total_events,
         "loaded_count": loaded_count,
-        "remaining_count": max(total_events - loaded_count, 0),
+        "remaining_count": remaining_count,
+        "loaded_label": loaded_label,
         "limit": limit,
-        "has_more": total_events > loaded_count,
+        "has_more": has_more,
         "summary": build_timeline_summary(items),
         "steps": build_timeline_steps(items),
         "sessions": build_timeline_sessions(items),

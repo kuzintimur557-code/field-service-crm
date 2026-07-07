@@ -1399,9 +1399,9 @@ function workflowTimelineSummary(summary, timeline) {
     const totalInHistory = timeline?.events_total ?? summary.total ?? 0;
     const loadedTotal = timeline?.loaded_count ?? summary.total ?? 0;
     const remainingTotal = timeline?.remaining_count ?? Math.max(totalInHistory - loadedTotal, 0);
-    const loadedLabel = timeline?.has_more
+    const loadedLabel = timeline?.loaded_label || (timeline?.has_more
         ? `Показано: ${loadedTotal} · Осталось: ${remainingTotal}`
-        : `Показано: ${loadedTotal}`;
+        : `Показано: ${loadedTotal}`);
 
     return [
         `Всего событий в истории: ${totalInHistory}`,
