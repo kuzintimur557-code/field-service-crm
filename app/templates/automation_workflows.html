@@ -1451,10 +1451,11 @@ function replayChainTimeline(ruleId) {
         const level = active?.dataset?.timelineLevel || "pending";
         const eventId = active?.dataset?.timelineEvent || "-";
         const eventStatus = active?.dataset?.timelineStatus || replayStepLevelLabel(level);
+        const attentionLabel = workflowTimelineStepAttentionLabel(level);
         const style = replayStepStyle(level);
 
         if (progress) {
-            progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length} · Событие #${eventId} · ${eventStatus}`;
+            progress.textContent = `Воспроизведение: ${state.index + 1} / ${rows.length} · Событие #${eventId} · ${eventStatus}${attentionLabel ? " · " + attentionLabel : ""}`;
         }
 
         updateReplayActiveEventLink(ruleId, eventId, eventStatus);
