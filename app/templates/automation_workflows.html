@@ -147,6 +147,9 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
             </div>
         </div>
         <div class="workflow-card-actions">
+            <button class="back" onclick="refreshWorkflowApprovals()">
+                Обновить подтверждения
+            </button>
             <button class="back" onclick="approveSafeWorkflowActions()">
                 Одобрить безопасные
             </button>
@@ -269,6 +272,11 @@ function showAllWorkflowChains() {
 
 async function refreshWorkflowCenter() {
     await loadChains();
+    await loadWorkflowApprovalQueue();
+    await loadWorkflowApprovalHistory();
+}
+
+async function refreshWorkflowApprovals() {
     await loadWorkflowApprovalQueue();
     await loadWorkflowApprovalHistory();
 }

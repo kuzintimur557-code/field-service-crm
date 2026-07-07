@@ -16257,6 +16257,8 @@ async def assert_a3_workflow_center():
     assert ".workflow-card-actions select," in body
     assert "loadWorkflowApprovalQueue" in body
     assert "loadWorkflowApprovalHistory" in body
+    assert "refreshWorkflowApprovals" in body
+    assert "Обновить подтверждения" in body
     assert "approveWorkflowAction" in body
     assert "rejectWorkflowAction" in body
     assert "approveSafeWorkflowActions" in body
