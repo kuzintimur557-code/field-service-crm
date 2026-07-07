@@ -310,14 +310,23 @@ def _workflow_debug(rule, actions, latest_problem_event):
     if not issues:
         issues.append("Критических проблем не найдено")
 
+    risk = _risk_level(priority)
+    diagnosis = _debug_diagnosis(rule, actions, latest_problem_event)
+    summary_label = (
+        f"Диагностика: {issues[0]} · "
+        f"Риск: {risk['label']} · "
+        f"Следующий шаг: {diagnosis['next_step']}"
+    )
+
     return {
         "status": "needs_attention" if issues[0] != "Критических проблем не найдено" else "ok",
         "severity": severity,
         "priority": priority,
-        "risk": _risk_level(priority),
+        "risk": risk,
         "reason": issues[0],
+        "summary_label": summary_label,
         "issues": issues,
-        "diagnosis": _debug_diagnosis(rule, actions, latest_problem_event),
+        "diagnosis": diagnosis,
         "ai_recommendations": _ai_debug_recommendations(rule, actions, latest_problem_event),
         "latest_problem_event": dict(latest_problem_event) if latest_problem_event else None,
         "quick_actions": quick_actions,

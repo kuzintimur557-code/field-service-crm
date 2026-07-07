@@ -1130,6 +1130,9 @@ async function loadChains() {
                     <div class="meta" style="margin-top:8px">
                         ${debug.risk?.description || "Критических проблем не найдено."}
                     </div>
+                    <div class="meta" style="margin-top:8px;font-weight:800">
+                        ${debug.summary_label || "Диагностика: данных пока недостаточно"}
+                    </div>
 
                     <div class="debug-action-row" style="margin-top:10px">
                         ${(debug.issues || []).slice(0, 3).map(issue => `

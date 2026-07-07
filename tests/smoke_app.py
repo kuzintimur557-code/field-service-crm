@@ -2205,6 +2205,8 @@ async def assert_automation_page():
     assert "priority" in workflow_graph["debug"]
     assert "risk" in workflow_graph["debug"]
     assert workflow_graph["debug"]["risk"]["key"] in {"low", "medium", "high", "critical"}
+    assert "summary_label" in workflow_graph["debug"]
+    assert workflow_graph["debug"]["summary_label"].startswith("Диагностика:")
     assert "safe_fixes" in workflow_graph["debug"]
     assert "dangerous_fixes" in workflow_graph["debug"]
     assert any(node["type"] == "trigger" for node in workflow_graph["nodes"])
@@ -2222,6 +2224,7 @@ async def assert_automation_page():
     assert "ai_recommendations" in workflow_debug["debug"]
     assert "diagnosis" in workflow_debug["debug"]
     assert "risk" in workflow_debug["debug"]
+    assert "summary_label" in workflow_debug["debug"]
     assert "safe_fixes" in workflow_debug["debug"]
     assert "dangerous_fixes" in workflow_debug["debug"]
     assert "stats" in workflow_debug
@@ -16282,6 +16285,8 @@ async def assert_a3_workflow_center():
     assert "Диагноз" in body
     assert "Следующий шаг:" in body
     assert "Риск:" in body
+    assert "debug.summary_label" in body
+    assert "Диагностика: данных пока недостаточно" in body
     assert "Безопасные исправления" in body
     assert "Автоисправления не требуются" in body
     assert "Требует подтверждения" in body
