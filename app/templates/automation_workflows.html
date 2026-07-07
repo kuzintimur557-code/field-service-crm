@@ -132,6 +132,7 @@ h2{margin:0 0 16px;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 <div class="card">
     <h2>Сводка</h2>
     <div id="chains-summary" class="meta">Загрузка...</div>
+    <div id="workflow-summary-pills" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
     <div id="replay-runtime-summary" style="margin-top:8px"></div>
 </div>
 
@@ -250,6 +251,61 @@ function updateChainFilterButtons() {
     document.querySelectorAll("[data-chain-filter]").forEach(button => {
         button.classList.toggle("active", button.dataset.chainFilter === chainFilter);
     });
+}
+
+function renderWorkflowSummaryPills(chains, approvalCount) {
+    const container = document.getElementById("workflow-summary-pills");
+
+    if (!container) {
+        return;
+    }
+
+    const stats = chains.reduce((result, chain) => {
+        const rule = chain.rule || chain;
+        const actions = chain.actions || [];
+        const health = chain.health || {};
+
+        result.total += 1;
+
+        if (rule.active) {
+            result.active += 1;
+        } else {
+            result.disabled += 1;
+        }
+
+        if (!actions.length) {
+            result.empty += 1;
+        }
+
+        if (
+            !rule.active
+            || !actions.length
+            || ["warning", "degraded", "critical"].includes(health.status)
+        ) {
+            result.problematic += 1;
+        }
+
+        return result;
+    }, {
+        total: 0,
+        active: 0,
+        disabled: 0,
+        empty: 0,
+        problematic: 0,
+    });
+
+    container.innerHTML = `
+        <span class="pill">Всего: ${stats.total}</span>
+        <span class="pill ok">Активные: ${stats.active}</span>
+        <span class="pill off">Выключенные: ${stats.disabled}</span>
+        <span class="pill warn">Без действий: ${stats.empty}</span>
+        <span class="pill ${stats.problematic ? "warn" : "ok"}">
+            Проблемные: ${stats.problematic}
+        </span>
+        <span class="pill ${approvalCount ? "off" : "ok"}">
+            Ждёт подтверждения: ${approvalCount}
+        </span>
+    `;
 }
 
 function workflowApprovalActionLabel(actionType) {
@@ -991,6 +1047,7 @@ async function loadChains() {
         }
 
         updateChainFilterButtons();
+        renderWorkflowSummaryPills(chains, approvalCount);
         summary.textContent = "Всего цепочек: " + chains.length
             + ". Фильтр: " + chainFilterLabel(chainFilter)
             + ". Поиск: " + (searchValue || "без поиска")
