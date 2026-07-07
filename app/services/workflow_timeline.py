@@ -231,6 +231,8 @@ def build_timeline_summary(events):
         "skipped": 0,
         "failed": 0,
         "pending": 0,
+        "state": "empty",
+        "state_label": "История пустая",
     }
 
     for event in events:
@@ -240,6 +242,19 @@ def build_timeline_summary(events):
             summary[status] += 1
         else:
             summary["pending"] += 1
+
+    if summary["failed"]:
+        summary["state"] = "problem"
+        summary["state_label"] = "Есть ошибки"
+    elif summary["skipped"]:
+        summary["state"] = "warning"
+        summary["state_label"] = "Есть пропуски"
+    elif summary["pending"]:
+        summary["state"] = "active"
+        summary["state_label"] = "Есть ожидающие"
+    elif summary["total"]:
+        summary["state"] = "finished"
+        summary["state_label"] = "Все события выполнены"
 
     return summary
 

@@ -2239,6 +2239,22 @@ async def assert_automation_page():
     assert "summary" in workflow_timeline["timeline"]
     assert "total" in workflow_timeline["timeline"]["summary"]
     assert "failed" in workflow_timeline["timeline"]["summary"]
+    assert "state" in workflow_timeline["timeline"]["summary"]
+    assert "state_label" in workflow_timeline["timeline"]["summary"]
+    assert workflow_timeline["timeline"]["summary"]["state"] in {
+        "empty",
+        "problem",
+        "warning",
+        "active",
+        "finished",
+    }
+    assert workflow_timeline["timeline"]["summary"]["state_label"] in {
+        "История пустая",
+        "Есть ошибки",
+        "Есть пропуски",
+        "Есть ожидающие",
+        "Все события выполнены",
+    }
     assert "steps" in workflow_timeline["timeline"]
     if workflow_timeline["timeline"]["steps"]:
         step = workflow_timeline["timeline"]["steps"][0]
@@ -16331,6 +16347,7 @@ async def assert_a3_workflow_center():
     assert "nextSessionIndex" in body
     assert 'progress.textContent = "Загрузка истории..."' in body
     assert "timeline.status_filter_label || workflowTimelineFilterLabel(statusFilter)" in body
+    assert "Состояние: ${summary.state_label || \"-\"}" in body
     assert "workflowTimelineFilterLabel" in body
     assert "workflowTimelineEventsUrl" in body
     assert "workflowTimelineEventsExportUrl" in body
