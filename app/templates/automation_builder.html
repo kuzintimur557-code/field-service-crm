@@ -560,7 +560,7 @@ function filterBuilderChains(filter) {
         const active = card.dataset.active === "1";
         const actionCount = Number(card.dataset.actionCount || 0);
         const hasConditions = card.dataset.hasConditions === "1";
-        const searchText = `${card.dataset.builderSearch || ""} ${card.textContent || ""}`.toLowerCase();
+        const searchText = (card.dataset.builderSearch || "").toLowerCase();
         let visible = true;
 
         if (currentBuilderFilter === "active") {
