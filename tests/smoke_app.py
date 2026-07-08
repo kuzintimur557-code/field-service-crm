@@ -2308,7 +2308,7 @@ async def assert_automation_page():
     assert "История выполненных действий" in action_history_html
     assert f'href="/task/{source_task["id"]}"' in action_history_html
     assert f'href="/task/{created_task_id}"' in action_history_html
-    assert f"Создана заявка #{created_task_id}" in action_history_html
+    assert f"Создано: заявка #{created_task_id}" in action_history_html
 
     c.execute("""
     DELETE FROM notifications
@@ -2713,10 +2713,10 @@ async def assert_automation_page():
     assert "Удалить" in rule_detail_html
     assert "Добавить действие" in rule_detail_html
     assert f"/automation/rules/{rule['id']}/actions/create" in rule_detail_html
-    assert "Исполнитель новой задачи" in rule_detail_html
+    assert "Для создания \"заявка\" можно выбрать только: исполнитель" in rule_detail_html
     assert 'data-role="worker"' in rule_detail_html
     assert "Авто: наименее загруженный" in rule_detail_html
-    assert "Данные берутся из исходной заявки или нового клиента" in rule_detail_html
+    assert "Данные берутся из исходной записи" in rule_detail_html
     assert "Дата выполнения" in rule_detail_html
     assert "Через 7 дней" in rule_detail_html
     assert "Приоритет" in rule_detail_html

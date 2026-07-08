@@ -14189,6 +14189,8 @@ async def automation_rule_detail(request: Request, rule_id: int):
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -14347,7 +14349,8 @@ async def automation_rule_detail(request: Request, rule_id: int):
             "graph_status": graph_status,
             "graph_status_color": graph_status_color,
             "a3_health_score": a3_health_score,
-            "a3_recommendation": a3_recommendation
+            "a3_recommendation": a3_recommendation,
+            "settings": settings
         }
     )
 

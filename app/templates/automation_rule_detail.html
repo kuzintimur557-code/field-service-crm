@@ -53,6 +53,9 @@
     </style>
 </head>
 <body>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <div class="container">
 
     <div class="top">
@@ -336,10 +339,10 @@
                     <div class="label">Лимит автоназначения</div>
                     <select name="task_max_daily_load" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;">
                         <option value="0">Без лимита</option>
-                        <option value="1">1 заявка в день</option>
-                        <option value="2">2 заявки в день</option>
-                        <option value="3">3 заявки в день</option>
-                        <option value="5">5 заявок в день</option>
+                        <option value="1">1 в день</option>
+                        <option value="2">2 в день</option>
+                        <option value="3">3 в день</option>
+                        <option value="5">5 в день</option>
                     </select>
                 </div>
                 <div>
@@ -365,7 +368,7 @@
             </button>
 
             <div class="label" style="margin-top:12px;">
-                Для создания задачи можно выбрать только исполнителя. Данные берутся из исходной заявки или нового клиента.
+                Для создания "{{ task_label|lower }}" можно выбрать только: {{ worker_label|lower }}. Данные берутся из исходной записи или нового {{ client_label|lower }}.
             </div>
         </form>
     </div>
@@ -447,7 +450,7 @@
                     <td>
                         {% if run["entity_type"] == "task" %}
                         <a href="/task/{{ run['entity_id'] }}">
-                            #{{ run["entity_id"] }} · {{ run["source_client"] or "Без клиента" }}
+                            #{{ run["entity_id"] }} · {{ run["source_client"] or ("Без связи: " ~ (client_label|lower)) }}
                         </a>
                         {% else %}
                         {{ run["entity_type"] }} #{{ run["entity_id"] }}
@@ -456,8 +459,8 @@
                     <td>
                         {% if run["created_entity_type"] == "task" and run["created_entity_id"] %}
                         <a href="/task/{{ run['created_entity_id'] }}">
-                            Создана заявка #{{ run["created_entity_id"] }}
-                            · {{ run["created_client"] or "Без клиента" }}
+                            Создано: {{ task_label|lower }} #{{ run["created_entity_id"] }}
+                            · {{ run["created_client"] or ("Без связи: " ~ (client_label|lower)) }}
                             · {{ run["created_status"] or "" }}
                         </a>
                         {% else %}
@@ -522,6 +525,8 @@ const actionTargetSelect = document.querySelector("[data-action-target]");
 const actionTargetLabel = document.querySelector("[data-target-label]");
 const actionMessageLabel = document.querySelector("[data-message-label]");
 const createTaskSettings = document.querySelector("[data-create-task-settings]");
+const taskLabel = {{ task_label|tojson }};
+const workerLabel = {{ worker_label|tojson }};
 
 function syncActionTargetOptions() {
     if (!actionKeySelect || !actionTargetSelect) {
@@ -546,11 +551,11 @@ function syncActionTargetOptions() {
     }
 
     if (actionTargetLabel) {
-        actionTargetLabel.textContent = createsTask ? "Исполнитель новой задачи" : "Получатель";
+        actionTargetLabel.textContent = createsTask ? `${workerLabel}: ${taskLabel.toLowerCase()}` : "Получатель";
     }
 
     if (actionMessageLabel) {
-        actionMessageLabel.textContent = createsTask ? "Описание новой задачи" : "Сообщение";
+        actionMessageLabel.textContent = createsTask ? `Описание: ${taskLabel.toLowerCase()}` : "Сообщение";
     }
 
     if (createTaskSettings) {
