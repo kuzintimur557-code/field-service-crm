@@ -17739,6 +17739,8 @@ async def assert_a3_api_layer():
     )
     assert invalid_approval_target.status_code == 400
     assert b"invalid_target_id" in invalid_approval_target.body
+    invalid_approval_payload = json.loads(invalid_approval_target.body.decode())
+    assert invalid_approval_payload["message"] == "Некорректный ID цели"
 
     zero_approval_target = await crm.api_a3_request_autonomous_action_approval(
         make_json_request(
@@ -17753,6 +17755,8 @@ async def assert_a3_api_layer():
     )
     assert zero_approval_target.status_code == 400
     assert b"invalid_target_id" in zero_approval_target.body
+    zero_approval_payload = json.loads(zero_approval_target.body.decode())
+    assert zero_approval_payload["message"] == "Некорректный ID цели"
 
     cooldown_action = crm.enqueue_autonomous_action(
         company_id=2,
@@ -18253,6 +18257,8 @@ async def assert_a3_api_layer():
     )
     assert invalid_governance_type.status_code == 400
     assert b"invalid_governance_settings" in invalid_governance_type.body
+    invalid_governance_type_payload = json.loads(invalid_governance_type.body.decode())
+    assert invalid_governance_type_payload["message"] == "Некорректные настройки управления"
 
     invalid_governance_range = await crm.api_a3_governance_settings_update(
         make_json_request(
@@ -18266,6 +18272,8 @@ async def assert_a3_api_layer():
     )
     assert invalid_governance_range.status_code == 400
     assert b"invalid_governance_settings" in invalid_governance_range.body
+    invalid_governance_range_payload = json.loads(invalid_governance_range.body.decode())
+    assert invalid_governance_range_payload["message"] == "Некорректные настройки управления"
 
     invalid_protected_rule = await crm.api_a3_governance_settings_update(
         make_json_request(
@@ -18278,6 +18286,8 @@ async def assert_a3_api_layer():
     )
     assert invalid_protected_rule.status_code == 400
     assert b"invalid_protected_rules" in invalid_protected_rule.body
+    invalid_protected_rule_payload = json.loads(invalid_protected_rule.body.decode())
+    assert invalid_protected_rule_payload["message"] == "Некорректный список защищённых правил"
 
     conn = connect()
     c = conn.cursor()
@@ -18312,6 +18322,8 @@ async def assert_a3_api_layer():
     )
     assert foreign_protected_rule.status_code == 400
     assert b"invalid_protected_rules" in foreign_protected_rule.body
+    foreign_protected_rule_payload = json.loads(foreign_protected_rule.body.decode())
+    assert foreign_protected_rule_payload["message"] == "Некорректный список защищённых правил"
 
     stable_governance = crm.api_a3_governance_settings(request)
     assert stable_governance["confidence_threshold"] == 75

@@ -35056,6 +35056,11 @@ def a3_api_error(error, status_code):
     messages = {
         "forbidden": "Доступ запрещён",
         "not_found": "Цепочка не найдена",
+        "unsupported_action": "Действие не поддерживается",
+        "invalid_target_id": "Некорректный ID цели",
+        "rule_not_found": "Правило не найдено",
+        "invalid_governance_settings": "Некорректные настройки управления",
+        "invalid_protected_rules": "Некорректный список защищённых правил",
     }
 
     return JSONResponse(
@@ -35274,33 +35279,15 @@ async def api_a3_request_autonomous_action_approval(request: Request):
         or target_id is None
         or target_id == ""
     ):
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "unsupported_action",
-            },
-            status_code=400,
-        )
+        return a3_api_error("unsupported_action", 400)
 
     try:
         target_id = int(target_id)
     except Exception:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "invalid_target_id",
-            },
-            status_code=400,
-        )
+        return a3_api_error("invalid_target_id", 400)
 
     if target_id <= 0:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "invalid_target_id",
-            },
-            status_code=400,
-        )
+        return a3_api_error("invalid_target_id", 400)
 
     conn = connect()
     c = conn.cursor()
@@ -35318,13 +35305,7 @@ async def api_a3_request_autonomous_action_approval(request: Request):
     conn.close()
 
     if not rule:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "rule_not_found",
-            },
-            status_code=404,
-        )
+        return a3_api_error("rule_not_found", 404)
 
     result = enqueue_autonomous_action(
         company_id=company_id,
@@ -35397,13 +35378,7 @@ async def api_a3_governance_settings_update(request: Request):
             current_governance.get("max_actions_per_cycle", 20),
         ))
     except Exception:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "invalid_governance_settings",
-            },
-            status_code=400,
-        )
+        return a3_api_error("invalid_governance_settings", 400)
 
     if (
         confidence_threshold < 0
@@ -35411,13 +35386,7 @@ async def api_a3_governance_settings_update(request: Request):
         or max_actions_per_cycle < 1
         or max_actions_per_cycle > 100
     ):
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "invalid_governance_settings",
-            },
-            status_code=400,
-        )
+        return a3_api_error("invalid_governance_settings", 400)
 
     protected_rules_json = current_governance.get("protected_rules_json") or "[]"
 
@@ -35428,13 +35397,7 @@ async def api_a3_governance_settings_update(request: Request):
                 for rule_id in payload.get("protected_rules") or []
             ]
         except Exception:
-            return JSONResponse(
-                {
-                    "ok": False,
-                    "error": "invalid_protected_rules",
-                },
-                status_code=400,
-            )
+            return a3_api_error("invalid_protected_rules", 400)
 
         if protected_rule_ids:
             placeholders = ",".join("?" for _ in protected_rule_ids)
@@ -35454,13 +35417,7 @@ async def api_a3_governance_settings_update(request: Request):
             existing_rule_ids = {row["id"] for row in rows}
 
             if existing_rule_ids != set(protected_rule_ids):
-                return JSONResponse(
-                    {
-                        "ok": False,
-                        "error": "invalid_protected_rules",
-                    },
-                    status_code=400,
-                )
+                return a3_api_error("invalid_protected_rules", 400)
 
         protected_rules_json = json.dumps(protected_rule_ids)
 
