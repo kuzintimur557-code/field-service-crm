@@ -512,6 +512,7 @@ async def assert_automation_page():
     assert '<optgroup label="Заявки">' in html
     assert '<optgroup label="Финансы">' in html
     assert '<optgroup label="Клиенты">' in html
+    assert '<optgroup label="Каталог">' in html
     assert '<optgroup label="SLA и загрузка">' in html
     assert '<optgroup label="ИИ-сводки">' in html
     assert "Просрочен SLA" in html
@@ -978,6 +979,14 @@ async def assert_automation_page():
     assert (
         "client_file_deleted",
         "Файл клиента удалён",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "catalog_item_created",
+        "Позиция каталога создана",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "catalog_item_toggled",
+        "Позиция каталога включена или выключена",
     ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
@@ -13548,8 +13557,22 @@ async def assert_archive_restore(task):
 async def assert_catalog_create():
     original_send_message = crm.send_message
     original_send_message_to_chat = crm.send_message_to_chat
+    original_run_automation_event = crm.run_automation_event
+    catalog_events = []
     crm.send_message = lambda text: True
     crm.send_message_to_chat = lambda chat_id, text: True
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        catalog_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
 
     try:
         response = await crm.create_catalog_item(make_form_request(
@@ -13566,6 +13589,7 @@ async def assert_catalog_create():
     finally:
         crm.send_message = original_send_message
         crm.send_message_to_chat = original_send_message_to_chat
+        crm.run_automation_event = original_run_automation_event
 
     assert response.status_code == 302
     assert response.headers["location"] == "/catalog?created=1"
@@ -13580,6 +13604,54 @@ async def assert_catalog_create():
     conn.close()
 
     assert item is not None
+    assert len(catalog_events) == 1
+    assert catalog_events[0]["company_id"] == 2
+    assert catalog_events[0]["trigger_key"] == "catalog_item_created"
+    assert catalog_events[0]["entity_type"] == "catalog_item"
+    assert catalog_events[0]["entity_id"] == item["id"]
+    assert catalog_events[0]["message"] == "Создана позиция каталога: Smoke service"
+    assert catalog_events[0]["link"] == "/catalog"
+
+    original_run_automation_event = crm.run_automation_event
+    catalog_toggle_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        catalog_toggle_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        toggle_response = await crm.toggle_catalog_item(
+            make_request("owner2"),
+            item["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert toggle_response.status_code == 302
+    assert toggle_response.headers["location"] == "/catalog"
+    assert len(catalog_toggle_events) == 1
+    assert catalog_toggle_events[0]["company_id"] == 2
+    assert catalog_toggle_events[0]["trigger_key"] == "catalog_item_toggled"
+    assert catalog_toggle_events[0]["entity_type"] == "catalog_item"
+    assert catalog_toggle_events[0]["entity_id"] == item["id"]
+    assert catalog_toggle_events[0]["message"] == (
+        "Позиция каталога выключена: Smoke service"
+    )
+    assert catalog_toggle_events[0]["link"] == "/catalog"
+
+    restore_toggle_response = await crm.toggle_catalog_item(
+        make_request("owner2"),
+        item["id"],
+    )
+    assert restore_toggle_response.status_code == 302
 
     catalog_response = await crm.catalog_page(make_asgi_request("owner2", "/catalog"))
     assert catalog_response.status_code == 200

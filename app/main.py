@@ -326,6 +326,8 @@ AUTOMATION_TRIGGERS = [
     ("client_note_added", "Заметка клиента добавлена"),
     ("client_file_uploaded", "Файл клиента загружен"),
     ("client_file_deleted", "Файл клиента удалён"),
+    ("catalog_item_created", "Позиция каталога создана"),
+    ("catalog_item_toggled", "Позиция каталога включена или выключена"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -353,6 +355,10 @@ AUTOMATION_TRIGGER_GROUPS = [
         "client_note_added",
         "client_file_uploaded",
         "client_file_deleted",
+    )),
+    ("Каталог", (
+        "catalog_item_created",
+        "catalog_item_toggled",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -27884,6 +27890,7 @@ async def create_catalog_item(request: Request):
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
+    item_id = c.lastrowid
     conn.commit()
     conn.close()
 
@@ -27902,6 +27909,15 @@ async def create_catalog_item(request: Request):
         )
     except Exception:
         pass
+
+    run_automation_event(
+        company_id,
+        "catalog_item_created",
+        "catalog_item",
+        item_id,
+        f"Создана позиция каталога: {name}",
+        "/catalog",
+    )
 
     return RedirectResponse("/catalog?created=1", status_code=302)
 
@@ -27951,6 +27967,18 @@ async def toggle_catalog_item(request: Request, item_id: int):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "catalog_item_toggled",
+        "catalog_item",
+        item_id,
+        (
+            f"Позиция каталога {'включена' if new_active else 'выключена'}: "
+            f"{item['name']}"
+        ),
+        "/catalog",
+    )
 
     return RedirectResponse("/catalog", status_code=302)
 
