@@ -12068,6 +12068,7 @@ async def my_tasks_page(request: Request, status: str = ""):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
 
     conn = connect()
     c = conn.cursor()
@@ -12102,7 +12103,8 @@ async def my_tasks_page(request: Request, status: str = ""):
             "username": username,
             "role": role,
             "tasks": tasks,
-            "selected_status": status
+            "selected_status": status,
+            "settings": settings
         }
     )
 

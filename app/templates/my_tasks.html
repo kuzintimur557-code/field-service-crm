@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Мои заявки</title>
+{% set task_label = settings["task_label"] or "Заявка" %}
+{% set client_label = settings["client_label"] or "Клиент" %}
+<title>{{ task_label }}: рабочий список</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -58,7 +60,7 @@ textarea,input{width:100%;min-height:44px;padding:12px;border-radius:12px;border
 <div class="container">
 
 <div class="header">
-<h1>Мои заявки</h1>
+<h1>{{ task_label }}: рабочий список</h1>
 <div class="meta">{{ username }} / исполнитель</div>
 <div class="nav">
 <a href="/profile">Профиль</a>
@@ -86,7 +88,7 @@ textarea,input{width:100%;min-height:44px;padding:12px;border-radius:12px;border
 
 <div class="top">
     <div>
-        <div class="title">#{{ task["id"] }} — {{ task["client"] }}</div>
+        <div class="title">#{{ task["id"] }} — {{ task["client"] or client_label ~ " не указан" }}</div>
         <div class="meta">{{ task["address"] }}</div>
     </div>
     <div class="badge {% if task['status'] == 'В работе' %}work{% elif task['status'] == 'Завершено' %}done{% elif task['status'] == 'Отменено' %}cancelled{% else %}new{% endif %}">{{ task["status"] }}</div>
@@ -141,7 +143,7 @@ textarea,input{width:100%;min-height:44px;padding:12px;border-radius:12px;border
 </div>
 {% endfor %}
 {% else %}
-<div class="empty">{% if selected_status %}Заявок с таким статусом пока нет.{% else %}Активных заявок пока нет.{% endif %}</div>
+<div class="empty">{% if selected_status %}{{ task_label }} с таким статусом пока нет.{% else %}Активных задач пока нет.{% endif %}</div>
 {% endif %}
 </div>
 

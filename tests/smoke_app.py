@@ -8771,6 +8771,28 @@ async def assert_platform_companies_page():
     assert "Рейс: создать" in logistics_home_html
     assert "Новая Рейс" not in logistics_home_html
 
+    c.execute("""
+    INSERT INTO users (
+        username, password, role, company_id, telegram_chat_id
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        "smoke_logistics_driver",
+        crm.hash_password("driver123"),
+        "worker",
+        logistics_company["id"],
+        "",
+    ))
+    conn.commit()
+
+    logistics_worker_tasks = await crm.my_tasks_page(
+        make_asgi_request("smoke_logistics_driver", "/my-tasks"),
+    )
+    assert logistics_worker_tasks.status_code == 200
+    logistics_worker_html = logistics_worker_tasks.body.decode("utf-8")
+    assert "Рейс: рабочий список" in logistics_worker_html
+    assert "Мои заявки" not in logistics_worker_html
+
     c.execute(
         "DELETE FROM company_features WHERE company_id=?",
         (logistics_company["id"],),
@@ -16846,12 +16868,13 @@ async def assert_client_card(task):
     )
     assert worker_tasks_response.status_code == 200
     worker_tasks_html = worker_tasks_response.body.decode("utf-8")
-    assert "Мои заявки" in worker_tasks_html
+    assert "Заявка: рабочий список" in worker_tasks_html
     assert ">Активные</a>" in worker_tasks_html
     assert ">Завершённые</a>" in worker_tasks_html
     assert "badge " in worker_tasks_html
     assert 'class="mobile-nav"' in worker_tasks_html
     assert ".container{padding:14px 14px 92px}" in worker_tasks_html
+    assert "Мои заявки" not in worker_tasks_html
     assert "📋 Мои заявки" not in worker_tasks_html
     assert "👤 Профиль" not in worker_tasks_html
     assert "❌ Перед завершением" not in worker_tasks_html
