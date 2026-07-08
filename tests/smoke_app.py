@@ -2217,6 +2217,11 @@ async def assert_automation_page():
     assert any(node["type"] == "trigger" for node in workflow_graph["nodes"])
     assert any(node["type"] == "rule" for node in workflow_graph["nodes"])
     assert any(node["type"] == "action" for node in workflow_graph["nodes"])
+    assert any(action.get("label") for action in workflow_graph["actions"])
+    assert any(
+        node["type"] == "action" and node.get("label")
+        for node in workflow_graph["nodes"]
+    )
     assert any(edge["label"] == "запускает" for edge in workflow_graph["edges"])
 
     workflow_debug = crm.api_a3_workflow_rule_debug(

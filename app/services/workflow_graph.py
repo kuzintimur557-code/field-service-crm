@@ -139,6 +139,18 @@ def _dangerous_fix(label, action_type, target_type, target_id=None, description=
     }
 
 
+def _action_key_label(action_key):
+    labels = {
+        "notification": "Уведомление",
+        "telegram_alert": "Telegram-уведомление",
+        "email": "Email",
+        "create_task": "Создать задачу",
+        "ai_digest": "ИИ-сводка",
+    }
+
+    return labels.get(action_key or "", action_key or "Действие")
+
+
 def _ai_debug_recommendations(rule, actions, latest_problem_event):
     recommendations = []
 
@@ -500,11 +512,12 @@ def get_rule_workflow_graph(company_id, rule_id):
     for action in actions:
         node_id = f"action:{action['id']}"
         payload = _safe_payload(action["payload_json"])
+        action_label = _action_key_label(action["action_key"])
 
         nodes.append({
             "id": node_id,
             "type": "action",
-            "label": action["action_key"],
+            "label": action_label,
             "status": "active" if action["active"] else "disabled",
             "sort_order": action["sort_order"],
             "target_username": payload.get("target_username", ""),
@@ -519,6 +532,7 @@ def get_rule_workflow_graph(company_id, rule_id):
         action_items.append({
             "id": action["id"],
             "action_key": action["action_key"],
+            "label": action_label,
             "active": bool(action["active"]),
             "sort_order": action["sort_order"],
             "payload": payload,
