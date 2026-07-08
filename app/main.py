@@ -27311,6 +27311,12 @@ async def upload_call_audio(
         conn.close()
         return RedirectResponse(f"/calls/{call_id}?audio_error=empty", status_code=302)
 
+    audio_extension = Path(Path(audio.filename).name).suffix.lower()
+
+    if audio_extension not in ALLOWED_CALL_AUDIO_EXTENSIONS:
+        conn.close()
+        return RedirectResponse(f"/calls/{call_id}?audio_error=type", status_code=302)
+
     stored_filename = safe_call_audio_filename(call_id, audio.filename)
     file_path = CALL_AUDIO_DIR / stored_filename
 

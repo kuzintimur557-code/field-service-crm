@@ -116,6 +116,10 @@ h1{font-size:28px}
 <div class="empty">Выберите аудиофайл для загрузки.</div>
 {% endif %}
 
+{% if request.query_params.get("audio_error") == "type" %}
+<div class="empty">Поддерживаются только аудиофайлы: mp3, wav, m4a, ogg, webm, aac, mp4.</div>
+{% endif %}
+
 {% if call["audio_filename"] %}
 <audio controls src="/calls/{{ call['id'] }}/audio"></audio>
 <div class="actions">

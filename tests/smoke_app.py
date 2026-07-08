@@ -5934,6 +5934,24 @@ async def assert_calls_page():
         assert empty_audio_response.status_code == 302
         assert empty_audio_response.headers["location"] == f"/calls/{call['id']}?audio_error=empty"
 
+        invalid_audio_response = await crm.upload_call_audio(
+            make_request("owner2"),
+            call["id"],
+            audio=crm.UploadFile(
+                file=crm.io.BytesIO(b"not audio"),
+                filename="call-smoke.exe",
+            ),
+        )
+        assert invalid_audio_response.status_code == 302
+        assert invalid_audio_response.headers["location"] == f"/calls/{call['id']}?audio_error=type"
+
+        invalid_audio_detail_response = await crm.call_detail(
+            make_asgi_request("owner2", f"/calls/{call['id']}", "audio_error=type"),
+            call["id"],
+        )
+        invalid_audio_detail_html = invalid_audio_detail_response.body.decode("utf-8")
+        assert "Поддерживаются только аудиофайлы" in invalid_audio_detail_html
+
         upload_audio_response = await crm.upload_call_audio(
             make_request("owner2"),
             call["id"],
