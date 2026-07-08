@@ -343,6 +343,7 @@ AUTOMATION_TRIGGERS = [
     ("worker_profile_updated", "Карточка сотрудника обновлена"),
     ("worker_commission_updated", "Процент сотрудника изменён"),
     ("worker_deleted", "Сотрудник удалён"),
+    ("worker_password_changed", "Пароль сотрудника изменён"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -392,6 +393,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "worker_profile_updated",
         "worker_commission_updated",
         "worker_deleted",
+        "worker_password_changed",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -30383,6 +30385,15 @@ async def change_team_user_password(request: Request, user_id: int):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "worker_password_changed",
+        "worker",
+        user_id,
+        f"Пароль сотрудника {user['username']} изменён",
+        f"/workers/{user_id}",
+    )
 
     return RedirectResponse("/workers?password_changed=1", status_code=302)
 

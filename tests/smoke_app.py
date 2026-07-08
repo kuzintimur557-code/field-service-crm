@@ -1050,6 +1050,10 @@ async def assert_automation_page():
         "worker_deleted",
         "Сотрудник удалён",
     ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "worker_password_changed",
+        "Пароль сотрудника изменён",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -14287,19 +14291,47 @@ async def assert_finance_margin(task):
     assert history_activity[1]["details"] == "Доступ восстановлен"
     conn.close()
 
-    history_password_response = await crm.change_team_user_password(
-        make_form_request(
-            "owner2",
-            f"/workers/{history_candidate['id']}/password",
-            {"password": "secure456"},
-        ),
-        history_candidate["id"],
+    original_run_automation_event = crm.run_automation_event
+    password_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        password_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        history_password_response = await crm.change_team_user_password(
+            make_form_request(
+                "owner2",
+                f"/workers/{history_candidate['id']}/password",
+                {"password": "secure456"},
+            ),
+            history_candidate["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert history_password_response.status_code == 302
     assert (
         history_password_response.headers["location"]
         == "/workers?password_changed=1"
     )
+    assert password_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_password_changed",
+        "entity_type": "worker",
+        "entity_id": history_candidate["id"],
+        "message": "Пароль сотрудника history_candidate2 изменён",
+        "link": f"/workers/{history_candidate['id']}",
+    }]
+    assert "secure456" not in password_events[0]["message"]
 
     original_run_automation_event = crm.run_automation_event
     commission_events = []
