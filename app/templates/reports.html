@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
 <title>Отчёты</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -35,7 +37,7 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 <div class="container">
 
 <div class="header">
-<h1>📊 Отчёты за месяц</h1>
+<h1>Отчёты за месяц</h1>
 <a href="/" class="btn">← Главное меню</a>
 </div>
 
@@ -56,12 +58,12 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 </div>
 
 <div class="card">
-<h2>👷 Исполнители</h2>
+<h2>Команда</h2>
 
 <table class="table">
 <thead>
 <tr>
-<th>Исполнитель</th>
+<th>{{ worker_label }}</th>
 <th>Всего</th>
 <th>Новые</th>
 <th>В работе</th>
@@ -88,19 +90,19 @@ button{border:0;background:#111827;color:white;font-weight:900;cursor:pointer}
 </div>
 
 <div class="card">
-<h2>📦 Заявки за {{ month }}</h2>
+<h2>{{ task_label }} за {{ month }}</h2>
 
 {% for task in tasks %}
 
 <div class="task">
 <a href="/task/{{ task[0] }}">#{{ task[0] }} — {{ task[1] }}</a>
-<div class="meta">📅 {{ task[5] }} | 👷 {{ task[6] }} | 💰 {{ task[8] }} ₽</div>
+<div class="meta">Дата: {{ task[5] }} | {{ worker_label }}: {{ task[6] }} | Сумма: {{ task[8] }} ₽</div>
 <div class="badge">{{ task[10] }}</div>
 </div>
 
 {% else %}
 
-<p>За этот месяц заявок нет.</p>
+<p>За этот месяц задач нет.</p>
 
 {% endfor %}
 

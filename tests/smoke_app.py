@@ -411,6 +411,20 @@ def assert_company_features():
     assert response.status_code == 302
     assert response.headers["location"] == "/"
 
+    crm.update_company_features(2, {"feature_analytics": "1"})
+    reports_response = asyncio.run(
+        crm.reports_page(make_asgi_request("owner2", "/reports"))
+    )
+    assert reports_response.status_code == 200
+    reports_html = reports_response.body.decode("utf-8")
+    assert "Отчёты за месяц" in reports_html
+    assert "Команда" in reports_html
+    assert "Запись за" in reports_html
+    assert "Мастер" in reports_html
+    assert "📊 Отчёты за месяц" not in reports_html
+    assert "👷 Исполнители" not in reports_html
+    assert "📦 Заявки" not in reports_html
+
 
 def assert_automation_foundation():
     conn = connect()

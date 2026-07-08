@@ -26725,6 +26725,8 @@ async def reports_page(request: Request, month: str = ""):
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     if not month:
         month = datetime.now().strftime("%Y-%m")
 
@@ -26821,7 +26823,9 @@ async def reports_page(request: Request, month: str = ""):
             "total_active": total_active,
             "total_new": total_new,
             "total_cancelled": total_cancelled,
-            "total_revenue": total_revenue
+            "total_revenue": total_revenue,
+            "role": role,
+            "settings": settings
         }
     )
 
