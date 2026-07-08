@@ -17411,6 +17411,7 @@ async def calendar_dispatch_page(
             "request": request,
             "username": username,
             "role": role,
+            "settings": calendar_settings,
             "workers": worker_rows,
             "board_columns": board_columns,
             "summary": summary,

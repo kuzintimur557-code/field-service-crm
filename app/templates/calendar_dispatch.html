@@ -223,7 +223,14 @@ h1{margin:0;font-size:32px}
 }
 </style>
 </head>
-<body>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+<body
+    data-task-label="{{ task_label }}"
+    data-worker-label="{{ worker_label }}"
+    data-client-label="{{ client_label }}"
+>
 <main class="container">
     <header class="header">
         <div>
@@ -242,7 +249,7 @@ h1{margin:0;font-size:32px}
     </header>
 
     <section class="summary">
-        <div class="summary-item"><div class="summary-label">Заявок</div><div class="summary-value">{{ summary["tasks"] }}</div></div>
+        <div class="summary-item"><div class="summary-label">{{ task_label }}</div><div class="summary-value">{{ summary["tasks"] }}</div></div>
         <div class="summary-item"><div class="summary-label">Без даты</div><div class="summary-value">{{ summary["backlog"] }}</div></div>
         <div class="summary-item"><div class="summary-label">Новые</div><div class="summary-value">{{ summary["new"] }}</div></div>
         <div class="summary-item"><div class="summary-label">В работе</div><div class="summary-value">{{ summary["in_progress"] }}</div></div>
@@ -253,7 +260,7 @@ h1{margin:0;font-size:32px}
         <header class="week-plans-head">
             <div>
                 <h2 class="week-plans-title" id="week-plans-title">Планы команды на неделю</h2>
-                <div class="week-plans-note">Публикация и принятие дневных маршрутов исполнителями</div>
+                <div class="week-plans-note">Публикация и принятие дневных маршрутов командой</div>
             </div>
             <div class="week-plans-controls">
                 <div class="week-plans-actions">
@@ -291,9 +298,9 @@ h1{margin:0;font-size:32px}
                 </div>
                 <span class="week-plan-status">{{ day["status_label"] }}</span>
                 <div class="week-plan-meta">
-                    <span>Заявок: {{ day["task_count"] }}</span>
+                    <span>{{ task_label }}: {{ day["task_count"] }}</span>
                     {% if day["worker_count"] %}
-                    <span>Исполнителей: {{ day["worker_count"] }}</span>
+                    <span>{{ worker_label }}: {{ day["worker_count"] }}</span>
                     {% endif %}
                     {% if day["state"] == "published" and day["worker_count"] %}
                     <span>Приняли: {{ day["acknowledged_count"] }}/{{ day["worker_count"] }}</span>
@@ -532,9 +539,9 @@ h1{margin:0;font-size:32px}
         <form class="filters" method="get" action="/calendar/dispatch">
             <input type="hidden" name="week_start" value="{{ selected_week_start }}">
             <div>
-                <label>Исполнитель</label>
+                <label>{{ worker_label }}</label>
                 <select name="worker">
-                    <option value="">Все исполнители</option>
+                    <option value="">Все сотрудники</option>
                     {% for worker in workers %}
                     <option value="{{ worker['username'] }}" {% if selected_worker == worker['username'] %}selected{% endif %}>{{ worker["username"] }}</option>
                     {% endfor %}
@@ -591,11 +598,11 @@ h1{margin:0;font-size:32px}
                         data-task-id="{{ task['id'] }}"
                         data-expected-date="{{ (task['task_date'] or '')[:10] }}"
                     >
-                        <div class="task-top">
+	                        <div class="task-top">
                             <span class="task-number">#{{ task["id"] }}</span>
                             <span class="priority {% if task['priority'] == 'Срочно' %}urgent{% endif %}">{{ task["priority"] or "Обычный" }}</span>
                         </div>
-	                        <div class="task-client">{{ task["client"] or "Клиент не указан" }}</div>
+	                        <div class="task-client">{{ task["client"] or client_label ~ " не указан" }}</div>
 	                        {% if task["description"] %}<div class="task-description">{{ task["description"] }}</div>{% endif %}
 	                        <div class="task-workers">{{ item["workers_label"] }}</div>
 	                        <div class="task-workers">
@@ -608,9 +615,9 @@ h1{margin:0;font-size:32px}
                         {% if item["has_conflict"] %}
                         <div class="task-flags"><span class="flag">Конфликт расписания</span></div>
                         {% endif %}
-                        <a class="task-link" href="/task/{{ task['id'] }}">Открыть заявку</a>
+                        <a class="task-link" href="/task/{{ task['id'] }}">Открыть</a>
                         <div class="mobile-move">
-                            <select aria-label="Новая дата для заявки #{{ task['id'] }}">
+                            <select aria-label="Новая дата: {{ task_label|lower }} #{{ task['id'] }}">
                                 {% for target in board_columns %}
                                 {% if not target["is_past"] %}
                                 <option value="{{ target['date'] }}" {% if target['date'] == (task['task_date'] or '')[:10] %}selected{% endif %}>{{ target["day_label"] }} · {{ target["date_label"] }}</option>
@@ -621,7 +628,7 @@ h1{margin:0;font-size:32px}
                         </div>
                     </div>
                     {% else %}
-                    <div class="empty">Нет заявок</div>
+                    <div class="empty">{{ task_label }} нет</div>
                     {% endfor %}
                 </div>
             </article>
@@ -658,7 +665,7 @@ h1{margin:0;font-size:32px}
             <div><span>Требуют план</span><strong id="planner-eligible">0</strong></div>
             <div><span>Готовы к применению</span><strong id="planner-ready">0</strong></div>
             <div><span>Без решения</span><strong id="planner-unresolved">0</strong></div>
-            <div><span>Исполнителей</span><strong id="planner-workers">0</strong></div>
+            <div><span>{{ worker_label }}</span><strong id="planner-workers">0</strong></div>
         </section>
         <label class="planner-select-bar">
             <input id="planner-select-all" type="checkbox">
@@ -669,7 +676,7 @@ h1{margin:0;font-size:32px}
                 <thead>
                     <tr>
                         <th></th>
-                        <th>Заявка</th>
+                        <th>{{ task_label }}</th>
                         <th>Сейчас</th>
                         <th>План</th>
                         <th>Причина</th>
@@ -720,6 +727,10 @@ h1{margin:0;font-size:32px}
     );
     let plannerItems = [];
     let draggedCard = null;
+    const taskLabel = document.body.dataset.taskLabel || "Заявка";
+    const workerLabel = document.body.dataset.workerLabel || "Исполнитель";
+    const clientLabel = document.body.dataset.clientLabel || "Клиент";
+    const taskLabelLower = taskLabel.toLocaleLowerCase("ru-RU");
 
     function escapeHtml(value) {
         return String(value ?? "")
@@ -742,15 +753,15 @@ h1{margin:0;font-size:32px}
 
     function errorMessage(data) {
         const messages = {
-            past_date: "Нельзя переносить заявку на прошедший день.",
-            stale: "Заявка уже изменилась. Доска будет обновлена.",
-            worker_unavailable: `Исполнитель ${data.worker || ""} недоступен${data.reason ? ": " + data.reason : "."}`,
-            capacity_reached: `У исполнителя ${data.worker || ""} больше нет свободных мест.`,
-            inactive_worker: "Один из исполнителей отключён.",
-            task_closed: "Заявка уже завершена или отменена.",
-            not_found: "Заявка не найдена."
+            past_date: `Нельзя переносить ${taskLabelLower} на прошедший день.`,
+            stale: `${taskLabel} уже изменена. Доска будет обновлена.`,
+            worker_unavailable: `${workerLabel} ${data.worker || ""} недоступен${data.reason ? ": " + data.reason : "."}`,
+            capacity_reached: `${workerLabel} ${data.worker || ""}: нет свободных мест.`,
+            inactive_worker: "Один из сотрудников отключён.",
+            task_closed: `${taskLabel} уже завершена или отменена.`,
+            not_found: `${taskLabel} не найдена.`
         };
-        let message = messages[data.error] || "Не удалось перенести заявку.";
+        let message = messages[data.error] || `Не удалось перенести ${taskLabelLower}.`;
 
         if (data.suggestions && data.suggestions.length) {
             message += " Свободные даты: " + data.suggestions.map(item => item.date_label).join(", ") + ".";
@@ -959,7 +970,7 @@ h1{margin:0;font-size:32px}
         }`;
 
         if (!plannerItems.length) {
-            plannerRows.innerHTML = '<tr><td colspan="5" class="planner-empty">Нет заявок, готовых к автоматическому назначению.</td></tr>';
+            plannerRows.innerHTML = `<tr><td colspan="5" class="planner-empty">Нет записей типа «${escapeHtml(taskLabel)}», готовых к автоматическому назначению.</td></tr>`;
         } else {
             plannerRows.innerHTML = plannerItems.map((item, index) => {
                 const currentDate = item.current_date || "Без даты";
@@ -968,9 +979,9 @@ h1{margin:0;font-size:32px}
                     : "Не назначены";
                 return `
                     <tr>
-                        <td class="planner-pick"><input class="planner-check" type="checkbox" data-index="${index}" checked aria-label="Выбрать заявку #${item.task_id}"></td>
-                        <td data-label="Заявка">
-                            <div class="planner-task">#${item.task_id} · ${escapeHtml(item.client || "Клиент не указан")}</div>
+                        <td class="planner-pick"><input class="planner-check" type="checkbox" data-index="${index}" checked aria-label="Выбрать ${escapeHtml(taskLabelLower)} #${item.task_id}"></td>
+                        <td data-label="${escapeHtml(taskLabel)}">
+                            <div class="planner-task">#${item.task_id} · ${escapeHtml(item.client || `${clientLabel} не указан`)}</div>
                             <div class="planner-muted">${escapeHtml(item.priority || "Обычный")} · ${escapeHtml(item.change_label)}</div>
                         </td>
                         <td data-label="Сейчас">
@@ -994,7 +1005,7 @@ h1{margin:0;font-size:32px}
         const unscheduled = data.unscheduled || [];
         plannerProblems.hidden = unscheduled.length === 0;
         plannerProblemList.innerHTML = unscheduled.map(item => (
-            `<li>#${item.task_id} · ${escapeHtml(item.client || "Клиент не указан")}: ${escapeHtml(item.reason)}</li>`
+            `<li>#${item.task_id} · ${escapeHtml(item.client || `${clientLabel} не указан`)}: ${escapeHtml(item.reason)}</li>`
         )).join("");
         updatePlannerSelection();
     }
@@ -1093,7 +1104,7 @@ h1{margin:0;font-size:32px}
             return;
         }
 
-        showToast("Дата заявки обновлена.");
+        showToast("Дата обновлена.");
         window.setTimeout(() => window.location.reload(), 350);
     }
 

@@ -6974,7 +6974,8 @@ async def assert_dispatch_board():
     assert "Dispatch outsider" not in page_html
     assert 'draggable="true"' in page_html
     assert "/api/calendar/dispatch/move" in page_html
-    assert "Новая дата для заявки" in page_html
+    assert "Новая дата: заявка" in page_html
+    assert "Открыть заявку" not in page_html
     assert len(page.context["board_columns"]) == 8
     assert page.context["summary"]["tasks"] == 3
     assert page.context["summary"]["backlog"] == 1
