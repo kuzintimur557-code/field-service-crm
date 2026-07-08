@@ -15635,6 +15635,7 @@ async def assert_finance_margin(task):
     assert 'class="mobile-nav"' in recurring_html
     assert ".container{padding:16px 14px 92px}" in recurring_html
     assert "Повторяющиеся работы" in recurring_html
+    assert "Шаблоны регулярных работ" in recurring_html
     assert "🔁 Повторяющиеся работы" not in recurring_html
 
     calendar_response = await crm.calendar_page(
@@ -17776,6 +17777,8 @@ async def assert_recurring_generate(task):
     assert f"/recurring/{job_id}/generate" in page_html
     assert f"/recurring/{job_id}/toggle" in page_html
     assert "job-actions" in page_html
+    assert "Создать: Заявка" in page_html
+    assert "Создать заявку" not in page_html
 
     conn = connect()
     c = conn.cursor()

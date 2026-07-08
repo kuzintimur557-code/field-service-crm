@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <title>Повторяющиеся работы</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -50,7 +53,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 
 <div class="card">
 <h1>Повторяющиеся работы</h1>
-<div class="meta">Шаблоны регулярных заявок: планируйте работы и создавайте заявки без повторного ввода.</div>
+<div class="meta">Шаблоны регулярных работ: планируйте и создавайте {{ task_label|lower }} без повторного ввода.</div>
 </div>
 
 {% if request.query_params.get("created") == "1" %}
@@ -66,7 +69,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 {% endif %}
 
 {% if request.query_params.get("error") == "no_active_workers" %}
-<div class="notice err">В шаблоне не осталось активных исполнителей. Назначьте сотрудника или включите его в разделе «Команда».</div>
+<div class="notice err">В шаблоне не осталось активных сотрудников. Назначьте {{ worker_label|lower }} или включите его в разделе «Команда».</div>
 {% endif %}
 
 <div class="card">
@@ -79,7 +82,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
         <input name="title" placeholder="Например: ежемесячное ТО" required>
     </div>
     <div>
-        <label>Клиент</label>
+        <label>{{ client_label }}</label>
         <select name="client_id">
             <option value="">Без привязки</option>
             {% for client in clients %}
@@ -110,9 +113,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 
 <div class="grid">
     <div>
-        <label>Исполнители</label>
+        <label>{{ worker_label }}</label>
         <details style="background:white;border:1px solid #d1d5db;border-radius:14px;padding:12px">
-            <summary style="cursor:pointer;font-weight:900">Выбрать исполнителей</summary>
+            <summary style="cursor:pointer;font-weight:900">Выбрать сотрудников</summary>
             <div style="display:grid;gap:10px;margin-top:12px">
                 {% for worker in workers %}
                 <label style="display:flex;align-items:center;gap:10px;font-weight:800;margin:0">
@@ -154,7 +157,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
 <div class="job">
     <div>
         <div class="title">{{ job["title"] }}</div>
-        <div class="meta">{{ job["client_name"] or "Без клиента" }}</div>
+        <div class="meta">{{ job["client_name"] or client_label ~ " не указан" }}</div>
     </div>
     <div>
         <div class="meta">Следующая дата</div>
@@ -172,14 +175,14 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;ma
         <span class="badge off">Остановлен</span>
         {% endif %}
     </div>
-    <div class="meta">{{ job["workers"] or job["worker"] or "Исполнители не назначены" }}</div>
+    <div class="meta">{{ job["workers"] or job["worker"] or worker_label ~ " не назначен" }}</div>
     <div class="job-actions">
         <form method="post" action="/recurring/{{ job['id'] }}/toggle">
             <button type="submit">{% if job["active"] %}Остановить{% else %}Включить{% endif %}</button>
         </form>
         {% if job["active"] %}
         <form method="post" action="/recurring/{{ job['id'] }}/generate">
-            <button type="submit">Создать заявку</button>
+            <button type="submit">Создать: {{ task_label }}</button>
         </form>
         {% endif %}
     </div>
