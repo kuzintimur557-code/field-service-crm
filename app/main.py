@@ -2881,6 +2881,8 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
 
     today_dt = datetime.now()
     today = today_dt.strftime("%Y-%m-%d")
+    tomorrow = (today_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+    next_7_days_date = (today_dt + timedelta(days=7)).strftime("%Y-%m-%d")
     next_24h = today_dt + timedelta(hours=24)
     price_threshold = automation_condition_number(conditions, 10000)
     client_task_threshold = int(automation_condition_number(conditions, 5, 1))
@@ -2977,6 +2979,14 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
 
     elif mode == "date_today":
         if task_date == today:
+            return True, ""
+
+    elif mode == "date_tomorrow":
+        if task_date == tomorrow:
+            return True, ""
+
+    elif mode == "date_next_7_days":
+        if task_date and today <= task_date <= next_7_days_date:
             return True, ""
 
     elif mode == "date_overdue":
@@ -12716,6 +12726,8 @@ async def automation_builder_page(request: Request):
         ("worker_unassigned", "Только задачи без исполнителя"),
         ("worker_specific", "Только выбранный исполнитель"),
         ("date_today", "Только задачи на сегодня"),
+        ("date_tomorrow", "Только задачи на завтра"),
+        ("date_next_7_days", "Только задачи на ближайшие 7 дней"),
         ("date_overdue", "Только просроченные задачи"),
         ("date_future", "Только будущие задачи"),
         ("price_high", "Только дорогие заявки"),
@@ -12736,11 +12748,11 @@ async def automation_builder_page(request: Request):
         ("Статус заявки", condition_presets[4:8]),
         ("Оплата", condition_presets[8:11]),
         ("Исполнители", condition_presets[11:14]),
-        ("Дата", condition_presets[14:17]),
-        ("Цена", condition_presets[17:19]),
-        ("Каталог", condition_presets[19:20]),
-        ("SLA", condition_presets[20:23]),
-        ("Клиенты", condition_presets[23:]),
+        ("Дата", condition_presets[14:19]),
+        ("Цена", condition_presets[19:21]),
+        ("Каталог", condition_presets[21:22]),
+        ("SLA", condition_presets[22:25]),
+        ("Клиенты", condition_presets[25:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -14255,6 +14267,18 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "field": "task_date",
             "operator": "equals_today",
             "label": "Только задачи на сегодня",
+        },
+        "date_tomorrow": {
+            "mode": "date_tomorrow",
+            "field": "task_date",
+            "operator": "equals_tomorrow",
+            "label": "Только задачи на завтра",
+        },
+        "date_next_7_days": {
+            "mode": "date_next_7_days",
+            "field": "task_date",
+            "operator": "within_next_7_days",
+            "label": "Только задачи на ближайшие 7 дней",
         },
         "date_overdue": {
             "mode": "date_overdue",

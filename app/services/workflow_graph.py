@@ -54,6 +54,8 @@ def _condition_summary(conditions_json):
         "worker_unassigned": "Только задачи без исполнителя",
         "worker_specific": "Только выбранный исполнитель",
         "date_today": "Только задачи на сегодня",
+        "date_tomorrow": "Только задачи на завтра",
+        "date_next_7_days": "Только задачи на ближайшие 7 дней",
         "date_overdue": "Только просроченные задачи",
         "date_future": "Только будущие задачи",
         "price_high": "Только дорогие заявки",

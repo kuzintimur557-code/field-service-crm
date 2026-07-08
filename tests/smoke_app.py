@@ -893,6 +893,8 @@ async def assert_automation_page():
     assert "Только задачи с исполнителем" in builder_html
     assert "Только задачи без исполнителя" in builder_html
     assert "Только задачи на сегодня" in builder_html
+    assert "Только задачи на завтра" in builder_html
+    assert "Только задачи на ближайшие 7 дней" in builder_html
     assert "Только просроченные задачи" in builder_html
     assert 'optgroup label="Статус заявки"' in builder_html
     assert 'optgroup label="Оплата"' in builder_html
@@ -3505,6 +3507,32 @@ async def assert_automation_runner(task):
     c = conn.cursor()
 
     today = datetime.now().strftime("%Y-%m-%d")
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    c.execute("""
+    UPDATE tasks
+    SET task_date=?
+    WHERE id=?
+    """, (tomorrow, task["id"]))
+    conn.commit()
+    tomorrow_rule = {
+        "conditions_json": json.dumps({
+            "mode": "date_tomorrow",
+            "label": "Только задачи на завтра",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, tomorrow_rule, "task", task["id"]
+    )[0] is True
+    next_7_days_rule = {
+        "conditions_json": json.dumps({
+            "mode": "date_next_7_days",
+            "label": "Только задачи на ближайшие 7 дней",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, next_7_days_rule, "task", task["id"]
+    )[0] is True
 
     c.execute("""
     UPDATE tasks
