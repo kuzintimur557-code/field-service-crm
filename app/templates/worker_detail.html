@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Сотрудник</title>
+<title>{{ worker_label or "Сотрудник" }}</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -80,7 +80,7 @@ h1{margin:0 0 10px;font-size:34px}
 <a href="/workers" class="back">← Назад к команде</a>
 
 {% if request.query_params.get("profile_updated") == "1" %}
-<div class="notice">Карточка сотрудника обновлена</div>
+<div class="notice">Карточка пользователя обновлена</div>
 {% endif %}
 {% if request.query_params.get("unavailability_created") == "1" %}
 <div class="notice">Период недоступности добавлен</div>
@@ -111,7 +111,7 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="meta">Электронная почта: {{ worker["email"] or "—" }}</div>
 <div class="meta">Номер чата Telegram: {{ worker["telegram_chat_id"] or "—" }}</div>
 {% if worker["role"] == "worker" %}
-<div class="meta">Лимит заявок в день: {{ daily_capacity }}</div>
+<div class="meta">Лимит задач в день: {{ daily_capacity }}</div>
 {% endif %}
 <div class="meta">Процент с прибыли: {{ worker["commission_percent"] or 0 }}%</div>
 <div class="meta">Был онлайн: {{ worker["last_seen"] }}</div>
@@ -150,7 +150,7 @@ h1{margin:0 0 10px;font-size:34px}
     </label>
     {% if worker["role"] == "worker" %}
     <label>
-        Дневной лимит заявок
+        Дневной лимит задач
         <input type="number" name="daily_capacity" min="1" max="20" value="{{ daily_capacity }}">
     </label>
     {% endif %}
@@ -161,8 +161,8 @@ h1{margin:0 0 10px;font-size:34px}
 
 {% if worker["role"] == "worker" and role in ("boss", "manager") %}
 <div class="card">
-<h2>Недоступность сотрудника</h2>
-<div class="meta">Добавляйте выходные, отпуск, больничный и другие периоды отсутствия. В эти дни сотрудник не попадёт в умный подбор.</div>
+<h2>Периоды отсутствия</h2>
+<div class="meta">Добавляйте выходные, отпуск, больничный и другие периоды отсутствия. В эти дни пользователь не попадёт в умный подбор.</div>
 <form class="absence-form" method="post" action="/workers/{{ worker['id'] }}/unavailability">
     <label>
         С даты
@@ -202,7 +202,7 @@ h1{margin:0 0 10px;font-size:34px}
 <h2>Статистика</h2>
 <div class="grid">
     <div class="stat">
-        <div class="label">Всего заявок</div>
+        <div class="label">Всего: {{ task_label }}</div>
         <div class="value">{{ total_tasks }}</div>
     </div>
 
@@ -242,8 +242,8 @@ h1{margin:0 0 10px;font-size:34px}
 <h2>Текущая загрузка</h2>
 {% if create_task_url %}
 <div class="quick-actions">
-    <a href="{{ create_task_url }}">Создать заявку на сегодня</a>
-    <a class="secondary" href="{{ worker_calendar_url }}">Открыть календарь сотрудника</a>
+    <a href="{{ create_task_url }}">{{ task_label }}: создать на сегодня</a>
+    <a class="secondary" href="{{ worker_calendar_url }}">Открыть календарь</a>
 </div>
 {% endif %}
 {% if active_tasks %}
@@ -268,7 +268,7 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="meta">Показаны ближайшие {{ active_tasks|length }} из {{ active_tasks_count }}</div>
 {% endif %}
 {% else %}
-<div class="meta">Активных заявок нет</div>
+<div class="meta">Активных задач нет</div>
 {% endif %}
 </div>
 
@@ -384,7 +384,7 @@ h1{margin:0 0 10px;font-size:34px}
 </div>
 {% endfor %}
 {% else %}
-<div class="meta">Действий по сотруднику пока нет</div>
+<div class="meta">Действий по пользователю пока нет</div>
 {% endif %}
 </div>
 

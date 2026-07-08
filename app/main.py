@@ -29787,6 +29787,7 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
     settings = get_company_settings(company_id)
     task_label = settings["task_label"] or "Заявка"
     client_label = settings["client_label"] or "Клиент"
+    worker_label = settings["worker_label"] or "Сотрудник"
     today = datetime.now().strftime("%Y-%m-%d")
 
     total_tasks = c.execute(f"""
@@ -30075,6 +30076,7 @@ async def worker_detail(request: Request, worker_id: int, month: str = ""):
             "today": today,
             "task_label": task_label,
             "client_label": client_label,
+            "worker_label": worker_label,
             "create_task_url": create_task_url,
             "worker_calendar_url": worker_calendar_url,
             "weekly_schedule": weekly_schedule,

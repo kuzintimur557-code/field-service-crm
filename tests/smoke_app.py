@@ -15150,7 +15150,7 @@ async def assert_finance_margin(task):
     assert "Карточка обновлена" in history_worker_html
     assert "Редактировать карточку" in history_worker_html
     assert "Сохранить карточку" in history_worker_html
-    assert "Недоступность сотрудника" in history_worker_html
+    assert "Периоды отсутствия" in history_worker_html
     assert "Учебный отпуск" in history_worker_html
     assert "Добавлен период недоступности" in history_worker_html
     assert "0% → 7.5%" in history_worker_html
@@ -16494,9 +16494,11 @@ async def assert_finance_margin(task):
     )
     assert f"/task/{task['id']}" in worker_detail_html
     assert (
-        "Создать заявку на сегодня" in worker_detail_html
-        and "Открыть календарь сотрудника" in worker_detail_html
+        "Заявка: создать на сегодня" in worker_detail_html
+        and "Открыть календарь" in worker_detail_html
     )
+    assert "Создать заявку на сегодня" not in worker_detail_html
+    assert "Открыть календарь сотрудника" not in worker_detail_html
     assert "worker=helper2" in worker_detail_html
     assert "return_to=calendar" in worker_detail_html
     assert "Загрузка на 7 дней" in worker_detail_html
