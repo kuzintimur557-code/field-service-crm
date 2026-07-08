@@ -35052,6 +35052,22 @@ def parse_a3_governance_bool(value):
     raise ValueError("invalid boolean value")
 
 
+def a3_api_error(error, status_code):
+    messages = {
+        "forbidden": "Доступ запрещён",
+        "not_found": "Цепочка не найдена",
+    }
+
+    return JSONResponse(
+        {
+            "ok": False,
+            "error": error,
+            "message": messages.get(error, "Ошибка A3"),
+        },
+        status_code=status_code,
+    )
+
+
 @app.get("/api/a3/system-health")
 def api_a3_system_health(request: Request):
     company_id = get_a3_company_id(request)
@@ -35174,12 +35190,12 @@ def api_a3_workflow_rule_graph(request: Request, rule_id: int):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     graph = get_rule_workflow_graph(company_id, rule_id)
 
     if not graph:
-        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+        return a3_api_error("not_found", 404)
 
     return graph
 
@@ -35189,12 +35205,12 @@ def api_a3_workflow_rule_debug(request: Request, rule_id: int):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     debug = get_rule_workflow_debug(company_id, rule_id)
 
     if not debug:
-        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+        return a3_api_error("not_found", 404)
 
     return debug
 
@@ -35204,7 +35220,7 @@ def api_a3_workflows_graph(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return get_company_workflow_graphs(company_id, limit=50)
 
@@ -36041,7 +36057,7 @@ def api_a3_workflow_timeline(
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     timeline = get_workflow_timeline(
         company_id=company_id,
@@ -36051,7 +36067,7 @@ def api_a3_workflow_timeline(
     )
 
     if not timeline:
-        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+        return a3_api_error("not_found", 404)
 
     return {
         "ok": True,

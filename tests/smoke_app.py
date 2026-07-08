@@ -2251,6 +2251,24 @@ async def assert_automation_page():
     assert "dangerous_fixes" in workflow_debug["debug"]
     assert "stats" in workflow_debug
 
+    missing_workflow_graph = crm.api_a3_workflow_rule_graph(
+        make_request("owner2"),
+        999999,
+    )
+    assert missing_workflow_graph.status_code == 404
+    missing_workflow_graph_payload = json.loads(missing_workflow_graph.body.decode())
+    assert missing_workflow_graph_payload["error"] == "not_found"
+    assert missing_workflow_graph_payload["message"] == "Цепочка не найдена"
+
+    missing_workflow_debug = crm.api_a3_workflow_rule_debug(
+        make_request("owner2"),
+        999999,
+    )
+    assert missing_workflow_debug.status_code == 404
+    missing_workflow_debug_payload = json.loads(missing_workflow_debug.body.decode())
+    assert missing_workflow_debug_payload["error"] == "not_found"
+    assert missing_workflow_debug_payload["message"] == "Цепочка не найдена"
+
     workflow_timeline = crm.api_a3_workflow_timeline(
         make_request("owner2"),
         rule["id"],
@@ -16523,12 +16541,18 @@ async def assert_a3_workflow_center():
         1,
     )
     assert public_timeline_response.status_code == 403
+    public_timeline_payload = json.loads(public_timeline_response.body.decode())
+    assert public_timeline_payload["error"] == "forbidden"
+    assert public_timeline_payload["message"] == "Доступ запрещён"
 
     missing_timeline_response = crm.api_a3_workflow_timeline(
         request,
         999999,
     )
     assert missing_timeline_response.status_code == 404
+    missing_timeline_payload = json.loads(missing_timeline_response.body.decode())
+    assert missing_timeline_payload["error"] == "not_found"
+    assert missing_timeline_payload["message"] == "Цепочка не найдена"
 
     automation_response = crm.automation_page(request)
 
