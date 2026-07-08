@@ -3,7 +3,7 @@
 set -e
 
 echo "Checking Python syntax..."
-python3 -m py_compile app/main.py app/database.py
+python3 -m compileall -q app tests
 
 echo "Running app smoke checks..."
 python3 tests/smoke_app.py
