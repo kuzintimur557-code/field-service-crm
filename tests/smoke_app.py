@@ -534,9 +534,11 @@ async def assert_automation_page():
     assert "Одобрить безопасные" in html
     assert "approveSafeA3Actions" in html
     assert "/api/a3/autonomous-actions/approve-safe" in html
+    assert 'data.message || "Не удалось одобрить действие"' in html
     assert "Отклонить небезопасные" in html
     assert "rejectUnsafeA3Actions" in html
     assert "/api/a3/autonomous-actions/reject-unsafe" in html
+    assert 'data.message || "Не удалось отклонить действие"' in html
     assert "approval_safety_label" in html
     assert "Требует проверки" in html
     assert "autonomous_action: \"ИИ-действие\"" in html

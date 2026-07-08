@@ -1229,16 +1229,30 @@ async function loadA3AutonomousActions() {
 }
 
 async function approveA3AutonomousAction(actionId) {
-    await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {
+    const response = await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {
         method: "POST"
     });
+    const data = await response.json();
+
+    if (!response.ok) {
+        alert(data.message || "Не удалось одобрить действие");
+        return;
+    }
+
     refreshA3ApprovalWidgets();
 }
 
 async function rejectA3AutonomousAction(actionId) {
-    await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {
+    const response = await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {
         method: "POST"
     });
+    const data = await response.json();
+
+    if (!response.ok) {
+        alert(data.message || "Не удалось отклонить действие");
+        return;
+    }
+
     refreshA3ApprovalWidgets();
 }
 
