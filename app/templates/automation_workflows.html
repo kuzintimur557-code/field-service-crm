@@ -898,10 +898,12 @@ function getChainStatus(rule, actions) {
 }
 
 function renderChainGraph(chain) {
+    const rule = chain.rule || chain;
     const trigger = chain.trigger || {};
     const actions = chain.actions || [];
     const events = chain.events || [];
     const state = chain.health || {};
+    const triggerLabel = trigger.label || rule.trigger_label || rule.trigger_key || "Триггер";
 
     let ruleColor = "#dcfce7";
     let actionColor = "#fef3c7";
@@ -932,7 +934,7 @@ function renderChainGraph(chain) {
     }
 
     const nodes = [
-        {x:20,label:trigger.label || "Триггер",color:"#dbeafe",stroke:"#2563eb"},
+        {x:20,label:triggerLabel,color:"#dbeafe",stroke:"#2563eb"},
         {x:250,label:`Правило ${state.score ?? 100}`,color:ruleColor,stroke:"#22c55e"},
         {x:480,label:actions.length ? `Действия ${actions.length}` : "Нет действий",color:actionColor,stroke:"#eab308"},
         {x:710,label:events.length ? `События ${events.length}` : "События",color:eventColor,stroke:"#8b5cf6"}
@@ -1030,10 +1032,12 @@ async function loadChains() {
             const debug = chain.debug || {};
             const stats = chain.stats || {};
             const state = chain.health || {};
+            const triggerLabel = trigger.label || rule.trigger_label || rule.trigger_key || "Триггер не указан";
             const isProblematic = isWorkflowProblematic(rule, actions, state);
             const searchText = [
                 rule.id,
                 rule.name,
+                rule.trigger_label,
                 rule.trigger_key,
                 trigger.label,
                 rule.conditions?.label,
@@ -1099,7 +1103,7 @@ async function loadChains() {
                 <div class="graph-box">${renderChainGraph(chain)}</div>
 
                 <div class="meta" style="margin-top:14px">
-                    ${trigger.label || rule.trigger_key || "Триггер не указан"}
+                    ${triggerLabel}
                 </div>
                 <div class="meta" style="margin-top:6px">
                     Условие: ${rule.conditions?.label || "Без условий"}

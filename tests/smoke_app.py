@@ -16246,6 +16246,8 @@ async def assert_a3_workflow_center():
     assert "stats.problem_count" in body
     assert "stats.problem_label" in body
     assert "Проблемных событий: 0" in body
+    assert "rule.trigger_label" in body
+    assert "triggerLabel" in body
     assert "/api/a3/workflows/graph" in body
     assert "workflow_center_load_failed" in body
     assert "serverSummary.label" in body
