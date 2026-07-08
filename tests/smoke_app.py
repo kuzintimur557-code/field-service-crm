@@ -13435,7 +13435,7 @@ async def assert_finance_margin(task):
     assert updated_profile["daily_capacity"] == 4
     assert profile_activity["details"] == (
         "Изменены поля: ФИО, Должность, Телефон, "
-        "Электронная почта, ID чата Telegram, Дневной лимит заявок"
+        "Электронная почта, Номер чата Telegram, Дневной лимит заявок"
     )
     assert "+7 900 000-00-00" not in profile_activity["details"]
     assert "history@example.test" not in profile_activity["details"]
@@ -13779,6 +13779,8 @@ async def assert_finance_margin(task):
     assert "Отключённые" in workers_html
     assert 'placeholder="+7 900 000-00-00"' in workers_html
     assert 'placeholder="user@example.ru"' in workers_html
+    assert "Номер чата Telegram" in workers_html
+    assert "ID чата Telegram" not in workers_html
     assert ".contact-link" in workers_html
     assert 'class="mobile-nav"' in workers_html
     assert ".container{padding:16px 14px 92px}" in workers_html
@@ -14495,6 +14497,8 @@ async def assert_finance_margin(task):
     assert "finance-actions" in worker_detail_html
     assert 'class="mobile-nav"' in worker_detail_html
     assert "Статус выплаты" in worker_detail_html
+    assert "Номер чата Telegram" in worker_detail_html
+    assert "ID чата Telegram" not in worker_detail_html
     assert "Не выплачено" in worker_detail_html
     assert "700.0 ₽" in worker_detail_html
     assert "70.0 ₽" in worker_detail_html
@@ -14722,6 +14726,8 @@ async def assert_client_card(task):
     assert "task_filter=completed" in html
     assert "task_filter=overdue" in html
     assert "Поиск: Заявка" in html
+    assert "#номер" in html
+    assert "#ID" not in html
     assert "task_search" in html
     assert "Сортировка" in html
     assert 'name="task_sort"' in html

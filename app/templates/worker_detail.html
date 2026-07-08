@@ -109,7 +109,7 @@ h1{margin:0 0 10px;font-size:34px}
 <div class="meta">Должность: {{ worker["position"] or "—" }}</div>
 <div class="meta">Телефон: {{ worker["phone"] or "—" }}</div>
 <div class="meta">Электронная почта: {{ worker["email"] or "—" }}</div>
-<div class="meta">ID чата Telegram: {{ worker["telegram_chat_id"] or "—" }}</div>
+<div class="meta">Номер чата Telegram: {{ worker["telegram_chat_id"] or "—" }}</div>
 {% if worker["role"] == "worker" %}
 <div class="meta">Лимит заявок в день: {{ daily_capacity }}</div>
 {% endif %}
@@ -145,7 +145,7 @@ h1{margin:0 0 10px;font-size:34px}
         <input type="email" name="email" maxlength="200" value="{{ worker['email'] or '' }}">
     </label>
     <label>
-        ID чата Telegram
+        Номер чата Telegram
         <input type="text" name="telegram_chat_id" maxlength="200" value="{{ worker['telegram_chat_id'] or '' }}">
     </label>
     {% if worker["role"] == "worker" %}

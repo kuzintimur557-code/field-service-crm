@@ -29719,7 +29719,7 @@ async def update_team_user_profile(request: Request, user_id: int):
         "position": "Должность",
         "phone": "Телефон",
         "email": "Электронная почта",
-        "telegram_chat_id": "ID чата Telegram",
+        "telegram_chat_id": "Номер чата Telegram",
         "daily_capacity": "Дневной лимит заявок",
     }
 
