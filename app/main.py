@@ -2779,7 +2779,7 @@ def automation_dry_run_readiness(rule_active, condition_matched, actions):
             "status": "unsupported_actions",
             "tone": "warn",
             "title": "Действия ещё не поддерживаются",
-            "message": "Настроенные действия пока не исполняются текущим runtime.",
+            "message": "Настроенные действия пока не исполняются текущим движком выполнения.",
         }
     else:
         status = {
@@ -35326,7 +35326,7 @@ async def api_a3_request_autonomous_action_approval(request: Request):
         target_id=target_id,
         payload_json=json.dumps({
             "requested_by": get_user(request) or "system",
-            "reason": payload.get("reason") or "Запрошено из A3 workflow debug",
+            "reason": payload.get("reason") or "Запрошено из диагностики цепочки A3",
         }, ensure_ascii=False),
     )
 

@@ -1437,6 +1437,10 @@ async def assert_automation_page():
     assert unsupported_dry_run["status"] == "unsupported_actions"
     assert len(unsupported_dry_run["unsupported_actions"]) == 1
     assert unsupported_dry_run["unsupported_actions"][0]["dry_run_supported"] is False
+    assert (
+        unsupported_dry_run["message"]
+        == "Настроенные действия пока не исполняются текущим движком выполнения."
+    )
 
     create_task_preview = crm.automation_dry_run_readiness(
         True,
