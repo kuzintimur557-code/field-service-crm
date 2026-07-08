@@ -16464,7 +16464,7 @@ async def assert_a3_workflow_center():
     assert "requestDangerousFixApproval" in body
     assert "Отправка действия на подтверждение..." in body
     assert "/api/a3/autonomous-actions/request-approval" in body
-    assert "dangerous_fix_approval_request_failed" in body
+    assert 'data.message || "Не удалось отправить на подтверждение"' in body
     assert "/api/a3/autonomous-actions/approve-safe" in body
     assert "/api/a3/autonomous-actions/reject-unsafe" in body
     assert "/api/a3/approval-queue" in body
