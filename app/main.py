@@ -33640,6 +33640,16 @@ async def complete_task(request: Request, task_id: int):
     conn.commit()
     conn.close()
 
+    if task["status"] != "Завершено":
+        run_automation_event(
+            company_id,
+            "task_status_changed",
+            "task",
+            task_id,
+            f"Статус заявки #{task_id}: {task['status']} → Завершено",
+            f"/task/{task_id}",
+        )
+
     try:
         send_message(
             f"""
@@ -33715,6 +33725,16 @@ async def start_task(request: Request, task_id: int):
 
     conn.commit()
     conn.close()
+
+    if task["status"] != "В работе":
+        run_automation_event(
+            company_id,
+            "task_status_changed",
+            "task",
+            task_id,
+            f"Статус заявки #{task_id}: {task['status']} → В работе",
+            f"/task/{task_id}",
+        )
 
     return RedirectResponse("/my-tasks", status_code=302)
 

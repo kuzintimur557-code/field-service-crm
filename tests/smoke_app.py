@@ -15229,6 +15229,136 @@ async def assert_client_card(task):
     assert "▶️ Взять в работу" not in worker_tasks_html
     assert "✅ Завершить" not in worker_tasks_html
 
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO tasks (
+        client_id, client, phone, address, description, task_date,
+        worker, workers, priority, price, photo, status, report,
+        after_photo, company_id
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        task["client_id"],
+        "Worker status client",
+        "+70000000002",
+        "Worker status address",
+        "Worker status smoke",
+        "2026-05-23",
+        "worker2",
+        "worker2",
+        "Обычный",
+        "0",
+        "",
+        "Новая",
+        "",
+        "",
+        2,
+    ))
+    worker_flow_task_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Worker status smoke",
+        "task_status_changed",
+        json.dumps({}, ensure_ascii=False),
+        1,
+        "owner2",
+        now,
+        now,
+    ))
+    worker_status_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        worker_status_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Worker status trigger matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        now,
+    ))
+    conn.commit()
+    conn.close()
+
+    start_response = await crm.start_task(
+        make_form_request("worker2", f"/task/{worker_flow_task_id}/start", {}),
+        worker_flow_task_id,
+    )
+    assert start_response.status_code == 302
+
+    original_send_message = crm.send_message
+    crm.send_message = lambda text: True
+
+    try:
+        complete_response = await crm.complete_task(
+            make_form_request(
+                "worker2",
+                f"/task/{worker_flow_task_id}/complete",
+                {"report": "Worker flow done"},
+            ),
+            worker_flow_task_id,
+        )
+    finally:
+        crm.send_message = original_send_message
+
+    assert complete_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    worker_status_events = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='task_status_changed'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id
+    """, (worker_status_rule_id, worker_flow_task_id)).fetchall()
+    worker_status_notifications = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Worker status smoke'
+      AND message='Worker status trigger matched'
+    """).fetchone()[0]
+    completed_worker_task = c.execute("""
+    SELECT status, report
+    FROM tasks
+    WHERE id=?
+      AND company_id=2
+    """, (worker_flow_task_id,)).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (worker_status_rule_id,))
+    c.execute("DELETE FROM notifications WHERE link=?", (f"/task/{worker_flow_task_id}",))
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (worker_status_rule_id,))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (worker_status_rule_id,))
+    c.execute("DELETE FROM task_activity WHERE task_id=?", (worker_flow_task_id,))
+    c.execute("DELETE FROM tasks WHERE id=? AND company_id=2", (worker_flow_task_id,))
+    conn.commit()
+    conn.close()
+
+    assert [event["status"] for event in worker_status_events] == ["done", "done"]
+    assert len(worker_status_events) == 2
+    assert worker_status_notifications == 2
+    assert completed_worker_task["status"] == "Завершено"
+    assert completed_worker_task["report"] == "Worker flow done"
+
     create_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),
         client_id=task["client_id"],
