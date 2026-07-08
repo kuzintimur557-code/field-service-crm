@@ -12306,13 +12306,18 @@ async def home(
       AND deadline_at <= ?
     """, (company_id, now_value, sla_soon_value)).fetchone()[0]
 
-    active_workers = c.execute("""
-    SELECT COUNT(DISTINCT worker)
+    active_worker_rows = c.execute("""
+    SELECT worker, workers
     FROM tasks
     WHERE archived=0
       AND company_id=?
       AND status='В работе'
-    """, (company_id,)).fetchone()[0]
+    """, (company_id,)).fetchall()
+    active_workers = len({
+        worker_name
+        for row in active_worker_rows
+        for worker_name in get_task_worker_names(row)
+    })
 
 
     workers = c.execute("""

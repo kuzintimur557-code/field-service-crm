@@ -5543,6 +5543,7 @@ async def assert_more_page():
 async def assert_home_page():
     response = await crm.home(make_asgi_request("owner2", "/"))
     assert response.status_code == 200
+    base_active_workers = response.context["active_workers"]
     html = response.body.decode("utf-8")
     assert "Бизнес CRM" in html
     assert "Заявка: создать" in html
@@ -5591,10 +5592,10 @@ async def assert_home_page():
         "Searchable dashboard service",
         "2026-06-16",
         "",
-        "",
+        "active_smoke_a,active_smoke_b",
         "Обычный",
         "0",
-        "Новая",
+        "В работе",
         0,
         datetime.now().strftime("%Y-%m-%d %H:%M"),
     ))
@@ -5611,6 +5612,7 @@ async def assert_home_page():
         address_html = address_response.body.decode("utf-8")
         assert "Smoke Address Lane 77" in address_html
         assert "Main Search Smoke Client" in address_html
+        assert address_response.context["active_workers"] >= base_active_workers + 2
 
         phone_response = await crm.home(
             make_asgi_request("owner2", "/", "search=000-55-66"),
