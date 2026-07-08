@@ -1106,7 +1106,7 @@ async function loadChains() {
                     ${triggerLabel}
                 </div>
                 <div class="meta" style="margin-top:6px">
-                    Условие: ${rule.conditions?.label || "Без условий"}
+                    Условие: ${rule.conditions?.label || "Без условий"}${rule.conditions?.count_label ? " · " + rule.conditions.count_label : ""}
                 </div>
                 <div class="meta" style="margin-top:6px;font-weight:800">
                     ${stats.summary_label || "Статистика: событий пока нет"}

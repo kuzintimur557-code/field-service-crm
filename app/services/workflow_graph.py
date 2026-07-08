@@ -76,6 +76,7 @@ def _condition_summary(conditions_json):
     if conditions.get("conditions"):
         items = conditions.get("conditions") or []
         operator = str(conditions.get("operator") or "and").lower()
+        operator_label = "ИЛИ" if operator == "or" else "И"
 
         item_labels = []
 
@@ -94,6 +95,9 @@ def _condition_summary(conditions_json):
             "mode": mode,
             "label": label,
             "operator": operator,
+            "operator_label": operator_label,
+            "count": len(item_labels),
+            "count_label": f"Условий: {len(item_labels)}",
             "items": item_labels,
             "raw": conditions,
         }
@@ -106,6 +110,10 @@ def _condition_summary(conditions_json):
     return {
         "mode": mode,
         "label": conditions.get("label") or labels[mode],
+        "operator": "and",
+        "operator_label": "И",
+        "count": 0 if mode == "none" else 1,
+        "count_label": f"Условий: {0 if mode == 'none' else 1}",
         "raw": conditions,
     }
 
