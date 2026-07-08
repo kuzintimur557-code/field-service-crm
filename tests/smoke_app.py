@@ -5810,6 +5810,7 @@ async def assert_calls_page():
     outsider_client_id = c.lastrowid
     conn.commit()
     conn.close()
+    created_call_task_id = None
 
     try:
         response = await crm.calls_page(make_asgi_request("owner2", "/calls"))
@@ -5921,6 +5922,7 @@ async def assert_calls_page():
         assert "Calls Smoke Client" in call_detail_html
         assert "Перезвонить завтра по оплате" in call_detail_html
         assert "Нужен контакт" in call_detail_html
+        assert f"/create-task?client_id={client_id}&call_id={call['id']}&return_to=client" in call_detail_html
         assert f'action="/calls/{call["id"]}/analysis"' in call_detail_html
         assert "Сохранить анализ" in call_detail_html
         assert f'action="/calls/{call["id"]}/audio"' in call_detail_html
@@ -6063,6 +6065,77 @@ async def assert_calls_page():
         assert protected_ai_call["transcript"] == "Smoke call transcript"
         assert protected_ai_call["ai_summary"] == "Smoke AI call summary"
 
+        call_task_page_response = await crm.create_task_page(
+            make_asgi_request("owner2", "/create-task"),
+            client_id=client_id,
+            call_id=call["id"],
+            return_to="client",
+        )
+        assert call_task_page_response.status_code == 200
+        call_task_page_html = call_task_page_response.body.decode("utf-8")
+        assert f'name="call_id" value="{call["id"]}"' in call_task_page_html
+        assert "Перезвонить завтра по оплате" in call_task_page_html
+        assert "Smoke AI call summary" in call_task_page_html
+
+        original_send_message = crm.send_message
+        original_send_message_to_chat = crm.send_message_to_chat
+        crm.send_message = lambda text: True
+        crm.send_message_to_chat = lambda chat_id, text: True
+
+        try:
+            call_task_response = await crm.create_task(
+                make_multipart_request(
+                    "owner2",
+                    "/create-task",
+                    {
+                        "client_id": str(client_id),
+                        "client": "Calls Smoke Client",
+                        "phone": "+7 900 111-22-33",
+                        "address": "",
+                        "description": "Task from call smoke",
+                        "task_date": "2026-06-15",
+                        "return_to": "client",
+                        "call_id": str(call["id"]),
+                        "priority": "Обычный",
+                        "price": "0",
+                    },
+                ),
+                photo=None,
+            )
+        finally:
+            crm.send_message = original_send_message
+            crm.send_message_to_chat = original_send_message_to_chat
+
+        assert call_task_response.status_code == 302
+        assert call_task_response.headers["location"] == f"/clients/{client_id}"
+
+        conn = connect()
+        c = conn.cursor()
+        created_call_task = c.execute("""
+        SELECT id
+        FROM tasks
+        WHERE company_id=2
+          AND client_id=?
+          AND description='Task from call smoke'
+        ORDER BY id DESC
+        """, (client_id,)).fetchone()
+        created_call_task_id = created_call_task["id"] if created_call_task else None
+        call_task_activity = c.execute("""
+        SELECT *
+        FROM task_activity
+        WHERE task_id=?
+          AND action='Создано из звонка'
+          AND details LIKE ?
+        ORDER BY id DESC
+        """, (
+            created_call_task_id,
+            f"%звонок #{call['id']}%",
+        )).fetchone()
+        conn.close()
+
+        assert created_call_task_id is not None
+        assert call_task_activity is not None
+
         filtered_response = await crm.calls_page(
             make_asgi_request(
                 "owner2",
@@ -6189,6 +6262,10 @@ async def assert_calls_page():
     finally:
         conn = connect()
         c = conn.cursor()
+        if created_call_task_id:
+            c.execute("DELETE FROM task_activity WHERE task_id=?", (created_call_task_id,))
+            c.execute("DELETE FROM notifications WHERE link=?", (f"/task/{created_call_task_id}",))
+            c.execute("DELETE FROM tasks WHERE id=? AND company_id=2", (created_call_task_id,))
         c.execute(
             "DELETE FROM call_records WHERE client_id IN (?, ?)",
             (client_id, outsider_client_id),

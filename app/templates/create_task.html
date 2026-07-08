@@ -145,6 +145,9 @@ button:hover{background:#1d4ed8}
 {% if selected_ai_note_id %}
 <input type="hidden" name="ai_note_id" value="{{ selected_ai_note_id }}">
 {% endif %}
+{% if selected_call_id %}
+<input type="hidden" name="call_id" value="{{ selected_call_id }}">
+{% endif %}
 
 <label>{{ settings["client_label"] or "Клиент" }}</label>
 <input name="client" placeholder="{{ settings["client_label"] or "Клиент" }}" value="{{ selected_client['name'] if selected_client else '' }}" required>

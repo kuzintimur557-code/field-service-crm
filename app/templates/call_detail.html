@@ -67,6 +67,7 @@ h1{font-size:28px}
     <a class="btn" href="/calls">Все звонки</a>
     {% if call["client_id"] and call["client_name"] %}
     <a class="btn" style="background:#111827" href="/clients/{{ call['client_id'] }}">Открыть: {{ client_label }}</a>
+    <a class="btn" href="/create-task?client_id={{ call['client_id'] }}&call_id={{ call['id'] }}&return_to=client">Создать заявку</a>
     {% endif %}
 </div>
 </div>

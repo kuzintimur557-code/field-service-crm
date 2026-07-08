@@ -33177,7 +33177,8 @@ async def create_task_page(
     client_id: int = 0,
     note_id: int = 0,
     source_task_id: int = 0,
-    ai_note_id: int = 0
+    ai_note_id: int = 0,
+    call_id: int = 0
 ):
 
     username = get_user(request)
@@ -33302,6 +33303,7 @@ async def create_task_page(
     selected_note_id = 0
     selected_source_task_id = 0
     selected_ai_note_id = 0
+    selected_call_id = 0
 
     if selected_worker in worker_names:
         if selected_worker not in selected_workers:
@@ -33401,6 +33403,9 @@ async def create_task_page(
                     if ai_note_id:
                         switch_params["ai_note_id"] = ai_note_id
 
+                    if call_id:
+                        switch_params["call_id"] = call_id
+
                     recommended_worker["switch_url"] = f"/create-task?{urlencode(switch_params)}"
 
     clients = c.execute("""
@@ -33453,6 +33458,30 @@ async def create_task_page(
                 selected_description = selected_note["note"] or ""
                 selected_note_id = note_id
 
+        if selected_client and call_id:
+            selected_call = c.execute("""
+            SELECT *
+            FROM call_records
+            WHERE id=?
+              AND client_id=?
+              AND company_id=?
+            """, (call_id, client_id, company_id)).fetchone()
+
+            if selected_call:
+                call_parts = []
+
+                if selected_call["summary"]:
+                    call_parts.append(selected_call["summary"])
+
+                if selected_call["ai_summary"]:
+                    call_parts.append(f"AI-резюме: {selected_call['ai_summary']}")
+
+                if selected_call["transcript"] and not call_parts:
+                    call_parts.append(selected_call["transcript"])
+
+                selected_description = "\n\n".join(call_parts) or selected_description
+                selected_call_id = call_id
+
     if ai_note_id:
         selected_ai_note = c.execute("""
         SELECT *
@@ -33494,6 +33523,7 @@ async def create_task_page(
             "selected_note_id": selected_note_id,
             "selected_source_task_id": selected_source_task_id,
             "selected_ai_note_id": selected_ai_note_id,
+            "selected_call_id": selected_call_id,
             "selected_task_date": selected_task_date,
             "selected_time_from": selected_time_from,
             "selected_time_to": selected_time_to,
@@ -33549,6 +33579,7 @@ async def create_task(
     note_id = (form.get("note_id") or "").strip()
     source_task_id = (form.get("source_task_id") or "").strip()
     ai_note_id = (form.get("ai_note_id") or "").strip()
+    call_id = (form.get("call_id") or "").strip()
     allow_capacity_override = (
         form.get("allow_capacity_override") or ""
     ).strip() == "1"
@@ -33638,6 +33669,18 @@ async def create_task(
                     if source_task:
                         error_params["source_task_id"] = source_task_id
 
+                if call_id.isdigit():
+                    call = c.execute("""
+                    SELECT id
+                    FROM call_records
+                    WHERE id=?
+                      AND client_id=?
+                      AND company_id=?
+                    """, (int(call_id), client_id, company_id)).fetchone()
+
+                    if call:
+                        error_params["call_id"] = call_id
+
             if ai_note_id.isdigit():
                 ai_note = c.execute("""
                 SELECT id
@@ -33665,6 +33708,17 @@ async def create_task(
             client = existing_client["name"]
             phone = existing_client["phone"]
             address = submitted_address or existing_client["address"]
+
+    source_call = None
+
+    if call_id.isdigit() and client_id:
+        source_call = c.execute("""
+        SELECT id, summary
+        FROM call_records
+        WHERE id=?
+          AND client_id=?
+          AND company_id=?
+        """, (int(call_id), client_id, company_id)).fetchone()
 
     valid_workers = []
     worker_chat_ids = []
@@ -33980,6 +34034,15 @@ async def create_task(
             f"{'–' + time_to if time_to else ''}"
         )
     )
+
+    if source_call:
+        log_task_activity(
+            task_id,
+            username,
+            role,
+            "Создано из звонка",
+            f"Источник: звонок #{source_call['id']}. {source_call['summary'] or ''}".strip()
+        )
 
     if over_capacity_workers:
         capacity_details = "; ".join(
