@@ -1024,13 +1024,17 @@ async function loadChains() {
             fetch("/api/a3/workflows/graph"),
             fetch("/api/a3/approval-queue"),
         ]);
-
-        if (!response.ok || !approvalResponse.ok) {
-            throw new Error("workflow_center_load_failed");
-        }
-
         const data = await response.json();
         const approvalData = await approvalResponse.json();
+
+        if (!response.ok || !approvalResponse.ok) {
+            throw new Error(
+                data.message
+                || approvalData.message
+                || "Не удалось загрузить список цепочек"
+            );
+        }
+
         const chains = data.workflows || data.items || [];
         const serverSummary = data.summary || {};
         const approvalCount = approvalData.count || (approvalData.items || []).length || 0;
@@ -1280,8 +1284,9 @@ async function loadChains() {
         }
     } catch (err) {
         console.error(err);
-        summary.textContent = "Не удалось загрузить сводку цепочек";
-        list.innerHTML = '<div class="card empty">Не удалось загрузить список цепочек</div>';
+        const message = err.message || "Не удалось загрузить список цепочек";
+        summary.textContent = message;
+        list.innerHTML = `<div class="card empty">${message}</div>`;
     }
 }
 

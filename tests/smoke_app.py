@@ -16287,7 +16287,8 @@ async def assert_a3_workflow_center():
     assert "rule.trigger_label" in body
     assert "triggerLabel" in body
     assert "/api/a3/workflows/graph" in body
-    assert "workflow_center_load_failed" in body
+    assert 'data.message' in body
+    assert 'approvalData.message' in body
     assert "serverSummary.label" in body
     assert "Фильтры" in body
     assert "Проблемные цепочки" in body
