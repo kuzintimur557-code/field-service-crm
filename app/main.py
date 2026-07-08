@@ -295,15 +295,18 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "."))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DOCS_DIR = UPLOAD_DIR / "docs"
 CLIENT_FILES_DIR = UPLOAD_DIR / "client_files"
+CALL_AUDIO_DIR = UPLOAD_DIR / "call_audio"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 DOCS_DIR.mkdir(parents=True, exist_ok=True)
 CLIENT_FILES_DIR.mkdir(parents=True, exist_ok=True)
+CALL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 ALLOWED_CLIENT_FILE_EXTENSIONS = {
     ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx",
     ".xls", ".xlsx", ".csv", ".txt"
 }
+ALLOWED_CALL_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg", ".webm", ".aac", ".mp4"}
 PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 AUTOMATION_TRIGGERS = [
@@ -692,6 +695,16 @@ def safe_client_file_filename(client_id, original_filename):
         extension = ".bin"
 
     return f"client_{client_id}_{uuid4().hex}{extension}"
+
+
+def safe_call_audio_filename(call_id, original_filename):
+    original = Path(original_filename or "audio").name
+    extension = Path(original).suffix.lower()
+
+    if extension not in ALLOWED_CALL_AUDIO_EXTENSIONS:
+        extension = ".mp3"
+
+    return f"call_{call_id}_{uuid4().hex}{extension}"
 
 
 def get_task_worker_names(task):
@@ -27243,6 +27256,126 @@ async def update_call_analysis(request: Request, call_id: int):
     conn.close()
 
     return RedirectResponse(f"/calls/{call_id}?updated=1", status_code=302)
+
+
+@app.post("/calls/{call_id}/audio")
+async def upload_call_audio(
+    request: Request,
+    call_id: int,
+    audio: UploadFile = File(None)
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calls")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    if not settings or not settings["calls_enabled"]:
+        return RedirectResponse("/calls", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    call = c.execute("""
+    SELECT id, audio_filename
+    FROM call_records
+    WHERE id=? AND company_id=?
+    """, (call_id, company_id)).fetchone()
+
+    if not call:
+        conn.close()
+        return RedirectResponse("/calls", status_code=302)
+
+    if not audio or not audio.filename:
+        conn.close()
+        return RedirectResponse(f"/calls/{call_id}?audio_error=empty", status_code=302)
+
+    stored_filename = safe_call_audio_filename(call_id, audio.filename)
+    file_path = CALL_AUDIO_DIR / stored_filename
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(audio.file, buffer)
+
+    old_filename = Path(call["audio_filename"] or "").name
+
+    c.execute("""
+    UPDATE call_records
+    SET audio_filename=?
+    WHERE id=? AND company_id=?
+    """, (
+        stored_filename,
+        call_id,
+        company_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    if old_filename and old_filename != stored_filename:
+        old_path = CALL_AUDIO_DIR / old_filename
+
+        if old_path.is_file():
+            try:
+                old_path.unlink()
+            except OSError:
+                pass
+
+    return RedirectResponse(f"/calls/{call_id}?audio_uploaded=1", status_code=302)
+
+
+@app.get("/calls/{call_id}/audio")
+async def download_call_audio(request: Request, call_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return Response(status_code=404)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return Response(status_code=404)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    call = c.execute("""
+    SELECT audio_filename
+    FROM call_records
+    WHERE id=? AND company_id=?
+    """, (call_id, company_id)).fetchone()
+
+    conn.close()
+
+    if not call:
+        return Response(status_code=404)
+
+    audio_filename = Path(call["audio_filename"] or "").name
+
+    if not audio_filename or audio_filename != (call["audio_filename"] or ""):
+        return Response(status_code=404)
+
+    file_path = CALL_AUDIO_DIR / audio_filename
+
+    if not file_path.is_file():
+        return Response(status_code=404)
+
+    return FileResponse(str(file_path), filename=audio_filename)
 
 
 @app.post("/calls")

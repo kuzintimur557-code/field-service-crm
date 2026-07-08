@@ -5921,6 +5921,62 @@ async def assert_calls_page():
         assert "Нужен контакт" in call_detail_html
         assert f'action="/calls/{call["id"]}/analysis"' in call_detail_html
         assert "Сохранить анализ" in call_detail_html
+        assert f'action="/calls/{call["id"]}/audio"' in call_detail_html
+        assert "Сохранить аудио" in call_detail_html
+
+        empty_audio_response = await crm.upload_call_audio(
+            make_request("owner2"),
+            call["id"],
+            audio=None,
+        )
+        assert empty_audio_response.status_code == 302
+        assert empty_audio_response.headers["location"] == f"/calls/{call['id']}?audio_error=empty"
+
+        upload_audio_response = await crm.upload_call_audio(
+            make_request("owner2"),
+            call["id"],
+            audio=crm.UploadFile(
+                file=crm.io.BytesIO(b"smoke audio"),
+                filename="call-smoke.mp3",
+            ),
+        )
+        assert upload_audio_response.status_code == 302
+        assert upload_audio_response.headers["location"] == f"/calls/{call['id']}?audio_uploaded=1"
+
+        conn = connect()
+        c = conn.cursor()
+        audio_call = c.execute("""
+        SELECT audio_filename
+        FROM call_records
+        WHERE id=? AND company_id=2
+        """, (call["id"],)).fetchone()
+        conn.close()
+
+        assert audio_call is not None
+        assert audio_call["audio_filename"].startswith(f"call_{call['id']}_")
+        assert audio_call["audio_filename"].endswith(".mp3")
+
+        download_audio_response = await crm.download_call_audio(
+            make_request("owner2"),
+            call["id"],
+        )
+        assert download_audio_response.status_code == 200
+
+        outsider_audio_response = await crm.download_call_audio(
+            make_request("manager1"),
+            call["id"],
+        )
+        assert outsider_audio_response.status_code == 404
+
+        audio_detail_response = await crm.call_detail(
+            make_asgi_request("owner2", f"/calls/{call['id']}", "audio_uploaded=1"),
+            call["id"],
+        )
+        assert audio_detail_response.status_code == 200
+        audio_detail_html = audio_detail_response.body.decode("utf-8")
+        assert "Аудио звонка загружено" in audio_detail_html
+        assert f'src="/calls/{call["id"]}/audio"' in audio_detail_html
+        assert "Скачать аудио" in audio_detail_html
 
         analysis_response = await crm.update_call_analysis(
             make_form_request(
