@@ -351,6 +351,9 @@ AUTOMATION_TRIGGERS = [
     ("worker_deleted", "Сотрудник удалён"),
     ("worker_password_changed", "Пароль сотрудника изменён"),
     ("company_settings_updated", "Настройки компании обновлены"),
+    ("ai_note_created", "ИИ-заметка создана"),
+    ("ai_note_postponed", "ИИ-заметка перенесена"),
+    ("ai_note_done", "ИИ-заметка выполнена"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -415,6 +418,11 @@ AUTOMATION_TRIGGER_GROUPS = [
         "sla_overdue",
         "sla_deadline_changed",
         "worker_overload",
+    )),
+    ("ИИ-помощник", (
+        "ai_note_created",
+        "ai_note_postponed",
+        "ai_note_done",
     )),
     ("ИИ-сводки", (
         "daily_digest",
@@ -27281,6 +27289,15 @@ async def add_ai_assistant_note(request: Request):
         note
     )
 
+    run_automation_event(
+        company_id,
+        "ai_note_created",
+        "ai_note",
+        note_id,
+        f"ИИ-заметка создана: {note[:120]}",
+        "/ai/assistant",
+    )
+
     return RedirectResponse("/ai/assistant?note_created=1", status_code=302)
 
 
@@ -27329,6 +27346,15 @@ async def complete_ai_assistant_note(request: Request, note_id: int):
         username,
         "done",
         "ИИ-заметка выполнена"
+    )
+
+    run_automation_event(
+        company_id,
+        "ai_note_done",
+        "ai_note",
+        note_id,
+        f"ИИ-заметка выполнена #{note_id}",
+        "/ai/assistant",
     )
 
     return RedirectResponse("/ai/assistant?note_done=1", status_code=302)
@@ -27385,6 +27411,15 @@ async def postpone_ai_assistant_note(request: Request, note_id: int):
         username,
         "postponed",
         f"Контроль перенесён на {next_date}"
+    )
+
+    run_automation_event(
+        company_id,
+        "ai_note_postponed",
+        "ai_note",
+        note_id,
+        f"ИИ-заметка перенесена на {next_date}",
+        "/ai/assistant",
     )
 
     return RedirectResponse("/ai/assistant?note_postponed=1", status_code=302)

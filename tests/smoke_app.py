@@ -1083,9 +1083,25 @@ async def assert_automation_page():
         "Настройки компании обновлены",
     ) in crm.AUTOMATION_TRIGGERS
     assert 'optgroup label="Компания"' in html
+    assert (
+        "ai_note_created",
+        "ИИ-заметка создана",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "ai_note_postponed",
+        "ИИ-заметка перенесена",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "ai_note_done",
+        "ИИ-заметка выполнена",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert 'optgroup label="ИИ-помощник"' in html
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'value="company_settings_updated"' in html
+    assert 'value="ai_note_created"' in html
+    assert 'value="ai_note_postponed"' in html
+    assert 'value="ai_note_done"' in html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
     assert 'name="action_key" value="telegram_alert"' in builder_html
     assert 'name="action_key" value="ai_digest"' in builder_html
@@ -4774,17 +4790,27 @@ async def assert_ai_assistant_page():
     assert empty_note_response.status_code == 302
     assert empty_note_response.headers["location"] == "/ai/assistant?note_error=empty"
 
-    note_response = await crm.add_ai_assistant_note(
-        make_form_request(
-            "owner2",
-            "/ai/assistant/notes",
-            {
-                "note": "Проверить рекомендацию ИИ-помощника",
-                "priority": "urgent",
-                "follow_up_date": "2026-05-26",
-            },
-        )
+    captured_ai_note_events = []
+    original_run_automation_event = crm.run_automation_event
+    crm.run_automation_event = (
+        lambda *args, **kwargs: captured_ai_note_events.append(args)
     )
+
+    try:
+        note_response = await crm.add_ai_assistant_note(
+            make_form_request(
+                "owner2",
+                "/ai/assistant/notes",
+                {
+                    "note": "Проверить рекомендацию ИИ-помощника",
+                    "priority": "urgent",
+                    "follow_up_date": "2026-05-26",
+                },
+            )
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert note_response.status_code == 302
     assert note_response.headers["location"] == "/ai/assistant?note_created=1"
 
@@ -4829,6 +4855,14 @@ async def assert_ai_assistant_page():
     assert saved_note["priority"] == "urgent"
     assert saved_note["follow_up_date"] == "2026-05-26"
     assert saved_note["is_done"] == 0
+    assert captured_ai_note_events[-1] == (
+        2,
+        "ai_note_created",
+        "ai_note",
+        saved_note["id"],
+        "ИИ-заметка создана: Проверить рекомендацию ИИ-помощника",
+        "/ai/assistant",
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -4933,16 +4967,36 @@ async def assert_ai_assistant_page():
     assert "Завтра" in notified_html
     assert "Через неделю" in notified_html
 
-    postponed_response = await crm.postpone_ai_assistant_note(
-        make_form_request(
-            "owner2",
-            f"/ai/assistant/notes/{saved_note['id']}/postpone",
-            {"days": "1"},
-        ),
-        saved_note["id"],
+    captured_ai_note_events = []
+    crm.run_automation_event = (
+        lambda *args, **kwargs: captured_ai_note_events.append(args)
     )
+
+    try:
+        postponed_response = await crm.postpone_ai_assistant_note(
+            make_form_request(
+                "owner2",
+                f"/ai/assistant/notes/{saved_note['id']}/postpone",
+                {"days": "1"},
+            ),
+            saved_note["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert postponed_response.status_code == 302
     assert postponed_response.headers["location"] == "/ai/assistant?note_postponed=1"
+    assert captured_ai_note_events[-1] == (
+        2,
+        "ai_note_postponed",
+        "ai_note",
+        saved_note["id"],
+        (
+            "ИИ-заметка перенесена на "
+            f"{(datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')}"
+        ),
+        "/ai/assistant",
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -5015,16 +5069,33 @@ async def assert_ai_assistant_page():
     assert f'name="ai_note_id" value="{saved_note["id"]}"' in ai_note_task_html
     assert "Проверить рекомендацию ИИ-помощника</textarea>" in ai_note_task_html
 
-    done_response = await crm.complete_ai_assistant_note(
-        make_form_request(
-            "owner2",
-            f"/ai/assistant/notes/{saved_note['id']}/done",
-            {},
-        ),
-        saved_note["id"],
+    captured_ai_note_events = []
+    crm.run_automation_event = (
+        lambda *args, **kwargs: captured_ai_note_events.append(args)
     )
+
+    try:
+        done_response = await crm.complete_ai_assistant_note(
+            make_form_request(
+                "owner2",
+                f"/ai/assistant/notes/{saved_note['id']}/done",
+                {},
+            ),
+            saved_note["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert done_response.status_code == 302
     assert done_response.headers["location"] == "/ai/assistant?note_done=1"
+    assert captured_ai_note_events[-1] == (
+        2,
+        "ai_note_done",
+        "ai_note",
+        saved_note["id"],
+        f"ИИ-заметка выполнена #{saved_note['id']}",
+        "/ai/assistant",
+    )
 
     conn = connect()
     c = conn.cursor()
