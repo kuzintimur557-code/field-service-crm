@@ -73,6 +73,11 @@ uvicorn app.main:app --reload --port 8011
 - `DATA_DIR`
 - `BOT_TOKEN`
 - `CHAT_ID`
+- `CALENDAR_INCIDENT_RESPONSE_MINUTES` - по умолчанию `30`
+- `CALENDAR_INCIDENT_ESCALATION_MINUTES` - по умолчанию `30`
+- `CALENDAR_INCIDENT_RECOVERY_MINUTES` - по умолчанию `120`
+- `CALENDAR_WATCHDOG_STALE_HOURS` - по умолчанию `6`
+- `CALENDAR_SCHEDULER_STUCK_MINUTES` - по умолчанию `30`
 
 Railway metadata обычно задаётся автоматически:
 
