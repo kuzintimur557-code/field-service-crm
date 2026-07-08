@@ -308,6 +308,7 @@ PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 AUTOMATION_TRIGGERS = [
     ("new_task", "Новая заявка"),
+    ("task_status_changed", "Статус заявки изменён"),
     ("overdue_task", "Просрочена задача"),
     ("sla_overdue", "Просрочен SLA"),
     ("unpaid_task", "Нет оплаты"),
@@ -34437,6 +34438,7 @@ async def update_task_status(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_task_company_id(task)
     old_status = task["status"]
 
     c.execute("""
@@ -34455,6 +34457,15 @@ async def update_task_status(request: Request, task_id: int):
             role,
             "Изменён статус",
             f"{old_status} → {new_status}"
+        )
+
+        run_automation_event(
+            company_id,
+            "task_status_changed",
+            "task",
+            task_id,
+            f"Статус заявки #{task_id}: {old_status} → {new_status}",
+            f"/task/{task_id}",
         )
 
         role_title = get_role_title(role)

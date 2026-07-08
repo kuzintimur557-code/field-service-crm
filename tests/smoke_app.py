@@ -5610,6 +5610,53 @@ async def assert_calendar_access():
     assert reschedule_response.status_code == 302
     assert reschedule_response.headers["location"].startswith("/calendar?month=2026-05&worker=helper2")
 
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Статус заявки smoke",
+        "task_status_changed",
+        json.dumps({
+            "mode": "status_in_progress",
+            "field": "status",
+            "operator": "equals",
+            "value": "В работе",
+            "label": "Только заявки в работе",
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        now,
+        now,
+    ))
+    status_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        status_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Status changed trigger matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        now,
+    ))
+    conn.commit()
+    conn.close()
+
     original_send_message = crm.send_message
     crm.send_message = lambda text: True
 
@@ -5630,6 +5677,38 @@ async def assert_calendar_access():
 
     assert status_response.status_code == 302
     assert status_response.headers["location"] == "/calendar?date=2026-05-21&worker=helper2"
+
+    conn = connect()
+    c = conn.cursor()
+    status_change_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='task_status_changed'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (status_rule_id, task["id"])).fetchone()
+    status_change_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Статус заявки smoke'
+      AND message='Status changed trigger matched'
+    ORDER BY id DESC
+    """).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (status_rule_id,))
+    c.execute("DELETE FROM notifications WHERE title='Статус заявки smoke'")
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (status_rule_id,))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (status_rule_id,))
+    conn.commit()
+    conn.close()
+
+    assert status_change_event is not None
+    assert status_change_event["status"] == "done"
+    assert status_change_notification is not None
 
     invalid_worker_response = await crm.calendar_page(
         make_asgi_request("owner2"),
