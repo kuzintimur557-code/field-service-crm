@@ -2189,6 +2189,7 @@ async def assert_automation_page():
     assert workflow_graph["rule"]["id"] == rule["id"]
     assert workflow_graph["rule"]["trigger_key"] == "sla_overdue"
     assert workflow_graph["rule"]["trigger_label"] == "Просрочен SLA"
+    assert workflow_graph["rule"]["status_label"] == "Активно"
     assert "conditions" in workflow_graph["rule"]
     assert workflow_graph["rule"]["conditions"]["label"] in {
         "Без условий",
@@ -2216,6 +2217,7 @@ async def assert_automation_page():
     assert "safe_fixes" in workflow_graph["debug"]
     assert "dangerous_fixes" in workflow_graph["debug"]
     assert any(node["type"] == "trigger" for node in workflow_graph["nodes"])
+    assert all(node.get("status_label") for node in workflow_graph["nodes"])
     assert any(
         node["type"] == "trigger" and node.get("label") == "Просрочен SLA"
         for node in workflow_graph["nodes"]
@@ -2223,6 +2225,7 @@ async def assert_automation_page():
     assert any(node["type"] == "rule" for node in workflow_graph["nodes"])
     assert any(node["type"] == "action" for node in workflow_graph["nodes"])
     assert any(action.get("label") for action in workflow_graph["actions"])
+    assert all(action.get("status_label") for action in workflow_graph["actions"])
     assert any(
         node["type"] == "action" and node.get("label")
         for node in workflow_graph["nodes"]

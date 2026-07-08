@@ -165,6 +165,21 @@ def _trigger_key_label(trigger_key):
     return labels.get(trigger_key or "", trigger_key or "Триггер")
 
 
+def _workflow_status_label(status):
+    labels = {
+        "active": "Активно",
+        "disabled": "Выключено",
+        "has_events": "Есть события",
+        "empty": "Нет событий",
+        "done": "Выполнено",
+        "skipped": "Пропущено",
+        "pending": "Ожидает",
+        "failed": "Ошибка",
+    }
+
+    return labels.get(status or "", status or "-")
+
+
 def _ai_debug_recommendations(rule, actions, latest_problem_event):
     recommendations = []
 
@@ -498,19 +513,23 @@ def get_rule_workflow_graph(company_id, rule_id):
     success_rate = round(done_count / max(done_count + skipped_count + failed_count, 1) * 100, 1)
     conditions = _condition_summary(rule["conditions_json"])
     trigger_label = _trigger_key_label(rule["trigger_key"])
+    rule_status = "active" if rule["active"] else "disabled"
+    event_status = "has_events" if total_events else "empty"
 
     nodes = [
         {
             "id": f"trigger:{rule_id}",
             "type": "trigger",
             "label": trigger_label,
-            "status": "active" if rule["active"] else "disabled",
+            "status": rule_status,
+            "status_label": _workflow_status_label(rule_status),
         },
         {
             "id": f"rule:{rule_id}",
             "type": "rule",
             "label": rule["name"],
-            "status": "active" if rule["active"] else "disabled",
+            "status": rule_status,
+            "status_label": _workflow_status_label(rule_status),
         },
     ]
 
@@ -528,12 +547,14 @@ def get_rule_workflow_graph(company_id, rule_id):
         node_id = f"action:{action['id']}"
         payload = _safe_payload(action["payload_json"])
         action_label = _action_key_label(action["action_key"])
+        action_status = "active" if action["active"] else "disabled"
 
         nodes.append({
             "id": node_id,
             "type": "action",
             "label": action_label,
-            "status": "active" if action["active"] else "disabled",
+            "status": action_status,
+            "status_label": _workflow_status_label(action_status),
             "sort_order": action["sort_order"],
             "target_username": payload.get("target_username", ""),
         })
@@ -549,6 +570,8 @@ def get_rule_workflow_graph(company_id, rule_id):
             "action_key": action["action_key"],
             "label": action_label,
             "active": bool(action["active"]),
+            "status": action_status,
+            "status_label": _workflow_status_label(action_status),
             "sort_order": action["sort_order"],
             "payload": payload,
         })
@@ -559,7 +582,8 @@ def get_rule_workflow_graph(company_id, rule_id):
         "id": event_node_id,
         "type": "events",
         "label": "События",
-        "status": "has_events" if total_events else "empty",
+        "status": event_status,
+        "status_label": _workflow_status_label(event_status),
         "total": total_events,
     })
 
@@ -577,6 +601,8 @@ def get_rule_workflow_graph(company_id, rule_id):
             "trigger_key": rule["trigger_key"],
             "trigger_label": trigger_label,
             "active": bool(rule["active"]),
+            "status": rule_status,
+            "status_label": _workflow_status_label(rule_status),
             "conditions": conditions,
         },
         "nodes": nodes,
