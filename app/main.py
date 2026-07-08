@@ -35062,6 +35062,7 @@ A3_API_ERROR_MESSAGES = {
     "invalid_protected_rules": "Некорректный список защищённых правил",
     "target_not_found": "Цель не найдена",
     "protected_rule": "Правило защищено",
+    "duplicate_pending_action": "Такое действие уже ждёт подтверждения",
 }
 
 
@@ -35331,10 +35332,16 @@ async def api_a3_request_autonomous_action_approval(request: Request):
     )
 
     if not result.get("queued"):
+        reason = result.get("reason")
+
         return {
             "ok": False,
             "queued": False,
-            "reason": result.get("reason"),
+            "reason": reason,
+            "message": A3_API_ERROR_MESSAGES.get(
+                reason,
+                "Не удалось отправить действие на подтверждение",
+            ),
         }
 
     process_result = process_autonomous_actions(company_id=company_id)

@@ -17746,6 +17746,7 @@ async def assert_a3_api_layer():
     )
     assert approval_request_duplicate["ok"] is False
     assert approval_request_duplicate["reason"] == "duplicate_pending_action"
+    assert approval_request_duplicate["message"] == "Такое действие уже ждёт подтверждения"
 
     invalid_approval_target = await crm.api_a3_request_autonomous_action_approval(
         make_json_request(
