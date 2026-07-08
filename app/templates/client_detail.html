@@ -376,7 +376,7 @@ h1{font-size:28px}
 </div>
 
 {% if client_calls_enabled or client_calls %}
-<div class="card">
+<div class="card" id="calls">
 <h2>Звонки: {{ client_label }}</h2>
 
 {% set call_direction_labels = {"incoming": "Входящий", "outgoing": "Исходящий"} %}
@@ -395,6 +395,13 @@ h1{font-size:28px}
 {% endif %}
 
 <div class="task-count">Звонков: {{ client_calls|length }} из {{ client_call_count }}</div>
+
+<div class="task-filters">
+    <a href="/clients/{{ client['id'] }}#calls" class="{% if not selected_call_filter %}active{% endif %}">Все</a>
+    <a href="/clients/{{ client['id'] }}?call_filter=follow_up#calls" class="{% if selected_call_filter == 'follow_up' %}active{% endif %}">Нужен контакт</a>
+    <a href="/clients/{{ client['id'] }}?call_filter=missed#calls" class="{% if selected_call_filter == 'missed' %}active{% endif %}">Пропущенные</a>
+    <a href="/clients/{{ client['id'] }}?call_filter=completed#calls" class="{% if selected_call_filter == 'completed' %}active{% endif %}">Состоялись</a>
+</div>
 
 <div class="stats">
     <div class="stat">

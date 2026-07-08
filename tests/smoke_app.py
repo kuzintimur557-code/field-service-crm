@@ -17774,7 +17774,7 @@ async def assert_client_card(task):
     DELETE FROM call_records
     WHERE company_id=2
       AND client_id=?
-      AND summary='Smoke client call note'
+      AND summary IN ('Smoke client call note', 'Smoke completed client call')
     """, (task["client_id"],))
     c.execute("""
     INSERT INTO call_records (
@@ -17800,6 +17800,32 @@ async def assert_client_card(task):
         "Smoke client call note",
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         4,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    c.execute("""
+    INSERT INTO call_records (
+        company_id,
+        client_id,
+        username,
+        direction,
+        status,
+        phone,
+        summary,
+        call_at,
+        duration_minutes,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        task["client_id"],
+        "owner2",
+        "incoming",
+        "completed",
+        "+70000000000",
+        "Smoke completed client call",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        6,
         datetime.now().strftime("%Y-%m-%d %H:%M"),
     ))
     conn.commit()
@@ -17838,11 +17864,15 @@ async def assert_client_card(task):
     assert "Smoke latest client note" in html
     assert "Звонки: Клиент" in html
     assert "Звонков:" in html
+    assert "call_filter=follow_up#calls" in html
+    assert "call_filter=missed#calls" in html
+    assert "call_filter=completed#calls" in html
     assert "Всего звонков" in html
     assert "Нужен контакт по звонкам" in html
     assert "С аудио" in html
     assert "С анализом" in html
     assert "Smoke client call note" in html
+    assert "Smoke completed client call" in html
     assert "Нужен контакт" in html
     assert "Поиск по заметкам" in html
     assert "note_search" in html
@@ -17881,6 +17911,21 @@ async def assert_client_card(task):
     assert 'input[type="hidden"]{display:none}' in html
     assert "💾 Сохранить изменения" not in html
     assert "📝 Добавить заметку" not in html
+
+    call_filter_response = await crm.client_detail(
+        make_asgi_request(
+            "owner2",
+            f"/clients/{task['client_id']}",
+            "call_filter=follow_up",
+        ),
+        task["client_id"],
+        call_filter="follow_up",
+    )
+    assert call_filter_response.status_code == 200
+    call_filter_html = call_filter_response.body.decode("utf-8")
+    assert "Smoke client call note" in call_filter_html
+    assert "Smoke completed client call" not in call_filter_html
+    assert 'class="active">Нужен контакт</a>' in call_filter_html
 
     worker_tasks_response = await crm.my_tasks_page(
         make_asgi_request("worker2", "/my-tasks")

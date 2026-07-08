@@ -29290,7 +29290,8 @@ async def client_detail(
     task_sort: str = "",
     activity_filter: str = "",
     note_search: str = "",
-    file_search: str = ""
+    file_search: str = "",
+    call_filter: str = ""
 ):
 
     username = get_user(request)
@@ -29340,6 +29341,7 @@ async def client_detail(
     selected_activity_filter = activity_filter if activity_filter in ("status", "date", "comment") else ""
     selected_note_search = str(note_search or "").strip()
     selected_file_search = str(file_search or "").strip()
+    selected_call_filter = call_filter if call_filter in ("follow_up", "missed", "completed") else ""
     search_value = selected_task_search.lower()
     note_search_value = selected_note_search.lower()
     file_search_value = selected_file_search.lower()
@@ -29497,13 +29499,21 @@ async def client_detail(
     """, (client_id, company_id)).fetchall()
     latest_activity = client_timeline[0] if client_timeline else None
 
-    client_calls = c.execute("""
+    call_filter_sql = ""
+    call_params = [client_id, company_id]
+
+    if selected_call_filter:
+        call_filter_sql = "AND status=?"
+        call_params.append(selected_call_filter)
+
+    client_calls = c.execute(f"""
     SELECT *
     FROM call_records
     WHERE client_id=? AND company_id=?
+      {call_filter_sql}
     ORDER BY COALESCE(call_at, created_at) DESC, id DESC
     LIMIT 10
-    """, (client_id, company_id)).fetchall()
+    """, call_params).fetchall()
     latest_client_call = client_calls[0] if client_calls else None
     client_call_count = c.execute("""
     SELECT COUNT(*)
@@ -29637,6 +29647,7 @@ async def client_detail(
             "selected_activity_filter": selected_activity_filter,
             "selected_note_search": selected_note_search,
             "selected_file_search": selected_file_search,
+            "selected_call_filter": selected_call_filter,
             "client_notes": client_notes,
             "client_files": client_files,
             "latest_client_note": latest_client_note,
