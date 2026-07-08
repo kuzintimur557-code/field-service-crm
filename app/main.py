@@ -12479,6 +12479,7 @@ async def notifications_page(request: Request, filter: str = "all"):
     WHERE company_id=?
       AND username=?
     """, (company_id, username)).fetchone()[0]
+    read_count = max(total_count - unread_count, 0)
 
     conn.close()
 
@@ -12492,6 +12493,7 @@ async def notifications_page(request: Request, filter: str = "all"):
             "notifications": notifications,
             "unread_count": unread_count,
             "total_count": total_count,
+            "read_count": read_count,
             "selected_filter": selected_filter,
             "settings": settings
         }
@@ -12522,6 +12524,32 @@ async def mark_all_notifications_read(request: Request):
     conn.close()
 
     return RedirectResponse("/notifications", status_code=302)
+
+
+@app.post("/notifications/delete-read")
+async def delete_read_notifications(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    DELETE FROM notifications
+    WHERE company_id=?
+      AND username=?
+      AND is_read=1
+    """, (company_id, username))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/notifications?filter=read", status_code=302)
 
 
 @app.post("/notifications/{notification_id}/read")

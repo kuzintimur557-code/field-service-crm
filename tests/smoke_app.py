@@ -17465,10 +17465,36 @@ async def assert_notifications(task):
         filter="read",
     )
     assert read_response.status_code == 200
-    assert "Smoke notification" in read_response.body.decode("utf-8")
+    read_html = read_response.body.decode("utf-8")
+    assert "Smoke notification" in read_html
+    assert "Удалить прочитанные" in read_html
 
     crm.create_notification(2, "owner2", "Unread one")
     crm.create_notification(2, "owner2", "Unread two")
+
+    delete_read_response = await crm.delete_read_notifications(make_request("owner2"))
+    assert delete_read_response.status_code == 302
+    assert delete_read_response.headers["location"] == "/notifications?filter=read"
+
+    conn = connect()
+    c = conn.cursor()
+    deleted_read_notification = c.execute("""
+    SELECT id
+    FROM notifications
+    WHERE id=?
+    """, (notification["id"],)).fetchone()
+    remaining_unread = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title IN ('Unread one', 'Unread two')
+      AND is_read=0
+    """).fetchone()[0]
+    conn.close()
+
+    assert deleted_read_notification is None
+    assert remaining_unread == 2
 
     read_all_response = await crm.mark_all_notifications_read(make_request("owner2"))
     assert read_all_response.status_code == 302

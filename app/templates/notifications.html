@@ -19,7 +19,9 @@ h1{margin:0 0 8px;font-size:34px;line-height:1.12}
 .notice.unread{background:#eff6ff;border-color:#bfdbfe}
 .notice-link{display:block;text-decoration:none;color:#111827}
 .top{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}
+.header-actions{display:flex;gap:10px;flex-wrap:wrap}
 .read-all{border:0;border-radius:14px;background:#111827;color:white;min-height:44px;padding:12px 16px;font-weight:900;cursor:pointer}
+.delete-read{border:0;border-radius:14px;background:#fee2e2;color:#991b1b;min-height:44px;padding:12px 16px;font-weight:900;cursor:pointer}
 .read-one{border:0;border-radius:12px;background:#2563eb;color:white;min-height:38px;padding:9px 12px;font-weight:900;cursor:pointer;margin-top:12px}
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .filter-link{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:10px 14px;border-radius:999px;background:#f3f4f6;color:#374151;text-decoration:none;font-weight:900;border:1px solid #e5e7eb}
@@ -48,11 +50,18 @@ h1{margin:0 0 8px;font-size:34px;line-height:1.12}
         <h1>Уведомления</h1>
         <div class="meta">Всего: {{ total_count }} · непрочитанных: {{ unread_count }}</div>
     </div>
+    <div class="header-actions">
     {% if unread_count and unread_count > 0 %}
     <form method="post" action="/notifications/read-all">
         <button class="read-all" type="submit">Отметить все прочитанными</button>
     </form>
     {% endif %}
+    {% if read_count and read_count > 0 %}
+    <form method="post" action="/notifications/delete-read">
+        <button class="delete-read" type="submit">Удалить прочитанные</button>
+    </form>
+    {% endif %}
+    </div>
 </div>
 
 <div class="filters">
