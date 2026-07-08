@@ -17098,7 +17098,7 @@ async def assert_client_card(task):
     assert 'name="phone" placeholder="+7 900 000-00-00" value="+70000000000"' in create_html
     assert 'name="address" placeholder="Адрес"' in create_html
     assert 'value="Company 2 address"' in create_html
-    assert "Исполнители не выбраны" in create_html
+    assert "Исполнитель не выбран" in create_html
     assert "syncWorkerSummary" in create_html
     assert 'class="mobile-nav"' in create_html
     assert ".container{padding:16px 14px 92px}" in create_html
