@@ -791,6 +791,7 @@ async def assert_automation_page():
     assert "Статус цепочки" in rule_detail_html
     assert "Оценка A3" in rule_detail_html
     assert "A3 Анализ" in rule_detail_html
+    assert "node.status_label || a3WorkflowStatusLabel(node.status)" in rule_detail_html
     assert "Рекомендация:" in rule_detail_html
     assert "Действия цепочки" in rule_detail_html
     assert "Последние события цепочки" in rule_detail_html
