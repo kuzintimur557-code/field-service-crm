@@ -8751,6 +8751,16 @@ async def assert_platform_companies_page():
     assert logistics_features["recurring"] == 1
     assert logistics_features["catalog"] == 0
 
+    logistics_create_page = await crm.create_task_page(
+        make_asgi_request("smoke_logistics_owner", "/create-task"),
+    )
+    assert logistics_create_page.status_code == 200
+    logistics_create_html = logistics_create_page.body.decode("utf-8")
+    assert "Рейс: создание" in logistics_create_html
+    assert "Дата рейс" in logistics_create_html
+    assert "Описание перевозка" in logistics_create_html
+    assert "Водитель" in logistics_create_html
+
     c.execute(
         "DELETE FROM company_features WHERE company_id=?",
         (logistics_company["id"],),
@@ -17090,7 +17100,7 @@ async def assert_client_card(task):
     assert "syncWorkerSummary" in create_html
     assert 'class="mobile-nav"' in create_html
     assert ".container{padding:16px 14px 92px}" in create_html
-    assert "Новая заявка" in create_html
+    assert "Заявка: создание" in create_html
     assert "Создать заявку" in create_html
     assert "➕ Новая заявка" not in create_html
     assert "🚀 Создать заявку" not in create_html
