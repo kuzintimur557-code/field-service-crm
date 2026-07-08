@@ -5983,8 +5983,11 @@ async def assert_calls_page():
         export_csv = export_response.body.decode("utf-8")
         assert export_csv.startswith("\ufeff")
         assert "Дата,Клиент,Телефон,Тип,Результат" in export_csv
+        assert "Расшифровка,AI-резюме" in export_csv
         assert "Calls Smoke Client" in export_csv
         assert "Перезвонить завтра по оплате" in export_csv
+        assert "Smoke call transcript" in export_csv
+        assert "Smoke AI call summary" in export_csv
         assert "Calls Outsider Client" not in export_csv
 
         client_page_response = await crm.client_detail(

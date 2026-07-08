@@ -27093,6 +27093,8 @@ async def calls_export(
         "Результат",
         "Длительность, минут",
         "Заметка",
+        "Расшифровка",
+        "AI-резюме",
         "Автор"
     ])
 
@@ -27105,6 +27107,8 @@ async def calls_export(
             status_labels.get(call["status"], call["status"] or ""),
             call["duration_minutes"] or 0,
             call["summary"] or "",
+            call["transcript"] or "",
+            call["ai_summary"] or "",
             call["username"] or ""
         ])
 
