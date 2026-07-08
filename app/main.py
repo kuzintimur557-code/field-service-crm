@@ -29510,6 +29510,28 @@ async def client_detail(
     FROM call_records
     WHERE client_id=? AND company_id=?
     """, (client_id, company_id)).fetchone()[0]
+    client_call_stats_row = c.execute("""
+    SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status='follow_up' THEN 1 ELSE 0 END) AS follow_up,
+        SUM(CASE WHEN status='missed' THEN 1 ELSE 0 END) AS missed,
+        SUM(CASE WHEN COALESCE(audio_filename, '')!='' THEN 1 ELSE 0 END) AS with_audio,
+        SUM(
+            CASE
+            WHEN COALESCE(transcript, '')!=''
+              OR COALESCE(ai_summary, '')!=''
+            THEN 1 ELSE 0 END
+        ) AS with_analysis
+    FROM call_records
+    WHERE client_id=? AND company_id=?
+    """, (client_id, company_id)).fetchone()
+    client_call_stats = {
+        "total": client_call_stats_row["total"] or 0,
+        "follow_up": client_call_stats_row["follow_up"] or 0,
+        "missed": client_call_stats_row["missed"] or 0,
+        "with_audio": client_call_stats_row["with_audio"] or 0,
+        "with_analysis": client_call_stats_row["with_analysis"] or 0,
+    }
 
     last_contact = None
 
@@ -29625,6 +29647,7 @@ async def client_detail(
             "shown_note_count": len(client_notes),
             "client_note_count": client_note_count,
             "client_call_count": client_call_count,
+            "client_call_stats": client_call_stats,
             "client_calls_enabled": bool(settings and settings["calls_enabled"]),
             "shown_file_count": len(client_files),
             "client_file_count": client_file_count,

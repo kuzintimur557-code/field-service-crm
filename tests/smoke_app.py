@@ -17838,6 +17838,10 @@ async def assert_client_card(task):
     assert "Smoke latest client note" in html
     assert "Звонки: Клиент" in html
     assert "Звонков:" in html
+    assert "Всего звонков" in html
+    assert "Нужен контакт по звонкам" in html
+    assert "С аудио" in html
+    assert "С анализом" in html
     assert "Smoke client call note" in html
     assert "Нужен контакт" in html
     assert "Поиск по заметкам" in html
