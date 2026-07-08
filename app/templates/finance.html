@@ -65,13 +65,16 @@ input,select,button{width:100%;margin-top:8px}
 </head>
 
 <body>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <div class="container">
 
 <div class="header">
     <div>
         <h1>Финансы</h1>
         <div style="color:#6b7280;font-weight:800;margin-top:6px">
-            Оплаты, выручка и прибыль по заявкам
+            Оплаты, выручка и прибыль: {{ task_label|lower }}
         </div>
     </div>
     <a href="/" class="back">← Назад</a>
@@ -90,9 +93,9 @@ input,select,button{width:100%;margin-top:8px}
     <input type="hidden" name="profit_filter" value="{{ selected_profit_filter }}">
     {% endif %}
     <div>
-        <div class="label">{{ settings["worker_label"] or "Исполнитель" }}</div>
+        <div class="label">{{ worker_label }}</div>
         <select name="worker">
-            <option value="">Все исполнители</option>
+            <option value="">Все: {{ worker_label|lower }}</option>
             {% for worker in workers %}
             <option value="{{ worker['username'] }}" {% if selected_worker == worker["username"] %}selected{% endif %}>{{ worker["username"] }}</option>
             {% endfor %}
@@ -132,7 +135,7 @@ input,select,button{width:100%;margin-top:8px}
 <div class="card">
 <div class="stats">
     <div class="stat">
-        <div class="label">Всего по заявкам</div>
+        <div class="label">Всего: {{ task_label|lower }}</div>
         <div class="value">{{ total_estimate }} ₽</div>
     </div>
 
@@ -199,13 +202,13 @@ input,select,button{width:100%;margin-top:8px}
 </div>
 
 <div class="card">
-<h2>Финансы по исполнителям</h2>
+<h2>Финансы: {{ worker_label }}</h2>
 
 {% if worker_finance_stats %}
 <div class="table">
     <div class="worker-row head">
-        <div>{{ settings["worker_label"] or "Исполнитель" }}</div>
-        <div>{{ settings["task_label"] or "Заявки" }}</div>
+        <div>{{ worker_label }}</div>
+        <div>{{ task_label }}</div>
         <div>Выручка</div>
         <div>Расходы</div>
         <div>Прибыль</div>
@@ -218,14 +221,14 @@ input,select,button{width:100%;margin-top:8px}
     {% for row in worker_finance_stats %}
     <div class="worker-row">
         <div>
-            <span class="mobile-label">{{ settings["worker_label"] or "Исполнитель" }}</span>
+            <span class="mobile-label">{{ worker_label }}</span>
             {% if row.worker_id %}
             <a href="/workers/{{ row.worker_id }}?month={{ month }}" style="color:#111827;text-decoration:none;font-weight:900">{{ row.worker }}</a>
             {% else %}
             <b>{{ row.worker }}</b>
             {% endif %}
         </div>
-        <div><span class="mobile-label">{{ settings["task_label"] or "Заявки" }}</span>{{ row.tasks }}</div>
+        <div><span class="mobile-label">{{ task_label }}</span>{{ row.tasks }}</div>
         <div><span class="mobile-label">Выручка</span>{{ row.total }} ₽</div>
         <div><span class="mobile-label">Расходы</span>{{ row.expenses }} ₽</div>
         <div><span class="mobile-label">Прибыль</span>{{ row.profit }} ₽</div>
@@ -243,20 +246,20 @@ input,select,button{width:100%;margin-top:8px}
     {% endfor %}
 </div>
 {% else %}
-<div class="empty">Нет данных по исполнителям за выбранный период</div>
+<div class="empty">Нет данных: {{ worker_label|lower }} за выбранный период</div>
 {% endif %}
 </div>
 
 <div class="card">
-<h2>{{ settings["task_label"] or "Заявки" }} за месяц</h2>
+<h2>{{ task_label }} за месяц</h2>
 
 {% if rows %}
 <div class="table">
     <div class="row head">
         <div>#</div>
-        <div>{{ settings["client_label"] or "Клиент" }}</div>
+        <div>{{ client_label }}</div>
         <div>Дата</div>
-        <div>{{ settings["worker_label"] or "Исполнитель" }}</div>
+        <div>{{ worker_label }}</div>
         <div>Оплата</div>
         <div>Сумма / прибыль</div>
         <div></div>
@@ -265,9 +268,9 @@ input,select,button{width:100%;margin-top:8px}
     {% for row in rows %}
     <div class="row">
         <div><span class="mobile-label">Номер</span>#{{ row.id }}</div>
-        <div><span class="mobile-label">{{ settings["client_label"] or "Клиент" }}</span><b>{{ row.client }}</b></div>
+        <div><span class="mobile-label">{{ client_label }}</span><b>{{ row.client }}</b></div>
         <div><span class="mobile-label">Дата</span>{{ row.task_date }}</div>
-        <div><span class="mobile-label">{{ settings["worker_label"] or "Исполнитель" }}</span>{{ row.worker }}</div>
+        <div><span class="mobile-label">{{ worker_label }}</span>{{ row.worker }}</div>
         <div>
             <span class="mobile-label">Оплата</span>
             {% if row.payment_status == "Оплачено" %}

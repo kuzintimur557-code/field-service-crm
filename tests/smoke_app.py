@@ -15842,7 +15842,7 @@ async def assert_finance_margin(task):
     assert "Выплачено ЗП" in finance_html
     assert "Остаток ЗП" in finance_html
     assert 'name="sort"' in finance_html
-    assert "Финансы по исполнителям" in finance_html
+    assert "Финансы: Исполнитель" in finance_html
     assert "Зарплаты" in finance_html
     assert "790.0 ₽" in finance_html
     assert "Выплата" in finance_html
@@ -16152,7 +16152,7 @@ async def assert_finance_margin(task):
     assert "Отметка выплаты снята" in unpaid_again_html
     assert "helper2" in unpaid_again_html
     assert "Выплатил" in unpaid_again_html
-    assert "Все исполнители" in finance_html
+    assert "Все: исполнитель" in finance_html
     assert "payment_filter=paid" in finance_html
     assert "payment_filter=partial" in finance_html
     assert "payment_filter=unpaid" in finance_html

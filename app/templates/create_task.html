@@ -273,6 +273,7 @@ const workerCheckboxes = Array.from(
     document.querySelectorAll('input[name="workers"]')
 );
 const workerSummary = document.getElementById("worker-summary");
+const workerLabel = {{ worker_label|tojson }};
 
 function syncCapacityConfirmation() {
     const hasOverloadedWorker = workerCheckboxes.some(
@@ -301,7 +302,7 @@ function syncWorkerSummary() {
     }
 
     if (!selectedWorkers.length) {
-        workerSummary.textContent = "Исполнители не выбраны";
+        workerSummary.textContent = "Не выбрано: " + workerLabel.toLowerCase();
         return;
     }
 
