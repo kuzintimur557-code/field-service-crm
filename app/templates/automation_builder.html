@@ -167,6 +167,17 @@
             </form>
 
             <form method="post" action="/automation/rules" class="chain">
+                <h2>Звонок → уведомление</h2>
+                <div class="meta">Если после звонка нужен контакт, владелец получает уведомление.</div>
+                <input type="hidden" name="name" value="Звонок требует контакта → уведомить владельца">
+                <input type="hidden" name="trigger_key" value="call_follow_up_created">
+                <input type="hidden" name="action_key" value="notification">
+                <input type="hidden" name="target_username" value="{{ username }}">
+                <input type="hidden" name="message" value="После звонка нужен контакт. Откройте карточку звонка и закройте следующий шаг.">
+                <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
+            </form>
+
+            <form method="post" action="/automation/rules" class="chain">
                 <h2>Без назначения: {{ task_label }}</h2>
                 <div class="meta">Если создана запись типа "{{ task_label|lower }}" без {{ worker_label|lower }}, владелец получает уведомление.</div>
                 <input type="hidden" name="name" value="Без назначения: {{ task_label }}">

@@ -1012,6 +1012,7 @@ async def assert_automation_page():
     assert "currentBuilderFilter === \"conditions\"" in builder_html
     assert "SLA → уведомление" in builder_html
     assert "Просрочка → Telegram" in builder_html
+    assert "Звонок → уведомление" in builder_html
     assert "Без назначения: Заявка" in builder_html
     assert "Завершено: Заявка" in builder_html
     assert "Назначения изменены" in builder_html
@@ -1022,6 +1023,7 @@ async def assert_automation_page():
     assert 'name="condition_mode" value="worker_unassigned"' in builder_html
     assert 'name="trigger_key" value="task_status_changed"' in builder_html
     assert 'name="trigger_key" value="task_workers_changed"' in builder_html
+    assert 'name="trigger_key" value="call_follow_up_created"' in builder_html
     assert (
         "task_archived",
         "Заявка отправлена в архив",
