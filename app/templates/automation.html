@@ -1626,6 +1626,11 @@ async function approveSafeA3Actions() {
         });
         const data = await response.json();
 
+        if (!response.ok) {
+            alert(data.message || "Не удалось выполнить массовое подтверждение");
+            return;
+        }
+
         refreshA3ApprovalWidgets();
 
         alert(
@@ -1644,6 +1649,11 @@ async function rejectUnsafeA3Actions() {
             method: "POST"
         });
         const data = await response.json();
+
+        if (!response.ok) {
+            alert(data.message || "Не удалось выполнить массовое отклонение");
+            return;
+        }
 
         refreshA3ApprovalWidgets();
 

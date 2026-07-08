@@ -847,12 +847,14 @@ async function approveSafeWorkflowActions() {
         const response = await fetch("/api/a3/autonomous-actions/approve-safe", {
             method: "POST"
         });
+        const data = await response.json();
 
         if (!response.ok) {
-            throw new Error("approval_safe_actions_failed");
+            const message = data.message || "Не удалось одобрить безопасные действия";
+            setWorkflowActionStatus(message, "error");
+            alert(message);
+            return;
         }
-
-        const data = await response.json();
 
         await loadWorkflowApprovalQueue();
         await loadWorkflowApprovalHistory();
@@ -876,12 +878,14 @@ async function rejectUnsafeWorkflowActions() {
         const response = await fetch("/api/a3/autonomous-actions/reject-unsafe", {
             method: "POST"
         });
+        const data = await response.json();
 
         if (!response.ok) {
-            throw new Error("approval_unsafe_actions_failed");
+            const message = data.message || "Не удалось отклонить небезопасные действия";
+            setWorkflowActionStatus(message, "error");
+            alert(message);
+            return;
         }
-
-        const data = await response.json();
 
         await loadWorkflowApprovalQueue();
         await loadWorkflowApprovalHistory();

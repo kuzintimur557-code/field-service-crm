@@ -534,10 +534,12 @@ async def assert_automation_page():
     assert "Одобрить безопасные" in html
     assert "approveSafeA3Actions" in html
     assert "/api/a3/autonomous-actions/approve-safe" in html
+    assert 'data.message || "Не удалось выполнить массовое подтверждение"' in html
     assert 'data.message || "Не удалось одобрить действие"' in html
     assert "Отклонить небезопасные" in html
     assert "rejectUnsafeA3Actions" in html
     assert "/api/a3/autonomous-actions/reject-unsafe" in html
+    assert 'data.message || "Не удалось выполнить массовое отклонение"' in html
     assert 'data.message || "Не удалось отклонить действие"' in html
     assert "approval_safety_label" in html
     assert "Требует проверки" in html
@@ -16380,12 +16382,12 @@ async def assert_a3_workflow_center():
     assert "approveSafeWorkflowActions" in body
     assert "Одобрить безопасные" in body
     assert "Безопасные действия обработаны" in body
-    assert "approval_safe_actions_failed" in body
+    assert 'data.message || "Не удалось одобрить безопасные действия"' in body
     assert "Не удалось одобрить безопасные действия" in body
     assert "rejectUnsafeWorkflowActions" in body
     assert "Отклонить небезопасные" in body
     assert "Небезопасные действия обработаны" in body
-    assert "approval_unsafe_actions_failed" in body
+    assert 'data.message || "Не удалось отклонить небезопасные действия"' in body
     assert "Не удалось отклонить небезопасные действия" in body
     assert "approval_safety_label" in body
     assert "Требует проверки" in body
