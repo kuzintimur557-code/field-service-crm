@@ -541,6 +541,8 @@ async def assert_automation_page():
     assert "Требует проверки" in html
     assert "autonomous_action: \"ИИ-действие\"" in html
     assert "renderA3ApprovalSummary" in html
+    assert "summary.total_label" in html
+    assert "summary.safe_label" in html
     assert "Можно подтвердить:" in html
     assert "Небезопасные:" in html
     assert "Защищённые:" in html
