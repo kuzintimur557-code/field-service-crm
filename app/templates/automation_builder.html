@@ -176,6 +176,30 @@
             </form>
 
             <form method="post" action="/automation/rules" class="chain">
+                <h2>Заявка завершена</h2>
+                <div class="meta">Когда заявка становится завершённой, владелец получает уведомление.</div>
+                <input type="hidden" name="name" value="Заявка завершена → уведомить владельца">
+                <input type="hidden" name="trigger_key" value="task_status_changed">
+                <input type="hidden" name="condition_mode" value="status_done">
+                <input type="hidden" name="action_key" value="notification">
+                <input type="hidden" name="target_username" value="{{ username }}">
+                <input type="hidden" name="message" value="Заявка завершена. Проверьте отчёт и оплату.">
+                <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
+            </form>
+
+            <form method="post" action="/automation/rules" class="chain">
+                <h2>Оплата поступила</h2>
+                <div class="meta">Когда заявка отмечена как оплаченная, владелец получает уведомление.</div>
+                <input type="hidden" name="name" value="Оплата поступила → уведомить владельца">
+                <input type="hidden" name="trigger_key" value="payment_status_changed">
+                <input type="hidden" name="condition_mode" value="payment_paid">
+                <input type="hidden" name="action_key" value="notification">
+                <input type="hidden" name="target_username" value="{{ username }}">
+                <input type="hidden" name="message" value="Оплата по заявке поступила. Проверьте финансы и зарплату.">
+                <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
+            </form>
+
+            <form method="post" action="/automation/rules" class="chain">
                 <h2>Ежедневная ИИ-сводка</h2>
                 <div class="meta">Каждый день готовить ИИ-сводку по рискам, задачам и деньгам.</div>
                 <input type="hidden" name="name" value="Ежедневная ИИ-сводка владельцу">

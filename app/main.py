@@ -13742,11 +13742,25 @@ async def create_automation_rule(request: Request):
         message = "ИИ-сводка по бизнесу"
 
     quick_condition_presets = {
+        "status_done": {
+            "mode": "status_done",
+            "field": "status",
+            "operator": "equals",
+            "value": "Завершено",
+            "label": "Только завершённые заявки",
+        },
         "worker_unassigned": {
             "mode": "worker_unassigned",
             "field": "workers",
             "operator": "empty",
             "label": "Только задачи без исполнителя",
+        },
+        "payment_paid": {
+            "mode": "payment_paid",
+            "field": "payment_status",
+            "operator": "equals",
+            "value": "Оплачено",
+            "label": "Только оплаченные заявки",
         },
     }
     conditions_json = quick_condition_presets.get(condition_mode, {})

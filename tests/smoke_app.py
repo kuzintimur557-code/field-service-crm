@@ -931,10 +931,16 @@ async def assert_automation_page():
     assert "SLA → уведомление" in builder_html
     assert "Просрочка → Telegram" in builder_html
     assert "Новая заявка без исполнителя" in builder_html
+    assert "Заявка завершена" in builder_html
+    assert "Оплата поступила" in builder_html
     assert "Ежедневная ИИ-сводка" in builder_html
     assert 'name="trigger_key" value="sla_overdue"' in builder_html
     assert 'name="trigger_key" value="new_task"' in builder_html
     assert 'name="condition_mode" value="worker_unassigned"' in builder_html
+    assert 'name="trigger_key" value="task_status_changed"' in builder_html
+    assert 'name="condition_mode" value="status_done"' in builder_html
+    assert 'name="trigger_key" value="payment_status_changed"' in builder_html
+    assert 'name="condition_mode" value="payment_paid"' in builder_html
     assert 'name="action_key" value="telegram_alert"' in builder_html
     assert 'name="action_key" value="ai_digest"' in builder_html
     assert f"/automation/rules/{rule['id']}" in builder_html
