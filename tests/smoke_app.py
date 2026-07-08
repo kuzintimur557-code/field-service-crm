@@ -948,6 +948,18 @@ async def assert_automation_page():
         "task_restored",
         "Заявка восстановлена из архива",
     ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "client_updated",
+        "Клиент обновлён",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "client_note_added",
+        "Заметка клиента добавлена",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "client_file_uploaded",
+        "Файл клиента загружен",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -15340,7 +15352,21 @@ async def assert_client_card(task):
     conn.close()
 
     original_send_message = crm.send_message
+    original_run_automation_event = crm.run_automation_event
+    client_card_events = []
     crm.send_message = lambda text: True
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        client_card_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
 
     try:
         note_response = await crm.add_client_note(
@@ -15351,22 +15377,34 @@ async def assert_client_card(task):
             ),
             task["client_id"],
         )
+
+        upload = crm.UploadFile(
+            file=crm.io.BytesIO(b"client file"),
+            filename="client-contract.txt",
+        )
+        file_response = await crm.upload_client_file(
+            make_request("owner2"),
+            task["client_id"],
+            upload=upload,
+        )
     finally:
         crm.send_message = original_send_message
+        crm.run_automation_event = original_run_automation_event
 
     assert note_response.status_code == 302
-
-    upload = crm.UploadFile(
-        file=crm.io.BytesIO(b"client file"),
-        filename="client-contract.txt",
-    )
-    file_response = await crm.upload_client_file(
-        make_request("owner2"),
-        task["client_id"],
-        upload=upload,
-    )
     assert file_response.status_code == 302
     assert file_response.headers["location"] == f"/clients/{task['client_id']}?file_uploaded=1"
+    assert [event["trigger_key"] for event in client_card_events] == [
+        "client_note_added",
+        "client_file_uploaded",
+    ]
+    assert all(event["company_id"] == 2 for event in client_card_events)
+    assert all(event["entity_type"] == "client" for event in client_card_events)
+    assert all(event["entity_id"] == task["client_id"] for event in client_card_events)
+    assert client_card_events[0]["link"] == f"/clients/{task['client_id']}"
+    assert client_card_events[1]["message"] == (
+        "Загружен файл клиента: client-contract.txt"
+    )
 
     response = await crm.client_detail(
         make_asgi_request("owner2", f"/clients/{task['client_id']}"),
@@ -16620,7 +16658,21 @@ async def assert_client_custom_fields():
     assert "Beauty" in detail_html
 
     original_send_message = crm.send_message
+    original_run_automation_event = crm.run_automation_event
+    client_update_events = []
     crm.send_message = lambda text: True
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        client_update_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
 
     try:
         edit_response = await crm.edit_client(
@@ -16640,8 +16692,18 @@ async def assert_client_custom_fields():
         )
     finally:
         crm.send_message = original_send_message
+        crm.run_automation_event = original_run_automation_event
     assert edit_response.status_code == 302
     assert edit_response.headers["location"] == f"/clients/{value['client_id']}?updated=1"
+    assert len(client_update_events) == 1
+    assert client_update_events[0]["company_id"] == 2
+    assert client_update_events[0]["trigger_key"] == "client_updated"
+    assert client_update_events[0]["entity_type"] == "client"
+    assert client_update_events[0]["entity_id"] == value["client_id"]
+    assert client_update_events[0]["message"] == (
+        "Обновлена карточка клиента: Custom Field Client Company"
+    )
+    assert client_update_events[0]["link"] == f"/clients/{value['client_id']}"
 
     conn = connect()
     c = conn.cursor()

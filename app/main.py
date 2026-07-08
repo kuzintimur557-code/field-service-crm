@@ -320,6 +320,9 @@ AUTOMATION_TRIGGERS = [
     ("unpaid_task", "Нет оплаты"),
     ("worker_overload", "Перегрузка сотрудника"),
     ("new_client", "Новый клиент"),
+    ("client_updated", "Клиент обновлён"),
+    ("client_note_added", "Заметка клиента добавлена"),
+    ("client_file_uploaded", "Файл клиента загружен"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -28306,6 +28309,15 @@ async def add_client_note(request: Request, client_id: int):
     except Exception:
         pass
 
+    run_automation_event(
+        company_id,
+        "client_note_added",
+        "client",
+        client_id,
+        f"Добавлена заметка по клиенту: {client['name']}",
+        f"/clients/{client_id}",
+    )
+
     return RedirectResponse(f"/clients/{client_id}?note_created=1", status_code=302)
 
 
@@ -28375,6 +28387,15 @@ async def upload_client_file(
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "client_file_uploaded",
+        "client",
+        client_id,
+        f"Загружен файл клиента: {original_filename}",
+        f"/clients/{client_id}",
+    )
 
     return RedirectResponse(f"/clients/{client_id}?file_uploaded=1", status_code=302)
 
@@ -28622,6 +28643,15 @@ async def edit_client(request: Request, client_id: int):
         )
     except Exception:
         pass
+
+    run_automation_event(
+        company_id,
+        "client_updated",
+        "client",
+        client_id,
+        f"Обновлена карточка клиента: {name}",
+        f"/clients/{client_id}",
+    )
 
     return RedirectResponse(f"/clients/{client_id}?updated=1", status_code=302)
 
