@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Заявки сегодня</title>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+<title>{{ task_label }}: сегодня</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -30,7 +33,7 @@ h1{margin:0 0 8px;font-size:34px;line-height:1.12}
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
-<h1>Заявки сегодня</h1>
+<h1>{{ task_label }}: сегодня</h1>
 <div class="meta">Дата: {{ today }}</div>
 </div>
 
@@ -38,14 +41,14 @@ h1{margin:0 0 8px;font-size:34px;line-height:1.12}
 {% if tasks %}
 {% for task in tasks %}
 <div class="task">
-    <div class="title">#{{ task["id"] }} — {{ task["client"] }}</div>
+    <div class="title">#{{ task["id"] }} — {{ task["client"] or client_label ~ " не указан" }}</div>
     <div class="badge">{{ task["status"] }}</div>
     <div class="info">
         Время: {{ task["task_date"] }}<br>
         Адрес: {{ task["address"] }}<br>
-        Исполнитель: {{ task["workers"] or task["worker"] }}
+        {{ worker_label }}: {{ task["workers"] or task["worker"] or "не назначен" }}
     </div>
-    <a class="btn" href="/task/{{ task['id'] }}">Открыть заявку</a>
+    <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
 
     <form method="post" action="/task/{{ task['id'] }}/date" style="margin-top:12px">
         <div style="font-weight:900;margin-bottom:8px">Быстро перенести</div>
@@ -55,7 +58,7 @@ h1{margin:0 0 8px;font-size:34px;line-height:1.12}
 </div>
 {% endfor %}
 {% else %}
-<div class="meta">На сегодня заявок нет</div>
+<div class="meta">На сегодня задач нет</div>
 {% endif %}
 </div>
 

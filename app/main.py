@@ -16538,6 +16538,7 @@ async def today_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
     today = datetime.now().strftime("%Y-%m-%d")
 
     conn = connect()
@@ -16562,7 +16563,8 @@ async def today_page(request: Request):
             "username": username,
             "role": role,
             "tasks": tasks,
-            "today": today
+            "today": today,
+            "settings": settings
         }
     )
 
@@ -16581,6 +16583,7 @@ async def overdue_page(request: Request):
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
     today_date = datetime.now().date()
     today = today_date.strftime("%Y-%m-%d")
 
@@ -16619,7 +16622,8 @@ async def overdue_page(request: Request):
             "username": username,
             "role": role,
             "tasks": tasks,
-            "entries": entries
+            "entries": entries,
+            "settings": settings
         }
     )
 

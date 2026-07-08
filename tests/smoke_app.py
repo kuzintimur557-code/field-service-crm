@@ -17343,12 +17343,14 @@ async def assert_overdue_sla(task):
     assert response.status_code == 200
     html = response.body.decode("utf-8")
     assert "Нарушен SLA" in html
+    assert "Заявка: просроченные" in html
     assert f"#{task['id']}" in html
     assert "Создать напоминания по просрочкам" in html
     assert 'href="/automation"' in html
     assert 'class="mobile-nav"' in html
     assert ".container{padding:16px 14px 92px}" in html
     assert "⏰ Просроченные заявки" not in html
+    assert "Просроченные заявки" not in html
     assert "📅 Дата:" not in html
     assert "📍 Адрес:" not in html
     assert "👷 Исполнитель:" not in html
@@ -17368,11 +17370,13 @@ async def assert_overdue_sla(task):
     today_response = await crm.today_page(make_asgi_request("owner2", "/today"))
     assert today_response.status_code == 200
     today_html = today_response.body.decode("utf-8")
-    assert "Заявки сегодня" in today_html
+    assert "Заявка: сегодня" in today_html
     assert f"#{task['id']}" in today_html
-    assert "Открыть заявку" in today_html
+    assert "Открыть" in today_html
+    assert "Открыть заявку" not in today_html
     assert 'class="mobile-nav"' in today_html
     assert ".container{padding:16px 14px 92px}" in today_html
+    assert "Заявки сегодня" not in today_html
     assert "📅 Заявки сегодня" not in today_html
     assert "⏰ Время:" not in today_html
     assert "📍 Адрес:" not in today_html

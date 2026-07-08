@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Просроченные заявки</title>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+<title>{{ task_label }}: просроченные</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -32,8 +35,8 @@ button{min-height:44px}
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
-<h1>Просроченные заявки</h1>
-<div class="meta">Заявки, которые не завершены и дата уже прошла</div>
+<h1>{{ task_label }}: просроченные</h1>
+<div class="meta">Не завершены, а дата уже прошла</div>
 
 {% if request.query_params.get("reminders") == "1" %}
 <div style="margin-top:14px;padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900">
@@ -55,7 +58,7 @@ button{min-height:44px}
 {% for entry in entries %}
 {% set task = entry["task"] %}
 <div class="task">
-    <div class="title">#{{ task["id"] }} — {{ task["client"] }}</div>
+    <div class="title">#{{ task["id"] }} — {{ task["client"] or client_label ~ " не указан" }}</div>
     <div class="badge">{{ task["status"] }}</div>
     <div class="badge {% if entry['sla_status'] == 'Нарушен SLA' %}sla{% endif %}">
         {{ entry["sla_status"] }} · {{ entry["overdue_days"] }} дн.
@@ -63,9 +66,9 @@ button{min-height:44px}
     <div class="info">
         Дата: {{ task["task_date"] }}<br>
         Адрес: {{ task["address"] }}<br>
-        Исполнитель: {{ task["workers"] or task["worker"] }}
+        {{ worker_label }}: {{ task["workers"] or task["worker"] or "не назначен" }}
     </div>
-    <a class="btn" href="/task/{{ task['id'] }}">Открыть заявку</a>
+    <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
 
     <form method="post" action="/task/{{ task['id'] }}/date" style="margin-top:12px">
         <div style="font-weight:900;margin-bottom:8px">Быстро перенести</div>
@@ -75,7 +78,7 @@ button{min-height:44px}
 </div>
 {% endfor %}
 {% else %}
-<div class="meta">Просроченных заявок нет</div>
+<div class="meta">Просроченных задач нет</div>
 {% endif %}
 </div>
 
