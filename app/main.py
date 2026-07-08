@@ -310,6 +310,7 @@ AUTOMATION_TRIGGERS = [
     ("new_task", "Новая заявка"),
     ("task_status_changed", "Статус заявки изменён"),
     ("task_schedule_changed", "Расписание заявки изменено"),
+    ("payment_status_changed", "Статус оплаты изменён"),
     ("overdue_task", "Просрочена задача"),
     ("sla_overdue", "Просрочен SLA"),
     ("unpaid_task", "Нет оплаты"),
@@ -33487,6 +33488,7 @@ async def update_payment_status(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    company_id = get_task_company_id(task)
     old_status = task["payment_status"] if "payment_status" in task.keys() else "Не оплачено"
 
     c.execute("""
@@ -33508,6 +33510,16 @@ async def update_payment_status(request: Request, task_id: int):
         )
     except Exception:
         pass
+
+    if old_status != new_status:
+        run_automation_event(
+            company_id,
+            "payment_status_changed",
+            "task",
+            task_id,
+            f"Статус оплаты заявки #{task_id}: {old_status} → {new_status}",
+            f"/task/{task_id}",
+        )
 
     try:
         send_message(

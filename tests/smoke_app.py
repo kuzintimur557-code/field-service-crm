@@ -14741,6 +14741,53 @@ async def assert_finance_margin(task):
     assert "Не выплачено" in export_csv
     assert "worker2, helper2" in export_csv
 
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Оплата заявки smoke",
+        "payment_status_changed",
+        json.dumps({
+            "mode": "payment_paid",
+            "field": "payment_status",
+            "operator": "equals",
+            "value": "Оплачено",
+            "label": "Только оплаченные заявки",
+        }, ensure_ascii=False),
+        1,
+        "owner2",
+        now,
+        now,
+    ))
+    payment_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        payment_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Payment changed trigger matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        now,
+    ))
+    conn.commit()
+    conn.close()
+
     original_send_message = crm.send_message
     crm.send_message = lambda text: True
 
@@ -14758,6 +14805,38 @@ async def assert_finance_margin(task):
 
     assert payment_response.status_code == 302
     assert payment_response.headers["location"] == f"/task/{task['id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    payment_change_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='payment_status_changed'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (payment_rule_id, task["id"])).fetchone()
+    payment_change_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Оплата заявки smoke'
+      AND message='Payment changed trigger matched'
+    ORDER BY id DESC
+    """).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (payment_rule_id,))
+    c.execute("DELETE FROM notifications WHERE title='Оплата заявки smoke'")
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (payment_rule_id,))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (payment_rule_id,))
+    conn.commit()
+    conn.close()
+
+    assert payment_change_event is not None
+    assert payment_change_event["status"] == "done"
+    assert payment_change_notification is not None
 
     task_response = await crm.task_detail(
         make_asgi_request("owner2", f"/task/{task['id']}"),
