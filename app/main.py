@@ -29326,6 +29326,8 @@ async def archive_page(request: Request):
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -29345,7 +29347,8 @@ async def archive_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "tasks": tasks
+            "tasks": tasks,
+            "settings": settings
         }
     )
 

@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Архив заявок</title>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+<title>Архив</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -39,7 +42,7 @@ h1{font-size:28px;margin-bottom:12px}
 
 <div class="header">
     <div>
-        <h1>🗄 Архив заявок</h1>
+        <h1>Архив</h1>
         <div style="color:#6b7280;font-weight:800;margin-top:6px">
             Вы вошли как: {{ username }} / {{ role_label(role) }}
         </div>
@@ -52,8 +55,8 @@ h1{font-size:28px;margin-bottom:12px}
 <div class="card">
     <div class="row">
         <div>
-            <div class="label">Клиент</div>
-            <div class="value">{{ task["client"] }}</div>
+            <div class="label">{{ client_label }}</div>
+            <div class="value">{{ task["client"] or client_label ~ " не указан" }}</div>
         </div>
 
         <div>
@@ -62,8 +65,8 @@ h1{font-size:28px;margin-bottom:12px}
         </div>
 
         <div>
-            <div class="label">Исполнитель</div>
-            <div class="value">{{ task["worker"] }}</div>
+            <div class="label">{{ worker_label }}</div>
+            <div class="value">{{ task["workers"] or task["worker"] or "не назначен" }}</div>
         </div>
 
         <div>
@@ -73,7 +76,7 @@ h1{font-size:28px;margin-bottom:12px}
 
         <div class="actions">
             <a class="btn" href="/task/{{ task['id'] }}">Открыть</a>
-            <form method="post" action="/task/{{ task['id'] }}/unarchive" onsubmit="return confirm('Восстановить заявку #{{ task['id'] }} из архива?')">
+            <form method="post" action="/task/{{ task['id'] }}/unarchive" onsubmit="return confirm('Восстановить: {{ task_label|lower }} #{{ task['id'] }}?')">
                 <button class="restore" type="submit">Восстановить</button>
             </form>
         </div>

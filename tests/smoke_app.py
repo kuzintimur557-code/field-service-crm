@@ -14085,8 +14085,11 @@ async def assert_archive_restore(task):
     archive_response = await crm.archive_page(make_asgi_request("owner2", "/archive"))
     assert archive_response.status_code == 200
     archive_html = archive_response.body.decode("utf-8")
+    assert "<h1>Архив</h1>" in archive_html
     assert f"/task/{task['id']}/unarchive" in archive_html
     assert "Восстановить" in archive_html
+    assert "🗄 Архив заявок" not in archive_html
+    assert "Восстановить заявку" not in archive_html
 
     detail_response = await crm.task_detail(
         make_asgi_request("owner2", f"/task/{task['id']}"),
