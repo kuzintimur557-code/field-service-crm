@@ -5887,6 +5887,75 @@ async def assert_calls_page():
         assert "Перезвонить завтра по оплате" in history_html
         assert "Нужен контакт" in history_html
         assert f'/clients/{client_id}' in history_html
+
+        client_page_response = await crm.client_detail(
+            make_asgi_request("owner2", f"/clients/{client_id}"),
+            client_id,
+        )
+        assert client_page_response.status_code == 200
+        client_page_html = client_page_response.body.decode("utf-8")
+        assert f'action="/clients/{client_id}/calls"' in client_page_html
+        assert "Сохранить звонок" in client_page_html
+        assert "Открыть все звонки" in client_page_html
+
+        outsider_client_call_response = await crm.add_client_call(
+            make_form_request(
+                "owner2",
+                f"/clients/{outsider_client_id}/calls",
+                {"summary": "Should not attach"},
+            ),
+            outsider_client_id,
+        )
+        assert outsider_client_call_response.status_code == 302
+        assert outsider_client_call_response.headers["location"] == "/clients"
+
+        quick_call_response = await crm.add_client_call(
+            make_form_request(
+                "owner2",
+                f"/clients/{client_id}/calls",
+                {
+                    "direction": "outgoing",
+                    "status": "missed",
+                    "phone": "",
+                    "summary": "Quick client card call",
+                    "duration_minutes": "3",
+                    "call_at": "2026-06-14T11:15",
+                },
+            ),
+            client_id,
+        )
+        assert quick_call_response.status_code == 302
+        assert quick_call_response.headers["location"] == f"/clients/{client_id}?call_created=1"
+
+        conn = connect()
+        c = conn.cursor()
+        quick_call = c.execute("""
+        SELECT *
+        FROM call_records
+        WHERE company_id=2
+          AND client_id=?
+          AND summary='Quick client card call'
+        ORDER BY id DESC
+        """, (client_id,)).fetchone()
+        conn.close()
+
+        assert quick_call is not None
+        assert quick_call["username"] == "owner2"
+        assert quick_call["direction"] == "outgoing"
+        assert quick_call["status"] == "missed"
+        assert quick_call["phone"] == "+7 900 111-22-33"
+        assert quick_call["duration_minutes"] == 3
+        assert quick_call["call_at"] == "2026-06-14 11:15"
+
+        quick_detail_response = await crm.client_detail(
+            make_asgi_request("owner2", f"/clients/{client_id}", "call_created=1"),
+            client_id,
+        )
+        assert quick_detail_response.status_code == 200
+        quick_detail_html = quick_detail_response.body.decode("utf-8")
+        assert "Звонок добавлен" in quick_detail_html
+        assert "Quick client card call" in quick_detail_html
+        assert "Пропущен" in quick_detail_html
     finally:
         conn = connect()
         c = conn.cursor()

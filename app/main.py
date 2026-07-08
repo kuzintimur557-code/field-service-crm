@@ -28941,6 +28941,110 @@ async def client_detail(
     )
 
 
+@app.post("/clients/{client_id}/calls")
+async def add_client_call(request: Request, client_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
+    disabled_response = require_feature(company_id, "calls")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    if not settings or not settings["calls_enabled"]:
+        return RedirectResponse(f"/clients/{client_id}?call_error=disabled", status_code=302)
+
+    form = await request.form()
+    phone = str(form.get("phone") or "").strip()[:80]
+    summary = str(form.get("summary") or "").strip()[:1000]
+    direction = str(form.get("direction") or "outgoing").strip()
+    status = str(form.get("status") or "completed").strip()
+    call_at = str(form.get("call_at") or "").strip().replace("T", " ")
+
+    if direction not in ("incoming", "outgoing"):
+        direction = "outgoing"
+
+    if status not in ("completed", "missed", "follow_up"):
+        status = "completed"
+
+    try:
+        duration_minutes = int(str(form.get("duration_minutes") or "0"))
+    except ValueError:
+        duration_minutes = 0
+
+    duration_minutes = max(0, min(duration_minutes, 1440))
+
+    conn = connect()
+    c = conn.cursor()
+
+    client = c.execute("""
+    SELECT id, phone
+    FROM clients
+    WHERE id=? AND company_id=?
+    """, (client_id, company_id)).fetchone()
+
+    if not client:
+        conn.close()
+        return RedirectResponse("/clients", status_code=302)
+
+    if not phone:
+        phone = str(client["phone"] or "").strip()[:80]
+
+    if not call_at:
+        call_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    if not phone and not summary:
+        conn.close()
+        return RedirectResponse(f"/clients/{client_id}?call_error=empty", status_code=302)
+
+    c.execute("""
+    INSERT INTO call_records (
+        company_id,
+        client_id,
+        username,
+        direction,
+        status,
+        phone,
+        summary,
+        call_at,
+        duration_minutes,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        client_id,
+        username,
+        direction,
+        status,
+        phone,
+        summary,
+        call_at,
+        duration_minutes,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/clients/{client_id}?call_created=1", status_code=302)
+
+
 @app.post("/clients/{client_id}/notes")
 async def add_client_note(request: Request, client_id: int):
 

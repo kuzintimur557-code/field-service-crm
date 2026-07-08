@@ -382,7 +382,56 @@ h1{font-size:28px}
 {% set call_direction_labels = {"incoming": "Входящий", "outgoing": "Исходящий"} %}
 {% set call_status_labels = {"completed": "Состоялся", "missed": "Пропущен", "follow_up": "Нужен контакт"} %}
 
+{% if request.query_params.get("call_created") == "1" %}
+<div class="notice ok">Звонок добавлен</div>
+{% endif %}
+
+{% if request.query_params.get("call_error") == "empty" %}
+<div class="notice err">Укажите телефон или заметку по звонку</div>
+{% endif %}
+
+{% if request.query_params.get("call_error") == "disabled" %}
+<div class="notice err">Модуль звонков отключён</div>
+{% endif %}
+
 <div class="task-count">Звонков: {{ client_calls|length }} из {{ client_call_count }}</div>
+
+{% if client_calls_enabled %}
+<form method="post" action="/clients/{{ client['id'] }}/calls">
+    <div class="grid">
+        <div>
+            <label>Направление</label>
+            <select name="direction">
+                <option value="outgoing">Исходящий</option>
+                <option value="incoming">Входящий</option>
+            </select>
+        </div>
+        <div>
+            <label>Статус</label>
+            <select name="status">
+                <option value="completed">Состоялся</option>
+                <option value="missed">Пропущен</option>
+                <option value="follow_up">Нужен контакт</option>
+            </select>
+        </div>
+    </div>
+    <div class="grid">
+        <div>
+            <label>Телефон</label>
+            <input type="text" name="phone" value="{{ client['phone'] or '' }}" placeholder="+7 900 000-00-00">
+        </div>
+        <div>
+            <label>Дата и время</label>
+            <input type="datetime-local" name="call_at" value="{{ client_now_value }}">
+        </div>
+    </div>
+    <label>Длительность, минут</label>
+    <input type="number" name="duration_minutes" min="0" max="1440" value="0">
+    <label>Заметка по звонку</label>
+    <textarea name="summary" placeholder="Например: клиент попросил перезвонить завтра"></textarea>
+    <button type="submit">Сохранить звонок</button>
+</form>
+{% endif %}
 
 {% if client_calls %}
 {% for call in client_calls %}
@@ -406,7 +455,7 @@ h1{font-size:28px}
 
 {% if client_calls_enabled %}
 <div style="margin-top:12px">
-    <a class="btn" href="/calls">Добавить звонок</a>
+    <a class="btn" href="/calls">Открыть все звонки</a>
 </div>
 {% endif %}
 </div>
