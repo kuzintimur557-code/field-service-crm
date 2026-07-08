@@ -1001,6 +1001,10 @@ async def assert_automation_page():
         "custom_field_toggled",
         "Поле компании включено или выключено",
     ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "task_custom_field_updated",
+        "Значение поля заявки изменено",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -17281,19 +17285,46 @@ async def assert_task_custom_fields():
     assert "Gate code" in detail_html
     assert "Не заполнено" in detail_html
 
-    edit_response = await crm.update_task_custom_field(
-        make_form_request(
-            "owner2",
-            f"/task/{value['task_id']}/custom-field",
-            {
-                "field_id": str(field_id),
-                "value": "Moscow - Kazan",
-            },
-        ),
-        value["task_id"],
+    original_run_automation_event = crm.run_automation_event
+    task_custom_field_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        task_custom_field_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        edit_response = await crm.update_task_custom_field(
+            make_form_request(
+                "owner2",
+                f"/task/{value['task_id']}/custom-field",
+                {
+                    "field_id": str(field_id),
+                    "value": "Moscow - Kazan",
+                },
+            ),
+            value["task_id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert edit_response.status_code == 302
     assert edit_response.headers["location"] == f"/task/{value['task_id']}"
+    assert task_custom_field_events == [{
+        "company_id": 2,
+        "trigger_key": "task_custom_field_updated",
+        "entity_type": "task",
+        "entity_id": value["task_id"],
+        "message": "Поле заявки изменено: Route — Moscow - Kazan",
+        "link": f"/task/{value['task_id']}",
+    }]
 
     conn = connect()
     c = conn.cursor()

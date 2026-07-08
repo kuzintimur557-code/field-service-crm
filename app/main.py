@@ -331,6 +331,7 @@ AUTOMATION_TRIGGERS = [
     ("custom_field_created", "Поле компании создано"),
     ("custom_field_ordered", "Порядок поля компании изменён"),
     ("custom_field_toggled", "Поле компании включено или выключено"),
+    ("task_custom_field_updated", "Значение поля заявки изменено"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -367,6 +368,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "custom_field_created",
         "custom_field_ordered",
         "custom_field_toggled",
+        "task_custom_field_updated",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -34549,6 +34551,18 @@ async def update_task_custom_field(request: Request, task_id: int):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "task_custom_field_updated",
+        "task",
+        task_id,
+        (
+            f"Поле заявки изменено: {custom_field['label']} — "
+            f"{value or 'очищено'}"
+        ),
+        f"/task/{task_id}",
+    )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
