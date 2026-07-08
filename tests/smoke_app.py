@@ -4913,6 +4913,7 @@ async def assert_settings_page():
     assert "Тарифы" in html
     assert "Поля компании" in html
     assert "Сохранить настройки" in html
+    assert "Реквизиты, банк, получатель..." in html
     assert "status-on" in html
     assert "status-off" in html
     assert 'class="mobile-nav"' in html
@@ -4921,6 +4922,7 @@ async def assert_settings_page():
     assert "🧪 Диагностика" not in html
     assert "💳 Тарифы" not in html
     assert "🧩 Поля компании" not in html
+    assert "IBAN, банк, получатель..." not in html
     assert "✅" not in html
     assert "❌" not in html
     assert "💾 Сохранить настройки" not in html
