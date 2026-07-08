@@ -5913,6 +5913,7 @@ async def assert_calls_page():
         assert "Нужен контакт" in history_html
         assert f'/clients/{client_id}' in history_html
         assert f'href="/calls/{call["id"]}"' in history_html
+        assert f'action="/calls/{call["id"]}/complete"' in history_html
 
         dashboard_response = await crm.home(make_asgi_request("owner2", "/"))
         assert dashboard_response.status_code == 200
@@ -5934,6 +5935,7 @@ async def assert_calls_page():
         assert "Перезвонить завтра по оплате" in call_detail_html
         assert "Нужен контакт" in call_detail_html
         assert f"/create-task?client_id={client_id}&call_id={call['id']}&return_to=client" in call_detail_html
+        assert f'action="/calls/{call["id"]}/complete"' in call_detail_html
         assert f'action="/calls/{call["id"]}/analysis"' in call_detail_html
         assert "Сохранить анализ" in call_detail_html
         assert f'action="/calls/{call["id"]}/audio"' in call_detail_html
@@ -6212,6 +6214,34 @@ async def assert_calls_page():
         assert "Smoke call transcript" in export_csv
         assert "Smoke AI call summary" in export_csv
         assert "Calls Outsider Client" not in export_csv
+
+        complete_call_response = await crm.complete_call_follow_up(
+            make_request("owner2"),
+            call["id"],
+        )
+        assert complete_call_response.status_code == 302
+        assert complete_call_response.headers["location"] == f"/calls/{call['id']}?completed=1"
+
+        completed_call_detail_response = await crm.call_detail(
+            make_asgi_request("owner2", f"/calls/{call['id']}", "completed=1"),
+            call["id"],
+        )
+        assert completed_call_detail_response.status_code == 200
+        completed_call_html = completed_call_detail_response.body.decode("utf-8")
+        assert "Контакт закрыт." in completed_call_html
+        assert "Состоялся" in completed_call_html
+        assert f'action="/calls/{call["id"]}/complete"' not in completed_call_html
+
+        conn = connect()
+        c = conn.cursor()
+        completed_call = c.execute("""
+        SELECT status
+        FROM call_records
+        WHERE id=? AND company_id=2
+        """, (call["id"],)).fetchone()
+        conn.close()
+
+        assert completed_call["status"] == "completed"
 
         client_page_response = await crm.client_detail(
             make_asgi_request("owner2", f"/clients/{client_id}"),

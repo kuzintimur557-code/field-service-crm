@@ -59,6 +59,10 @@ h1{font-size:28px}
 <div class="notice ok">Карточка звонка обновлена</div>
 {% endif %}
 
+{% if request.query_params.get("completed") == "1" %}
+<div class="notice ok">Контакт закрыт.</div>
+{% endif %}
+
 {% if request.query_params.get("audio_uploaded") == "1" %}
 <div class="notice ok">Аудио звонка загружено</div>
 {% endif %}
@@ -68,6 +72,11 @@ h1{font-size:28px}
     {% if call["client_id"] and call["client_name"] %}
     <a class="btn" style="background:#111827" href="/clients/{{ call['client_id'] }}">Открыть: {{ client_label }}</a>
     <a class="btn" href="/create-task?client_id={{ call['client_id'] }}&call_id={{ call['id'] }}&return_to=client">Создать заявку</a>
+    {% endif %}
+    {% if call["status"] == "follow_up" %}
+    <form method="post" action="/calls/{{ call['id'] }}/complete" style="margin:0">
+        <button type="submit" style="background:#16a34a;margin-top:0">Контакт закрыт</button>
+    </form>
     {% endif %}
 </div>
 </div>
