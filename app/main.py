@@ -2946,6 +2946,10 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         if status in ("завершено", "done", "completed"):
             return True, ""
 
+    elif mode == "status_cancelled":
+        if status in ("отменено", "cancelled", "canceled"):
+            return True, ""
+
     elif mode == "payment_unpaid":
         if payment_status in ("не оплачено", "unpaid", "not_paid"):
             return True, ""
@@ -12700,6 +12704,7 @@ async def automation_builder_page(request: Request):
         ("status_new", "Только новые заявки"),
         ("status_in_progress", "Только заявки в работе"),
         ("status_done", "Только завершённые заявки"),
+        ("status_cancelled", "Только отменённые заявки"),
         ("payment_unpaid", "Только неоплаченные заявки"),
         ("payment_partial", "Только частично оплаченные заявки"),
         ("payment_paid", "Только оплаченные заявки"),
@@ -12723,14 +12728,14 @@ async def automation_builder_page(request: Request):
     ]
     condition_groups = [
         ("Базовые", condition_presets[:4]),
-        ("Статус заявки", condition_presets[4:7]),
-        ("Оплата", condition_presets[7:10]),
-        ("Исполнители", condition_presets[10:12]),
-        ("Дата", condition_presets[12:15]),
-        ("Цена", condition_presets[15:17]),
-        ("Каталог", condition_presets[17:18]),
-        ("SLA", condition_presets[18:21]),
-        ("Клиенты", condition_presets[21:]),
+        ("Статус заявки", condition_presets[4:8]),
+        ("Оплата", condition_presets[8:11]),
+        ("Исполнители", condition_presets[11:13]),
+        ("Дата", condition_presets[13:16]),
+        ("Цена", condition_presets[16:18]),
+        ("Каталог", condition_presets[18:19]),
+        ("SLA", condition_presets[19:22]),
+        ("Клиенты", condition_presets[22:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -14192,6 +14197,13 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "operator": "equals",
             "value": "Завершено",
             "label": "Только завершённые заявки",
+        },
+        "status_cancelled": {
+            "mode": "status_cancelled",
+            "field": "status",
+            "operator": "equals",
+            "value": "Отменено",
+            "label": "Только отменённые заявки",
         },
         "payment_unpaid": {
             "mode": "payment_unpaid",

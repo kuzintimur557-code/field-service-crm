@@ -889,6 +889,7 @@ async def assert_automation_page():
     assert "Только высокий приоритет" in builder_html
     assert "Только неоплаченные заявки" in builder_html
     assert "Только заявки в работе" in builder_html
+    assert "Только отменённые заявки" in builder_html
     assert "Только задачи с исполнителем" in builder_html
     assert "Только задачи на сегодня" in builder_html
     assert "Только просроченные задачи" in builder_html
@@ -3311,6 +3312,28 @@ async def assert_automation_runner(task):
     assert crm.automation_condition_matches(
         c, 2, task_text_rule, "task", task["id"]
     )[0] is False
+
+    c.execute("""
+    UPDATE tasks
+    SET status='Отменено'
+    WHERE id=?
+    """, (task["id"],))
+    conn.commit()
+    cancelled_status_rule = {
+        "conditions_json": json.dumps({
+            "mode": "status_cancelled",
+            "label": "Только отменённые заявки",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, cancelled_status_rule, "task", task["id"]
+    )[0] is True
+    c.execute("""
+    UPDATE tasks
+    SET status='Новая'
+    WHERE id=?
+    """, (task["id"],))
+    conn.commit()
 
     specific_client_rule = {
         "conditions_json": json.dumps({

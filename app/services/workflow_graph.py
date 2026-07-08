@@ -46,6 +46,7 @@ def _condition_summary(conditions_json):
         "status_new": "Только новые заявки",
         "status_in_progress": "Только заявки в работе",
         "status_done": "Только завершённые заявки",
+        "status_cancelled": "Только отменённые заявки",
         "payment_unpaid": "Только неоплаченные заявки",
         "payment_partial": "Только частично оплаченные заявки",
         "payment_paid": "Только оплаченные заявки",
