@@ -340,6 +340,8 @@ AUTOMATION_TRIGGERS = [
     ("client_file_uploaded", "Файл клиента загружен"),
     ("client_file_deleted", "Файл клиента удалён"),
     ("client_custom_field_updated", "Значение поля клиента изменено"),
+    ("call_follow_up_created", "Нужен контакт по звонку"),
+    ("call_follow_up_completed", "Контакт по звонку закрыт"),
     ("catalog_item_created", "Позиция каталога создана"),
     ("catalog_item_toggled", "Позиция каталога включена или выключена"),
     ("custom_field_created", "Поле компании создано"),
@@ -398,6 +400,10 @@ AUTOMATION_TRIGGER_GROUPS = [
         "client_file_uploaded",
         "client_file_deleted",
         "client_custom_field_updated",
+    )),
+    ("Звонки", (
+        "call_follow_up_created",
+        "call_follow_up_completed",
     )),
     ("Каталог", (
         "catalog_item_created",
@@ -27465,6 +27471,15 @@ async def complete_call_follow_up(request: Request, call_id: int):
     conn.commit()
     conn.close()
 
+    run_automation_event(
+        company_id,
+        "call_follow_up_completed",
+        "call",
+        call_id,
+        f"Контакт по звонку #{call_id} закрыт",
+        f"/calls/{call_id}",
+    )
+
     return RedirectResponse(f"/calls/{call_id}?completed=1", status_code=302)
 
 
@@ -27713,6 +27728,14 @@ async def create_call_record(request: Request):
             summary,
             phone,
             call_id,
+        )
+        run_automation_event(
+            company_id,
+            "call_follow_up_created",
+            "call",
+            call_id,
+            f"Нужен контакт по звонку #{call_id}: {summary or phone}",
+            f"/calls/{call_id}",
         )
 
     return RedirectResponse("/calls?created=1", status_code=302)
@@ -29726,6 +29749,14 @@ async def add_client_call(request: Request, client_id: int):
             summary,
             phone,
             call_id,
+        )
+        run_automation_event(
+            company_id,
+            "call_follow_up_created",
+            "call",
+            call_id,
+            f"Нужен контакт по звонку #{call_id}: {summary or phone}",
+            f"/calls/{call_id}",
         )
 
     return RedirectResponse(f"/clients/{client_id}?call_created=1", status_code=302)

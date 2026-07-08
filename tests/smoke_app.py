@@ -1099,6 +1099,15 @@ async def assert_automation_page():
         "Значение поля клиента изменено",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "call_follow_up_created",
+        "Нужен контакт по звонку",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "call_follow_up_completed",
+        "Контакт по звонку закрыт",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert 'optgroup label="Звонки"' in html
+    assert (
         "catalog_item_created",
         "Позиция каталога создана",
     ) in crm.AUTOMATION_TRIGGERS
@@ -5926,21 +5935,40 @@ async def assert_calls_page():
         assert outsider_response.status_code == 302
         assert outsider_response.headers["location"] == "/calls?error=client"
 
-        create_response = await crm.create_call_record(
-            make_form_request(
-                "owner2",
-                "/calls",
-                {
-                    "client_id": str(client_id),
-                    "direction": "incoming",
-                    "status": "follow_up",
-                    "phone": "",
-                    "summary": "Перезвонить завтра по оплате",
-                    "duration_minutes": "7",
-                    "call_at": "2026-06-14T10:30",
-                },
-            )
+        original_run_automation_event = crm.run_automation_event
+        call_follow_up_events = []
+        crm.run_automation_event = (
+            lambda company_id, trigger_key, entity_type="", entity_id=None,
+            message="", link="":
+            call_follow_up_events.append({
+                "company_id": company_id,
+                "trigger_key": trigger_key,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "message": message,
+                "link": link,
+            }) or 1
         )
+
+        try:
+            create_response = await crm.create_call_record(
+                make_form_request(
+                    "owner2",
+                    "/calls",
+                    {
+                        "client_id": str(client_id),
+                        "direction": "incoming",
+                        "status": "follow_up",
+                        "phone": "",
+                        "summary": "Перезвонить завтра по оплате",
+                        "duration_minutes": "7",
+                        "call_at": "2026-06-14T10:30",
+                    },
+                )
+            )
+        finally:
+            crm.run_automation_event = original_run_automation_event
+
         assert create_response.status_code == 302
         assert create_response.headers["location"] == "/calls?created=1"
 
@@ -5978,6 +6006,14 @@ async def assert_calls_page():
         assert call["summary"] == "Перезвонить завтра по оплате"
         assert call["duration_minutes"] == 7
         assert call["call_at"] == "2026-06-14 10:30"
+        assert call_follow_up_events == [{
+            "company_id": 2,
+            "trigger_key": "call_follow_up_created",
+            "entity_type": "call",
+            "entity_id": call["id"],
+            "message": f"Нужен контакт по звонку #{call['id']}: Перезвонить завтра по оплате",
+            "link": f"/calls/{call['id']}",
+        }]
         assert call_notification is not None
         assert call_notification["link"] == f"/calls/{call['id']}"
         assert "Calls Smoke Client" in call_notification["message"]
@@ -6294,12 +6330,39 @@ async def assert_calls_page():
         assert "Smoke AI call summary" in export_csv
         assert "Calls Outsider Client" not in export_csv
 
-        complete_call_response = await crm.complete_call_follow_up(
-            make_request("owner2"),
-            call["id"],
+        original_run_automation_event = crm.run_automation_event
+        call_completed_events = []
+        crm.run_automation_event = (
+            lambda company_id, trigger_key, entity_type="", entity_id=None,
+            message="", link="":
+            call_completed_events.append({
+                "company_id": company_id,
+                "trigger_key": trigger_key,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "message": message,
+                "link": link,
+            }) or 1
         )
+
+        try:
+            complete_call_response = await crm.complete_call_follow_up(
+                make_request("owner2"),
+                call["id"],
+            )
+        finally:
+            crm.run_automation_event = original_run_automation_event
+
         assert complete_call_response.status_code == 302
         assert complete_call_response.headers["location"] == f"/calls/{call['id']}?completed=1"
+        assert call_completed_events == [{
+            "company_id": 2,
+            "trigger_key": "call_follow_up_completed",
+            "entity_type": "call",
+            "entity_id": call["id"],
+            "message": f"Контакт по звонку #{call['id']} закрыт",
+            "link": f"/calls/{call['id']}",
+        }]
 
         completed_call_detail_response = await crm.call_detail(
             make_asgi_request("owner2", f"/calls/{call['id']}", "completed=1"),
@@ -6352,21 +6415,40 @@ async def assert_calls_page():
         assert outsider_client_call_response.status_code == 302
         assert outsider_client_call_response.headers["location"] == "/clients"
 
-        quick_call_response = await crm.add_client_call(
-            make_form_request(
-                "owner2",
-                f"/clients/{client_id}/calls",
-                {
-                    "direction": "outgoing",
-                    "status": "follow_up",
-                    "phone": "",
-                    "summary": "Quick client card call",
-                    "duration_minutes": "3",
-                    "call_at": "2026-06-14T11:15",
-                },
-            ),
-            client_id,
+        original_run_automation_event = crm.run_automation_event
+        quick_call_events = []
+        crm.run_automation_event = (
+            lambda company_id, trigger_key, entity_type="", entity_id=None,
+            message="", link="":
+            quick_call_events.append({
+                "company_id": company_id,
+                "trigger_key": trigger_key,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "message": message,
+                "link": link,
+            }) or 1
         )
+
+        try:
+            quick_call_response = await crm.add_client_call(
+                make_form_request(
+                    "owner2",
+                    f"/clients/{client_id}/calls",
+                    {
+                        "direction": "outgoing",
+                        "status": "follow_up",
+                        "phone": "",
+                        "summary": "Quick client card call",
+                        "duration_minutes": "3",
+                        "call_at": "2026-06-14T11:15",
+                    },
+                ),
+                client_id,
+            )
+        finally:
+            crm.run_automation_event = original_run_automation_event
+
         assert quick_call_response.status_code == 302
         assert quick_call_response.headers["location"] == f"/clients/{client_id}?call_created=1"
 
@@ -6405,6 +6487,14 @@ async def assert_calls_page():
         assert quick_call["phone"] == "+7 900 111-22-33"
         assert quick_call["duration_minutes"] == 3
         assert quick_call["call_at"] == "2026-06-14 11:15"
+        assert quick_call_events == [{
+            "company_id": 2,
+            "trigger_key": "call_follow_up_created",
+            "entity_type": "call",
+            "entity_id": quick_call["id"],
+            "message": f"Нужен контакт по звонку #{quick_call['id']}: Quick client card call",
+            "link": f"/calls/{quick_call['id']}",
+        }]
         assert quick_call_notification is not None
         assert quick_call_notification["link"] == f"/calls/{quick_call['id']}"
 
