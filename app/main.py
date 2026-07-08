@@ -34878,11 +34878,17 @@ async def update_task_date(request: Request, task_id: int):
             )
 
     old_date = task["task_date"]
+    old_time_from = str(task["time_from"] or "")[:5]
+    old_time_to = str(task["time_to"] or "")[:5]
     old_time = (
-        f"{str(task['time_from'] or '')[:5]}–"
-        f"{str(task['time_to'] or '')[:5]}"
-        if task["time_from"] and task["time_to"]
+        f"{old_time_from}–{old_time_to}"
+        if old_time_from and old_time_to
         else "Без времени"
+    )
+    schedule_changed = (
+        str(old_date or "")[:10] != selected_date
+        or old_time_from != new_time_from
+        or old_time_to != new_time_to
     )
     worker_chat_ids = get_task_worker_chat_ids(c, task)
 
@@ -34912,17 +34918,18 @@ async def update_task_date(request: Request, task_id: int):
         ),
     )
 
-    run_automation_event(
-        get_task_company_id(task),
-        "task_schedule_changed",
-        "task",
-        task_id,
-        (
-            f"Расписание заявки #{task_id}: "
-            f"{old_date or 'Без даты'} → {selected_date or 'Без даты'}"
-        ),
-        f"/task/{task_id}",
-    )
+    if schedule_changed:
+        run_automation_event(
+            get_task_company_id(task),
+            "task_schedule_changed",
+            "task",
+            task_id,
+            (
+                f"Расписание заявки #{task_id}: "
+                f"{old_date or 'Без даты'} → {selected_date or 'Без даты'}"
+            ),
+            f"/task/{task_id}",
+        )
 
     try:
         date_text = f"""

@@ -5909,6 +5909,43 @@ async def assert_calendar_access():
     assert schedule_change_event["status"] == "done"
     assert schedule_change_notification is not None
 
+    original_send_message = crm.send_message
+    original_send_message_to_chat = crm.send_message_to_chat
+    original_run_automation_event = crm.run_automation_event
+    no_op_schedule_events = []
+    crm.send_message = lambda text: True
+    crm.send_message_to_chat = lambda chat_id, text: True
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        no_op_schedule_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        same_schedule_response = await crm.update_task_date(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/date",
+                {"task_date": "2026-05-21"},
+            ),
+            task["id"],
+        )
+    finally:
+        crm.send_message = original_send_message
+        crm.send_message_to_chat = original_send_message_to_chat
+        crm.run_automation_event = original_run_automation_event
+
+    assert same_schedule_response.status_code == 302
+    assert same_schedule_response.headers["location"] == f"/task/{task['id']}"
+    assert no_op_schedule_events == []
+
     conn = connect()
     c = conn.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
