@@ -12743,18 +12743,62 @@ async def automation_builder_page(request: Request):
         ("client_has_debt", "Только клиенты с долгом"),
         ("client_many_tasks", "Только клиенты с большим количеством заявок"),
     ]
-    condition_groups = [
-        ("Базовые", condition_presets[:4]),
-        ("Статус заявки", condition_presets[4:8]),
-        ("Оплата", condition_presets[8:11]),
-        ("Исполнители", condition_presets[11:14]),
-        ("Дата", condition_presets[14:19]),
-        ("Цена", condition_presets[19:21]),
-        ("Каталог", condition_presets[21:22]),
-        ("SLA", condition_presets[22:25]),
-        ("Клиенты", condition_presets[25:]),
-    ]
     condition_labels = dict(condition_presets)
+
+    def condition_group(*keys):
+        return [(key, condition_labels[key]) for key in keys]
+
+    condition_groups = [
+        ("Базовые", condition_group(
+            "none",
+            "priority_high",
+            "emergency",
+            "task_text_contains",
+        )),
+        ("Статус заявки", condition_group(
+            "status_new",
+            "status_in_progress",
+            "status_done",
+            "status_cancelled",
+        )),
+        ("Оплата", condition_group(
+            "payment_unpaid",
+            "payment_partial",
+            "payment_paid",
+        )),
+        ("Исполнители", condition_group(
+            "worker_assigned",
+            "worker_unassigned",
+            "worker_specific",
+        )),
+        ("Дата", condition_group(
+            "date_today",
+            "date_tomorrow",
+            "date_next_7_days",
+            "date_overdue",
+            "date_future",
+        )),
+        ("Цена", condition_group(
+            "price_high",
+            "price_missing",
+        )),
+        ("Каталог", condition_group(
+            "catalog_specific",
+        )),
+        ("SLA", condition_group(
+            "sla_today",
+            "sla_overdue",
+            "sla_due_24h",
+        )),
+        ("Клиенты", condition_group(
+            "client_specific",
+            "client_new",
+            "client_repeat",
+            "client_vip",
+            "client_has_debt",
+            "client_many_tasks",
+        )),
+    ]
     rules_view = []
     test_rule_id = str(request.query_params.get("test_rule_id") or "")
     test_task_id = str(request.query_params.get("test_task_id") or "")
