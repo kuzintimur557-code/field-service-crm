@@ -34175,6 +34175,21 @@ async def task_detail(request: Request, task_id: int):
         WHERE id=? AND company_id=?
         """, (task["client_id"], company_id)).fetchone()
 
+    source_call = None
+
+    if "source_call_id" in task.keys() and task["source_call_id"]:
+        source_call = c.execute("""
+        SELECT
+            call_records.*,
+            clients.name AS client_name
+        FROM call_records
+        LEFT JOIN clients
+          ON clients.id=call_records.client_id
+         AND clients.company_id=call_records.company_id
+        WHERE call_records.id=?
+          AND call_records.company_id=?
+        """, (task["source_call_id"], company_id)).fetchone()
+
     comments = c.execute("""
     SELECT *
     FROM task_comments
@@ -34360,6 +34375,7 @@ async def task_detail(request: Request, task_id: int):
             "activity": activity,
             "activities": activity,
             "linked_client": linked_client,
+            "source_call": source_call,
             "task_items": task_items,
             "task_expenses": task_expenses,
             "catalog_items": catalog_items,

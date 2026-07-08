@@ -6152,6 +6152,17 @@ async def assert_calls_page():
         assert f"#{created_call_task_id}" in linked_call_html
         assert f'href="/task/{created_call_task_id}"' in linked_call_html
 
+        source_task_response = await crm.task_detail(
+            make_asgi_request("owner2", f"/task/{created_call_task_id}"),
+            created_call_task_id,
+        )
+        assert source_task_response.status_code == 200
+        source_task_html = source_task_response.body.decode("utf-8")
+        assert "Источник заявки" in source_task_html
+        assert f"#{call['id']}" in source_task_html
+        assert f'href="/calls/{call["id"]}"' in source_task_html
+        assert "Перезвонить завтра по оплате" in source_task_html
+
         filtered_response = await crm.calls_page(
             make_asgi_request(
                 "owner2",

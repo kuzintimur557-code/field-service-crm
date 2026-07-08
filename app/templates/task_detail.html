@@ -643,6 +643,51 @@ button{
 
 	</div>
 
+{% if source_call %}
+<div class="card">
+<div class="section-title">Источник заявки</div>
+
+<div class="grid2">
+<div class="mini">
+<div class="mini-label">Звонок</div>
+<div class="mini-value">#{{ source_call["id"] }}</div>
+</div>
+<div class="mini">
+<div class="mini-label">Дата звонка</div>
+<div class="mini-value">{{ source_call["call_at"] or source_call["created_at"] or "Не указана" }}</div>
+</div>
+<div class="mini">
+<div class="mini-label">Телефон</div>
+<div class="mini-value">{{ source_call["phone"] or task["phone"] or "Не указан" }}</div>
+</div>
+<div class="mini">
+<div class="mini-label">Результат</div>
+<div class="mini-value">
+{% if source_call["status"] == "completed" %}
+Состоялся
+{% elif source_call["status"] == "missed" %}
+Пропущен
+{% elif source_call["status"] == "follow_up" %}
+Нужен контакт
+{% else %}
+{{ source_call["status"] or "Не указан" }}
+{% endif %}
+</div>
+</div>
+</div>
+
+{% if source_call["summary"] or source_call["ai_summary"] %}
+<div class="comment" style="margin-top:16px">
+{{ source_call["summary"] or source_call["ai_summary"] }}
+</div>
+{% endif %}
+
+<a class="btn gray" href="/calls/{{ source_call['id'] }}" style="display:block;text-align:center;text-decoration:none">
+Открыть звонок
+</a>
+</div>
+{% endif %}
+
 <div class="card">
 
 <div class="section-title">Фото</div>
