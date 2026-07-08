@@ -940,6 +940,14 @@ async def assert_automation_page():
     assert 'name="condition_mode" value="worker_unassigned"' in builder_html
     assert 'name="trigger_key" value="task_status_changed"' in builder_html
     assert 'name="trigger_key" value="task_workers_changed"' in builder_html
+    assert (
+        "task_archived",
+        "Заявка отправлена в архив",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "task_restored",
+        "Заявка восстановлена из архива",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -13293,9 +13301,81 @@ async def assert_daily_route_schedule():
 async def assert_archive_restore(task):
     conn = connect()
     c = conn.cursor()
-    c.execute("UPDATE tasks SET archived=1 WHERE id=?", (task["id"],))
+    c.execute("UPDATE tasks SET archived=0 WHERE id=?", (task["id"],))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Архив заявки smoke",
+        "task_archived",
+        json.dumps({}, ensure_ascii=False),
+        1,
+        "owner2",
+        now,
+        now,
+    ))
+    archive_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        archive_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Archive trigger matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        now,
+    ))
     conn.commit()
     conn.close()
+
+    archive_task_response = await crm.delete_task(make_request("owner2"), task["id"])
+    assert archive_task_response.status_code == 302
+    assert archive_task_response.headers["location"] == "/?archived=1"
+
+    conn = connect()
+    c = conn.cursor()
+    archive_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='task_archived'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (archive_rule_id, task["id"])).fetchone()
+    archive_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Архив заявки smoke'
+      AND message='Archive trigger matched'
+    ORDER BY id DESC
+    """).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (archive_rule_id,))
+    c.execute("DELETE FROM notifications WHERE title='Архив заявки smoke'")
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (archive_rule_id,))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (archive_rule_id,))
+    conn.commit()
+    conn.close()
+
+    assert archive_event is not None
+    assert archive_event["status"] == "done"
+    assert archive_notification is not None
 
     archive_response = await crm.archive_page(make_asgi_request("owner2", "/archive"))
     assert archive_response.status_code == 200
@@ -13312,6 +13392,47 @@ async def assert_archive_restore(task):
     assert f"/task/{task['id']}/unarchive" in detail_html
     assert "Восстановить из архива" in detail_html
 
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Восстановление заявки smoke",
+        "task_restored",
+        json.dumps({}, ensure_ascii=False),
+        1,
+        "owner2",
+        now,
+        now,
+    ))
+    restore_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        restore_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Restore trigger matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        now,
+    ))
+    conn.commit()
+    conn.close()
+
     restore_response = await crm.unarchive_task(make_request("owner2"), task["id"])
     assert restore_response.status_code == 302
     assert restore_response.headers["location"] == f"/task/{task['id']}"
@@ -13327,10 +13448,37 @@ async def assert_archive_restore(task):
     FROM task_activity
     WHERE task_id=? AND action='Заявка возвращена из архива'
     """, (task["id"],)).fetchone()
+    restore_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='task_restored'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (restore_rule_id, task["id"])).fetchone()
+    restore_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Восстановление заявки smoke'
+      AND message='Restore trigger matched'
+    ORDER BY id DESC
+    """).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (restore_rule_id,))
+    c.execute("DELETE FROM notifications WHERE title='Восстановление заявки smoke'")
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (restore_rule_id,))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (restore_rule_id,))
+    conn.commit()
     conn.close()
 
     assert restored["archived"] == 0
     assert activity is not None
+    assert restore_event is not None
+    assert restore_event["status"] == "done"
+    assert restore_notification is not None
 
 
 async def assert_catalog_create():

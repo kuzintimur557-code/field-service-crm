@@ -311,6 +311,8 @@ AUTOMATION_TRIGGERS = [
     ("task_status_changed", "Статус заявки изменён"),
     ("task_schedule_changed", "Расписание заявки изменено"),
     ("task_workers_changed", "Исполнители заявки изменены"),
+    ("task_archived", "Заявка отправлена в архив"),
+    ("task_restored", "Заявка восстановлена из архива"),
     ("payment_status_changed", "Статус оплаты изменён"),
     ("task_comment_added", "Комментарий к заявке добавлен"),
     ("overdue_task", "Просрочена задача"),
@@ -34793,6 +34795,15 @@ async def archive_task(request: Request, task_id: int):
     except Exception:
         pass
 
+    run_automation_event(
+        get_task_company_id(task),
+        "task_archived",
+        "task",
+        task_id,
+        f"Заявка #{task_id} отправлена в архив",
+        f"/task/{task_id}",
+    )
+
     return RedirectResponse("/", status_code=302)
 
 
@@ -34843,6 +34854,15 @@ async def unarchive_task(request: Request, task_id: int):
         )
     except Exception:
         pass
+
+    run_automation_event(
+        get_task_company_id(task),
+        "task_restored",
+        "task",
+        task_id,
+        f"Заявка #{task_id} восстановлена из архива",
+        f"/task/{task_id}",
+    )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
@@ -34902,6 +34922,15 @@ async def delete_task(request: Request, task_id: int):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "task_archived",
+        "task",
+        task_id,
+        f"Заявка #{task_id} отправлена в архив",
+        f"/task/{task_id}",
+    )
 
     return RedirectResponse("/?archived=1", status_code=302)
 
