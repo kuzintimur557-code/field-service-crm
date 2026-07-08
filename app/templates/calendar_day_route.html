@@ -187,7 +187,11 @@ h1{margin:0;font-size:30px}
 }
 </style>
 </head>
-<body>
+<body
+    data-task-label="{{ task_label }}"
+    data-worker-label="{{ worker_label }}"
+    data-client-label="{{ client_label }}"
+>
 <main class="container">
     <header class="header">
         <div>
@@ -550,7 +554,7 @@ h1{margin:0;font-size:30px}
                         class="timeline-slot {{ slot['status'] }} {% if role in ('boss', 'manager') %}manageable{% endif %}"
                         data-time-from="{{ slot['time_from'] }}"
                         data-worker="{{ worker['username'] }}"
-                        title="{{ slot['time_from'] }}–{{ slot['time_to'] }}{% if slot['task_ids'] %} · заявки: #{{ slot['task_ids']|join(', #') }}{% else %} · свободно{% endif %}"
+                        title="{{ slot['time_from'] }}–{{ slot['time_to'] }}{% if slot['task_ids'] %} · {{ task_label|lower }}: #{{ slot['task_ids']|join(', #') }}{% else %} · свободно{% endif %}"
                     >
                         {% if slot["hour_label"] %}<span class="timeline-hour">{{ slot["hour_label"] }}</span>{% endif %}
                         {% if slot["task_count"] %}<span class="timeline-count">{{ slot["task_count"] }}</span>{% endif %}
@@ -582,7 +586,7 @@ h1{margin:0;font-size:30px}
                     <div class="route-order-line">
                         <div class="route-order">{{ item["route_order"] }}</div>
                         {% if role in ("boss", "manager") %}
-                        <button class="pick-task" type="button" title="Выбрать заявку для переноса" aria-label="Выбрать заявку #{{ item['task_id'] }} для переноса">↔</button>
+                        <button class="pick-task" type="button" title="Выбрать для переноса" aria-label="Выбрать: {{ task_label|lower }} #{{ item['task_id'] }} для переноса">↔</button>
                         {% endif %}
                     </div>
                     <div class="route-time {% if not item['has_time'] %}empty{% endif %}">
@@ -594,7 +598,7 @@ h1{margin:0;font-size:30px}
                     </div>
                 </div>
                 <div>
-                    <a class="task-title" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+                    <a class="task-title" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or client_label ~ " не указан" }}</a>
                     <div class="task-meta">
                         <span>{{ item["address"] or "Адрес не указан" }}</span>
                         <span>{{ item["status"] }}</span>
@@ -611,7 +615,7 @@ h1{margin:0;font-size:30px}
                     {% endif %}
                     {% if role in ("boss", "manager") %}
                     <div class="quick-slots">
-                        <select aria-label="Свободное окно для заявки #{{ item['task_id'] }}">
+                        <select aria-label="Свободное окно: {{ task_label|lower }} #{{ item['task_id'] }}">
                             <option value="">Свободное окно</option>
                             {% for slot in item["available_slots"] %}
                             <option value="{{ slot['time_from'] }}">{{ slot["label"] }}</option>
@@ -625,8 +629,8 @@ h1{margin:0;font-size:30px}
                 <form class="schedule-form" method="post" action="/task/{{ item['task_id'] }}/date">
                     <input type="hidden" name="task_date" value="{{ selected_date }}">
                     <input type="hidden" name="return_to" value="/calendar/day?date={{ selected_date }}{% if selected_worker %}&worker={{ selected_worker }}{% endif %}">
-                    <input type="time" name="time_from" value="{{ item['time_from'] }}" aria-label="Начало заявки #{{ item['task_id'] }}">
-                    <input type="time" name="time_to" value="{{ item['time_to'] }}" aria-label="Окончание заявки #{{ item['task_id'] }}">
+                    <input type="time" name="time_from" value="{{ item['time_from'] }}" aria-label="Начало: {{ task_label|lower }} #{{ item['task_id'] }}">
+                    <input type="time" name="time_to" value="{{ item['time_to'] }}" aria-label="Окончание: {{ task_label|lower }} #{{ item['task_id'] }}">
                     <button type="submit">Сохранить время</button>
                 </form>
                 {% endif %}
@@ -637,12 +641,12 @@ h1{margin:0;font-size:30px}
     {% endif %}
     {% endfor %}
     {% else %}
-    <div class="empty">На выбранный день нет заявок.</div>
+    <div class="empty">На выбранный день нет записей типа «{{ task_label }}».</div>
     {% endif %}
 
     {% if schedule["unassigned"] %}
     <section class="unassigned">
-        <h2>Заявки без исполнителя</h2>
+        <h2>{{ task_label }} без ответственного</h2>
         <div class="unassigned-list">
             {% for item in schedule["unassigned"] %}
             <article
@@ -653,7 +657,7 @@ h1{margin:0;font-size:30px}
                 data-expected-time-to="{{ item['time_to'] }}"
             >
                 <div>
-                    <a class="unassigned-title" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+                    <a class="unassigned-title" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or client_label ~ " не указан" }}</a>
                     <div class="unassigned-meta">
                         <span>{{ item["address"] or "Адрес не указан" }}</span>
                         <span>{{ item["priority"] }}</span>
@@ -665,7 +669,7 @@ h1{margin:0;font-size:30px}
                 {% if item["assignment_suggestions"] %}
                 <div>
                     <div class="assignment-choice">
-                        <select aria-label="Вариант назначения заявки #{{ item['task_id'] }}">
+                        <select aria-label="Вариант назначения: {{ task_label|lower }} #{{ item['task_id'] }}">
                             {% for suggestion in item["assignment_suggestions"] %}
                             <option value="{{ suggestion['worker'] }}|{{ suggestion['time_from'] }}|{{ suggestion['time_to'] }}">
                                 {% if loop.first %}Рекомендуем: {% endif %}{{ suggestion["worker"] }} · {{ suggestion["time_label"] }} · загрузка {{ suggestion["active_count"] }}/{{ suggestion["daily_capacity"] }}
@@ -698,6 +702,9 @@ h1{margin:0;font-size:30px}
     const selectedDate = "{{ selected_date }}";
     let draggedCard = null;
     let selectedCard = null;
+    const taskLabel = document.body.dataset.taskLabel || "Заявка";
+    const workerLabel = document.body.dataset.workerLabel || "Исполнитель";
+    const taskLabelLower = taskLabel.toLocaleLowerCase("ru-RU");
 
     function showToast(message, isError = false) {
         toast.textContent = message;
@@ -807,17 +814,17 @@ h1{margin:0;font-size:30px}
     function errorMessage(data) {
         const messages = {
             invalid_date: "Указана некорректная дата.",
-            past_date: "Нельзя переносить заявку на прошедший день.",
+            past_date: `Нельзя переносить ${taskLabelLower} на прошедший день.`,
             invalid_time: "Выберите время с шагом 30 минут.",
             outside_workday: "Интервал выходит за рабочий день 08:00–20:00.",
             stale: "Расписание уже изменилось. Страница будет обновлена.",
             time_conflict: "Это время уже занято.",
-            worker_unavailable: `Исполнитель ${data.worker || ""} недоступен${data.reason ? ": " + data.reason : "."}`,
-            capacity_reached: `У исполнителя ${data.worker || ""} заполнен дневной лимит.`,
-            inactive_worker: `Исполнитель ${data.worker || ""} отключён.`,
-            unassigned: "Сначала назначьте исполнителя.",
-            task_closed: "Заявка уже завершена или отменена.",
-            not_found: "Заявка не найдена."
+            worker_unavailable: `${workerLabel} ${data.worker || ""} недоступен${data.reason ? ": " + data.reason : "."}`,
+            capacity_reached: `${workerLabel} ${data.worker || ""}: дневной лимит заполнен.`,
+            inactive_worker: `${workerLabel} ${data.worker || ""} отключён.`,
+            unassigned: "Сначала назначьте ответственного.",
+            task_closed: `${taskLabel} уже завершена или отменена.`,
+            not_found: `${taskLabel} не найдена.`
         };
         let message = messages[data.error] || "Не удалось изменить время.";
 
@@ -841,13 +848,13 @@ h1{margin:0;font-size:30px}
         if (selectedCard) {
             selectedCard.classList.add("selected");
             selectedCard.querySelector(".pick-task")?.classList.add("active");
-            showToast(`Выбрана заявка #${selectedCard.dataset.taskId}.`);
+            showToast(`Выбрано: ${taskLabelLower} #${selectedCard.dataset.taskId}.`);
         }
     }
 
     async function moveTaskTime(card, targetTimeFrom) {
         if (!card || !targetTimeFrom) {
-            showToast("Сначала выберите заявку и свободное окно.", true);
+            showToast(`Сначала выберите ${taskLabelLower} и свободное окно.`, true);
             return;
         }
 
@@ -877,7 +884,7 @@ h1{margin:0;font-size:30px}
         }
 
         showToast(
-            `Заявка #${data.task_id}: ${data.target_time_from}–${data.target_time_to}.`
+            `${taskLabel} #${data.task_id}: ${data.target_time_from}–${data.target_time_to}.`
         );
         window.setTimeout(() => window.location.reload(), 350);
     }
@@ -923,7 +930,7 @@ h1{margin:0;font-size:30px}
 
             if (!response.ok || !data.ok) {
                 showToast(
-                    data.message || "Не удалось назначить заявку.",
+                    data.message || `Не удалось назначить ${taskLabelLower}.`,
                     true
                 );
                 return;
@@ -939,7 +946,7 @@ h1{margin:0;font-size:30px}
             }
 
             showToast(
-                `Заявка #${item.dataset.taskId}: ${worker}, ${timeFrom}–${timeTo}.`
+                `${taskLabel} #${item.dataset.taskId}: ${worker}, ${timeFrom}–${timeTo}.`
             );
             window.setTimeout(() => window.location.reload(), 350);
         } catch (error) {
@@ -998,7 +1005,7 @@ h1{margin:0;font-size:30px}
         const items = selectedAutoPlanItems();
 
         if (!items.length) {
-            showToast("Выберите хотя бы одну заявку.", true);
+            showToast(`Выберите хотя бы одну запись типа «${taskLabel}».`, true);
             return;
         }
 
@@ -1027,7 +1034,7 @@ h1{margin:0;font-size:30px}
 
             const applied = data.summary?.applied || 0;
             const skipped = data.summary?.skipped || 0;
-            let message = `Запланировано заявок: ${applied}.`;
+            let message = `Запланировано: ${applied}.`;
 
             if (skipped) {
                 message += ` Пропущено: ${skipped}.`;
