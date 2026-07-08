@@ -172,7 +172,8 @@ def init_db():
         after_photo TEXT,
         archived INTEGER DEFAULT 0,
         payment_status TEXT DEFAULT 'Не оплачено',
-        deadline_at TEXT
+        deadline_at TEXT,
+        source_call_id INTEGER
     )
     """)
 
@@ -749,6 +750,7 @@ def init_db():
     add_column_if_missing(c, "tasks", "discount_amount", "REAL DEFAULT 0")
     add_column_if_missing(c, "tasks", "time_from", "TEXT")
     add_column_if_missing(c, "tasks", "time_to", "TEXT")
+    add_column_if_missing(c, "tasks", "source_call_id", "INTEGER")
 
     add_column_if_missing(c, "recurring_jobs", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "recurring_jobs", "client_id", "INTEGER")

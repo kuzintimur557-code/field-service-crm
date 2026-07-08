@@ -112,6 +112,26 @@ h1{font-size:28px}
 </div>
 
 <div class="card">
+<h2>Созданные заявки</h2>
+{% if linked_tasks %}
+<div class="grid">
+    {% for task in linked_tasks %}
+    <div class="empty">
+        <div class="value">#{{ task["id"] }} / {{ task["status"] }}</div>
+        <div class="small">{{ task["task_date"] or "Дата не указана" }}</div>
+        <div class="small">{{ task["description"] or "Без описания" }}</div>
+        <div class="actions">
+            <a class="btn" href="/task/{{ task['id'] }}">Открыть заявку</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty">Из этого звонка заявки пока не созданы.</div>
+{% endif %}
+</div>
+
+<div class="card">
 <h2>Аудио</h2>
 {% if request.query_params.get("audio_error") == "empty" %}
 <div class="empty">Выберите аудиофайл для загрузки.</div>

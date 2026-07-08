@@ -522,6 +522,10 @@ def assert_calls_foundation():
         row["name"]
         for row in c.execute("PRAGMA table_info(call_records)").fetchall()
     }
+    task_columns = {
+        row["name"]
+        for row in c.execute("PRAGMA table_info(tasks)").fetchall()
+    }
 
     conn.close()
 
@@ -545,6 +549,7 @@ def assert_calls_foundation():
         "ai_summary",
         "created_at",
     }.issubset(columns)
+    assert "source_call_id" in task_columns
 
 
 async def assert_automation_page():
@@ -6112,7 +6117,7 @@ async def assert_calls_page():
         conn = connect()
         c = conn.cursor()
         created_call_task = c.execute("""
-        SELECT id
+        SELECT id, source_call_id
         FROM tasks
         WHERE company_id=2
           AND client_id=?
@@ -6134,7 +6139,18 @@ async def assert_calls_page():
         conn.close()
 
         assert created_call_task_id is not None
+        assert created_call_task["source_call_id"] == call["id"]
         assert call_task_activity is not None
+
+        linked_call_response = await crm.call_detail(
+            make_asgi_request("owner2", f"/calls/{call['id']}"),
+            call["id"],
+        )
+        assert linked_call_response.status_code == 200
+        linked_call_html = linked_call_response.body.decode("utf-8")
+        assert "Созданные заявки" in linked_call_html
+        assert f"#{created_call_task_id}" in linked_call_html
+        assert f'href="/task/{created_call_task_id}"' in linked_call_html
 
         filtered_response = await crm.calls_page(
             make_asgi_request(

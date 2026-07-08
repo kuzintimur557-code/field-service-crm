@@ -27189,10 +27189,20 @@ async def call_detail(request: Request, call_id: int):
       AND call_records.company_id=?
     """, (call_id, company_id)).fetchone()
 
-    conn.close()
-
     if not call:
+        conn.close()
         return RedirectResponse("/calls", status_code=302)
+
+    linked_tasks = c.execute("""
+    SELECT id, status, task_date, description
+    FROM tasks
+    WHERE company_id=?
+      AND source_call_id=?
+      AND COALESCE(archived, 0)=0
+    ORDER BY id DESC
+    """, (company_id, call_id)).fetchall()
+
+    conn.close()
 
     return templates.TemplateResponse(
         request,
@@ -27202,7 +27212,8 @@ async def call_detail(request: Request, call_id: int):
             "username": username,
             "role": role,
             "settings": settings,
-            "call": call
+            "call": call,
+            "linked_tasks": linked_tasks
         }
     )
 
@@ -33907,9 +33918,10 @@ async def create_task(
         status,
         report,
         after_photo,
-        created_at
+        created_at,
+        source_call_id
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         client_id,
@@ -33928,7 +33940,8 @@ async def create_task(
         "Новая",
         "",
         "",
-        datetime.now().strftime("%Y-%m-%d %H:%M")
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        source_call["id"] if source_call else None
     ))
 
     task_id = c.lastrowid
