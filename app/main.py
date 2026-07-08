@@ -328,6 +328,9 @@ AUTOMATION_TRIGGERS = [
     ("client_file_deleted", "Файл клиента удалён"),
     ("catalog_item_created", "Позиция каталога создана"),
     ("catalog_item_toggled", "Позиция каталога включена или выключена"),
+    ("custom_field_created", "Поле компании создано"),
+    ("custom_field_ordered", "Порядок поля компании изменён"),
+    ("custom_field_toggled", "Поле компании включено или выключено"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -359,6 +362,11 @@ AUTOMATION_TRIGGER_GROUPS = [
     ("Каталог", (
         "catalog_item_created",
         "catalog_item_toggled",
+    )),
+    ("Поля компании", (
+        "custom_field_created",
+        "custom_field_ordered",
+        "custom_field_toggled",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -27675,8 +27683,18 @@ async def create_custom_field(request: Request):
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
+    field_id = c.lastrowid
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "custom_field_created",
+        "custom_field",
+        field_id,
+        f"Создано поле компании: {label}",
+        "/custom-fields",
+    )
 
     return RedirectResponse("/custom-fields?created=1", status_code=302)
 
@@ -27714,6 +27732,16 @@ async def update_custom_field_order(request: Request, field_id: int):
     conn = connect()
     c = conn.cursor()
 
+    field = c.execute("""
+    SELECT *
+    FROM custom_fields
+    WHERE id=? AND company_id=?
+    """, (field_id, company_id)).fetchone()
+
+    if not field:
+        conn.close()
+        return RedirectResponse("/custom-fields", status_code=302)
+
     c.execute("""
     UPDATE custom_fields
     SET sort_order=?
@@ -27722,6 +27750,18 @@ async def update_custom_field_order(request: Request, field_id: int):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "custom_field_ordered",
+        "custom_field",
+        field_id,
+        (
+            f"Порядок поля компании изменён: "
+            f"{field['label']} → {sort_order}"
+        ),
+        "/custom-fields",
+    )
 
     return RedirectResponse("/custom-fields?ordered=1", status_code=302)
 
@@ -27768,6 +27808,18 @@ async def toggle_custom_field(request: Request, field_id: int):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "custom_field_toggled",
+        "custom_field",
+        field_id,
+        (
+            f"Поле компании {'включено' if new_active else 'выключено'}: "
+            f"{field['label']}"
+        ),
+        "/custom-fields",
+    )
 
     return RedirectResponse("/custom-fields", status_code=302)
 

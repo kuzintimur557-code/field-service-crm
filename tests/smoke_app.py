@@ -513,6 +513,7 @@ async def assert_automation_page():
     assert '<optgroup label="Финансы">' in html
     assert '<optgroup label="Клиенты">' in html
     assert '<optgroup label="Каталог">' in html
+    assert '<optgroup label="Поля компании">' in html
     assert '<optgroup label="SLA и загрузка">' in html
     assert '<optgroup label="ИИ-сводки">' in html
     assert "Просрочен SLA" in html
@@ -987,6 +988,18 @@ async def assert_automation_page():
     assert (
         "catalog_item_toggled",
         "Позиция каталога включена или выключена",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "custom_field_created",
+        "Поле компании создано",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "custom_field_ordered",
+        "Порядок поля компании изменён",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "custom_field_toggled",
+        "Поле компании включено или выключено",
     ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
@@ -16635,31 +16648,49 @@ async def assert_recurring_generate(task):
 
 
 async def assert_custom_fields():
-    response = await crm.create_custom_field(make_form_request(
-        "owner2",
-        "/custom-fields",
-        {
-            "entity_type": "task",
-            "field_type": "text",
-            "label": "VIN",
-            "is_required": "on",
-            "sort_order": "7",
-        },
-    ))
+    original_run_automation_event = crm.run_automation_event
+    custom_field_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        custom_field_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        response = await crm.create_custom_field(make_form_request(
+            "owner2",
+            "/custom-fields",
+            {
+                "entity_type": "task",
+                "field_type": "text",
+                "label": "VIN",
+                "is_required": "on",
+                "sort_order": "7",
+            },
+        ))
+        select_response = await crm.create_custom_field(make_form_request(
+            "owner2",
+            "/custom-fields",
+            {
+                "entity_type": "client",
+                "field_type": "select",
+                "label": "Client segment",
+                "options": "Beauty\nAuto service\nLogistics",
+                "sort_order": "8",
+            },
+        ))
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert response.status_code == 302
     assert response.headers["location"] == "/custom-fields?created=1"
-
-    select_response = await crm.create_custom_field(make_form_request(
-        "owner2",
-        "/custom-fields",
-        {
-            "entity_type": "client",
-            "field_type": "select",
-            "label": "Client segment",
-            "options": "Beauty\nAuto service\nLogistics",
-            "sort_order": "8",
-        },
-    ))
     assert select_response.status_code == 302
     assert select_response.headers["location"] == "/custom-fields?created=1"
 
@@ -16697,6 +16728,17 @@ async def assert_custom_fields():
     assert select_field is not None
     assert select_field["field_type"] == "select"
     assert select_field["options"] == "Beauty\nAuto service\nLogistics"
+    assert [event["trigger_key"] for event in custom_field_events] == [
+        "custom_field_created",
+        "custom_field_created",
+    ]
+    assert custom_field_events[0]["entity_type"] == "custom_field"
+    assert custom_field_events[0]["entity_id"] == field["id"]
+    assert custom_field_events[0]["message"] == "Создано поле компании: VIN"
+    assert custom_field_events[1]["entity_id"] == select_field["id"]
+    assert custom_field_events[1]["message"] == (
+        "Создано поле компании: Client segment"
+    )
 
     page_response = await crm.custom_fields_page(
         make_asgi_request("owner2", "/custom-fields")
@@ -16727,19 +16769,52 @@ async def assert_custom_fields():
     assert "Для списка добавьте хотя бы один вариант" in options_error_html
     assert "❌ Для списка" not in options_error_html
 
-    order_response = await crm.update_custom_field_order(make_form_request(
-        "owner2",
-        f"/custom-fields/{field['id']}/order",
-        {
-            "sort_order": "3",
-        },
-    ), field["id"])
+    original_run_automation_event = crm.run_automation_event
+    custom_field_update_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        custom_field_update_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        order_response = await crm.update_custom_field_order(make_form_request(
+            "owner2",
+            f"/custom-fields/{field['id']}/order",
+            {
+                "sort_order": "3",
+            },
+        ), field["id"])
+
+        toggle_response = await crm.toggle_custom_field(
+            make_request("owner2"),
+            field["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert order_response.status_code == 302
     assert order_response.headers["location"] == "/custom-fields?ordered=1"
-
-    toggle_response = await crm.toggle_custom_field(make_request("owner2"), field["id"])
     assert toggle_response.status_code == 302
     assert toggle_response.headers["location"] == "/custom-fields"
+    assert [event["trigger_key"] for event in custom_field_update_events] == [
+        "custom_field_ordered",
+        "custom_field_toggled",
+    ]
+    assert custom_field_update_events[0]["entity_id"] == field["id"]
+    assert custom_field_update_events[0]["message"] == (
+        "Порядок поля компании изменён: VIN → 3"
+    )
+    assert custom_field_update_events[1]["message"] == (
+        "Поле компании выключено: VIN"
+    )
 
     conn = connect()
     c = conn.cursor()
