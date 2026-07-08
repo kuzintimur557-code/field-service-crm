@@ -309,6 +309,7 @@ PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 AUTOMATION_TRIGGERS = [
     ("new_task", "Новая заявка"),
     ("task_status_changed", "Статус заявки изменён"),
+    ("task_schedule_changed", "Расписание заявки изменено"),
     ("overdue_task", "Просрочена задача"),
     ("sla_overdue", "Просрочен SLA"),
     ("unpaid_task", "Нет оплаты"),
@@ -34372,6 +34373,18 @@ async def update_task_date(request: Request, task_id: int):
             f"Стало: {selected_date or 'Без даты'}, "
             f"{new_time_from + '–' + new_time_to if new_time_from else 'Без времени'}"
         ),
+    )
+
+    run_automation_event(
+        get_task_company_id(task),
+        "task_schedule_changed",
+        "task",
+        task_id,
+        (
+            f"Расписание заявки #{task_id}: "
+            f"{old_date or 'Без даты'} → {selected_date or 'Без даты'}"
+        ),
+        f"/task/{task_id}",
     )
 
     try:

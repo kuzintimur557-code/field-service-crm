@@ -5583,6 +5583,42 @@ async def assert_calendar_access():
         "DELETE FROM worker_unavailability WHERE id=?",
         (unavailable_period_id,),
     )
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Расписание заявки smoke",
+        "task_schedule_changed",
+        json.dumps({}, ensure_ascii=False),
+        1,
+        "owner2",
+        now,
+        now,
+    ))
+    schedule_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        schedule_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Schedule changed trigger matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        now,
+    ))
     conn.commit()
     conn.close()
 
@@ -5609,6 +5645,38 @@ async def assert_calendar_access():
 
     assert reschedule_response.status_code == 302
     assert reschedule_response.headers["location"].startswith("/calendar?month=2026-05&worker=helper2")
+
+    conn = connect()
+    c = conn.cursor()
+    schedule_change_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='task_schedule_changed'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (schedule_rule_id, task["id"])).fetchone()
+    schedule_change_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Расписание заявки smoke'
+      AND message='Schedule changed trigger matched'
+    ORDER BY id DESC
+    """).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (schedule_rule_id,))
+    c.execute("DELETE FROM notifications WHERE title='Расписание заявки smoke'")
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (schedule_rule_id,))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (schedule_rule_id,))
+    conn.commit()
+    conn.close()
+
+    assert schedule_change_event is not None
+    assert schedule_change_event["status"] == "done"
+    assert schedule_change_notification is not None
 
     conn = connect()
     c = conn.cursor()
