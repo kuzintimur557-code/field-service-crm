@@ -1247,6 +1247,7 @@ async def assert_automation_page():
     assert "Подходит" in test_result_html
     assert "Условия выполнены, правило может сработать" in test_result_html
     assert "Логика проверки: И" in test_result_html
+    assert "Условие выполнено" in test_result_html
     assert "Выполнено" in test_result_html
     assert "Текст содержит: Smoke" in test_result_html
     assert "Готово к запуску" in test_result_html

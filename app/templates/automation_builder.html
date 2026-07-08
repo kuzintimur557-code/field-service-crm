@@ -371,6 +371,7 @@
                              style="justify-content:flex-start">
                             {% if detail["matched"] %}Выполнено{% else %}Не выполнено{% endif %}
                             · {{ detail["label"] }}
+                            · {{ detail["message"] }}
                         </div>
                         {% endfor %}
                     </div>
