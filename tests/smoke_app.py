@@ -3460,6 +3460,9 @@ async def assert_automation_runner(task):
     assert crm.automation_condition_matches(
         c, 2, specific_client_rule, "task", task["id"]
     )[0] is True
+    assert crm.automation_condition_matches(
+        c, 2, specific_client_rule, "client", task["client_id"]
+    )[0] is True
 
     specific_client_rule["conditions_json"] = json.dumps({
         "mode": "client_specific",
@@ -3469,6 +3472,36 @@ async def assert_automation_runner(task):
     assert crm.automation_condition_matches(
         c, 2, specific_client_rule, "task", task["id"]
     )[0] is False
+    assert crm.automation_condition_matches(
+        c, 2, specific_client_rule, "client", task["client_id"]
+    )[0] is False
+
+    original_client_notes = c.execute("""
+    SELECT notes
+    FROM clients
+    WHERE company_id=2 AND id=?
+    """, (task["client_id"],)).fetchone()["notes"]
+    c.execute("""
+    UPDATE clients
+    SET notes='VIP smoke client'
+    WHERE company_id=2 AND id=?
+    """, (task["client_id"],))
+    conn.commit()
+    vip_client_rule = {
+        "conditions_json": json.dumps({
+            "mode": "client_vip",
+            "label": "Только VIP клиенты",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, vip_client_rule, "client", task["client_id"]
+    )[0] is True
+    c.execute("""
+    UPDATE clients
+    SET notes=?
+    WHERE company_id=2 AND id=?
+    """, (original_client_notes, task["client_id"]))
+    conn.commit()
 
     automation_catalog_item = c.execute("""
     SELECT id, name, item_type, unit, price, cost

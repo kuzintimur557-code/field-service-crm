@@ -2873,6 +2873,93 @@ def automation_condition_number(conditions, default, minimum=0):
     return max(value, minimum)
 
 
+CLIENT_AUTOMATION_CONDITION_MODES = {
+    "client_specific",
+    "client_new",
+    "client_repeat",
+    "client_vip",
+    "client_has_debt",
+    "client_many_tasks",
+}
+
+
+def automation_client_condition_matches(c, company_id, conditions, client_id):
+    mode = conditions.get("mode") or "none"
+
+    try:
+        client_id = int(client_id or 0)
+    except (TypeError, ValueError):
+        client_id = 0
+
+    if not client_id:
+        return False, f"Условие не выполнено: {conditions.get('label') or mode}"
+
+    client = c.execute("""
+    SELECT id, name, phone, notes, created_at
+    FROM clients
+    WHERE id=?
+      AND company_id=?
+    """, (client_id, company_id)).fetchone()
+
+    if not client:
+        return False, f"Условие не выполнено: клиент #{client_id} не найден"
+
+    client_task_count = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND client_id=?
+    """, (
+        company_id,
+        client_id,
+    )).fetchone()[0]
+
+    client_unpaid_count = c.execute("""
+    SELECT COUNT(*)
+    FROM tasks
+    WHERE company_id=?
+      AND client_id=?
+      AND payment_status IN ('Не оплачено', 'unpaid', 'not_paid')
+    """, (
+        company_id,
+        client_id,
+    )).fetchone()[0]
+
+    client_task_threshold = int(automation_condition_number(conditions, 5, 1))
+
+    if mode == "client_specific":
+        try:
+            selected_client_id = int(conditions.get("value"))
+        except (TypeError, ValueError):
+            selected_client_id = 0
+
+        if selected_client_id and client_id == selected_client_id:
+            return True, ""
+
+    elif mode == "client_new":
+        if client_task_count <= 1:
+            return True, ""
+
+    elif mode == "client_repeat":
+        if client_task_count >= 2:
+            return True, ""
+
+    elif mode == "client_vip":
+        client_notes = str(client["notes"] or "").lower()
+        if "vip" in client_notes or "вип" in client_notes:
+            return True, ""
+
+    elif mode == "client_has_debt":
+        if client_unpaid_count > 0:
+            return True, ""
+
+    elif mode == "client_many_tasks":
+        if client_task_count >= client_task_threshold:
+            return True, ""
+
+    return False, f"Условие не выполнено: {conditions.get('label') or mode}"
+
+
 
 def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
     try:
@@ -2894,6 +2981,14 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
 
     if mode == "none":
         return True, ""
+
+    if entity_type == "client" and mode in CLIENT_AUTOMATION_CONDITION_MODES:
+        return automation_client_condition_matches(
+            c,
+            company_id,
+            conditions,
+            entity_id,
+        )
 
     if entity_type != "task" or not entity_id:
         return False, f"Условие не выполнено: {conditions.get('label') or mode}"
