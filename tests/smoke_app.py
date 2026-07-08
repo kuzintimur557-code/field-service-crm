@@ -16097,6 +16097,73 @@ async def assert_finance_margin(task):
     assert "80.0 ₽" in discounted_finance_html
     assert "63.6%" in discounted_finance_html
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO task_expenses (
+        company_id, task_id, title, amount, created_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        2,
+        task["id"],
+        "Temporary delete expense",
+        12.5,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    temporary_expense_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    original_run_automation_event = crm.run_automation_event
+    delete_expense_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        delete_expense_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        delete_expense_response = await crm.delete_task_expense(
+            make_request("owner2"),
+            task["id"],
+            temporary_expense_id,
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert delete_expense_response.status_code == 302
+    assert delete_expense_response.headers["location"] == f"/task/{task['id']}"
+    assert delete_expense_events == [{
+        "company_id": 2,
+        "trigger_key": "task_finance_changed",
+        "entity_type": "task",
+        "entity_id": task["id"],
+        "message": (
+            f"Удалён расход заявки #{task['id']}: "
+            "Temporary delete expense — 12.5"
+        ),
+        "link": f"/task/{task['id']}",
+    }]
+
+    conn = connect()
+    c = conn.cursor()
+    deleted_expense = c.execute("""
+    SELECT id
+    FROM task_expenses
+    WHERE id=?
+    """, (temporary_expense_id,)).fetchone()
+    conn.close()
+
+    assert deleted_expense is None
+
     loss_response = await crm.finance_page(
         make_asgi_request("owner2", "/finance"),
         month="2026-05",
