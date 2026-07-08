@@ -4323,7 +4323,7 @@ async def assert_automation_runner(task):
     assert "Обработано:" in done_html
     assert f"Объект: Заявка #{task['id']}" in done_html
     assert f'href="/task/{task["id"]}"' in done_html
-    assert "Открыть заявку" in done_html
+    assert "Открыть заявку" not in done_html
     assert 'href="/automation/events/export?event_filter=done"' in done_html
     assert "Все триггеры" in done_html
 

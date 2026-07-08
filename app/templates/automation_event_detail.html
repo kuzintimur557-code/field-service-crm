@@ -100,11 +100,11 @@
 
         <div class="event-actions">
             {% if event["entity_type"] == "task" and event["entity_id"] %}
-            <a href="/task/{{ event['entity_id'] }}" class="btn btn-blue">Открыть заявку</a>
+            <a href="/task/{{ event['entity_id'] }}" class="btn btn-blue">Открыть</a>
             {% endif %}
 
             {% if event["entity_type"] == "client" and event["entity_id"] %}
-            <a href="/clients/{{ event['entity_id'] }}" class="btn btn-blue">Открыть клиента</a>
+            <a href="/clients/{{ event['entity_id'] }}" class="btn btn-blue">Открыть</a>
             {% endif %}
 
             {% if event["status"] in ("pending", "skipped") %}
