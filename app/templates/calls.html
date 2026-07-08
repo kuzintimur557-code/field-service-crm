@@ -30,13 +30,15 @@ input,select,textarea{border:1px solid #d1d5db;background:#fff}
 textarea{min-height:90px;resize:vertical}
 button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.filter-grid{display:grid;grid-template-columns:1fr 1fr 1.2fr auto;gap:12px;align-items:end}
+.reset-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px;border-radius:14px;background:#eef2ff;color:#1d4ed8;text-decoration:none;font-weight:900}
 .table{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:minmax(110px,.9fr) minmax(130px,1.1fr) minmax(90px,.8fr) minmax(0,1.6fr);gap:12px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:14px}
 .head{background:#e5e7eb;font-weight:900}
 .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:12px;font-weight:900}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:24px}
 .mobile-label{display:none}
-@media(max-width:800px){.container{padding:16px 14px 92px}.grid,.form-grid,.row{grid-template-columns:1fr}h1{font-size:28px}.card{padding:22px}.head{display:none}.mobile-label{display:block}}
+@media(max-width:800px){.container{padding:16px 14px 92px}.grid,.form-grid,.filter-grid,.row{grid-template-columns:1fr}h1{font-size:28px}.card{padding:22px}.head{display:none}.mobile-label{display:block}}
 </style>
 </head>
 
@@ -46,7 +48,7 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
-<h1>☎️ Звонки</h1>
+<h1>Звонки</h1>
 <div class="small">
 История звонков, ручные заметки по разговору и база для будущей телефонии.
 </div>
@@ -73,7 +75,7 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
 {% if not settings["calls_enabled"] %}
 <div class="card">
 <div class="notice locked">
-🔒 Модуль звонков недоступен на текущем тарифе.<br>
+Модуль звонков недоступен на текущем тарифе.<br>
 Доступен на тарифах Бизнес, Бизнес + 1С и Корпоративный + 1С.
 </div>
 </div>
@@ -103,6 +105,40 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
         <div class="value">{{ call_stats.follow_up }}</div>
     </div>
 </div>
+</div>
+
+<div class="card">
+<h2>Фильтры</h2>
+<form method="get" action="/calls">
+    <div class="filter-grid">
+        <div>
+            <div class="label">Результат</div>
+            <select name="status">
+                <option value="" {% if not selected_call_status %}selected{% endif %}>Все результаты</option>
+                <option value="completed" {% if selected_call_status == "completed" %}selected{% endif %}>Состоялся</option>
+                <option value="missed" {% if selected_call_status == "missed" %}selected{% endif %}>Пропущен</option>
+                <option value="follow_up" {% if selected_call_status == "follow_up" %}selected{% endif %}>Нужен контакт</option>
+            </select>
+        </div>
+        <div>
+            <div class="label">{{ client_label }}</div>
+            <select name="client_id">
+                <option value="" {% if not selected_call_client_id %}selected{% endif %}>Все клиенты</option>
+                {% for client in clients %}
+                <option value="{{ client['id'] }}" {% if selected_call_client_id == client['id'] %}selected{% endif %}>{{ client["name"] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <div class="label">Поиск</div>
+            <input name="search" value="{{ selected_call_search }}" placeholder="Клиент, телефон или заметка">
+        </div>
+        <div>
+            <button type="submit">Показать</button>
+            <a class="reset-link" href="/calls">Сбросить</a>
+        </div>
+    </div>
+</form>
 </div>
 
 <div class="card">

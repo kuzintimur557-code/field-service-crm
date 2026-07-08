@@ -5820,6 +5820,10 @@ async def assert_calls_page():
         assert "Calls Smoke Client" in html
         assert "Calls Outsider Client" not in html
         assert 'action="/calls"' in html
+        assert "Фильтры" in html
+        assert 'name="status"' in html
+        assert 'placeholder="Клиент, телефон или заметка"' in html
+        assert "☎️ Звонки" not in html
         assert "Сохранить звонок" in html
 
         empty_response = await crm.create_call_record(
@@ -5899,6 +5903,24 @@ async def assert_calls_page():
         assert "Перезвонить завтра по оплате" in history_html
         assert "Нужен контакт" in history_html
         assert f'/clients/{client_id}' in history_html
+
+        filtered_response = await crm.calls_page(
+            make_asgi_request(
+                "owner2",
+                "/calls",
+                f"status=follow_up&client_id={client_id}&search=оплате",
+            ),
+            status="follow_up",
+            client_id=str(client_id),
+            search="оплате",
+        )
+        assert filtered_response.status_code == 200
+        filtered_html = filtered_response.body.decode("utf-8")
+        assert '<option value="follow_up" selected>Нужен контакт</option>' in filtered_html
+        assert f'<option value="{client_id}" selected>Calls Smoke Client</option>' in filtered_html
+        assert 'name="search" value="оплате"' in filtered_html
+        assert "Перезвонить завтра по оплате" in filtered_html
+        assert "Calls Outsider Client" not in filtered_html
 
         client_page_response = await crm.client_detail(
             make_asgi_request("owner2", f"/clients/{client_id}"),

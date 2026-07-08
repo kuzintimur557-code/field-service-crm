@@ -26880,7 +26880,12 @@ async def reports_page(request: Request, month: str = ""):
 
 
 @app.get("/calls", response_class=HTMLResponse)
-async def calls_page(request: Request):
+async def calls_page(
+    request: Request,
+    status: str = "",
+    client_id: str = "",
+    search: str = ""
+):
 
     username = get_user(request)
 
@@ -26899,6 +26904,14 @@ async def calls_page(request: Request):
         return disabled_response
 
     settings = get_company_settings(company_id)
+    selected_call_status = status if status in ("completed", "missed", "follow_up") else ""
+    selected_call_search = str(search or "").strip()
+    selected_call_client_id = None
+
+    try:
+        selected_call_client_id = int(str(client_id or "").strip()) if str(client_id or "").strip() else None
+    except ValueError:
+        selected_call_client_id = None
 
     conn = connect()
     c = conn.cursor()
@@ -26910,7 +26923,31 @@ async def calls_page(request: Request):
     ORDER BY name, id
     """, (company_id,)).fetchall()
 
-    call_records = c.execute("""
+    call_filters = ["call_records.company_id=?"]
+    call_params = [company_id]
+
+    if selected_call_status:
+        call_filters.append("call_records.status=?")
+        call_params.append(selected_call_status)
+
+    if selected_call_client_id:
+        call_filters.append("call_records.client_id=?")
+        call_params.append(selected_call_client_id)
+
+    if selected_call_search:
+        search_pattern = f"%{selected_call_search.lower()}%"
+        call_filters.append("""
+        (
+            LOWER(COALESCE(call_records.summary, '')) LIKE ?
+            OR LOWER(COALESCE(call_records.phone, '')) LIKE ?
+            OR LOWER(COALESCE(clients.name, '')) LIKE ?
+        )
+        """)
+        call_params.extend([search_pattern, search_pattern, search_pattern])
+
+    call_where_sql = " AND ".join(call_filters)
+
+    call_records = c.execute(f"""
     SELECT
         call_records.*,
         clients.name AS client_name
@@ -26918,11 +26955,11 @@ async def calls_page(request: Request):
     LEFT JOIN clients
       ON clients.id=call_records.client_id
      AND clients.company_id=call_records.company_id
-    WHERE call_records.company_id=?
+    WHERE {call_where_sql}
     ORDER BY COALESCE(call_records.call_at, call_records.created_at) DESC,
              call_records.id DESC
     LIMIT 50
-    """, (company_id,)).fetchall()
+    """, call_params).fetchall()
 
     call_stats = {
         "total": len(call_records),
@@ -26948,7 +26985,10 @@ async def calls_page(request: Request):
             "settings": settings,
             "clients": clients,
             "call_records": call_records,
-            "call_stats": call_stats
+            "call_stats": call_stats,
+            "selected_call_status": selected_call_status,
+            "selected_call_client_id": selected_call_client_id,
+            "selected_call_search": selected_call_search
         }
     )
 
