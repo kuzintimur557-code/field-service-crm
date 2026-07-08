@@ -29364,6 +29364,7 @@ async def more_page(request: Request):
     role = get_role(username)
     company_id = get_user_company_id(username)
     features = get_company_features(company_id)
+    settings = get_company_settings(company_id)
 
     return templates.TemplateResponse(
         request,
@@ -29372,7 +29373,8 @@ async def more_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "features": features
+            "features": features,
+            "settings": settings
         }
     )
 
