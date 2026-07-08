@@ -1152,11 +1152,19 @@ setInterval(loadA3DecisionEngine, 30000);
 
 <script>
 async function loadA3AutonomousActions() {
+    const container = document.getElementById("a3-autonomous-actions");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/autonomous-actions");
         const data = await response.json();
 
-        const container = document.getElementById("a3-autonomous-actions");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить автономные действия");
+        }
 
         container.innerHTML = "";
 
@@ -1225,6 +1233,8 @@ async function loadA3AutonomousActions() {
         }
     } catch (err) {
         console.error("Ошибка загрузки автономных действий", err);
+        const message = err.message || "Не удалось загрузить автономные действия";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
@@ -1308,6 +1318,10 @@ async function processA3AutonomousActions() {
 
         const data = await response.json();
 
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось выполнить ИИ-действия");
+        }
+
         const result = data.result || {};
 
         status.innerHTML = `
@@ -1328,10 +1342,11 @@ async function processA3AutonomousActions() {
 
     } catch (err) {
         console.error(err);
+        const message = err.message || "Не удалось выполнить ИИ-действия";
 
         status.innerHTML = `
             <div class="pill off">
-                Ошибка ИИ-выполнения
+                ${message}
             </div>
         `;
     } finally {

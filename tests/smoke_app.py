@@ -598,6 +598,8 @@ async def assert_automation_page():
     assert "Все действия" in html
     assert "Все цели" in html
     assert "ИИ-действия" in html
+    assert "Не удалось загрузить автономные действия" in html
+    assert "Не удалось выполнить ИИ-действия" in html
     assert "activeFilterLabels.map" in html
     assert "Отключить правило" in html
     assert "Повторить события" in html
