@@ -1046,6 +1046,10 @@ async def assert_automation_page():
         "worker_commission_updated",
         "Процент сотрудника изменён",
     ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "worker_deleted",
+        "Сотрудник удалён",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -14661,16 +14665,43 @@ async def assert_finance_margin(task):
     assert clean_toggle_response.status_code == 302
     assert clean_toggle_response.headers["location"] == "/workers?status_updated=1"
 
-    clean_delete_response = await crm.delete_team_user(
-        make_form_request(
-            "owner2",
-            f"/workers/{delete_candidate['id']}/delete",
-            {},
-        ),
-        delete_candidate["id"],
+    original_run_automation_event = crm.run_automation_event
+    worker_delete_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        worker_delete_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        clean_delete_response = await crm.delete_team_user(
+            make_form_request(
+                "owner2",
+                f"/workers/{delete_candidate['id']}/delete",
+                {},
+            ),
+            delete_candidate["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert clean_delete_response.status_code == 302
     assert clean_delete_response.headers["location"] == "/workers?deleted=1"
+    assert worker_delete_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_deleted",
+        "entity_type": "worker",
+        "entity_id": delete_candidate["id"],
+        "message": "Сотрудник удалён: delete_candidate2",
+        "link": "/workers",
+    }]
 
     conn = connect()
     c = conn.cursor()

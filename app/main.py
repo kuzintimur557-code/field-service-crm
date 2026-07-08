@@ -342,6 +342,7 @@ AUTOMATION_TRIGGERS = [
     ("worker_unavailability_changed", "Недоступность сотрудника изменена"),
     ("worker_profile_updated", "Карточка сотрудника обновлена"),
     ("worker_commission_updated", "Процент сотрудника изменён"),
+    ("worker_deleted", "Сотрудник удалён"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -390,6 +391,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "worker_unavailability_changed",
         "worker_profile_updated",
         "worker_commission_updated",
+        "worker_deleted",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -30722,6 +30724,15 @@ async def delete_team_user(request: Request, user_id: int):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        current_company_id,
+        "worker_deleted",
+        "worker",
+        user_id,
+        f"Сотрудник удалён: {user['username']}",
+        "/workers",
+    )
 
     return RedirectResponse("/workers?deleted=1", status_code=302)
 
