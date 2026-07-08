@@ -5564,6 +5564,74 @@ async def assert_home_page():
     assert "✅ Завершено" not in html
     assert "🚧 В работе" not in html
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO tasks (
+        company_id,
+        client,
+        phone,
+        address,
+        description,
+        task_date,
+        worker,
+        workers,
+        priority,
+        price,
+        status,
+        archived,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Main Search Smoke Client",
+        "+7 900 000-55-66",
+        "Smoke Address Lane 77",
+        "Searchable dashboard service",
+        "2026-06-16",
+        "",
+        "",
+        "Обычный",
+        "0",
+        "Новая",
+        0,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    search_task_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    try:
+        address_response = await crm.home(
+            make_asgi_request("owner2", "/", "search=Smoke Address Lane"),
+            search="Smoke Address Lane",
+        )
+        assert address_response.status_code == 200
+        address_html = address_response.body.decode("utf-8")
+        assert "Smoke Address Lane 77" in address_html
+        assert "Main Search Smoke Client" in address_html
+
+        phone_response = await crm.home(
+            make_asgi_request("owner2", "/", "search=000-55-66"),
+            search="000-55-66",
+        )
+        assert phone_response.status_code == 200
+        assert "Main Search Smoke Client" in phone_response.body.decode("utf-8")
+
+        description_response = await crm.home(
+            make_asgi_request("owner2", "/", "search=dashboard service"),
+            search="dashboard service",
+        )
+        assert description_response.status_code == 200
+        assert "Main Search Smoke Client" in description_response.body.decode("utf-8")
+    finally:
+        conn = connect()
+        c = conn.cursor()
+        c.execute("DELETE FROM tasks WHERE id=? AND company_id=2", (search_task_id,))
+        conn.commit()
+        conn.close()
+
 
 async def assert_login_page():
     response = await crm.login_page(make_public_asgi_request("/login"))

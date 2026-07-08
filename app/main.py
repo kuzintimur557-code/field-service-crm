@@ -12173,6 +12173,7 @@ async def home(
 
     conn = connect()
     c = conn.cursor()
+    selected_search = (search or "").strip()[:100]
 
     query = "SELECT * FROM tasks WHERE archived=0 AND company_id=?"
     params = [company_id]
@@ -12193,9 +12194,22 @@ async def home(
         query += " AND task_date=?"
         params.append(task_date)
 
-    if search:
-        query += " AND client LIKE ?"
-        params.append(f"%{search}%")
+    if selected_search:
+        search_pattern = f"%{selected_search}%"
+        query += """
+        AND (
+            client LIKE ?
+            OR phone LIKE ?
+            OR address LIKE ?
+            OR description LIKE ?
+        )
+        """
+        params.extend([
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+        ])
 
     query += " ORDER BY id DESC"
 
@@ -12389,7 +12403,7 @@ async def home(
             "selected_status": status,
             "selected_worker": worker,
             "selected_date": task_date,
-            "search": search,
+            "search": selected_search,
             "features": features,
             "settings": settings
         }
