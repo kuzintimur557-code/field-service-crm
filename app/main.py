@@ -26993,6 +26993,137 @@ async def calls_page(
     )
 
 
+@app.get("/calls/export")
+async def calls_export(
+    request: Request,
+    status: str = "",
+    client_id: str = "",
+    search: str = ""
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calls")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    if not settings or not settings["calls_enabled"]:
+        return RedirectResponse("/calls", status_code=302)
+
+    selected_call_status = status if status in ("completed", "missed", "follow_up") else ""
+    selected_call_search = str(search or "").strip()
+    selected_call_client_id = None
+
+    try:
+        selected_call_client_id = int(str(client_id or "").strip()) if str(client_id or "").strip() else None
+    except ValueError:
+        selected_call_client_id = None
+
+    call_filters = ["call_records.company_id=?"]
+    call_params = [company_id]
+
+    if selected_call_status:
+        call_filters.append("call_records.status=?")
+        call_params.append(selected_call_status)
+
+    if selected_call_client_id:
+        call_filters.append("call_records.client_id=?")
+        call_params.append(selected_call_client_id)
+
+    if selected_call_search:
+        search_pattern = f"%{selected_call_search.lower()}%"
+        call_filters.append("""
+        (
+            LOWER(COALESCE(call_records.summary, '')) LIKE ?
+            OR LOWER(COALESCE(call_records.phone, '')) LIKE ?
+            OR LOWER(COALESCE(clients.name, '')) LIKE ?
+        )
+        """)
+        call_params.extend([search_pattern, search_pattern, search_pattern])
+
+    call_where_sql = " AND ".join(call_filters)
+
+    conn = connect()
+    c = conn.cursor()
+
+    call_records = c.execute(f"""
+    SELECT
+        call_records.*,
+        clients.name AS client_name
+    FROM call_records
+    LEFT JOIN clients
+      ON clients.id=call_records.client_id
+     AND clients.company_id=call_records.company_id
+    WHERE {call_where_sql}
+    ORDER BY COALESCE(call_records.call_at, call_records.created_at) DESC,
+             call_records.id DESC
+    """, call_params).fetchall()
+
+    conn.close()
+
+    direction_labels = {
+        "incoming": "Входящий",
+        "outgoing": "Исходящий",
+    }
+    status_labels = {
+        "completed": "Состоялся",
+        "missed": "Пропущен",
+        "follow_up": "Нужен контакт",
+    }
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Дата",
+        "Клиент",
+        "Телефон",
+        "Тип",
+        "Результат",
+        "Длительность, минут",
+        "Заметка",
+        "Автор"
+    ])
+
+    for call in call_records:
+        writer.writerow([
+            call["call_at"] or call["created_at"],
+            call["client_name"] or "Без привязки",
+            call["phone"] or "",
+            direction_labels.get(call["direction"], call["direction"] or ""),
+            status_labels.get(call["status"], call["status"] or ""),
+            call["duration_minutes"] or 0,
+            call["summary"] or "",
+            call["username"] or ""
+        ])
+
+    filename_parts = [
+        selected_call_status or "all",
+        str(selected_call_client_id or "all"),
+        "search" if selected_call_search else "all",
+    ]
+    filename = "calls_" + "_".join(filename_parts) + ".csv"
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
 @app.post("/calls")
 async def create_call_record(request: Request):
 

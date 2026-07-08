@@ -136,6 +136,7 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
         <div>
             <button type="submit">Показать</button>
             <a class="reset-link" href="/calls">Сбросить</a>
+            <a class="reset-link" href="/calls/export?status={{ selected_call_status }}&client_id={{ selected_call_client_id or '' }}&search={{ selected_call_search|urlencode }}">Экспорт CSV</a>
         </div>
     </div>
 </form>

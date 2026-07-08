@@ -5823,6 +5823,7 @@ async def assert_calls_page():
         assert "Фильтры" in html
         assert 'name="status"' in html
         assert 'placeholder="Клиент, телефон или заметка"' in html
+        assert 'href="/calls/export?' in html
         assert "☎️ Звонки" not in html
         assert "Сохранить звонок" in html
 
@@ -5921,6 +5922,29 @@ async def assert_calls_page():
         assert 'name="search" value="оплате"' in filtered_html
         assert "Перезвонить завтра по оплате" in filtered_html
         assert "Calls Outsider Client" not in filtered_html
+
+        export_response = await crm.calls_export(
+            make_asgi_request(
+                "owner2",
+                "/calls/export",
+                f"status=follow_up&client_id={client_id}&search=оплате",
+            ),
+            status="follow_up",
+            client_id=str(client_id),
+            search="оплате",
+        )
+        assert export_response.status_code == 200
+        assert export_response.media_type == "text/csv; charset=utf-8"
+        assert (
+            f"calls_follow_up_{client_id}_search.csv"
+            in export_response.headers["Content-Disposition"]
+        )
+        export_csv = export_response.body.decode("utf-8")
+        assert export_csv.startswith("\ufeff")
+        assert "Дата,Клиент,Телефон,Тип,Результат" in export_csv
+        assert "Calls Smoke Client" in export_csv
+        assert "Перезвонить завтра по оплате" in export_csv
+        assert "Calls Outsider Client" not in export_csv
 
         client_page_response = await crm.client_detail(
             make_asgi_request("owner2", f"/clients/{client_id}"),
