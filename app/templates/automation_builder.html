@@ -329,7 +329,6 @@
                         </select>
                         <button class="small-button" type="submit">Сохранить условия</button>
                     </form>
-                    <div class="meta" style="margin-top:8px">{{ rule["conditions_json"] or "{}" }}</div>
                     <form method="post" action="/automation/rules/{{ rule['id'] }}/test-condition" style="margin-top:12px">
                         <select name="task_id" aria-label="Заявка для проверки" required>
                             <option value="">Выберите заявку для теста</option>

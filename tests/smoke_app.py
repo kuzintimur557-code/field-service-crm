@@ -830,6 +830,7 @@ async def assert_automation_page():
     assert "Сохранить условия" in builder_html
     assert "Проверить условие" in builder_html
     assert "Выберите заявку для теста" in builder_html
+    assert '"mode":' not in builder_html
     assert 'name="condition_operator"' in builder_html
     assert 'name="condition_secondary_mode"' in builder_html
     assert 'name="condition_tertiary_mode"' in builder_html
