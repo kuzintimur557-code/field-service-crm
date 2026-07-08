@@ -966,6 +966,10 @@ async def assert_automation_page():
         "Финансы заявки изменены",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "task_photo_uploaded",
+        "Фото заявки загружено",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "sla_deadline_changed",
         "Срок SLA изменён",
     ) in crm.AUTOMATION_TRIGGERS
@@ -15691,6 +15695,70 @@ async def assert_notifications(task):
     assert unread_count == 0
 
 
+async def assert_task_photo_automation(task):
+    original_send_message = crm.send_message
+    original_send_photo = crm.send_photo
+    original_run_automation_event = crm.run_automation_event
+    photo_events = []
+    crm.send_message = lambda text: True
+    crm.send_photo = lambda path, caption: True
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        photo_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        before_response = await crm.update_before_photo(
+            make_request("owner2"),
+            task["id"],
+            before_photo=crm.UploadFile(
+                file=crm.io.BytesIO(b"before photo smoke"),
+                filename="before-smoke.jpg",
+            ),
+        )
+        report_response = await crm.update_report(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/report",
+                {"report": "Photo automation report"},
+            ),
+            task["id"],
+            after_photo=crm.UploadFile(
+                file=crm.io.BytesIO(b"after photo smoke"),
+                filename="after-smoke.jpg",
+            ),
+        )
+    finally:
+        crm.send_message = original_send_message
+        crm.send_photo = original_send_photo
+        crm.run_automation_event = original_run_automation_event
+
+    assert before_response.status_code == 302
+    assert report_response.status_code == 302
+    assert before_response.headers["location"] == f"/task/{task['id']}"
+    assert report_response.headers["location"] == f"/task/{task['id']}"
+    assert [event["trigger_key"] for event in photo_events] == [
+        "task_photo_uploaded",
+        "task_photo_uploaded",
+    ]
+    assert all(event["company_id"] == 2 for event in photo_events)
+    assert all(event["entity_type"] == "task" for event in photo_events)
+    assert all(event["entity_id"] == task["id"] for event in photo_events)
+    assert photo_events[0]["message"] == f"Загружено фото до заявки #{task['id']}"
+    assert photo_events[1]["message"] == (
+        f"Загружено фото после заявки #{task['id']}"
+    )
+    assert all(event["link"] == f"/task/{task['id']}" for event in photo_events)
+
+
 async def assert_client_card(task):
     crm.log_task_activity(
         task["id"],
@@ -20132,6 +20200,7 @@ def main():
         asyncio.run(assert_finance_summary_page())
         asyncio.run(assert_owner_dashboard_page())
         asyncio.run(assert_notifications(task))
+        asyncio.run(assert_task_photo_automation(task))
         asyncio.run(assert_client_card(task))
         asyncio.run(assert_overdue_sla(task))
         asyncio.run(assert_recurring_generate(task))

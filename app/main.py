@@ -315,6 +315,7 @@ AUTOMATION_TRIGGERS = [
     ("task_restored", "Заявка восстановлена из архива"),
     ("task_details_changed", "Данные заявки изменены"),
     ("task_finance_changed", "Финансы заявки изменены"),
+    ("task_photo_uploaded", "Фото заявки загружено"),
     ("recurring_task_generated", "Создана регулярная заявка"),
     ("payment_status_changed", "Статус оплаты изменён"),
     ("task_comment_added", "Комментарий к заявке добавлен"),
@@ -348,6 +349,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "task_archived",
         "task_restored",
         "task_details_changed",
+        "task_photo_uploaded",
         "task_comment_added",
         "recurring_task_generated",
         "overdue_task",
@@ -35108,6 +35110,15 @@ async def update_before_photo(
             filename
         )
 
+        run_automation_event(
+            get_task_company_id(task),
+            "task_photo_uploaded",
+            "task",
+            task_id,
+            f"Загружено фото до заявки #{task_id}",
+            f"/task/{task_id}",
+        )
+
     try:
         if filename:
             send_photo(
@@ -35186,6 +35197,15 @@ async def update_report(
             role,
             "Загружено фото после",
             new_after_filename
+        )
+
+        run_automation_event(
+            get_task_company_id(task),
+            "task_photo_uploaded",
+            "task",
+            task_id,
+            f"Загружено фото после заявки #{task_id}",
+            f"/task/{task_id}",
         )
 
     try:
