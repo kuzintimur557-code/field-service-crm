@@ -12349,6 +12349,20 @@ async def home(
             })
 
     settings = get_company_settings(company_id)
+    call_follow_up_count = 0
+
+    if (
+        role in ("boss", "manager")
+        and features.get("calls", True)
+        and settings
+        and settings["calls_enabled"]
+    ):
+        call_follow_up_count = c.execute("""
+        SELECT COUNT(*)
+        FROM call_records
+        WHERE company_id=?
+          AND status='follow_up'
+        """, (company_id,)).fetchone()[0]
 
     conn.close()
 
@@ -12369,6 +12383,7 @@ async def home(
             "sla_breached_tasks": sla_breached_tasks,
             "sla_due_soon_tasks": sla_due_soon_tasks,
             "active_workers": active_workers,
+            "call_follow_up_count": call_follow_up_count,
             "workers": workers,
             "worker_stats": worker_stats,
             "selected_status": status,

@@ -172,6 +172,15 @@ h1{font-size:30px}
 </div>
 {% endif %}
 
+{% if role in ["boss", "manager"] and f.get("calls", True) and settings["calls_enabled"] and call_follow_up_count > 0 %}
+<div class="alert warning">
+    Нужен контакт после звонков: {{ call_follow_up_count }}
+    <a href="/calls?status=follow_up">
+        Открыть
+    </a>
+</div>
+{% endif %}
+
 <div class="stats">
 
     <a href="/today" class="stat" style="text-decoration:none;color:inherit">
@@ -202,6 +211,14 @@ h1{font-size:30px}
         <div class="stat-value">{{ active_workers }}</div>
     </a>
     {% endif %}
+
+    {% if role in ["boss", "manager"] and f.get("calls", True) and settings["calls_enabled"] %}
+    <a href="/calls?status=follow_up" class="stat" style="text-decoration:none;color:inherit">
+        <div class="stat-title">Нужен контакт</div>
+        <div class="stat-value">{{ call_follow_up_count }}</div>
+    </a>
+    {% endif %}
+
     <div class="stat">
         <div class="stat-label">Всего: {{ task_label }}</div>
         <div class="stat-value">{{ total_tasks }}</div>
