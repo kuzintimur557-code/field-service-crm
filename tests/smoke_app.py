@@ -891,6 +891,7 @@ async def assert_automation_page():
     assert "Только заявки в работе" in builder_html
     assert "Только отменённые заявки" in builder_html
     assert "Только задачи с исполнителем" in builder_html
+    assert "Только задачи без исполнителя" in builder_html
     assert "Только задачи на сегодня" in builder_html
     assert "Только просроченные задачи" in builder_html
     assert 'optgroup label="Статус заявки"' in builder_html
@@ -3292,6 +3293,34 @@ async def assert_automation_runner(task):
     assert crm.automation_condition_matches(
         c, 2, specific_worker_rule, "task", task["id"]
     )[0] is False
+
+    c.execute("""
+    UPDATE tasks
+    SET worker='',
+        workers=''
+    WHERE id=?
+    """, (task["id"],))
+    conn.commit()
+    unassigned_worker_rule = {
+        "conditions_json": json.dumps({
+            "mode": "worker_unassigned",
+            "label": "Только задачи без исполнителя",
+        }, ensure_ascii=False),
+    }
+    assert crm.automation_condition_matches(
+        c, 2, unassigned_worker_rule, "task", task["id"]
+    )[0] is True
+    c.execute("""
+    UPDATE tasks
+    SET worker=?,
+        workers=?
+    WHERE id=?
+    """, (
+        task["worker"],
+        task["workers"],
+        task["id"],
+    ))
+    conn.commit()
 
     task_text_rule = {
         "conditions_json": json.dumps({

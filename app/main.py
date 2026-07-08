@@ -2966,6 +2966,10 @@ def automation_condition_matches(c, company_id, rule, entity_type, entity_id):
         if get_task_worker_names(task):
             return True, ""
 
+    elif mode == "worker_unassigned":
+        if not get_task_worker_names(task):
+            return True, ""
+
     elif mode == "worker_specific":
         selected_worker = str(conditions.get("value") or "").strip()
         if selected_worker and task_has_worker(selected_worker, task):
@@ -12709,6 +12713,7 @@ async def automation_builder_page(request: Request):
         ("payment_partial", "Только частично оплаченные заявки"),
         ("payment_paid", "Только оплаченные заявки"),
         ("worker_assigned", "Только задачи с исполнителем"),
+        ("worker_unassigned", "Только задачи без исполнителя"),
         ("worker_specific", "Только выбранный исполнитель"),
         ("date_today", "Только задачи на сегодня"),
         ("date_overdue", "Только просроченные задачи"),
@@ -12730,12 +12735,12 @@ async def automation_builder_page(request: Request):
         ("Базовые", condition_presets[:4]),
         ("Статус заявки", condition_presets[4:8]),
         ("Оплата", condition_presets[8:11]),
-        ("Исполнители", condition_presets[11:13]),
-        ("Дата", condition_presets[13:16]),
-        ("Цена", condition_presets[16:18]),
-        ("Каталог", condition_presets[18:19]),
-        ("SLA", condition_presets[19:22]),
-        ("Клиенты", condition_presets[22:]),
+        ("Исполнители", condition_presets[11:14]),
+        ("Дата", condition_presets[14:17]),
+        ("Цена", condition_presets[17:19]),
+        ("Каталог", condition_presets[19:20]),
+        ("SLA", condition_presets[20:23]),
+        ("Клиенты", condition_presets[23:]),
     ]
     condition_labels = dict(condition_presets)
     rules_view = []
@@ -14231,6 +14236,12 @@ async def update_automation_rule_conditions(request: Request, rule_id: int):
             "field": "workers",
             "operator": "not_empty",
             "label": "Только задачи с исполнителем",
+        },
+        "worker_unassigned": {
+            "mode": "worker_unassigned",
+            "field": "workers",
+            "operator": "empty",
+            "label": "Только задачи без исполнителя",
         },
         "worker_specific": {
             "mode": "worker_specific",

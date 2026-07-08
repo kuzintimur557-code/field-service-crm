@@ -51,6 +51,7 @@ def _condition_summary(conditions_json):
         "payment_partial": "Только частично оплаченные заявки",
         "payment_paid": "Только оплаченные заявки",
         "worker_assigned": "Только задачи с исполнителем",
+        "worker_unassigned": "Только задачи без исполнителя",
         "worker_specific": "Только выбранный исполнитель",
         "date_today": "Только задачи на сегодня",
         "date_overdue": "Только просроченные задачи",
