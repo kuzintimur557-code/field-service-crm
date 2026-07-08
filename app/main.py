@@ -10300,7 +10300,7 @@ async def platform_readiness_snapshot_export(
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Снимок готовности релиза"])
-    writer.writerow(["ID", snapshot["id"]])
+    writer.writerow(["Номер", snapshot["id"]])
     writer.writerow(["Дата", snapshot["created_at"]])
     writer.writerow(["Автор", snapshot["created_by"]])
     writer.writerow(["Статус", snapshot["status_label"]])
@@ -10945,7 +10945,7 @@ async def platform_calendar_health_export(
     writer.writerow([])
     writer.writerow(["Компании"])
     writer.writerow([
-        "ID компании",
+        "Номер компании",
         "Компания",
         "Владелец",
         "Приоритет",
@@ -11120,7 +11120,7 @@ async def platform_calendar_incident_analytics_export(
 
     writer.writerow(["Компании"])
     writer.writerow([
-        "ID компании",
+        "Номер компании",
         "Компания",
         "Риск",
         "Оценка риска",
@@ -11261,7 +11261,7 @@ async def platform_calendar_company_health_export(
     writer = csv.writer(output)
 
     writer.writerow(["Сводка"])
-    writer.writerow(["ID компании", company["company_id"]])
+    writer.writerow(["Номер компании", company["company_id"]])
     writer.writerow(["Компания", company["company_name"]])
     writer.writerow(["Владелец", company["owner_username"]])
     writer.writerow(["Состояние", company["status_label"]])
@@ -23774,7 +23774,7 @@ async def finance_export(
     worker_finance = {}
 
     writer.writerow([
-        "ID",
+        "Номер",
         "Дата",
         "Клиент",
         "Телефон",
@@ -24071,7 +24071,7 @@ async def sla_analytics_export(request: Request):
     writer = csv.writer(output)
 
     writer.writerow([
-        "ID заявки",
+        "Номер заявки",
         "Клиент",
         "Исполнители",
         "Дата заявки",
@@ -26746,7 +26746,7 @@ async def ai_assistant_events_export(request: Request, event_filter: str = ""):
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Дата", "Автор", "Действие", "Заметка ID", "Детали"])
+    writer.writerow(["Дата", "Автор", "Действие", "Номер заметки", "Детали"])
 
     for event in events:
         writer.writerow([

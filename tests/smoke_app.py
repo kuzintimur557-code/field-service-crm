@@ -4638,7 +4638,7 @@ async def assert_ai_assistant_page():
     events_export_response = await crm.ai_assistant_events_export(make_request("owner2"))
     assert events_export_response.status_code == 200
     events_export_csv = events_export_response.body.decode("utf-8")
-    assert "Дата,Автор,Действие,Заметка ID,Детали" in events_export_csv
+    assert "Дата,Автор,Действие,Номер заметки,Детали" in events_export_csv
     assert "owner2" in events_export_csv
     assert "created" in events_export_csv
     assert "done" in events_export_csv
@@ -8353,7 +8353,7 @@ async def assert_platform_calendar_health():
         assert "Старейший активный инцидент" in export_csv
         assert "Просрочена реакция" in export_csv
         assert "Компании" in export_csv
-        assert "ID компании,Компания,Владелец,Приоритет" in export_csv
+        assert "Номер компании,Компания,Владелец,Приоритет" in export_csv
         assert "Реакция просрочена" in export_csv
         assert "SLA срок" in export_csv
         assert "Реакция просрочена на" in export_csv
