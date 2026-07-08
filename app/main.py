@@ -35063,6 +35063,7 @@ A3_API_ERROR_MESSAGES = {
     "target_not_found": "Цель не найдена",
     "protected_rule": "Правило защищено",
     "duplicate_pending_action": "Такое действие уже ждёт подтверждения",
+    "cooldown_active": "Слишком много одинаковых действий за короткое время",
 }
 
 

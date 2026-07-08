@@ -17893,6 +17893,10 @@ async def assert_a3_api_layer():
     )
     assert cooldown_blocked_action["queued"] is False
     assert cooldown_blocked_action["reason"] == "cooldown_active"
+    assert (
+        crm.A3_API_ERROR_MESSAGES["cooldown_active"]
+        == "Слишком много одинаковых действий за короткое время"
+    )
 
     conn = connect()
     c = conn.cursor()
