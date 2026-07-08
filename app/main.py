@@ -12384,6 +12384,14 @@ async def home(
           AND status='follow_up'
         """, (company_id,)).fetchone()[0]
 
+    unread_notification_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
+      AND is_read=0
+    """, (company_id, username)).fetchone()[0]
+
     conn.close()
 
     return templates.TemplateResponse(
@@ -12404,6 +12412,7 @@ async def home(
             "sla_due_soon_tasks": sla_due_soon_tasks,
             "active_workers": active_workers,
             "call_follow_up_count": call_follow_up_count,
+            "unread_notification_count": unread_notification_count,
             "workers": workers,
             "worker_stats": worker_stats,
             "selected_status": status,
@@ -30298,6 +30307,19 @@ async def more_page(request: Request):
     company_id = get_user_company_id(username)
     features = get_company_features(company_id)
     settings = get_company_settings(company_id)
+    unread_notification_count = 0
+
+    if company_id:
+        conn = connect()
+        c = conn.cursor()
+        unread_notification_count = c.execute("""
+        SELECT COUNT(*)
+        FROM notifications
+        WHERE company_id=?
+          AND username=?
+          AND is_read=0
+        """, (company_id, username)).fetchone()[0]
+        conn.close()
 
     return templates.TemplateResponse(
         request,
@@ -30307,7 +30329,8 @@ async def more_page(request: Request):
             "username": username,
             "role": role,
             "features": features,
-            "settings": settings
+            "settings": settings,
+            "unread_notification_count": unread_notification_count
         }
     )
 

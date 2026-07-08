@@ -5531,6 +5531,7 @@ async def assert_more_page():
     assert "Ещё" in html
     assert "Главная" in html
     assert "Мой профиль" in html
+    assert "Уведомления" in html
     assert "ИИ-инсайты" in html
     assert "ИИ-помощник" in html
     assert 'class="mobile-nav"' in html
@@ -17398,6 +17399,16 @@ async def assert_notifications(task):
     assert 'class="mobile-nav"' in notifications_html
     assert ".container{padding:14px 14px 92px}" in notifications_html
     assert "🔔 Уведомления" not in notifications_html
+
+    dashboard_response = await crm.home(make_asgi_request("owner2", "/"))
+    assert dashboard_response.status_code == 200
+    dashboard_html = dashboard_response.body.decode("utf-8")
+    assert "Уведомления ·" in dashboard_html
+
+    more_response = await crm.more_page(make_asgi_request("owner2", "/more"))
+    assert more_response.status_code == 200
+    more_html = more_response.body.decode("utf-8")
+    assert "Уведомления ·" in more_html
 
     unread_response = await crm.notifications_page(
         make_asgi_request("owner2", "/notifications", "filter=unread"),

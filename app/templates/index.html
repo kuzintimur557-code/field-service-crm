@@ -129,7 +129,7 @@ h1{font-size:30px}
         {% endif %}
 
         {% if f.get("notifications", True) %}
-        <a href="/notifications" class="dark">Уведомления</a>
+        <a href="/notifications" class="dark">Уведомления{% if unread_notification_count and unread_notification_count > 0 %} · {{ unread_notification_count }}{% endif %}</a>
         {% endif %}
         <a href="/profile" class="dark">Профиль</a>
         <a href="/logout" class="red">Выйти</a>

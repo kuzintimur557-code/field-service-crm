@@ -41,6 +41,9 @@ h1{margin:0 0 8px;font-size:32px}
 
 <a href="/">Главная</a>
 <a href="/profile">Мой профиль</a>
+{% if f.get("notifications", True) %}
+<a href="/notifications">Уведомления{% if unread_notification_count and unread_notification_count > 0 %} · {{ unread_notification_count }}{% endif %}</a>
+{% endif %}
 {% if f.get("calendar", True) %}
 <a href="/calendar">Календарь</a>
 {% endif %}
