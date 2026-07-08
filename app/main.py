@@ -316,6 +316,7 @@ AUTOMATION_TRIGGERS = [
     ("task_details_changed", "Данные заявки изменены"),
     ("task_finance_changed", "Финансы заявки изменены"),
     ("task_photo_uploaded", "Фото заявки загружено"),
+    ("task_report_updated", "Отчёт по заявке обновлён"),
     ("recurring_task_generated", "Создана регулярная заявка"),
     ("payment_status_changed", "Статус оплаты изменён"),
     ("task_comment_added", "Комментарий к заявке добавлен"),
@@ -350,6 +351,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "task_restored",
         "task_details_changed",
         "task_photo_uploaded",
+        "task_report_updated",
         "task_comment_added",
         "recurring_task_generated",
         "overdue_task",
@@ -35163,6 +35165,7 @@ async def update_report(
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    previous_report = str(task["report"] or "")
     after_filename = task["after_photo"] if "after_photo" in task.keys() else ""
     new_after_filename = save_upload_file(after_photo, task_id, "after")
 
@@ -35189,6 +35192,16 @@ async def update_report(
         "Обновлён отчёт исполнителя",
         report or ""
     )
+
+    if previous_report != str(report or ""):
+        run_automation_event(
+            get_task_company_id(task),
+            "task_report_updated",
+            "task",
+            task_id,
+            f"Отчёт по заявке #{task_id} обновлён",
+            f"/task/{task_id}",
+        )
 
     if new_after_filename:
         log_task_activity(

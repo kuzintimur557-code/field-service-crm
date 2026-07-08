@@ -970,6 +970,10 @@ async def assert_automation_page():
         "Фото заявки загружено",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "task_report_updated",
+        "Отчёт по заявке обновлён",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "sla_deadline_changed",
         "Срок SLA изменён",
     ) in crm.AUTOMATION_TRIGGERS
@@ -15747,6 +15751,7 @@ async def assert_task_photo_automation(task):
     assert report_response.headers["location"] == f"/task/{task['id']}"
     assert [event["trigger_key"] for event in photo_events] == [
         "task_photo_uploaded",
+        "task_report_updated",
         "task_photo_uploaded",
     ]
     assert all(event["company_id"] == 2 for event in photo_events)
@@ -15754,6 +15759,9 @@ async def assert_task_photo_automation(task):
     assert all(event["entity_id"] == task["id"] for event in photo_events)
     assert photo_events[0]["message"] == f"Загружено фото до заявки #{task['id']}"
     assert photo_events[1]["message"] == (
+        f"Отчёт по заявке #{task['id']} обновлён"
+    )
+    assert photo_events[2]["message"] == (
         f"Загружено фото после заявки #{task['id']}"
     )
     assert all(event["link"] == f"/task/{task['id']}" for event in photo_events)
