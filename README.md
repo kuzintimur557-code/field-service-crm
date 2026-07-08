@@ -110,7 +110,7 @@ BASE=http://127.0.0.1:8000 ./quick_check.sh
 Полный локальный smoke:
 
 ```bash
-python3 -m py_compile app/main.py app/database.py tests/smoke_app.py tests/smoke_security.py
+python3 -m compileall -q app tests
 python3 tests/smoke_app.py
 python3 tests/smoke_security.py
 ```
