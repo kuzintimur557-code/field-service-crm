@@ -307,6 +307,7 @@ ALLOWED_CLIENT_FILE_EXTENSIONS = {
 PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 AUTOMATION_TRIGGERS = [
+    ("new_task", "Новая заявка"),
     ("overdue_task", "Просрочена задача"),
     ("sla_overdue", "Просрочен SLA"),
     ("unpaid_task", "Нет оплаты"),
@@ -32490,6 +32491,15 @@ async def create_task(
             "Превышен дневной лимит",
             f"Подтверждено при создании. {capacity_details}",
         )
+
+    run_automation_event(
+        company_id,
+        "new_task",
+        "task",
+        task_id,
+        f"Создана новая заявка #{task_id}",
+        f"/task/{task_id}",
+    )
 
     text = f"""
 🚀 Новая заявка #{task_id}

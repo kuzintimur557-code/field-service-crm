@@ -4819,6 +4819,35 @@ async def assert_ai_assistant_page():
 
     assert task_note is not None
 
+    new_task_rule_response = await crm.create_automation_rule(
+        make_form_request(
+            "owner2",
+            "/automation/rules",
+            {
+                "name": "Новая заявка smoke",
+                "trigger_key": "new_task",
+                "action_key": "notification",
+                "target_username": "owner2",
+                "message": "New task trigger matched",
+            },
+        )
+    )
+    assert new_task_rule_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    new_task_rule = c.execute("""
+    SELECT *
+    FROM automation_rules
+    WHERE company_id=2
+      AND name='Новая заявка smoke'
+    ORDER BY id DESC
+    """).fetchone()
+    conn.close()
+
+    assert new_task_rule is not None
+    assert new_task_rule["trigger_key"] == "new_task"
+
     original_send_message = crm.send_message
     original_send_message_to_chat = crm.send_message_to_chat
     crm.send_message = lambda text: True
@@ -4862,6 +4891,41 @@ async def assert_ai_assistant_page():
     assert linked_note is not None
     assert linked_note["is_done"] == 1
     assert linked_note["created_task_id"] is not None
+
+    conn = connect()
+    c = conn.cursor()
+    new_task_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='new_task'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (
+        new_task_rule["id"],
+        linked_note["created_task_id"],
+    )).fetchone()
+    new_task_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Новая заявка smoke'
+      AND message='New task trigger matched'
+    ORDER BY id DESC
+    """).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (new_task_rule["id"],))
+    c.execute("DELETE FROM notifications WHERE title='Новая заявка smoke'")
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (new_task_rule["id"],))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (new_task_rule["id"],))
+    conn.commit()
+    conn.close()
+
+    assert new_task_event is not None
+    assert new_task_event["status"] == "done"
+    assert new_task_notification is not None
 
     linked_page_response = await crm.ai_assistant_page(make_asgi_request("owner2", "/ai/assistant"))
     assert linked_page_response.status_code == 200
