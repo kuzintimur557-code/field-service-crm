@@ -8689,6 +8689,87 @@ async def assert_platform_companies_page():
     assert "Заполните все поля" in error_html
     assert "❌ Заполните все поля" not in error_html
 
+    conn = connect()
+    c = conn.cursor()
+    c.executemany("""
+    INSERT OR IGNORE INTO companies (
+        id, name, owner_username, created_at
+    )
+    VALUES (?, ?, ?, ?)
+    """, [
+        (1, "Smoke Company 1", "owner1", "2026-05-17 09:00"),
+        (2, "Smoke Company 2", "owner2", "2026-05-17 09:00"),
+    ])
+    conn.commit()
+    conn.close()
+
+    logistics_response = await crm.create_platform_company(
+        make_form_request(
+            "super",
+            "/platform/companies",
+            {
+                "company_name": "Smoke Logistics Company",
+                "owner_username": "smoke_logistics_owner",
+                "owner_password": "logistics123",
+                "industry": "logistics",
+            },
+        )
+    )
+    assert logistics_response.status_code == 302
+    assert logistics_response.headers["location"] == "/platform/companies?created=1"
+
+    conn = connect()
+    c = conn.cursor()
+    logistics_company = c.execute("""
+    SELECT *
+    FROM companies
+    WHERE owner_username=?
+    """, ("smoke_logistics_owner",)).fetchone()
+    assert logistics_company is not None
+
+    logistics_settings = c.execute("""
+    SELECT *
+    FROM company_settings
+    WHERE company_id=?
+    """, (logistics_company["id"],)).fetchone()
+    assert logistics_settings is not None
+    assert logistics_settings["industry"] == "logistics"
+    assert logistics_settings["task_label"] == "Рейс"
+    assert logistics_settings["worker_label"] == "Водитель"
+    assert logistics_settings["service_label"] == "Перевозка"
+
+    logistics_features = {
+        row["feature_key"]: row["enabled"]
+        for row in c.execute("""
+        SELECT feature_key, enabled
+        FROM company_features
+        WHERE company_id=?
+        """, (logistics_company["id"],)).fetchall()
+    }
+    assert logistics_features["tasks"] == 1
+    assert logistics_features["notifications"] == 1
+    assert logistics_features["recurring"] == 1
+    assert logistics_features["catalog"] == 0
+
+    c.execute(
+        "DELETE FROM company_features WHERE company_id=?",
+        (logistics_company["id"],),
+    )
+    c.execute(
+        "DELETE FROM company_settings WHERE company_id=?",
+        (logistics_company["id"],),
+    )
+    c.execute(
+        "DELETE FROM users WHERE company_id=?",
+        (logistics_company["id"],),
+    )
+    c.execute(
+        "DELETE FROM companies WHERE id=?",
+        (logistics_company["id"],),
+    )
+    conn.commit()
+    conn.close()
+
 
 async def assert_platform_calendar_health():
     policy_environment_names = (

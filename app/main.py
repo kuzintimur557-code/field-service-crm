@@ -1493,6 +1493,7 @@ def apply_business_preset(company_id, industry):
     c.execute("""
     UPDATE company_settings
     SET
+        industry=?,
         task_label=?,
         worker_label=?,
         client_label=?,
@@ -1500,6 +1501,7 @@ def apply_business_preset(company_id, industry):
         updated_at=?
     WHERE company_id=?
     """, (
+        industry,
         labels["task_label"],
         labels["worker_label"],
         labels["client_label"],
@@ -6542,12 +6544,18 @@ async def create_platform_company(request: Request):
     company_name = (form.get("company_name") or "").strip()
     owner_username = (form.get("owner_username") or "").strip()
     owner_password = (form.get("owner_password") or "").strip()
+    industry = (form.get("industry") or "field_service").strip()
 
     if not company_name or not owner_username or not owner_password:
         return RedirectResponse("/platform/companies?error=empty", status_code=302)
 
     if not is_password_strong(owner_password):
         return RedirectResponse("/platform/companies?error=weak_password", status_code=302)
+
+    allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
+
+    if industry not in allowed_industries:
+        industry = "field_service"
 
     conn = connect()
     c = conn.cursor()
@@ -6618,7 +6626,7 @@ async def create_platform_company(request: Request):
 
     conn.commit()
     conn.close()
-    ensure_company_features(company_id)
+    apply_business_preset(company_id, industry)
 
     return RedirectResponse("/platform/companies?created=1", status_code=302)
 
