@@ -20155,6 +20155,8 @@ async def calendar_day_route_page(
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     try:
         selected_day = datetime.strptime(
             str(date or datetime.now().strftime("%Y-%m-%d")),
@@ -20359,6 +20361,7 @@ async def calendar_day_route_page(
             "can_publish_day": can_auto_manage_day,
             "day_auto_plan": day_auto_plan,
             "day_conflict_repair": day_conflict_repair,
+            "settings": settings,
             "previous_day_url": day_url(
                 selected_day - timedelta(days=1)
             ),

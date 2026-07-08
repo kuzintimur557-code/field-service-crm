@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <title>Маршрут дня</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -206,9 +209,9 @@ h1{margin:0;font-size:30px}
             </div>
             {% if role in ("boss", "manager") %}
             <div>
-                <label for="day-worker">Исполнитель</label>
+                <label for="day-worker">{{ worker_label }}</label>
                 <select id="day-worker" name="worker">
-                    <option value="">Все исполнители</option>
+                    <option value="">Все сотрудники</option>
                     {% for worker in workers %}
                     <option value="{{ worker['username'] }}" {% if selected_worker == worker['username'] %}selected{% endif %}>{{ worker["full_name"] or worker["username"] }}</option>
                     {% endfor %}
@@ -225,11 +228,11 @@ h1{margin:0;font-size:30px}
     </section>
 
     <section class="summary">
-        <div class="metric"><span>Заявок</span><strong>{{ schedule["summary"]["tasks"] }}</strong></div>
+        <div class="metric"><span>Задач</span><strong>{{ schedule["summary"]["tasks"] }}</strong></div>
         <div class="metric"><span>Со временем</span><strong>{{ schedule["summary"]["scheduled"] }}</strong></div>
         <div class="metric"><span>Без времени</span><strong>{{ schedule["summary"]["without_time"] }}</strong></div>
         <div class="metric"><span>Конфликты</span><strong>{{ schedule["summary"]["conflicts"] }}</strong></div>
-        <div class="metric"><span>Без исполнителя</span><strong>{{ schedule["summary"]["unassigned"] }}</strong></div>
+        <div class="metric"><span>Без сотрудника</span><strong>{{ schedule["summary"]["unassigned"] }}</strong></div>
     </section>
 
     <section class="readiness {{ day_readiness['tone'] }}" id="day-readiness">
@@ -245,7 +248,7 @@ h1{margin:0;font-size:30px}
                 <div>
                     <div class="readiness-headline">{{ day_readiness["headline"] }}</div>
                     <div class="readiness-caption">
-                        Проверено активных заявок: {{ day_readiness["active_tasks"] }}
+                        Проверено активных задач: {{ day_readiness["active_tasks"] }}
                     </div>
                 </div>
             </div>
@@ -282,8 +285,8 @@ h1{margin:0;font-size:30px}
                 <div class="publication-title">{{ day_publication["title"] }}</div>
                 <div class="publication-message">{{ day_publication["message"] }}</div>
                 <div class="publication-meta">
-                    <span>Заявок: {{ day_publication["task_count"] }}</span>
-                    <span>Исполнителей: {{ day_publication["worker_count"] }}</span>
+                    <span>Задач: {{ day_publication["task_count"] }}</span>
+                    <span>Сотрудников: {{ day_publication["worker_count"] }}</span>
                     {% if day_publication["published_at"] %}
                     <span>Версия: {{ day_publication["revision"] }}</span>
                     <span>{{ day_publication["published_at"] }} · {{ day_publication["published_by"] }}</span>
@@ -320,7 +323,7 @@ h1{margin:0;font-size:30px}
                 id="publish-day-plan"
                 type="button"
                 {% if day_readiness["score"] != 100 or not day_publication["task_count"] %}disabled{% endif %}
-                title="{% if day_readiness['score'] != 100 %}Сначала доведите готовность дня до 100{% else %}Подтвердить план для исполнителей{% endif %}"
+                title="{% if day_readiness['score'] != 100 %}Сначала доведите готовность дня до 100{% else %}Подтвердить план для сотрудников{% endif %}"
             >
                 {% if day_publication["state"] == "changed" %}Обновить публикацию{% else %}Опубликовать план{% endif %}
             </button>
@@ -362,7 +365,7 @@ h1{margin:0;font-size:30px}
             <div>
                 <div class="auto-plan-title">Автоисправление пересечений</div>
                 <div class="auto-plan-subtitle">
-                    Сохраняет приоритетную заявку и переносит вторую в ближайшее общее окно.
+                    Сохраняет приоритетную задачу и переносит вторую в ближайшее общее окно.
                 </div>
             </div>
             {% if day_conflict_repair["items"] %}
@@ -402,9 +405,9 @@ h1{margin:0;font-size:30px}
                 data-target-time-from="{{ item['target_time_from'] }}"
                 data-target-time-to="{{ item['target_time_to'] }}"
             >
-                <input class="auto-plan-check conflict-repair-check" type="checkbox" checked aria-label="Исправить пересечение заявки #{{ item['task_id'] }}">
+                <input class="auto-plan-check conflict-repair-check" type="checkbox" checked aria-label="Исправить пересечение задачи #{{ item['task_id'] }}">
                 <div>
-                    <a class="auto-plan-task" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+                    <a class="auto-plan-task" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or client_label ~ " не указан" }}</a>
                     <div class="auto-plan-meta">
                         <span>{{ item["priority"] }}</span>
                         <span>Конфликт: {{ item["conflict_label"] }}</span>
@@ -428,7 +431,7 @@ h1{margin:0;font-size:30px}
             <summary>Почему часть пересечений нельзя исправить автоматически</summary>
             <ul>
                 {% for item in day_conflict_repair["unscheduled"] %}
-                <li>#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}: {{ item["reason"] }}</li>
+                <li>#{{ item["task_id"] }} · {{ item["client"] or client_label ~ " не указан" }}: {{ item["reason"] }}</li>
                 {% endfor %}
             </ul>
         </details>
@@ -442,7 +445,7 @@ h1{margin:0;font-size:30px}
             <div>
                 <div class="auto-plan-title">Автозаполнение дня</div>
                 <div class="auto-plan-subtitle">
-                    Распределяет заявки без исполнителя и подбирает время заявкам без окна.
+                    Распределяет задачи без сотрудника и подбирает время задачам без окна.
                 </div>
             </div>
             {% if day_auto_plan["items"] %}
@@ -482,9 +485,9 @@ h1{margin:0;font-size:30px}
                 data-target-time-from="{{ item['target_time_from'] }}"
                 data-target-time-to="{{ item['target_time_to'] }}"
             >
-                <input class="auto-plan-check" type="checkbox" checked aria-label="Выбрать заявку #{{ item['task_id'] }}">
+                <input class="auto-plan-check" type="checkbox" checked aria-label="Выбрать задачу #{{ item['task_id'] }}">
                 <div>
-                    <a class="auto-plan-task" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}</a>
+                    <a class="auto-plan-task" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or client_label ~ " не указан" }}</a>
                     <div class="auto-plan-meta">
                         <span>{{ item["priority"] }}</span>
                         <span>{{ item["change_label"] }}</span>
@@ -503,7 +506,7 @@ h1{margin:0;font-size:30px}
             <summary>Почему часть заявок не вошла в план</summary>
             <ul>
                 {% for item in day_auto_plan["unscheduled"] %}
-                <li>#{{ item["task_id"] }} · {{ item["client"] or "Клиент не указан" }}: {{ item["reason"] }}</li>
+                <li>#{{ item["task_id"] }} · {{ item["client"] or client_label ~ " не указан" }}: {{ item["reason"] }}</li>
                 {% endfor %}
             </ul>
         </details>
