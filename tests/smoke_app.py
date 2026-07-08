@@ -5919,6 +5919,32 @@ async def assert_calls_page():
         assert "Calls Smoke Client" in call_detail_html
         assert "Перезвонить завтра по оплате" in call_detail_html
         assert "Нужен контакт" in call_detail_html
+        assert f'action="/calls/{call["id"]}/analysis"' in call_detail_html
+        assert "Сохранить анализ" in call_detail_html
+
+        analysis_response = await crm.update_call_analysis(
+            make_form_request(
+                "owner2",
+                f"/calls/{call['id']}/analysis",
+                {
+                    "transcript": "Smoke call transcript",
+                    "ai_summary": "Smoke AI call summary",
+                },
+            ),
+            call["id"],
+        )
+        assert analysis_response.status_code == 302
+        assert analysis_response.headers["location"] == f"/calls/{call['id']}?updated=1"
+
+        updated_call_detail_response = await crm.call_detail(
+            make_asgi_request("owner2", f"/calls/{call['id']}", "updated=1"),
+            call["id"],
+        )
+        assert updated_call_detail_response.status_code == 200
+        updated_call_detail_html = updated_call_detail_response.body.decode("utf-8")
+        assert "Карточка звонка обновлена" in updated_call_detail_html
+        assert "Smoke call transcript" in updated_call_detail_html
+        assert "Smoke AI call summary" in updated_call_detail_html
 
         filtered_response = await crm.calls_page(
             make_asgi_request(

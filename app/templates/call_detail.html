@@ -23,8 +23,13 @@ h2{margin:0 0 14px;font-size:22px}
 .pill{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:13px;font-weight:900}
 .text-block{white-space:pre-wrap;line-height:1.5;font-weight:800;color:#374151;overflow-wrap:anywhere}
 .empty{font-weight:900;color:#6b7280;padding:18px;border-radius:16px;background:#f9fafb}
+.notice{padding:14px;border-radius:16px;font-weight:900;margin-bottom:14px}
+.notice.ok{background:#dcfce7;color:#166534}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900;text-align:center}
+label{display:block;margin-top:12px;font-weight:900;color:#374151}
+textarea{width:100%;min-height:130px;padding:14px;border-radius:14px;border:1px solid #d1d5db;background:white;font:inherit;resize:vertical}
+button{width:100%;min-height:44px;margin-top:14px;padding:12px;border:0;border-radius:14px;background:#2563eb;color:white;font:inherit;font-weight:900;cursor:pointer}
 @media(max-width:800px){
 .container{padding:16px 14px 92px}
 .grid{grid-template-columns:1fr}
@@ -47,6 +52,10 @@ h1{font-size:28px}
 <div class="card">
 <h1>Звонок #{{ call["id"] }}</h1>
 <div class="small">{{ call["call_at"] or call["created_at"] }} / {{ direction_labels.get(call["direction"], call["direction"] or "Звонок") }}</div>
+
+{% if request.query_params.get("updated") == "1" %}
+<div class="notice ok">Карточка звонка обновлена</div>
+{% endif %}
 
 <div class="actions">
     <a class="btn" href="/calls">Все звонки</a>
@@ -93,6 +102,17 @@ h1{font-size:28px}
 {% else %}
 <div class="empty">Заметка по звонку не заполнена.</div>
 {% endif %}
+</div>
+
+<div class="card">
+<h2>Анализ звонка</h2>
+<form method="post" action="/calls/{{ call['id'] }}/analysis">
+    <label>Расшифровка</label>
+    <textarea name="transcript" placeholder="Текст разговора">{{ call["transcript"] or "" }}</textarea>
+    <label>AI-резюме</label>
+    <textarea name="ai_summary" placeholder="Ключевой итог, риск, следующий шаг">{{ call["ai_summary"] or "" }}</textarea>
+    <button type="submit">Сохранить анализ</button>
+</form>
 </div>
 
 <div class="card">

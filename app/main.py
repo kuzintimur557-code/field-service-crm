@@ -27182,6 +27182,65 @@ async def call_detail(request: Request, call_id: int):
     )
 
 
+@app.post("/calls/{call_id}/analysis")
+async def update_call_analysis(request: Request, call_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calls")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    if not settings or not settings["calls_enabled"]:
+        return RedirectResponse("/calls", status_code=302)
+
+    form = await request.form()
+    transcript = str(form.get("transcript") or "").strip()[:10000]
+    ai_summary = str(form.get("ai_summary") or "").strip()[:5000]
+
+    conn = connect()
+    c = conn.cursor()
+
+    call = c.execute("""
+    SELECT id
+    FROM call_records
+    WHERE id=? AND company_id=?
+    """, (call_id, company_id)).fetchone()
+
+    if not call:
+        conn.close()
+        return RedirectResponse("/calls", status_code=302)
+
+    c.execute("""
+    UPDATE call_records
+    SET transcript=?,
+        ai_summary=?
+    WHERE id=? AND company_id=?
+    """, (
+        transcript,
+        ai_summary,
+        call_id,
+        company_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(f"/calls/{call_id}?updated=1", status_code=302)
+
+
 @app.post("/calls")
 async def create_call_record(request: Request):
 
