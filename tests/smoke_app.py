@@ -982,6 +982,10 @@ async def assert_automation_page():
         "Файл клиента удалён",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "client_custom_field_updated",
+        "Значение поля клиента изменено",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "catalog_item_created",
         "Позиция каталога создана",
     ) in crm.AUTOMATION_TRIGGERS
@@ -17008,7 +17012,7 @@ async def assert_client_custom_fields():
         crm.run_automation_event = original_run_automation_event
     assert edit_response.status_code == 302
     assert edit_response.headers["location"] == f"/clients/{value['client_id']}?updated=1"
-    assert len(client_update_events) == 1
+    assert len(client_update_events) == 2
     assert client_update_events[0]["company_id"] == 2
     assert client_update_events[0]["trigger_key"] == "client_updated"
     assert client_update_events[0]["entity_type"] == "client"
@@ -17017,6 +17021,14 @@ async def assert_client_custom_fields():
         "Обновлена карточка клиента: Custom Field Client Company"
     )
     assert client_update_events[0]["link"] == f"/clients/{value['client_id']}"
+    assert client_update_events[1]["company_id"] == 2
+    assert client_update_events[1]["trigger_key"] == "client_custom_field_updated"
+    assert client_update_events[1]["entity_type"] == "client"
+    assert client_update_events[1]["entity_id"] == value["client_id"]
+    assert client_update_events[1]["message"] == (
+        "Поля клиента изменены: Industry: Auto service"
+    )
+    assert client_update_events[1]["link"] == f"/clients/{value['client_id']}"
 
     conn = connect()
     c = conn.cursor()

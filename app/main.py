@@ -326,6 +326,7 @@ AUTOMATION_TRIGGERS = [
     ("client_note_added", "Заметка клиента добавлена"),
     ("client_file_uploaded", "Файл клиента загружен"),
     ("client_file_deleted", "Файл клиента удалён"),
+    ("client_custom_field_updated", "Значение поля клиента изменено"),
     ("catalog_item_created", "Позиция каталога создана"),
     ("catalog_item_toggled", "Позиция каталога включена или выключена"),
     ("custom_field_created", "Поле компании создано"),
@@ -359,6 +360,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "client_note_added",
         "client_file_uploaded",
         "client_file_deleted",
+        "client_custom_field_updated",
     )),
     ("Каталог", (
         "catalog_item_created",
@@ -28829,6 +28831,8 @@ async def edit_client(request: Request, client_id: int):
         company_id
     ))
 
+    changed_custom_fields = []
+
     for custom_field in custom_fields:
         field_name = f"custom_field_{custom_field['id']}"
         custom_value = (form.get(field_name) or "").strip()
@@ -28840,6 +28844,11 @@ async def edit_client(request: Request, client_id: int):
           AND entity_type='client'
           AND entity_id=?
         """, (company_id, custom_field["id"], client_id)).fetchone()
+
+        previous_value = (existing_value["value"] if existing_value else "").strip()
+
+        if custom_value != previous_value:
+            changed_custom_fields.append((custom_field["label"], custom_value))
 
         if custom_value:
             if existing_value:
@@ -28918,6 +28927,21 @@ async def edit_client(request: Request, client_id: int):
         f"Обновлена карточка клиента: {name}",
         f"/clients/{client_id}",
     )
+
+    if changed_custom_fields:
+        changed_fields_preview = ", ".join(
+            f"{label}: {value or 'очищено'}"
+            for label, value in changed_custom_fields
+        )
+
+        run_automation_event(
+            company_id,
+            "client_custom_field_updated",
+            "client",
+            client_id,
+            f"Поля клиента изменены: {changed_fields_preview}",
+            f"/clients/{client_id}",
+        )
 
     return RedirectResponse(f"/clients/{client_id}?updated=1", status_code=302)
 
