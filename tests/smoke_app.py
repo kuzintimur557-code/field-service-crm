@@ -2201,6 +2201,8 @@ async def assert_automation_page():
     assert "Диагностика правила" in rule_detail_html
     assert "Действия" in rule_detail_html
     assert "Последние события правила" in rule_detail_html
+    assert "<th>Номер</th>" in rule_detail_html
+    assert "<th>ID</th>" not in rule_detail_html
     assert "Открыть все в журнале" in rule_detail_html
     assert f"/automation?event_rule_id={rule['id']}" in rule_detail_html
     assert "Запустить сейчас" in rule_detail_html
