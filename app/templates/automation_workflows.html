@@ -1974,6 +1974,7 @@ function renderChainTimeline(ruleId, timeline) {
                             onclick="selectWorkflowSession(${ruleId}, ${index})"
                             style="border:0;cursor:pointer;${activeStyle}">
                         ${session.label || `Сессия ${index + 1}`} · ${session.execution_state_label || workflowExecutionStateLabel(session.execution_state)} · Статус: ${session.status_label || workflowSessionStatusLabel(session.status)} · Событий: ${session.total || 0} · ${session.problem_label || "Проблем: 0"} · ${session.summary_label || "Сводка недоступна"} · ${session.duration_label || "-"}
+                        · ${session.time_range_label || "Период: не указан"}
                     </button>
                 `;
             }).join("")}

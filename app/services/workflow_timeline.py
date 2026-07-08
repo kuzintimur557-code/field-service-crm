@@ -246,6 +246,13 @@ def _session_duration(session):
     return seconds
 
 
+def _session_time_range_label(session):
+    started_at = session.get("started_at") or "-"
+    ended_at = session.get("ended_at") or "-"
+
+    return f"Период: {started_at} → {ended_at}"
+
+
 def _session_execution_state(session):
     if session["pending"]:
         return "active"
@@ -388,6 +395,7 @@ def build_timeline_sessions(events):
         duration_seconds = _session_duration(session)
         session["duration_seconds"] = duration_seconds
         session["duration_label"] = _format_duration(duration_seconds)
+        session["time_range_label"] = _session_time_range_label(session)
         session["execution_state"] = _session_execution_state(session)
         session["execution_state_label"] = _execution_state_label(session["execution_state"])
         session["summary_label"] = _session_summary_label(session)
