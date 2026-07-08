@@ -164,6 +164,18 @@
             </form>
 
             <form method="post" action="/automation/rules" class="chain">
+                <h2>Новая заявка без исполнителя</h2>
+                <div class="meta">Если создана заявка без назначенного исполнителя, владелец получает уведомление.</div>
+                <input type="hidden" name="name" value="Новая заявка без исполнителя">
+                <input type="hidden" name="trigger_key" value="new_task">
+                <input type="hidden" name="condition_mode" value="worker_unassigned">
+                <input type="hidden" name="action_key" value="notification">
+                <input type="hidden" name="target_username" value="{{ username }}">
+                <input type="hidden" name="message" value="Новая заявка создана без исполнителя. Назначьте ответственного.">
+                <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
+            </form>
+
+            <form method="post" action="/automation/rules" class="chain">
                 <h2>Ежедневная ИИ-сводка</h2>
                 <div class="meta">Каждый день готовить ИИ-сводку по рискам, задачам и деньгам.</div>
                 <input type="hidden" name="name" value="Ежедневная ИИ-сводка владельцу">

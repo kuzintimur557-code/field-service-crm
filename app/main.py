@@ -13697,6 +13697,7 @@ async def create_automation_rule(request: Request):
     name = str(form.get("name") or "").strip()
     trigger_key = str(form.get("trigger_key") or "").strip()
     action_key = str(form.get("action_key") or "").strip()
+    condition_mode = str(form.get("condition_mode") or "none").strip()
     target_username = str(form.get("target_username") or username).strip()
     message = str(form.get("message") or "").strip()
     task_delay_days, task_priority, task_deadline_hours = (
@@ -13737,6 +13738,16 @@ async def create_automation_rule(request: Request):
     if action_key == "ai_digest" and not message:
         message = "ИИ-сводка по бизнесу"
 
+    quick_condition_presets = {
+        "worker_unassigned": {
+            "mode": "worker_unassigned",
+            "field": "workers",
+            "operator": "empty",
+            "label": "Только задачи без исполнителя",
+        },
+    }
+    conditions_json = quick_condition_presets.get(condition_mode, {})
+
     payload = {
         "target_username": target_username,
         "message": message
@@ -13776,7 +13787,7 @@ async def create_automation_rule(request: Request):
         company_id,
         name,
         trigger_key,
-        json.dumps({}, ensure_ascii=False),
+        json.dumps(conditions_json, ensure_ascii=False),
         username,
         now,
         now

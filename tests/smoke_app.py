@@ -930,8 +930,11 @@ async def assert_automation_page():
     assert "currentBuilderFilter === \"conditions\"" in builder_html
     assert "SLA → уведомление" in builder_html
     assert "Просрочка → Telegram" in builder_html
+    assert "Новая заявка без исполнителя" in builder_html
     assert "Ежедневная ИИ-сводка" in builder_html
     assert 'name="trigger_key" value="sla_overdue"' in builder_html
+    assert 'name="trigger_key" value="new_task"' in builder_html
+    assert 'name="condition_mode" value="worker_unassigned"' in builder_html
     assert 'name="action_key" value="telegram_alert"' in builder_html
     assert 'name="action_key" value="ai_digest"' in builder_html
     assert f"/automation/rules/{rule['id']}" in builder_html
@@ -4826,6 +4829,7 @@ async def assert_ai_assistant_page():
             {
                 "name": "Новая заявка smoke",
                 "trigger_key": "new_task",
+                "condition_mode": "worker_unassigned",
                 "action_key": "notification",
                 "target_username": "owner2",
                 "message": "New task trigger matched",
@@ -4847,6 +4851,7 @@ async def assert_ai_assistant_page():
 
     assert new_task_rule is not None
     assert new_task_rule["trigger_key"] == "new_task"
+    assert "worker_unassigned" in new_task_rule["conditions_json"]
 
     original_send_message = crm.send_message
     original_send_message_to_chat = crm.send_message_to_chat
