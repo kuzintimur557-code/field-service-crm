@@ -5807,7 +5807,7 @@ async def assert_calendar_access():
     assert "Проверено дней:" in manager_html
     assert "Дней с нужной командой:" in manager_html
     assert "Средняя загрузка после назначения:" in manager_html
-    assert "Обязательный исполнитель: helper2" in manager_html
+    assert "Обязательный сотрудник: helper2" in manager_html
     assert "week-cell" in manager_html
     assert "Рекомендованное свободное окно" in manager_html
     assert "/calendar?date=2026-05-16&amp;worker=helper2&amp;status=" in manager_html
@@ -5914,7 +5914,8 @@ async def assert_calendar_access():
     team_schedule_html = team_schedule_response.body.decode("utf-8")
     assert '<option value="7" selected>7 дней</option>' in team_schedule_html
     assert '<option value="2" selected>2</option>' in team_schedule_html
-    assert "Создать заявку" in team_schedule_html
+    assert "Заявка: создать" in team_schedule_html
+    assert "Создать заявку" not in team_schedule_html
     assert team_schedule_response.context["smart_schedule_summary"] == {
         "search_days": 7,
         "required_workers": 2,

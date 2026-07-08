@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Календарь заявок</title>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+<title>Календарь</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -152,7 +155,7 @@ h1{font-size:32px;margin:0}
 <div class="container">
 
 	<div class="header">
-		    <h1>📅 Календарь заявок</h1>
+		    <h1>Календарь</h1>
 		    <div class="header-actions">
 		        <a href="/calendar/day?date={{ availability_date }}" class="btn" style="background:#2563eb">Маршрут дня</a>
 		        {% if role in ("boss", "manager") %}
@@ -176,9 +179,9 @@ h1{font-size:32px;margin:0}
 		        <input type="date" name="date" value="{{ selected_date }}">
 		    </div>
 		    <div>
-		        <label>Исполнитель</label>
+		        <label>{{ worker_label }}</label>
 		        <select name="worker">
-	            <option value="">Все исполнители</option>
+	            <option value="">Все сотрудники</option>
 	            {% for worker in workers %}
 	            <option value="{{ worker['username'] }}" {% if selected_worker == worker['username'] %}selected{% endif %}>
 	                {{ worker["username"] }}
@@ -209,7 +212,7 @@ h1{font-size:32px;margin:0}
 		            <div class="smart-title">Умный подбор окна</div>
 		            <div class="smart-subtitle">
 		                Подбирает ближайшую дату и наименее загруженную команду.
-		                {% if selected_worker %}Обязательный исполнитель: {{ selected_worker }}.{% endif %}
+		                {% if selected_worker %}Обязательный сотрудник: {{ selected_worker }}.{% endif %}
 		            </div>
 		        </div>
 		        <form class="smart-form" method="get" action="/calendar">
@@ -226,7 +229,7 @@ h1{font-size:32px;margin:0}
 		                </select>
 		            </div>
 		            <div>
-		                <label>Исполнителей</label>
+		                <label>Сотрудников</label>
 		                <select name="schedule_workers">
 		                    {% for count in range(1, 6) %}
 		                    <option value="{{ count }}" {% if selected_schedule_workers == count %}selected{% endif %}>{{ count }}</option>
@@ -270,7 +273,7 @@ h1{font-size:32px;margin:0}
 		                <span>Резерв мест: {{ item["available_after"] }}</span>
 		            </div>
 		            <div class="smart-actions">
-		                <a class="primary" href="{{ item['create_url'] }}">Создать заявку</a>
+		                <a class="primary" href="{{ item['create_url'] }}">{{ task_label }}: создать</a>
 		                <a href="{{ item['calendar_url'] }}">Открыть день</a>
 		            </div>
 		        </article>
@@ -342,7 +345,7 @@ h1{font-size:32px;margin:0}
 		    <div class="week-scroll">
 		        <div class="week-grid">
 		            <div class="week-row header-row">
-		                <div class="week-worker">Исполнитель</div>
+		                <div class="week-worker">{{ worker_label }}</div>
 		                {% for day in weekly_capacity_days %}
 		                <div class="week-day-head {% if day['is_today'] %}today{% endif %}">
 		                    {{ day["day_label"] }}<br>{{ day["date_label"] }}
@@ -380,7 +383,7 @@ h1{font-size:32px;margin:0}
 		                    <div class="week-cell-actions">
 		                        <a href="{{ cell['calendar_url'] }}" title="Открыть день">День</a>
 		                        {% if not cell["is_unavailable"] %}
-		                        <a href="{{ cell['create_url'] }}" title="Создать заявку">+</a>
+		                        <a href="{{ cell['create_url'] }}" title="{{ task_label }}: создать">+</a>
 		                        {% endif %}
 		                    </div>
 		                </div>
@@ -398,7 +401,7 @@ h1{font-size:32px;margin:0}
 		        </div>
 		    </div>
 		    {% else %}
-		    <div class="week-empty">Добавьте активных исполнителей, чтобы планировать загрузку.</div>
+		    <div class="week-empty">Добавьте активных сотрудников, чтобы планировать загрузку.</div>
 		    {% endif %}
 		</section>
 		{% endif %}
@@ -463,7 +466,7 @@ h1{font-size:32px;margin:0}
 		{% for load in worker_loads %}
 		    <div class="load-card">
 		        <div class="load-name">{{ load["username"] }}</div>
-		        <div class="load-total">{{ load["total"] }} заявок</div>
+		        <div class="load-total">{{ load["total"] }} задач</div>
 		        <div class="load-row"><span>Новые</span><b>{{ load["new"] }}</b></div>
 		        <div class="load-row"><span>В работе</span><b>{{ load["active"] }}</b></div>
 		        <div class="load-row"><span>Завершено</span><b>{{ load["completed"] }}</b></div>
@@ -477,7 +480,7 @@ h1{font-size:32px;margin:0}
 		<div class="day">
 			    <div class="date">
 			        <span>{{ day["date"] }}</span>
-			        <span class="day-count">{{ day["tasks"]|length }} заявок</span>
+			        <span class="day-count">{{ day["tasks"]|length }} задач</span>
 			    </div>
 			    <div class="day-statuses">
 			        <span class="day-status">Новые: {{ day["status_counts"]["Новая"] }}</span>
@@ -492,12 +495,12 @@ h1{font-size:32px;margin:0}
 	            #{{ task["id"] }} — {{ task["client"] }}
 	        </a>
 
-			        <div class="meta">📍 {{ task["address"] }}</div>
-			        <div class="meta">👷 {{ entry["workers"] }}</div>
+			        <div class="meta">Адрес: {{ task["address"] }}</div>
+			        <div class="meta">{{ worker_label }}: {{ entry["workers"] }}</div>
 			        {% if task["time_from"] and task["time_to"] %}
-			        <div class="meta">⏰ {{ task["time_from"][:5] }}–{{ task["time_to"][:5] }}</div>
+			        <div class="meta">Время: {{ task["time_from"][:5] }}–{{ task["time_to"][:5] }}</div>
 			        {% else %}
-			        <div class="meta">⏰ Время не назначено</div>
+			        <div class="meta">Время не назначено</div>
 			        {% endif %}
 			        <div class="badge">{{ task["status"] }}</div>
 		        {% if role in ("boss", "manager") %}
@@ -523,7 +526,7 @@ h1{font-size:32px;margin:0}
 	{% endfor %}
 	{% else %}
 	<div class="empty">
-	    Заявок в календаре пока нет.
+	    В календаре пока нет задач.
 	</div>
 	{% endif %}
 

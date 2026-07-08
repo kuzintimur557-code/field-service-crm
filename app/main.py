@@ -22849,6 +22849,8 @@ async def calendar_page(
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -23485,7 +23487,8 @@ async def calendar_page(
             "current_week_url": current_week_url,
             "next_week_url": next_week_url,
             "username": username,
-            "role": role
+            "role": role,
+            "settings": settings
         }
     )
 
