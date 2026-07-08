@@ -2176,6 +2176,8 @@ async def assert_automation_page():
     assert 'class="pill warn" id="a3-workflow-builder-status"' in rule_detail_html
     assert "Обновить граф" in rule_detail_html
     assert "Обновление..." in rule_detail_html
+    assert 'const message = data.message || "Граф недоступен"' in rule_detail_html
+    assert "Не удалось загрузить граф" in rule_detail_html
     assert 'onclick="loadA3WorkflowBuilderPreview()"' in rule_detail_html
     assert 'status.className = "pill ok"' in rule_detail_html
     assert 'status.className = "pill off"' in rule_detail_html

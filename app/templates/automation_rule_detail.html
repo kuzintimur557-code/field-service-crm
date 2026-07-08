@@ -610,9 +610,10 @@ async function loadA3WorkflowBuilderPreview() {
         const response = await fetch("/api/a3/workflow/rules/{{ rule['id'] }}/graph");
         const data = await response.json();
 
-        if (!data.ok) {
-            container.innerHTML = `<div class="pill" style="background:#fee2e2;color:#991b1b;">Граф недоступен</div>`;
-            status.textContent = "Ошибка";
+        if (!response.ok || !data.ok) {
+            const message = data.message || "Граф недоступен";
+            container.innerHTML = `<div class="pill" style="background:#fee2e2;color:#991b1b;">${message}</div>`;
+            status.textContent = message;
             status.className = "pill off";
             return;
         }
@@ -652,8 +653,8 @@ async function loadA3WorkflowBuilderPreview() {
         });
     } catch (err) {
         console.error("Ошибка загрузки графа A3", err);
-        container.innerHTML = `<div class="pill" style="background:#fee2e2;color:#991b1b;">Ошибка загрузки</div>`;
-        status.textContent = "Ошибка";
+        container.innerHTML = `<div class="pill" style="background:#fee2e2;color:#991b1b;">Не удалось загрузить граф</div>`;
+        status.textContent = "Не удалось загрузить";
         status.className = "pill off";
     }
 }
