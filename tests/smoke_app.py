@@ -16568,6 +16568,8 @@ async def assert_a3_api_layer():
     def assert_forbidden(response):
         assert response.status_code == 403
         assert b"forbidden" in response.body
+        payload = json.loads(response.body.decode())
+        assert payload["message"] == "Доступ запрещён"
 
     a3_company_guarded_routes = [
         (

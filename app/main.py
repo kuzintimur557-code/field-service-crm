@@ -35073,7 +35073,7 @@ def api_a3_system_health(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return calculate_system_health(company_id)
 
@@ -35083,7 +35083,7 @@ def api_a3_system_health_history(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return {
         "items": get_system_health_history(company_id, limit=30)
@@ -35095,7 +35095,7 @@ def api_a3_automation_analytics(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return get_automation_analytics(company_id)
 
@@ -35105,7 +35105,7 @@ def api_a3_unhealthy_rules(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     items = get_unhealthy_rules(company_id)
 
@@ -35121,7 +35121,7 @@ def api_a3_operations_insights(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return get_operations_insights(company_id)
 
@@ -35131,7 +35131,7 @@ def api_a3_self_healing_run(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     result = run_self_healing_cycle(company_id=company_id)
 
@@ -35146,7 +35146,7 @@ def api_a3_recovery_history(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return {
         "items": get_recovery_history(company_id, limit=20)
@@ -35158,7 +35158,7 @@ def api_a3_ops_timeline(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return {
         "items": get_ops_timeline(company_id, limit=50)
@@ -35170,7 +35170,7 @@ def api_a3_predictive_signals(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return get_predictive_signals(company_id)
 
@@ -35180,7 +35180,7 @@ def api_a3_decision_engine(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return get_decision_engine(company_id)
 
@@ -35230,7 +35230,7 @@ def api_a3_autonomous_actions(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return {
         "items": get_autonomous_actions(company_id, limit=50)
@@ -35242,7 +35242,7 @@ def api_a3_process_autonomous_actions(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     result = process_autonomous_actions(company_id=company_id)
 
@@ -35257,7 +35257,7 @@ async def api_a3_request_autonomous_action_approval(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     try:
         payload = await request.json()
@@ -35358,7 +35358,7 @@ def api_a3_governance_settings(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     return ensure_governance_settings(company_id)
 
@@ -35368,7 +35368,7 @@ async def api_a3_governance_settings_update(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     payload = {}
 
@@ -35479,7 +35479,7 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     decided_by = get_user(request) or "system"
     result = approve_autonomous_action(
@@ -35502,7 +35502,7 @@ def api_a3_approve_safe_autonomous_actions(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     decided_by = get_user(request) or "system"
 
@@ -35517,7 +35517,7 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     decided_by = get_user(request) or "system"
     result = reject_autonomous_action(
@@ -35537,7 +35537,7 @@ def api_a3_reject_unsafe_autonomous_actions(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     decided_by = get_user(request) or "system"
 
@@ -35552,7 +35552,7 @@ def api_a3_approval_queue(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     items = get_approval_queue(company_id)
     summary = {
@@ -35591,7 +35591,7 @@ def api_a3_approval_history(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     filters = get_a3_approval_history_filters(request)
 
@@ -35619,7 +35619,7 @@ def api_a3_approval_history_export(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     filters = get_a3_approval_history_filters(request)
     items = get_approval_history(
@@ -36027,7 +36027,7 @@ async def api_a3_create_ops_timeline_event(request: Request):
     company_id = get_a3_company_id(request)
 
     if not company_id:
-        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return a3_api_error("forbidden", 403)
 
     payload = await request.json()
 
