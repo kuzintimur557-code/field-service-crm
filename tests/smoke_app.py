@@ -17601,6 +17601,8 @@ async def assert_a3_api_layer():
     )
     assert missing_approval_target.status_code == 404
     assert b"target_not_found" in missing_approval_target.body
+    missing_approval_target_payload = json.loads(missing_approval_target.body.decode())
+    assert missing_approval_target_payload["message"] == "Цель не найдена"
 
     conn = connect()
     c = conn.cursor()
@@ -17641,6 +17643,8 @@ async def assert_a3_api_layer():
     )
     assert unsupported_approval.status_code == 400
     assert b"unsupported_action" in unsupported_approval.body
+    unsupported_approval_payload = json.loads(unsupported_approval.body.decode())
+    assert unsupported_approval_payload["message"] == "Действие не поддерживается"
 
     conn = connect()
     c = conn.cursor()
@@ -18425,6 +18429,8 @@ async def assert_a3_api_layer():
     )
     assert protected_approval.status_code == 400
     assert b"protected_rule" in protected_approval.body
+    protected_approval_payload = json.loads(protected_approval.body.decode())
+    assert protected_approval_payload["message"] == "Правило защищено"
 
     conn = connect()
     c = conn.cursor()

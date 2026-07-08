@@ -35052,25 +35052,37 @@ def parse_a3_governance_bool(value):
     raise ValueError("invalid boolean value")
 
 
+A3_API_ERROR_MESSAGES = {
+    "forbidden": "Доступ запрещён",
+    "not_found": "Цепочка не найдена",
+    "unsupported_action": "Действие не поддерживается",
+    "invalid_target_id": "Некорректный ID цели",
+    "rule_not_found": "Правило не найдено",
+    "invalid_governance_settings": "Некорректные настройки управления",
+    "invalid_protected_rules": "Некорректный список защищённых правил",
+    "target_not_found": "Цель не найдена",
+    "protected_rule": "Правило защищено",
+}
+
+
 def a3_api_error(error, status_code):
-    messages = {
-        "forbidden": "Доступ запрещён",
-        "not_found": "Цепочка не найдена",
-        "unsupported_action": "Действие не поддерживается",
-        "invalid_target_id": "Некорректный ID цели",
-        "rule_not_found": "Правило не найдено",
-        "invalid_governance_settings": "Некорректные настройки управления",
-        "invalid_protected_rules": "Некорректный список защищённых правил",
-    }
 
     return JSONResponse(
         {
             "ok": False,
             "error": error,
-            "message": messages.get(error, "Ошибка A3"),
+            "message": A3_API_ERROR_MESSAGES.get(error, "Ошибка A3"),
         },
         status_code=status_code,
     )
+
+
+def a3_result_error_response(result, status_code):
+    payload = dict(result)
+    error = payload.get("error")
+    payload.setdefault("message", A3_API_ERROR_MESSAGES.get(error, "Ошибка A3"))
+
+    return JSONResponse(payload, status_code=status_code)
 
 
 @app.get("/api/a3/system-health")
@@ -35447,9 +35459,9 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
 
     if not result.get("ok"):
         if result.get("error") in {"unsupported_action", "protected_rule"}:
-            return JSONResponse(result, status_code=400)
+            return a3_result_error_response(result, 400)
 
-        return JSONResponse(result, status_code=404)
+        return a3_result_error_response(result, 404)
 
     return result
 
@@ -35484,7 +35496,7 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
     )
 
     if not result.get("ok"):
-        return JSONResponse(result, status_code=404)
+        return a3_result_error_response(result, 404)
 
     return result
 
