@@ -60,6 +60,9 @@ h1{font-size:30px}
 </head>
 
 <body>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
 <div class="container">
 
 <div class="header">
@@ -68,7 +71,7 @@ h1{font-size:30px}
 
     <div class="nav">
         {% set f = features if features is defined else {} %}
-        <a href="/create-task">{{ settings["task_label"] or "Заявка" }}: создать</a>
+        <a href="/create-task">{{ task_label }}: создать</a>
         {% if f.get("calendar", True) %}
         <a href="/calendar">Календарь</a>
         {% endif %}
@@ -78,7 +81,7 @@ h1{font-size:30px}
 
         {% if role in ["boss", "manager"] %}
         {% if f.get("clients", True) %}
-        <a href="/clients">{{ settings["client_label"] or "Клиенты" }}</a>
+        <a href="/clients">{{ client_label }}</a>
         {% endif %}
         {% if f.get("catalog", True) %}
         <a href="/catalog">Каталог</a>
@@ -115,7 +118,7 @@ h1{font-size:30px}
         {% endif %}
 
         {% if role == "boss" %}
-        <a href="/workers" class="dark">{{ settings["worker_label"] or "Исполнители" }}</a>
+        <a href="/workers" class="dark">{{ worker_label }}</a>
         {% endif %}
 
         {% if role == "boss" %}
@@ -153,7 +156,7 @@ h1{font-size:30px}
 
 {% if overdue_tasks and overdue_tasks > 0 %}
 <div class="alert danger">
-    Есть просроченные {{ (settings["task_label"] or "заявка")|lower }}: {{ overdue_tasks }}
+    Просрочено: {{ task_label|lower }} · {{ overdue_tasks }}
     <a href="/overdue">
         Открыть
     </a>
@@ -162,7 +165,7 @@ h1{font-size:30px}
 
 {% if today_tasks and today_tasks > 0 %}
 <div class="alert info">
-    Сегодня есть {{ (settings["task_label"] or "заявка")|lower }}: {{ today_tasks }}
+    Сегодня: {{ task_label|lower }} · {{ today_tasks }}
     <a href="/today">
         Открыть
     </a>
@@ -172,7 +175,7 @@ h1{font-size:30px}
 <div class="stats">
 
     <a href="/today" class="stat" style="text-decoration:none;color:inherit">
-        <div class="stat-title">Сегодня заявок</div>
+        <div class="stat-title">Сегодня: {{ task_label|lower }}</div>
         <div class="stat-value">{{ today_tasks }}</div>
     </a>
 
@@ -195,17 +198,17 @@ h1{font-size:30px}
 
     {% if f.get("workload", True) %}
     <a href="/workload" class="stat" style="text-decoration:none;color:inherit">
-        <div class="stat-title">{{ settings["worker_label"] or "Исполнитель" }} в работе</div>
+        <div class="stat-title">{{ worker_label }} в работе</div>
         <div class="stat-value">{{ active_workers }}</div>
     </a>
     {% endif %}
     <div class="stat">
-        <div class="stat-label">Всего {{ (settings["task_label"] or "заявок")|lower }}</div>
+        <div class="stat-label">Всего: {{ task_label }}</div>
         <div class="stat-value">{{ total_tasks }}</div>
     </div>
 
     <div class="stat">
-        <div class="stat-label">Новые {{ (settings["task_label"] or "заявки")|lower }}</div>
+        <div class="stat-label">Новые: {{ task_label|lower }}</div>
         <div class="stat-value">{{ new_tasks }}</div>
     </div>
 
@@ -228,7 +231,7 @@ h1{font-size:30px}
 </div>
 
 {% if role in ["boss", "manager"] and f.get("workload", True) %}
-<div class="section-title">{{ settings["worker_label"] or "Исполнители" }}</div>
+<div class="section-title">{{ worker_label }}</div>
 
 {% if worker_stats %}
 <div class="worker-grid">
@@ -243,16 +246,16 @@ h1{font-size:30px}
 {% endfor %}
 </div>
 {% else %}
-<div class="card empty">{{ settings["worker_label"] or "Исполнитель" }} пока нет.</div>
+<div class="card empty">Пока нет: {{ worker_label|lower }}.</div>
 {% endif %}
 {% endif %}
 
 <div class="card">
-<div class="section-title">{{ settings["task_label"] or "Заявки" }}</div>
+<div class="section-title">{{ task_label }}</div>
 
 <form method="get" action="/">
 <div class="filters">
-    <input type="text" name="search" placeholder="Поиск по клиенту или адресу" value="{{ search }}">
+    <input type="text" name="search" placeholder="Поиск: {{ client_label|lower }} или адрес" value="{{ search }}">
 
     <select name="status">
         <option value="">Все статусы</option>
@@ -264,7 +267,7 @@ h1{font-size:30px}
 
     {% if role in ["boss", "manager"] %}
     <select name="worker">
-        <option value="">Все {{ (settings["worker_label"] or "исполнители")|lower }}</option>
+        <option value="">Все: {{ worker_label|lower }}</option>
         {% for worker in workers %}
         <option value="{{ worker[0] }}" {% if selected_worker == worker[0] %}selected{% endif %}>{{ worker[0] }}</option>
         {% endfor %}
@@ -279,7 +282,7 @@ h1{font-size:30px}
 {% for task in tasks %}
 <div class="task">
     <div>
-        <div class="label">{{ settings["client_label"] or "Клиент" }}</div>
+        <div class="label">{{ client_label }}</div>
         <div class="value">{{ task["client"] }}</div>
     </div>
 
@@ -302,7 +305,7 @@ h1{font-size:30px}
 </div>
 {% endfor %}
 {% else %}
-<div class="empty">Заявок пока нет</div>
+<div class="empty">Пока нет: {{ task_label|lower }}</div>
 {% endif %}
 </div>
 
