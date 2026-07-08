@@ -6317,9 +6317,18 @@ async def assert_calls_page():
         FROM call_records
         WHERE id=? AND company_id=2
         """, (call["id"],)).fetchone()
+        completed_call_notification = c.execute("""
+        SELECT is_read
+        FROM notifications
+        WHERE company_id=2
+          AND username='owner2'
+          AND title='Нужен контакт по звонку'
+          AND link=?
+        """, (f"/calls/{call['id']}",)).fetchone()
         conn.close()
 
         assert completed_call["status"] == "completed"
+        assert completed_call_notification["is_read"] == 1
 
         client_page_response = await crm.client_detail(
             make_asgi_request("owner2", f"/clients/{client_id}"),

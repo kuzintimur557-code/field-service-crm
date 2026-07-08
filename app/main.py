@@ -27357,6 +27357,19 @@ async def complete_call_follow_up(request: Request, call_id: int):
     WHERE id=? AND company_id=?
     """, (call_id, company_id))
 
+    c.execute("""
+    UPDATE notifications
+    SET is_read=1
+    WHERE company_id=?
+      AND username=?
+      AND title='Нужен контакт по звонку'
+      AND link=?
+    """, (
+        company_id,
+        username,
+        f"/calls/{call_id}",
+    ))
+
     conn.commit()
     conn.close()
 
