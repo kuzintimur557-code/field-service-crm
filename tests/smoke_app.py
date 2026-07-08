@@ -15441,9 +15441,10 @@ async def assert_finance_margin(task):
     )
     assert workload_response.status_code == 200
     workload_html = workload_response.body.decode("utf-8")
-    assert "Загрузка исполнителей" in workload_html
+    assert "Загрузка команды" in workload_html
     assert "load-card" in workload_html
-    assert "Кто свободен, кто занят, кто перегружен" in workload_html
+    assert "Исполнитель: кто свободен, кто занят, кто перегружен" in workload_html
+    assert "👷 Загрузка исполнителей" not in workload_html
 
     task_detail_response = await crm.task_detail(
         make_asgi_request("owner2", f"/task/{task['id']}"),

@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Загрузка исполнителей</title>
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+<title>Загрузка команды</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -40,8 +41,8 @@ h1{margin:0 0 8px;font-size:34px}
 <a href="/" class="back">← Назад</a>
 
 <div class="card">
-<h1>👷 Загрузка исполнителей</h1>
-<div class="meta">Кто свободен, кто занят, кто перегружен</div>
+<h1>Загрузка команды</h1>
+<div class="meta">{{ worker_label }}: кто свободен, кто занят, кто перегружен</div>
 </div>
 
 <div class="card">
@@ -50,7 +51,7 @@ h1{margin:0 0 8px;font-size:34px}
 <div class="worker load-card">
     <div>
         <div class="name">{{ item.worker["full_name"] or item.worker["username"] }}</div>
-        <div class="meta">{{ item.worker["position"] or "Исполнитель" }}</div>
+        <div class="meta">{{ item.worker["position"] or worker_label }}</div>
         <div class="meta">Был онлайн: {{ item.worker["last_seen"] }}</div>
     </div>
 
@@ -84,7 +85,7 @@ h1{margin:0 0 8px;font-size:34px}
 </div>
 {% endfor %}
 {% else %}
-<div class="meta">Исполнителей пока нет</div>
+<div class="meta">Активных сотрудников пока нет</div>
 {% endif %}
 </div>
 
