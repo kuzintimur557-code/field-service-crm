@@ -14112,37 +14112,69 @@ async def assert_finance_margin(task):
     """).fetchone()
     conn.close()
 
-    item_response = await crm.add_task_item(
-        make_form_request(
-            "owner2",
-            f"/task/{task['id']}/items",
-            {
-                "catalog_item_id": str(item["id"]),
-                "qty": "2",
-            },
-        ),
-        task["id"],
+    original_run_automation_event = crm.run_automation_event
+    estimate_item_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        estimate_item_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        item_response = await crm.add_task_item(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/items",
+                {
+                    "catalog_item_id": str(item["id"]),
+                    "qty": "2",
+                },
+            ),
+            task["id"],
+        )
+
+        manual_item_response = await crm.add_manual_task_item(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/items/manual",
+                {
+                    "item_name": "Manual smoke item",
+                    "item_type": "material",
+                    "unit": "шт",
+                    "qty": "3",
+                    "price": "100",
+                    "cost": "40",
+                },
+            ),
+            task["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert item_response.status_code == 302
     assert item_response.headers["location"] == f"/task/{task['id']}"
-
-    manual_item_response = await crm.add_manual_task_item(
-        make_form_request(
-            "owner2",
-            f"/task/{task['id']}/items/manual",
-            {
-                "item_name": "Manual smoke item",
-                "item_type": "material",
-                "unit": "шт",
-                "qty": "3",
-                "price": "100",
-                "cost": "40",
-            },
-        ),
-        task["id"],
-    )
     assert manual_item_response.status_code == 302
     assert manual_item_response.headers["location"] == f"/task/{task['id']}"
+    assert [event["trigger_key"] for event in estimate_item_events] == [
+        "task_finance_changed",
+        "task_finance_changed",
+    ]
+    assert all(event["company_id"] == 2 for event in estimate_item_events)
+    assert all(event["entity_type"] == "task" for event in estimate_item_events)
+    assert all(event["entity_id"] == task["id"] for event in estimate_item_events)
+    assert estimate_item_events[0]["message"] == (
+        f"Добавлена позиция в смету заявки #{task['id']}: Smoke service"
+    )
+    assert estimate_item_events[1]["message"] == (
+        f"Добавлена ручная позиция в смету заявки #{task['id']}: Manual smoke item"
+    )
 
     conn = connect()
     c = conn.cursor()
