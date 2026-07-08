@@ -10,7 +10,7 @@
 <div class="mobile-nav-grid">
 {% set f = features if features is defined else {} %}
 {% set nav_task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
-{% set nav_client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиенты" %}
+{% set nav_client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 
 {% if role == "worker" %}
 <a href="/my-tasks" class="{% if request.url.path == '/my-tasks' %}active{% endif %}">
