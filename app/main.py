@@ -317,6 +317,9 @@ AUTOMATION_TRIGGERS = [
     ("task_finance_changed", "Финансы заявки изменены"),
     ("task_photo_uploaded", "Фото заявки загружено"),
     ("task_report_updated", "Отчёт по заявке обновлён"),
+    ("payroll_payout_paid", "Выплата сотруднику отмечена"),
+    ("payroll_payout_unpaid", "Выплата сотруднику отменена"),
+    ("payroll_payout_note_updated", "Комментарий выплаты обновлён"),
     ("recurring_task_generated", "Создана регулярная заявка"),
     ("recurring_job_created", "Шаблон регулярной работы создан"),
     ("recurring_job_toggled", "Статус шаблона регулярной работы изменён"),
@@ -373,6 +376,9 @@ AUTOMATION_TRIGGER_GROUPS = [
         "task_finance_changed",
         "payment_status_changed",
         "unpaid_task",
+        "payroll_payout_paid",
+        "payroll_payout_unpaid",
+        "payroll_payout_note_updated",
     )),
     ("Клиенты", (
         "new_client",
@@ -26513,6 +26519,18 @@ async def mark_payroll_paid(request: Request, worker_id: int):
     conn.commit()
     conn.close()
 
+    run_automation_event(
+        company_id,
+        "payroll_payout_paid",
+        "worker",
+        worker_id,
+        (
+            f"Выплата сотруднику {worker['username']} отмечена: "
+            f"{amount:g} за {month}"
+        ),
+        f"/workers/{worker_id}?month={month}",
+    )
+
     redirect_url = f"/payroll?month={month}&payout_paid=1"
     if selected_payout_filter:
         redirect_url += f"&payout_filter={selected_payout_filter}"
@@ -26549,6 +26567,18 @@ async def update_payroll_payout_note(request: Request, worker_id: int):
     conn = connect()
     c = conn.cursor()
 
+    worker = c.execute("""
+    SELECT username
+    FROM users
+    WHERE id=? AND company_id=? AND role='worker'
+    """, (worker_id, company_id)).fetchone()
+    payout = c.execute("""
+    SELECT note
+    FROM payroll_payouts
+    WHERE company_id=? AND worker_id=? AND month=? AND status='paid'
+    """, (company_id, worker_id, month)).fetchone()
+    previous_note = str(payout["note"] or "") if payout else ""
+
     c.execute("""
     UPDATE payroll_payouts
     SET note=?
@@ -26557,6 +26587,16 @@ async def update_payroll_payout_note(request: Request, worker_id: int):
 
     conn.commit()
     conn.close()
+
+    if worker and payout and previous_note != note:
+        run_automation_event(
+            company_id,
+            "payroll_payout_note_updated",
+            "worker",
+            worker_id,
+            f"Комментарий выплаты сотрудника {worker['username']} обновлён за {month}",
+            f"/workers/{worker_id}?month={month}",
+        )
 
     redirect_url = f"/payroll?month={month}&payout_note_updated=1"
     if selected_payout_filter:
@@ -26593,6 +26633,17 @@ async def mark_payroll_unpaid(request: Request, worker_id: int):
     conn = connect()
     c = conn.cursor()
 
+    worker = c.execute("""
+    SELECT username
+    FROM users
+    WHERE id=? AND company_id=? AND role='worker'
+    """, (worker_id, company_id)).fetchone()
+    payout = c.execute("""
+    SELECT amount
+    FROM payroll_payouts
+    WHERE company_id=? AND worker_id=? AND month=?
+    """, (company_id, worker_id, month)).fetchone()
+
     c.execute("""
     DELETE FROM payroll_payouts
     WHERE company_id=? AND worker_id=? AND month=?
@@ -26600,6 +26651,16 @@ async def mark_payroll_unpaid(request: Request, worker_id: int):
 
     conn.commit()
     conn.close()
+
+    if worker and payout:
+        run_automation_event(
+            company_id,
+            "payroll_payout_unpaid",
+            "worker",
+            worker_id,
+            f"Выплата сотруднику {worker['username']} отменена за {month}",
+            f"/workers/{worker_id}?month={month}",
+        )
 
     redirect_url = f"/payroll?month={month}&payout_unpaid=1"
     if selected_payout_filter:

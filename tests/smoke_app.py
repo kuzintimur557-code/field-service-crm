@@ -967,6 +967,18 @@ async def assert_automation_page():
         "Финансы заявки изменены",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "payroll_payout_paid",
+        "Выплата сотруднику отмечена",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "payroll_payout_unpaid",
+        "Выплата сотруднику отменена",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "payroll_payout_note_updated",
+        "Комментарий выплаты обновлён",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "task_photo_uploaded",
         "Фото заявки загружено",
     ) in crm.AUTOMATION_TRIGGERS
@@ -15381,16 +15393,43 @@ async def assert_finance_margin(task):
     assert 'name="payout_filter" value="unpaid"' in unpaid_payroll_html
     assert "helper2" in unpaid_payroll_html
 
-    mark_paid_response = await crm.mark_payroll_paid(
-        make_form_request(
-            "owner2",
-            f"/payroll/{helper['id']}/mark-paid",
-            {"month": "2026-05", "amount": "70.0", "note": "аванс на карту", "payout_filter": "positive"},
-        ),
-        helper["id"],
+    original_run_automation_event = crm.run_automation_event
+    payroll_paid_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        payroll_paid_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        mark_paid_response = await crm.mark_payroll_paid(
+            make_form_request(
+                "owner2",
+                f"/payroll/{helper['id']}/mark-paid",
+                {"month": "2026-05", "amount": "70.0", "note": "аванс на карту", "payout_filter": "positive"},
+            ),
+            helper["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert mark_paid_response.status_code == 302
     assert mark_paid_response.headers["location"] == "/payroll?month=2026-05&payout_paid=1&payout_filter=positive"
+    assert payroll_paid_events == [{
+        "company_id": 2,
+        "trigger_key": "payroll_payout_paid",
+        "entity_type": "worker",
+        "entity_id": helper["id"],
+        "message": "Выплата сотруднику helper2 отмечена: 70 за 2026-05",
+        "link": f"/workers/{helper['id']}?month=2026-05",
+    }]
 
     paid_payroll_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll", "payout_paid=1"),
@@ -15430,16 +15469,43 @@ async def assert_finance_margin(task):
     assert "🏆" not in payroll_history_html
     assert "аванс на карту" in payroll_history_html
 
-    note_response = await crm.update_payroll_payout_note(
-        make_form_request(
-            "owner2",
-            f"/payroll/{helper['id']}/note",
-            {"month": "2026-05", "note": "наличными", "payout_filter": "partial"},
-        ),
-        helper["id"],
+    original_run_automation_event = crm.run_automation_event
+    payroll_note_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        payroll_note_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        note_response = await crm.update_payroll_payout_note(
+            make_form_request(
+                "owner2",
+                f"/payroll/{helper['id']}/note",
+                {"month": "2026-05", "note": "наличными", "payout_filter": "partial"},
+            ),
+            helper["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert note_response.status_code == 302
     assert note_response.headers["location"] == "/payroll?month=2026-05&payout_note_updated=1&payout_filter=partial"
+    assert payroll_note_events == [{
+        "company_id": 2,
+        "trigger_key": "payroll_payout_note_updated",
+        "entity_type": "worker",
+        "entity_id": helper["id"],
+        "message": "Комментарий выплаты сотрудника helper2 обновлён за 2026-05",
+        "link": f"/workers/{helper['id']}?month=2026-05",
+    }]
 
     note_page_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll", "payout_note_updated=1"),
@@ -15517,16 +15583,43 @@ async def assert_finance_margin(task):
     assert "Частично" in paid_worker_detail_html
     assert "Комментарий выплаты: наличными" in paid_worker_detail_html
 
-    mark_unpaid_response = await crm.mark_payroll_unpaid(
-        make_form_request(
-            "owner2",
-            f"/payroll/{helper['id']}/mark-unpaid",
-            {"month": "2026-05", "payout_filter": "partial"},
-        ),
-        helper["id"],
+    original_run_automation_event = crm.run_automation_event
+    payroll_unpaid_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        payroll_unpaid_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        mark_unpaid_response = await crm.mark_payroll_unpaid(
+            make_form_request(
+                "owner2",
+                f"/payroll/{helper['id']}/mark-unpaid",
+                {"month": "2026-05", "payout_filter": "partial"},
+            ),
+            helper["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert mark_unpaid_response.status_code == 302
     assert mark_unpaid_response.headers["location"] == "/payroll?month=2026-05&payout_unpaid=1&payout_filter=partial"
+    assert payroll_unpaid_events == [{
+        "company_id": 2,
+        "trigger_key": "payroll_payout_unpaid",
+        "entity_type": "worker",
+        "entity_id": helper["id"],
+        "message": "Выплата сотруднику helper2 отменена за 2026-05",
+        "link": f"/workers/{helper['id']}?month=2026-05",
+    }]
 
     unpaid_again_response = await crm.payroll_page(
         make_asgi_request("owner2", "/payroll", "payout_unpaid=1"),
