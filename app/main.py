@@ -28795,6 +28795,21 @@ async def client_detail(
     LIMIT 20
     """, (client_id, company_id)).fetchall()
     latest_activity = client_timeline[0] if client_timeline else None
+
+    client_calls = c.execute("""
+    SELECT *
+    FROM call_records
+    WHERE client_id=? AND company_id=?
+    ORDER BY COALESCE(call_at, created_at) DESC, id DESC
+    LIMIT 10
+    """, (client_id, company_id)).fetchall()
+    latest_client_call = client_calls[0] if client_calls else None
+    client_call_count = c.execute("""
+    SELECT COUNT(*)
+    FROM call_records
+    WHERE client_id=? AND company_id=?
+    """, (client_id, company_id)).fetchone()[0]
+
     last_contact = None
 
     if latest_client_note:
@@ -28813,6 +28828,19 @@ async def client_detail(
             "date": latest_activity["created_at"],
             "text": latest_activity["details"]
         }
+
+    if latest_client_call:
+        latest_call_date = latest_client_call["call_at"] or latest_client_call["created_at"]
+
+        if (
+            not last_contact
+            or str(latest_call_date or "") > str(last_contact["date"] or "")
+        ):
+            last_contact = {
+                "type": "Звонок",
+                "date": latest_call_date,
+                "text": latest_client_call["summary"] or latest_client_call["phone"] or ""
+            }
 
     if selected_activity_filter:
         filtered_timeline = []
@@ -28889,10 +28917,14 @@ async def client_detail(
             "client_notes": client_notes,
             "client_files": client_files,
             "latest_client_note": latest_client_note,
+            "client_calls": client_calls,
+            "latest_client_call": latest_client_call,
             "last_contact": last_contact,
             "client_next_action": client_next_action,
             "shown_note_count": len(client_notes),
             "client_note_count": client_note_count,
+            "client_call_count": client_call_count,
+            "client_calls_enabled": bool(settings and settings["calls_enabled"]),
             "shown_file_count": len(client_files),
             "client_file_count": client_file_count,
             "shown_activity_count": len(client_timeline),

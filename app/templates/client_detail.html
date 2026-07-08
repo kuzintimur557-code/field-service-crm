@@ -193,6 +193,14 @@ h1{font-size:28px}
 	</div>
 	{% endif %}
 
+	{% if latest_client_call %}
+	<div class="latest-note">
+	    <div class="latest-title">Последний звонок</div>
+	    <div class="latest-meta">{{ latest_client_call["call_at"] or latest_client_call["created_at"] }} / {{ latest_client_call["phone"] or "телефон не указан" }}</div>
+	    <div class="latest-note-text">{{ latest_client_call["summary"] or "Заметка по звонку не заполнена" }}</div>
+	</div>
+	{% endif %}
+
 	<div class="next-action">
 	    <div>
 	        <div class="latest-title">Следующее действие</div>
@@ -366,6 +374,43 @@ h1{font-size:28px}
 {% endif %}
 </div>
 </div>
+
+{% if client_calls_enabled or client_calls %}
+<div class="card">
+<h2>Звонки: {{ client_label }}</h2>
+
+{% set call_direction_labels = {"incoming": "Входящий", "outgoing": "Исходящий"} %}
+{% set call_status_labels = {"completed": "Состоялся", "missed": "Пропущен", "follow_up": "Нужен контакт"} %}
+
+<div class="task-count">Звонков: {{ client_calls|length }} из {{ client_call_count }}</div>
+
+{% if client_calls %}
+{% for call in client_calls %}
+<div class="note-item">
+    <div class="note-head">
+        <span>{{ call_direction_labels.get(call["direction"], call["direction"] or "Звонок") }} / {{ call_status_labels.get(call["status"], call["status"] or "Без статуса") }}</span>
+        <span>{{ call["call_at"] or call["created_at"] }}</span>
+    </div>
+    <div class="note-text">{{ call["summary"] or "Заметка по звонку не заполнена" }}</div>
+    <div class="file-meta">
+        {{ call["phone"] or "Телефон не указан" }}
+        {% if call["duration_minutes"] %}
+        / {{ call["duration_minutes"] }} мин.
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">Звонков пока нет: {{ client_label }}</div>
+{% endif %}
+
+{% if client_calls_enabled %}
+<div style="margin-top:12px">
+    <a class="btn" href="/calls">Добавить звонок</a>
+</div>
+{% endif %}
+</div>
+{% endif %}
 
 <div class="card">
 <h2>Файлы: {{ client_label }}</h2>

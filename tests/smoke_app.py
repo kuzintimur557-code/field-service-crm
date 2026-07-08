@@ -17030,6 +17030,43 @@ async def assert_client_card(task):
         "Загружен файл клиента: client-contract.txt"
     )
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    DELETE FROM call_records
+    WHERE company_id=2
+      AND client_id=?
+      AND summary='Smoke client call note'
+    """, (task["client_id"],))
+    c.execute("""
+    INSERT INTO call_records (
+        company_id,
+        client_id,
+        username,
+        direction,
+        status,
+        phone,
+        summary,
+        call_at,
+        duration_minutes,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        task["client_id"],
+        "owner2",
+        "outgoing",
+        "follow_up",
+        "+70000000000",
+        "Smoke client call note",
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        4,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+    conn.close()
+
     response = await crm.client_detail(
         make_asgi_request("owner2", f"/clients/{task['client_id']}"),
         task["client_id"],
@@ -17057,9 +17094,14 @@ async def assert_client_card(task):
     assert "worker2, helper2" in html
     assert "Последний контакт" in html
     assert "Последняя заметка" in html
+    assert "Последний звонок" in html
     assert "Следующее действие" in html
     assert "Заявка #" in html
     assert "Smoke latest client note" in html
+    assert "Звонки: Клиент" in html
+    assert "Звонков:" in html
+    assert "Smoke client call note" in html
+    assert "Нужен контакт" in html
     assert "Поиск по заметкам" in html
     assert "note_search" in html
     assert "Заметок:" in html
