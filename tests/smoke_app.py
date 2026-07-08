@@ -2359,6 +2359,9 @@ async def assert_automation_page():
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
     assert workflows_graph["ok"] is True
     assert workflows_graph["count"] >= 1
+    assert "summary" in workflows_graph
+    assert workflows_graph["summary"]["total"] == workflows_graph["count"]
+    assert workflows_graph["summary"]["label"].startswith("Цепочек:")
     assert any(
         item["rule"]["id"] == rule["id"]
         for item in workflows_graph["items"]
@@ -16228,6 +16231,7 @@ async def assert_a3_workflow_center():
     assert "Проблемных событий: 0" in body
     assert "/api/a3/workflows/graph" in body
     assert "workflow_center_load_failed" in body
+    assert "serverSummary.label" in body
     assert "Фильтры" in body
     assert "Проблемные цепочки" in body
     assert "Рекомендации ИИ" in body

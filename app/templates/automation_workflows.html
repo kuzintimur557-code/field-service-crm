@@ -1016,6 +1016,7 @@ async function loadChains() {
         const data = await response.json();
         const approvalData = await approvalResponse.json();
         const chains = data.workflows || data.items || [];
+        const serverSummary = data.summary || {};
         const approvalCount = approvalData.count || (approvalData.items || []).length || 0;
 
         let rendered = 0;
@@ -1248,7 +1249,7 @@ async function loadChains() {
 
         updateChainFilterButtons();
         renderWorkflowSummaryPills(chains, approvalCount);
-        summary.textContent = "Всего цепочек: " + chains.length
+        summary.textContent = (serverSummary.label || "Всего цепочек: " + chains.length)
             + ". Фильтр: " + chainFilterLabel(chainFilter)
             + ". Поиск: " + (searchValue || "без поиска")
             + ". Показано: " + rendered

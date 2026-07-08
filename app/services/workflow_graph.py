@@ -346,6 +346,39 @@ def _workflow_stats_summary(total_events, done_count, skipped_count, pending_cou
     )
 
 
+def _company_workflow_summary(items):
+    total = len(items)
+    active = sum(1 for item in items if (item.get("rule") or {}).get("active"))
+    disabled = total - active
+    empty = sum(1 for item in items if not item.get("actions"))
+    needs_attention = sum(
+        1
+        for item in items
+        if (item.get("debug") or {}).get("status") == "needs_attention"
+    )
+    problem_events = sum(
+        (item.get("stats") or {}).get("problem_count", 0)
+        for item in items
+    )
+
+    return {
+        "total": total,
+        "active": active,
+        "disabled": disabled,
+        "empty": empty,
+        "needs_attention": needs_attention,
+        "problem_events": problem_events,
+        "label": (
+            f"Цепочек: {total} · "
+            f"Активных: {active} · "
+            f"Выключенных: {disabled} · "
+            f"Без действий: {empty} · "
+            f"Требуют внимания: {needs_attention} · "
+            f"Проблемных событий: {problem_events}"
+        ),
+    }
+
+
 def get_rule_workflow_graph(company_id, rule_id):
     require_company_id(company_id)
 
@@ -553,6 +586,7 @@ def get_company_workflow_graphs(company_id, limit=50):
     return {
         "ok": True,
         "count": len(items),
+        "summary": _company_workflow_summary(items),
         "items": items,
     }
 
