@@ -444,6 +444,7 @@ def build_timeline_steps(events):
             "level": level,
             "status": status,
             "status_label": _event_status_label(status),
+            "event_label": f"Событие #{event.get('id') or '-'} · {_event_status_label(status)}",
             "message": event.get("message") or "",
             "created_at": event.get("created_at"),
             "processed_at": event.get("processed_at"),

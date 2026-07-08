@@ -2297,6 +2297,8 @@ async def assert_automation_page():
         step = workflow_timeline["timeline"]["steps"][0]
         assert "status_label" in step
         assert step["status_label"] in {"Выполнено", "Пропущено", "Ошибка", "Ожидает"}
+        assert "event_label" in step
+        assert step["event_label"].startswith("Событие #")
     if workflow_timeline["timeline"]["sessions"]:
         session = workflow_timeline["timeline"]["sessions"][0]
         assert "duration_seconds" in session
@@ -16486,6 +16488,7 @@ async def assert_a3_workflow_center():
     assert "Фильтр:" in body
     assert "Показано событий:" in body
     assert "step.status_label || workflowSessionStatusLabel(step.status)" in body
+    assert "step.event_label" in body
     assert "data-timeline-event" in body
     assert "data-timeline-status" in body
     assert "Событие #" in body
