@@ -327,6 +327,63 @@ AUTOMATION_TRIGGERS = [
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
 
+AUTOMATION_TRIGGER_GROUPS = [
+    ("Заявки", (
+        "new_task",
+        "task_status_changed",
+        "task_schedule_changed",
+        "task_workers_changed",
+        "task_archived",
+        "task_restored",
+        "task_comment_added",
+        "overdue_task",
+        "unpaid_task",
+    )),
+    ("Клиенты", (
+        "new_client",
+        "client_updated",
+        "client_note_added",
+        "client_file_uploaded",
+    )),
+    ("SLA и загрузка", (
+        "sla_overdue",
+        "worker_overload",
+    )),
+    ("ИИ-сводки", (
+        "daily_digest",
+        "weekly_digest",
+    )),
+]
+
+
+def get_automation_trigger_groups():
+    trigger_labels = dict(AUTOMATION_TRIGGERS)
+    grouped_keys = set()
+    groups = []
+
+    for group_label, group_keys in AUTOMATION_TRIGGER_GROUPS:
+        group_items = [
+            (key, trigger_labels[key])
+            for key in group_keys
+            if key in trigger_labels
+        ]
+
+        if group_items:
+            grouped_keys.update(key for key, _ in group_items)
+            groups.append((group_label, group_items))
+
+    other_items = [
+        (key, label)
+        for key, label in AUTOMATION_TRIGGERS
+        if key not in grouped_keys
+    ]
+
+    if other_items:
+        groups.append(("Другое", other_items))
+
+    return groups
+
+
 AUTOMATION_ACTIONS = [
     ("notification", "Создать уведомление"),
     ("telegram_alert", "Telegram-уведомление"),
@@ -12284,6 +12341,7 @@ async def automation_page(
         return disabled_response
 
     trigger_labels = dict(AUTOMATION_TRIGGERS)
+    trigger_groups = get_automation_trigger_groups()
     action_labels = dict(AUTOMATION_ACTIONS)
     status_labels = AUTOMATION_STATUS_LABELS
     entity_labels = {
@@ -12613,6 +12671,7 @@ async def automation_page(
             "shown_events_count": len(events),
             "users": users,
             "triggers": AUTOMATION_TRIGGERS,
+            "trigger_groups": trigger_groups,
             "actions": AUTOMATION_ACTIONS,
             "trigger_labels": trigger_labels,
             "action_labels": action_labels,

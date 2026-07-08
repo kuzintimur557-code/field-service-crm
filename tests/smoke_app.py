@@ -507,6 +507,10 @@ async def assert_automation_page():
     assert "Автоматизация" in html
     assert "Новое правило" in html
     assert "Правил пока нет" in html
+    assert '<optgroup label="Заявки">' in html
+    assert '<optgroup label="Клиенты">' in html
+    assert '<optgroup label="SLA и загрузка">' in html
+    assert '<optgroup label="ИИ-сводки">' in html
     assert "Просрочен SLA" in html
     assert "Создать уведомление" in html
     assert "Telegram-уведомление" in html

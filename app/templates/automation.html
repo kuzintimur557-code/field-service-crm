@@ -2203,8 +2203,12 @@ setInterval(loadA3ApprovalHistory, 30000);
         <div>
             <label>Триггер</label>
             <select name="trigger_key">
-                {% for key, label in triggers %}
-                <option value="{{ key }}">{{ label }}</option>
+                {% for group_label, group_items in trigger_groups %}
+                <optgroup label="{{ group_label }}">
+                    {% for key, label in group_items %}
+                    <option value="{{ key }}">{{ label }}</option>
+                    {% endfor %}
+                </optgroup>
                 {% endfor %}
             </select>
         </div>
@@ -2372,8 +2376,12 @@ if (newRuleActionKey) {
     {% endif %}
     <select name="rule_trigger_filter">
         <option value="">Все триггеры</option>
-        {% for key, label in triggers %}
-        <option value="{{ key }}" {% if selected_rule_trigger_filter == key %}selected{% endif %}>{{ label }}</option>
+        {% for group_label, group_items in trigger_groups %}
+        <optgroup label="{{ group_label }}">
+            {% for key, label in group_items %}
+            <option value="{{ key }}" {% if selected_rule_trigger_filter == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </optgroup>
         {% endfor %}
     </select>
     <select name="rule_action_filter">
@@ -2499,8 +2507,12 @@ if (newRuleActionKey) {
     {% endif %}
     <select name="trigger_filter">
         <option value="">Все триггеры</option>
-        {% for key, label in triggers %}
-        <option value="{{ key }}" {% if selected_trigger_filter == key %}selected{% endif %}>{{ label }}</option>
+        {% for group_label, group_items in trigger_groups %}
+        <optgroup label="{{ group_label }}">
+            {% for key, label in group_items %}
+            <option value="{{ key }}" {% if selected_trigger_filter == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </optgroup>
         {% endfor %}
     </select>
     <select name="event_entity_filter">
