@@ -126,7 +126,7 @@
         </div>
         <div class="search-row">
             <input id="builder-search" type="text"
-                   placeholder="Найти цепочку по названию, ID, триггеру или условию"
+                   placeholder="Найти цепочку по названию, номеру, триггеру или условию"
                    aria-label="Поиск цепочек автоматизации"
                    oninput="queueBuilderFilter()">
             <button class="back" type="button" onclick="resetBuilderSearch()">Сбросить поиск</button>
@@ -188,7 +188,7 @@
             <div class="chain-heading">
                 <div>
                     <h2>{{ rule["name"] }}</h2>
-                    <div class="meta">ID #{{ rule["id"] }}</div>
+                    <div class="meta">Номер #{{ rule["id"] }}</div>
                 </div>
                 <div class="pill {% if rule['active'] %}ok{% else %}off{% endif %}">
                     {% if rule["active"] %}Включено{% else %}Выключено{% endif %}

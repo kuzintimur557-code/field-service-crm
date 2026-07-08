@@ -647,6 +647,8 @@ async def assert_automation_page():
     assert 'class="top-actions"' in diagnostics_html
     assert 'class="maintenance-actions"' in diagnostics_html
     assert 'class="table-wrap"' in diagnostics_html
+    assert "<th>Номер</th>" in diagnostics_html
+    assert "<th>ID</th>" not in diagnostics_html
     assert ".container { padding:0 0 92px; }" in diagnostics_html
     assert "overflow-x:hidden" in diagnostics_html
 
@@ -836,6 +838,9 @@ async def assert_automation_page():
     assert "Проверка выполнения" in builder_html
     assert "События, диагностика и подтверждения" in builder_html
     assert "события и повторное воспроизведение" in builder_html
+    assert "Найти цепочку по названию, номеру, триггеру или условию" in builder_html
+    assert "Номер #" in builder_html
+    assert "ID #" not in builder_html
     assert "события и replay" not in builder_html
     assert "Runtime debug" not in builder_html
     assert "Открыть выполнение" in builder_html
@@ -16253,6 +16258,7 @@ async def assert_a3_workflow_center():
     assert 'class="header-actions"' in body
     assert 'class="filter-actions"' in body
     assert 'id="workflow-chain-search"' in body
+    assert "Найти цепочку по названию, номеру, триггеру или состоянию" in body
     assert "setChainSearch" in body
     assert "chainSearchTimer" in body
     assert "window.setTimeout" in body
