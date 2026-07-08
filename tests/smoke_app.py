@@ -17391,9 +17391,22 @@ async def assert_notifications(task):
     assert f"/notifications/{notification['id']}/open" in notifications_html
     assert "Отметить все прочитанными" in notifications_html
     assert "Уведомления" in notifications_html
+    assert "Всего:" in notifications_html
+    assert "Непрочитанные" in notifications_html
+    assert "Прочитанные" in notifications_html
+    assert 'href="/notifications?filter=unread"' in notifications_html
     assert 'class="mobile-nav"' in notifications_html
     assert ".container{padding:14px 14px 92px}" in notifications_html
     assert "🔔 Уведомления" not in notifications_html
+
+    unread_response = await crm.notifications_page(
+        make_asgi_request("owner2", "/notifications", "filter=unread"),
+        filter="unread",
+    )
+    assert unread_response.status_code == 200
+    unread_html = unread_response.body.decode("utf-8")
+    assert "Smoke notification" in unread_html
+    assert 'filter-link active' in unread_html
 
     open_response = await crm.open_notification(
         make_request("owner2"),
@@ -17412,6 +17425,13 @@ async def assert_notifications(task):
     conn.close()
 
     assert opened["is_read"] == 1
+
+    read_response = await crm.notifications_page(
+        make_asgi_request("owner2", "/notifications", "filter=read"),
+        filter="read",
+    )
+    assert read_response.status_code == 200
+    assert "Smoke notification" in read_response.body.decode("utf-8")
 
     crm.create_notification(2, "owner2", "Unread one")
     crm.create_notification(2, "owner2", "Unread two")

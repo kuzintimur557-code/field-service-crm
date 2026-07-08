@@ -12417,7 +12417,7 @@ async def home(
 
 
 @app.get("/notifications", response_class=HTMLResponse)
-async def notifications_page(request: Request):
+async def notifications_page(request: Request, filter: str = "all"):
 
     username = get_user(request)
 
@@ -12436,14 +12436,25 @@ async def notifications_page(request: Request):
     conn = connect()
     c = conn.cursor()
 
-    notifications = c.execute("""
-    SELECT *
-    FROM notifications
+    selected_filter = filter if filter in ("all", "unread", "read") else "all"
+    notifications_where = """
     WHERE company_id=?
       AND username=?
+    """
+    notification_params = [company_id, username]
+
+    if selected_filter == "unread":
+        notifications_where += "\n      AND is_read=0"
+    elif selected_filter == "read":
+        notifications_where += "\n      AND is_read=1"
+
+    notifications = c.execute(f"""
+    SELECT *
+    FROM notifications
+    {notifications_where}
     ORDER BY id DESC
     LIMIT 100
-    """, (company_id, username)).fetchall()
+    """, notification_params).fetchall()
 
     unread_count = c.execute("""
     SELECT COUNT(*)
@@ -12451,6 +12462,13 @@ async def notifications_page(request: Request):
     WHERE company_id=?
       AND username=?
       AND is_read=0
+    """, (company_id, username)).fetchone()[0]
+
+    total_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
     """, (company_id, username)).fetchone()[0]
 
     conn.close()
@@ -12464,6 +12482,8 @@ async def notifications_page(request: Request):
             "role": role,
             "notifications": notifications,
             "unread_count": unread_count,
+            "total_count": total_count,
+            "selected_filter": selected_filter,
             "settings": settings
         }
     )
