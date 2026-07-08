@@ -6559,6 +6559,7 @@ async def assert_schedule_conflicts():
     assert page.status_code == 200
     page_html = page.body.decode("utf-8")
     assert "Центр конфликтов расписания" in page_html
+    assert "только активные задачи" in page_html
     assert "Conflict unavailable" in page_html
     assert "Conflict overload two" in page_html
     assert "Conflict unassigned" in page_html
@@ -6567,6 +6568,8 @@ async def assert_schedule_conflicts():
     assert "Сохранить дату" in page_html
     assert "Лучший вариант" in page_html
     assert "/calendar/conflicts/" in page_html
+    assert "только активные заявки" not in page_html
+    assert "Открыть заявку" not in page_html
 
     filtered_page = await crm.calendar_conflicts_page(
         make_asgi_request(

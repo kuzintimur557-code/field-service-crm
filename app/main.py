@@ -22433,6 +22433,8 @@ async def calendar_conflicts_page(
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     selected_days = days if days in (7, 14, 30, 60) else 30
     date_from = datetime.now().strftime("%Y-%m-%d")
     date_to = (
@@ -22489,6 +22491,7 @@ async def calendar_conflicts_page(
             "selected_type": selected_type,
             "date_from": date_from,
             "date_to": date_to,
+            "settings": settings,
         },
     )
 

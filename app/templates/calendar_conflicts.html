@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <title>Конфликты расписания</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -65,7 +68,7 @@ h1{margin:0;font-size:32px}
     <header class="header">
         <div>
             <h1>Центр конфликтов расписания</h1>
-            <div class="subtitle">{{ date_from }} — {{ date_to }} · только активные заявки</div>
+            <div class="subtitle">{{ date_from }} — {{ date_to }} · только активные задачи</div>
         </div>
         <div class="header-actions">
             <a class="button" href="/calendar/dispatch">Диспетчерская</a>
@@ -75,20 +78,20 @@ h1{margin:0;font-size:32px}
     </header>
 
     {% if request.query_params.get("resolved") == "1" %}
-    <div class="notice">Конфликт заявки #{{ request.query_params.get("task_id") }} устранён.</div>
+    <div class="notice">Конфликт: {{ task_label|lower }} #{{ request.query_params.get("task_id") }} устранён.</div>
     {% endif %}
     {% if request.query_params.get("error") %}
     <div class="notice error">
         {% if request.query_params.get("error") == "stale" %}
-        Заявка уже изменилась. Рекомендации пересчитаны.
+        Данные уже изменились. Рекомендации пересчитаны.
         {% elif request.query_params.get("error") == "worker_unavailable" %}
-        Исполнитель стал недоступен. Выберите новый вариант.
+        Сотрудник стал недоступен. Выберите новый вариант.
         {% elif request.query_params.get("error") == "capacity_changed" %}
         Свободное место уже занято. Рекомендации пересчитаны.
         {% elif request.query_params.get("error") == "past_date" %}
-        Нельзя перенести заявку на прошедшую дату.
+        Нельзя перенести задачу на прошедшую дату.
         {% elif request.query_params.get("error") == "no_workers" %}
-        Для решения конфликта нужен хотя бы один исполнитель.
+        Для решения конфликта нужен хотя бы один сотрудник.
         {% else %}
         Не удалось применить решение. Проверьте выбранные данные.
         {% endif %}
@@ -128,11 +131,11 @@ h1{margin:0;font-size:32px}
                 <label>Причина</label>
                 <select name="conflict_type">
                     <option value="">Все причины</option>
-                    <option value="unavailable" {% if selected_type == "unavailable" %}selected{% endif %}>Сотрудник недоступен</option>
+                    <option value="unavailable" {% if selected_type == "unavailable" %}selected{% endif %}>{{ worker_label }} недоступен</option>
 	                    <option value="overload" {% if selected_type == "overload" %}selected{% endif %}>Превышен лимит</option>
 	                    <option value="time_overlap" {% if selected_type == "time_overlap" %}selected{% endif %}>Пересечение времени</option>
-	                    <option value="unassigned" {% if selected_type == "unassigned" %}selected{% endif %}>Нет исполнителя</option>
-                    <option value="inactive_worker" {% if selected_type == "inactive_worker" %}selected{% endif %}>Сотрудник отключён</option>
+	                    <option value="unassigned" {% if selected_type == "unassigned" %}selected{% endif %}>Нет сотрудника</option>
+                    <option value="inactive_worker" {% if selected_type == "inactive_worker" %}selected{% endif %}>{{ worker_label }} отключён</option>
                 </select>
             </div>
             <button type="submit">Показать</button>
@@ -147,13 +150,13 @@ h1{margin:0;font-size:32px}
         <article class="conflict {{ conflict['severity'] }}">
             <div class="conflict-head">
                 <div>
-                    <div class="task-title">Заявка #{{ task["id"] }} · {{ task["client"] or "Клиент не указан" }}</div>
+                    <div class="task-title">{{ task_label }} #{{ task["id"] }} · {{ task["client"] or client_label ~ " не указан" }}</div>
 	                    <div class="task-meta">
 	                        <span>Дата: {{ conflict["task_date"] }}</span>
 	                        {% if task["time_from"] and task["time_to"] %}
 	                        <span>Время: {{ task["time_from"][:5] }}–{{ task["time_to"][:5] }}</span>
 	                        {% endif %}
-	                        <span>Исполнители: {{ conflict["workers"]|join(", ") or "не назначены" }}</span>
+	                        <span>Команда: {{ conflict["workers"]|join(", ") or "не назначена" }}</span>
                         <span>Статус: {{ task["status"] }}</span>
                     </div>
                 </div>
@@ -191,7 +194,7 @@ h1{margin:0;font-size:32px}
             {% else %}
             <div class="empty-recommendation">Свободных вариантов в ближайшие 14 дней не найдено. Увеличьте лимиты или измените периоды отсутствия.</div>
             {% endif %}
-            <a class="task-link" href="/task/{{ task['id'] }}">Открыть заявку</a>
+            <a class="task-link" href="/task/{{ task['id'] }}">Открыть</a>
         </article>
         {% endfor %}
     </section>
