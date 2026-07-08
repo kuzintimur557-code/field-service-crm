@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% set task_label = settings["task_label"] or "Заявка" %}
 {% set client_label = settings["client_label"] or "Клиент" %}
+{% set worker_label = settings["worker_label"] or "Исполнитель" %}
 <title>{{ task_label }}: рабочий список</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -61,7 +62,7 @@ textarea,input{width:100%;min-height:44px;padding:12px;border-radius:12px;border
 
 <div class="header">
 <h1>{{ task_label }}: рабочий список</h1>
-<div class="meta">{{ username }} / исполнитель</div>
+<div class="meta">{{ username }} / {{ worker_label|lower }}</div>
 <div class="nav">
 <a href="/profile">Профиль</a>
 <a href="/logout" class="red">Выйти</a>

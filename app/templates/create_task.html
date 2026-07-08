@@ -84,7 +84,7 @@ button:hover{background:#1d4ed8}
 
 	{% if request.query_params.get("error") == "worker_unavailable" %}
 	<div class="note" style="background:#fee2e2;color:#991b1b">
-	Выбранный исполнитель недоступен на эту дату. Выберите другого сотрудника или измените дату.
+	Выбранный {{ worker_label_lower }} недоступен на эту дату. Выберите другого сотрудника или измените дату.
 	</div>
 	{% endif %}
 
