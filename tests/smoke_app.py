@@ -18242,11 +18242,11 @@ async def assert_client_custom_fields():
     page_html = page_response.body.decode("utf-8")
     assert "Industry" in page_html
     assert f"custom_field_{field_id}" in page_html
-    assert "Заявок:" in page_html
+    assert "Заявка:" in page_html
     assert "Активных:" in page_html
-    assert "Последняя заявка:" in page_html
+    assert "Последняя запись:" in page_html
     assert "Выручка:" in page_html
-    assert "Поиск клиентов" in page_html
+    assert "Поиск: Клиент" in page_html
     assert "client_filter=active" in page_html
     assert "client_filter=overdue" in page_html
     assert "client_filter=empty" in page_html
@@ -18258,6 +18258,7 @@ async def assert_client_custom_fields():
     assert 'input[type="hidden"]{display:none}' in page_html
     assert "👤 Клиенты" not in page_html
     assert "➕ Создать клиента" not in page_html
+    assert "Открыть клиента" not in page_html
     assert "Телефон:" in page_html
     assert "Email:" in page_html
 

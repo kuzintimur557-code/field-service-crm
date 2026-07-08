@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Клиенты</title>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+<title>{{ client_label }}: база</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 
@@ -61,23 +63,23 @@ h1{font-size:28px;margin-bottom:12px}
 
 <div class="header">
     <div>
-        <h1>Клиенты</h1>
+        <h1>{{ client_label }}: база</h1>
         <div style="color:#6b7280;font-weight:800;margin-top:6px">
-            База клиентов платформы
+            Контакты, история и показатели
         </div>
     </div>
     <a href="/" class="back">← Назад</a>
 </div>
 
 <div class="card">
-<h2>Добавить клиента</h2>
+<h2>Добавить: {{ client_label|lower }}</h2>
 
 {% if request.query_params.get("created") == "1" %}
-<div class="notice ok">Клиент создан</div>
+<div class="notice ok">{{ client_label }} создан</div>
 {% endif %}
 
 	{% if request.query_params.get("error") == "empty" %}
-	<div class="notice err">Имя клиента обязательно</div>
+	<div class="notice err">Имя обязательно</div>
 	{% endif %}
 
 	{% if request.query_params.get("error") == "custom_required" %}
@@ -111,7 +113,7 @@ h1{font-size:28px;margin-bottom:12px}
 </div>
 
 	<label>Заметки</label>
-	<textarea name="notes" placeholder="Важная информация по клиенту..."></textarea>
+	<textarea name="notes" placeholder="Важная информация..."></textarea>
 
 	{% if custom_fields %}
 	<div style="margin-top:18px;padding:16px;border-radius:18px;background:#f9fafb;border:1px solid #e5e7eb">
@@ -140,19 +142,19 @@ h1{font-size:28px;margin-bottom:12px}
 	</div>
 	{% endif %}
 
-	<button type="submit">Создать клиента</button>
+	<button type="submit">Создать</button>
 
 </form>
 </div>
 
 <div class="card">
-<h2>Список клиентов</h2>
+<h2>Список</h2>
 
 <div class="filters">
     <a href="/clients{% if selected_search %}?search={{ selected_search }}{% endif %}" class="{% if not selected_client_filter %}active{% endif %}">Все</a>
     <a href="/clients?client_filter=active{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'active' %}active{% endif %}">Активные</a>
     <a href="/clients?client_filter=overdue{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'overdue' %}active{% endif %}">С просрочками</a>
-    <a href="/clients?client_filter=empty{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'empty' %}active{% endif %}">Без заявок</a>
+    <a href="/clients?client_filter=empty{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'empty' %}active{% endif %}">Без записей</a>
 </div>
 
 <form class="search-row" method="get" action="/clients">
@@ -160,7 +162,7 @@ h1{font-size:28px;margin-bottom:12px}
     <input type="hidden" name="client_filter" value="{{ selected_client_filter }}">
     {% endif %}
     <div>
-        <label>Поиск клиентов</label>
+        <label>Поиск: {{ client_label }}</label>
         <input type="text" name="search" value="{{ selected_search }}" placeholder="Имя, телефон, email, адрес">
     </div>
     <div>
@@ -168,7 +170,7 @@ h1{font-size:28px;margin-bottom:12px}
         <select name="client_sort" style="width:100%;padding:15px;border-radius:14px;border:1px solid #d1d5db;background:white;font-size:16px;margin-top:8px">
             <option value="newest" {% if selected_client_sort == "newest" %}selected{% endif %}>Сначала новые</option>
             <option value="name" {% if selected_client_sort == "name" %}selected{% endif %}>По имени</option>
-            <option value="tasks" {% if selected_client_sort == "tasks" %}selected{% endif %}>Больше заявок</option>
+            <option value="tasks" {% if selected_client_sort == "tasks" %}selected{% endif %}>Больше записей</option>
             <option value="active" {% if selected_client_sort == "active" %}selected{% endif %}>Больше активных</option>
             <option value="overdue" {% if selected_client_sort == "overdue" %}selected{% endif %}>Больше просрочек</option>
         </select>
@@ -196,22 +198,22 @@ h1{font-size:28px;margin-bottom:12px}
         <div class="meta">Заметки: {{ client["notes"] }}</div>
         {% endif %}
         <div class="client-stats">
-            <span class="client-stat">Заявок: {{ client["task_count"] or 0 }}</span>
+            <span class="client-stat">{{ task_label }}: {{ client["task_count"] or 0 }}</span>
             <span class="client-stat">Активных: {{ client["active_task_count"] or 0 }}</span>
             {% if client["overdue_task_count"] %}
             <span class="client-stat warn">Просрочено: {{ client["overdue_task_count"] }}</span>
             {% endif %}
         </div>
-        <div class="meta">Последняя заявка: {{ client["last_task_date"] or "нет" }}</div>
+        <div class="meta">Последняя запись: {{ client["last_task_date"] or "нет" }}</div>
         <div class="meta">Выручка: {{ "%.0f"|format(client["completed_revenue"] or 0) }} ₽</div>
         <div style="margin-top:10px">
-            <a href="/clients/{{ client['id'] }}" class="client-open">Открыть клиента</a>
+            <a href="/clients/{{ client['id'] }}" class="client-open">Открыть</a>
         </div>
     </div>
 </div>
 {% endfor %}
 {% else %}
-<div class="empty">Клиентов пока нет</div>
+<div class="empty">Записей пока нет</div>
 {% endif %}
 
 </div>
