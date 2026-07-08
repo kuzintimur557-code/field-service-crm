@@ -603,7 +603,7 @@ async def assert_automation_page():
     assert "Кто решил" in html
     assert "Показать автора" in html
     assert "Сбросить автора" in html
-    assert "ID цели" in html
+    assert "Номер цели" in html
     assert "Показать цель" in html
     assert "Сбросить цель" in html
     assert "Все действия" in html
@@ -16464,7 +16464,7 @@ async def assert_a3_workflow_center():
     assert "Кто решил" in body
     assert "Показать автора" in body
     assert "Сбросить автора" in body
-    assert "ID цели" in body
+    assert "Номер цели" in body
     assert "Показать цель" in body
     assert "Сбросить цель" in body
     assert "Все действия" in body
@@ -17574,9 +17574,9 @@ async def assert_a3_api_layer():
     assert "Тип действия,Отключить правило" in approved_export_body
     assert "Тип цели,Все цели" in approved_export_body
     assert "Кто решил,owner2" in approved_export_body
-    assert f"ID цели,{disabled_unhealthy_rule_id}" in approved_export_body
+    assert f"Номер цели,{disabled_unhealthy_rule_id}" in approved_export_body
     assert "Период,Сегодня" in approved_export_body
-    assert "ID решения,ID действия,Решение" in approved_export_body
+    assert "Номер решения,Номер действия,Решение" in approved_export_body
     assert "Одобрено" in approved_export_body
     assert "Отключить правило" in approved_export_body
     assert "Правило автоматизации" in approved_export_body
@@ -17779,7 +17779,7 @@ async def assert_a3_api_layer():
     assert invalid_approval_target.status_code == 400
     assert b"invalid_target_id" in invalid_approval_target.body
     invalid_approval_payload = json.loads(invalid_approval_target.body.decode())
-    assert invalid_approval_payload["message"] == "Некорректный ID цели"
+    assert invalid_approval_payload["message"] == "Некорректный номер цели"
 
     zero_approval_target = await crm.api_a3_request_autonomous_action_approval(
         make_json_request(
@@ -17795,7 +17795,7 @@ async def assert_a3_api_layer():
     assert zero_approval_target.status_code == 400
     assert b"invalid_target_id" in zero_approval_target.body
     zero_approval_payload = json.loads(zero_approval_target.body.decode())
-    assert zero_approval_payload["message"] == "Некорректный ID цели"
+    assert zero_approval_payload["message"] == "Некорректный номер цели"
 
     cooldown_action = crm.enqueue_autonomous_action(
         company_id=2,

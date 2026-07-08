@@ -35056,7 +35056,7 @@ A3_API_ERROR_MESSAGES = {
     "forbidden": "Доступ запрещён",
     "not_found": "Цепочка не найдена",
     "unsupported_action": "Действие не поддерживается",
-    "invalid_target_id": "Некорректный ID цели",
+    "invalid_target_id": "Некорректный номер цели",
     "rule_not_found": "Правило не найдено",
     "invalid_governance_settings": "Некорректные настройки управления",
     "invalid_protected_rules": "Некорректный список защищённых правил",
@@ -35629,14 +35629,14 @@ def api_a3_approval_history_export(request: Request):
         )
     )
     writer.writerow([
-        "ID решения",
-        "ID действия",
+        "Номер решения",
+        "Номер действия",
         "Решение",
         "Кто решил",
         "Причина",
         "Тип действия",
         "Тип цели",
-        "ID цели",
+        "Номер цели",
         "Название цели",
         "Цель активна",
         "Дата",
@@ -35740,7 +35740,7 @@ def build_a3_approval_export_filter_rows(filters, items_count=None):
             get_a3_approval_actor_label(filters["decided_by"]),
         ],
         [
-            "ID цели",
+            "Номер цели",
             filters["target_id"] or "Все",
         ],
         [
