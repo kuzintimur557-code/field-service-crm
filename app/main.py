@@ -313,6 +313,7 @@ AUTOMATION_TRIGGERS = [
     ("task_workers_changed", "Исполнители заявки изменены"),
     ("task_archived", "Заявка отправлена в архив"),
     ("task_restored", "Заявка восстановлена из архива"),
+    ("task_finance_changed", "Финансы заявки изменены"),
     ("payment_status_changed", "Статус оплаты изменён"),
     ("task_comment_added", "Комментарий к заявке добавлен"),
     ("overdue_task", "Просрочена задача"),
@@ -338,6 +339,10 @@ AUTOMATION_TRIGGER_GROUPS = [
         "task_restored",
         "task_comment_added",
         "overdue_task",
+    )),
+    ("Финансы", (
+        "task_finance_changed",
+        "payment_status_changed",
         "unpaid_task",
     )),
     ("Клиенты", (
@@ -33135,6 +33140,15 @@ async def add_task_item(request: Request, task_id: int):
     except Exception:
         pass
 
+    run_automation_event(
+        company_id,
+        "task_finance_changed",
+        "task",
+        task_id,
+        f"Добавлена позиция в смету заявки #{task_id}: {item['name']}",
+        f"/task/{task_id}",
+    )
+
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
@@ -33249,6 +33263,15 @@ async def add_manual_task_item(request: Request, task_id: int):
         f"{item_name} × {qty}"
     )
 
+    run_automation_event(
+        company_id,
+        "task_finance_changed",
+        "task",
+        task_id,
+        f"Добавлена ручная позиция в смету заявки #{task_id}: {item_name}",
+        f"/task/{task_id}",
+    )
+
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
@@ -33313,6 +33336,15 @@ async def delete_task_item(request: Request, task_id: int, item_id: int):
     except Exception:
         pass
 
+    run_automation_event(
+        company_id,
+        "task_finance_changed",
+        "task",
+        task_id,
+        f"Удалена позиция из сметы заявки #{task_id}: {item['item_name']}",
+        f"/task/{task_id}",
+    )
+
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
@@ -33374,6 +33406,15 @@ async def apply_task_estimate_total(request: Request, task_id: int):
         role,
         "Цена обновлена по смете",
         f"Новая цена: {final_total}"
+    )
+
+    run_automation_event(
+        company_id,
+        "task_finance_changed",
+        "task",
+        task_id,
+        f"Цена заявки #{task_id} обновлена по смете: {final_total}",
+        f"/task/{task_id}",
     )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
@@ -33454,6 +33495,15 @@ async def add_task_expense(request: Request, task_id: int):
         f"{title}: {amount}"
     )
 
+    run_automation_event(
+        company_id,
+        "task_finance_changed",
+        "task",
+        task_id,
+        f"Добавлен расход заявки #{task_id}: {title} — {amount}",
+        f"/task/{task_id}",
+    )
+
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
@@ -33512,6 +33562,18 @@ async def delete_task_expense(request: Request, task_id: int, expense_id: int):
         role,
         "Удалён расход",
         f"{expense['title']}: {expense['amount']}"
+    )
+
+    run_automation_event(
+        company_id,
+        "task_finance_changed",
+        "task",
+        task_id,
+        (
+            f"Удалён расход заявки #{task_id}: "
+            f"{expense['title']} — {expense['amount']}"
+        ),
+        f"/task/{task_id}",
     )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
@@ -33576,6 +33638,15 @@ async def update_task_discount(request: Request, task_id: int):
         role,
         "Изменена скидка",
         f"{old_discount} → {discount_amount}"
+    )
+
+    run_automation_event(
+        company_id,
+        "task_finance_changed",
+        "task",
+        task_id,
+        f"Скидка заявки #{task_id}: {old_discount} → {discount_amount}",
+        f"/task/{task_id}",
     )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)

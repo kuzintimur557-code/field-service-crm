@@ -508,6 +508,7 @@ async def assert_automation_page():
     assert "Новое правило" in html
     assert "Правил пока нет" in html
     assert '<optgroup label="Заявки">' in html
+    assert '<optgroup label="Финансы">' in html
     assert '<optgroup label="Клиенты">' in html
     assert '<optgroup label="SLA и загрузка">' in html
     assert '<optgroup label="ИИ-сводки">' in html
@@ -951,6 +952,10 @@ async def assert_automation_page():
     assert (
         "task_restored",
         "Заявка восстановлена из архива",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "task_finance_changed",
+        "Финансы заявки изменены",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
         "client_updated",
@@ -15133,30 +15138,62 @@ async def assert_finance_margin(task):
     assert "Сохранить оплату" in task_html
     assert '<option value="Оплачено" selected' in task_html
 
-    discount_response = await crm.update_task_discount(
-        make_form_request(
-            "owner2",
-            f"/task/{task['id']}/discount",
-            {"discount_amount": "100"},
-        ),
-        task["id"],
+    original_run_automation_event = crm.run_automation_event
+    task_finance_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        task_finance_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        discount_response = await crm.update_task_discount(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/discount",
+                {"discount_amount": "100"},
+            ),
+            task["id"],
+        )
+
+        expense_response = await crm.add_task_expense(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/expenses",
+                {
+                    "title": "Fuel smoke expense",
+                    "amount": "80",
+                },
+            ),
+            task["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert discount_response.status_code == 302
     assert discount_response.headers["location"] == f"/task/{task['id']}"
-
-    expense_response = await crm.add_task_expense(
-        make_form_request(
-            "owner2",
-            f"/task/{task['id']}/expenses",
-            {
-                "title": "Fuel smoke expense",
-                "amount": "80",
-            },
-        ),
-        task["id"],
-    )
     assert expense_response.status_code == 302
     assert expense_response.headers["location"] == f"/task/{task['id']}"
+    assert [event["trigger_key"] for event in task_finance_events] == [
+        "task_finance_changed",
+        "task_finance_changed",
+    ]
+    assert all(event["company_id"] == 2 for event in task_finance_events)
+    assert all(event["entity_type"] == "task" for event in task_finance_events)
+    assert all(event["entity_id"] == task["id"] for event in task_finance_events)
+    assert task_finance_events[0]["message"].startswith(
+        f"Скидка заявки #{task['id']}:"
+    )
+    assert task_finance_events[1]["message"] == (
+        f"Добавлен расход заявки #{task['id']}: Fuel smoke expense — 80.0"
+    )
 
     discounted_task_response = await crm.task_detail(
         make_asgi_request("owner2", f"/task/{task['id']}"),
@@ -15241,12 +15278,38 @@ async def assert_finance_margin(task):
         for day in worker_detail_response.context["weekly_schedule"]
     )
 
-    apply_response = await crm.apply_task_estimate_total(
-        make_request("owner2"),
-        task["id"],
+    original_run_automation_event = crm.run_automation_event
+    apply_finance_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        apply_finance_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        apply_response = await crm.apply_task_estimate_total(
+            make_request("owner2"),
+            task["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert apply_response.status_code == 302
     assert apply_response.headers["location"] == f"/task/{task['id']}"
+    assert len(apply_finance_events) == 1
+    assert apply_finance_events[0]["trigger_key"] == "task_finance_changed"
+    assert apply_finance_events[0]["entity_type"] == "task"
+    assert apply_finance_events[0]["entity_id"] == task["id"]
+    assert apply_finance_events[0]["message"] == (
+        f"Цена заявки #{task['id']} обновлена по смете: 2200.0"
+    )
 
     conn = connect()
     c = conn.cursor()
