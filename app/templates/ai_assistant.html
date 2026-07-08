@@ -305,7 +305,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
                             <a href="/task/{{ note['created_task_id'] }}">#{{ note["created_task_id"] }}</a>
                             {% if note["created_task_client"] %}<span class="meta">{{ note["created_task_client"] }}</span>{% endif %}
                             {% else %}
-                            <span class="meta">Без заявки</span>
+                            <span class="meta">Без связи: {{ settings["task_label"] or "Заявка" }}</span>
                             {% endif %}
                         </td>
                     </tr>
