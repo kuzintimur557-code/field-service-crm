@@ -547,12 +547,14 @@ async def assert_automation_page():
     assert "renderA3ApprovalSummary" in html
     assert "summary.total_label" in html
     assert "summary.safe_label" in html
+    assert 'data.message || "Не удалось загрузить очередь подтверждений"' in html
     assert "Можно подтвердить:" in html
     assert "Небезопасные:" in html
     assert "Защищённые:" in html
     assert "Правило:" in html
     assert "item.target_name" in html
     assert "renderA3ApprovalHistorySummary" in html
+    assert 'data.message || "Не удалось загрузить историю подтверждений"' in html
     assert "Всего решений:" in html
     assert "Одобрено:" in html
     assert "Отклонено:" in html

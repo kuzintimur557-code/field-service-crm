@@ -1515,11 +1515,19 @@ setInterval(loadA3GovernanceSettings, 30000);
 
 <script>
 async function loadA3ApprovalQueue() {
+    const container = document.getElementById("a3-approval-queue");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/approval-queue");
         const data = await response.json();
 
-        const container = document.getElementById("a3-approval-queue");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить очередь подтверждений");
+        }
 
         container.innerHTML = "";
 
@@ -1595,6 +1603,8 @@ async function loadA3ApprovalQueue() {
         }
     } catch (err) {
         console.error("Ошибка загрузки очереди подтверждений", err);
+        const message = err.message || "Не удалось загрузить очередь подтверждений";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
@@ -1727,13 +1737,21 @@ function buildA3ApprovalHistoryQuery() {
 }
 
 async function loadA3ApprovalHistory() {
+    const container = document.getElementById("a3-approval-history");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch(
             "/api/a3/approval-history?" + buildA3ApprovalHistoryQuery()
         );
         const data = await response.json();
 
-        const container = document.getElementById("a3-approval-history");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить историю подтверждений");
+        }
 
         container.innerHTML = "";
 
@@ -1821,6 +1839,8 @@ async function loadA3ApprovalHistory() {
         }
     } catch (err) {
         console.error("Ошибка загрузки истории подтверждений", err);
+        const message = err.message || "Не удалось загрузить историю подтверждений";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
