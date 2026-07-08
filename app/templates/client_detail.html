@@ -447,6 +447,9 @@ h1{font-size:28px}
         / {{ call["duration_minutes"] }} мин.
         {% endif %}
     </div>
+    <div style="margin-top:10px">
+        <a class="btn" href="/calls/{{ call['id'] }}">Открыть звонок</a>
+    </div>
 </div>
 {% endfor %}
 {% else %}

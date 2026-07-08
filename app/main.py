@@ -27124,6 +27124,64 @@ async def calls_export(
     )
 
 
+@app.get("/calls/{call_id}", response_class=HTMLResponse)
+async def call_detail(request: Request, call_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calls")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    if not settings or not settings["calls_enabled"]:
+        return RedirectResponse("/calls", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+
+    call = c.execute("""
+    SELECT
+        call_records.*,
+        clients.name AS client_name,
+        clients.phone AS client_phone
+    FROM call_records
+    LEFT JOIN clients
+      ON clients.id=call_records.client_id
+     AND clients.company_id=call_records.company_id
+    WHERE call_records.id=?
+      AND call_records.company_id=?
+    """, (call_id, company_id)).fetchone()
+
+    conn.close()
+
+    if not call:
+        return RedirectResponse("/calls", status_code=302)
+
+    return templates.TemplateResponse(
+        request,
+        "call_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "call": call
+        }
+    )
+
+
 @app.post("/calls")
 async def create_call_record(request: Request):
 

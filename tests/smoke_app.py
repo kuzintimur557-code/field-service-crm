@@ -5904,6 +5904,21 @@ async def assert_calls_page():
         assert "Перезвонить завтра по оплате" in history_html
         assert "Нужен контакт" in history_html
         assert f'/clients/{client_id}' in history_html
+        assert f'href="/calls/{call["id"]}"' in history_html
+
+        call_detail_response = await crm.call_detail(
+            make_asgi_request("owner2", f"/calls/{call['id']}"),
+            call["id"],
+        )
+        assert call_detail_response.status_code == 200
+        call_detail_html = call_detail_response.body.decode("utf-8")
+        assert f"Звонок #{call['id']}" in call_detail_html
+        assert "Основная информация" in call_detail_html
+        assert "Расшифровка" in call_detail_html
+        assert "AI-резюме" in call_detail_html
+        assert "Calls Smoke Client" in call_detail_html
+        assert "Перезвонить завтра по оплате" in call_detail_html
+        assert "Нужен контакт" in call_detail_html
 
         filtered_response = await crm.calls_page(
             make_asgi_request(

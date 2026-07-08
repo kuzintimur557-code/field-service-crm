@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+<title>Звонок #{{ call["id"] }}</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:900px;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 10px;font-size:34px;line-height:1.12;overflow-wrap:anywhere}
+h2{margin:0 0 14px;font-size:22px}
+.small{color:#6b7280;font-weight:800;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
+.value{font-size:18px;font-weight:900;overflow-wrap:anywhere}
+.pill{display:inline-block;padding:7px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:13px;font-weight:900}
+.text-block{white-space:pre-wrap;line-height:1.5;font-weight:800;color:#374151;overflow-wrap:anywhere}
+.empty{font-weight:900;color:#6b7280;padding:18px;border-radius:16px;background:#f9fafb}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 15px;border-radius:14px;background:#2563eb;color:white;text-decoration:none;font-weight:900;text-align:center}
+@media(max-width:800px){
+.container{padding:16px 14px 92px}
+.grid{grid-template-columns:1fr}
+.card{padding:20px}
+h1{font-size:28px}
+.actions{display:grid;grid-template-columns:1fr}
+.btn{width:100%}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/calls" class="back">← Назад к звонкам</a>
+
+{% set direction_labels = {"incoming": "Входящий", "outgoing": "Исходящий"} %}
+{% set status_labels = {"completed": "Состоялся", "missed": "Пропущен", "follow_up": "Нужен контакт"} %}
+
+<div class="card">
+<h1>Звонок #{{ call["id"] }}</h1>
+<div class="small">{{ call["call_at"] or call["created_at"] }} / {{ direction_labels.get(call["direction"], call["direction"] or "Звонок") }}</div>
+
+<div class="actions">
+    <a class="btn" href="/calls">Все звонки</a>
+    {% if call["client_id"] and call["client_name"] %}
+    <a class="btn" style="background:#111827" href="/clients/{{ call['client_id'] }}">Открыть: {{ client_label }}</a>
+    {% endif %}
+</div>
+</div>
+
+<div class="card">
+<h2>Основная информация</h2>
+<div class="grid">
+    <div>
+        <div class="label">{{ client_label }}</div>
+        <div class="value">{{ call["client_name"] or "Без привязки" }}</div>
+    </div>
+    <div>
+        <div class="label">Телефон</div>
+        <div class="value">{{ call["phone"] or call["client_phone"] or "Не указан" }}</div>
+    </div>
+    <div>
+        <div class="label">Результат</div>
+        <div class="value"><span class="pill">{{ status_labels.get(call["status"], call["status"] or "Без статуса") }}</span></div>
+    </div>
+    <div>
+        <div class="label">Длительность</div>
+        <div class="value">{{ call["duration_minutes"] or 0 }} мин.</div>
+    </div>
+    <div>
+        <div class="label">Автор</div>
+        <div class="value">{{ call["username"] or "Не указан" }}</div>
+    </div>
+    <div>
+        <div class="label">Создан</div>
+        <div class="value">{{ call["created_at"] }}</div>
+    </div>
+</div>
+</div>
+
+<div class="card">
+<h2>Заметка</h2>
+{% if call["summary"] %}
+<div class="text-block">{{ call["summary"] }}</div>
+{% else %}
+<div class="empty">Заметка по звонку не заполнена.</div>
+{% endif %}
+</div>
+
+<div class="card">
+<h2>Расшифровка</h2>
+{% if call["transcript"] %}
+<div class="text-block">{{ call["transcript"] }}</div>
+{% else %}
+<div class="empty">Расшифровки пока нет.</div>
+{% endif %}
+</div>
+
+<div class="card">
+<h2>AI-резюме</h2>
+{% if call["ai_summary"] %}
+<div class="text-block">{{ call["ai_summary"] }}</div>
+{% else %}
+<div class="empty">AI-резюме пока нет.</div>
+{% endif %}
+</div>
+
+</div>
+{% include 'mobile_nav.html' %}
+</body>
+</html>
