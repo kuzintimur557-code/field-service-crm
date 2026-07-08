@@ -6366,6 +6366,26 @@ async def assert_calls_page():
             "link": f"/calls/{call['id']}",
         }]
 
+        repeat_completed_events = []
+        original_run_automation_event = crm.run_automation_event
+        crm.run_automation_event = (
+            lambda company_id, trigger_key, entity_type="", entity_id=None,
+            message="", link="":
+            repeat_completed_events.append(trigger_key) or 1
+        )
+
+        try:
+            repeat_complete_response = await crm.complete_call_follow_up(
+                make_request("owner2"),
+                call["id"],
+            )
+        finally:
+            crm.run_automation_event = original_run_automation_event
+
+        assert repeat_complete_response.status_code == 302
+        assert repeat_complete_response.headers["location"] == f"/calls/{call['id']}"
+        assert repeat_completed_events == []
+
         completed_call_detail_response = await crm.call_detail(
             make_asgi_request("owner2", f"/calls/{call['id']}", "completed=1"),
             call["id"],

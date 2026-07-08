@@ -27440,7 +27440,7 @@ async def complete_call_follow_up(request: Request, call_id: int):
     c = conn.cursor()
 
     call = c.execute("""
-    SELECT id
+    SELECT id, status
     FROM call_records
     WHERE id=? AND company_id=?
     """, (call_id, company_id)).fetchone()
@@ -27448,6 +27448,10 @@ async def complete_call_follow_up(request: Request, call_id: int):
     if not call:
         conn.close()
         return RedirectResponse("/calls", status_code=302)
+
+    if call["status"] != "follow_up":
+        conn.close()
+        return RedirectResponse(f"/calls/{call_id}", status_code=302)
 
     c.execute("""
     UPDATE call_records
