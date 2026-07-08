@@ -456,12 +456,12 @@ async function loadWorkflowApprovalQueue() {
 
     try {
         const response = await fetch("/api/a3/approval-queue");
+        const data = await response.json();
 
         if (!response.ok) {
-            throw new Error("approval_queue_load_failed");
+            throw new Error(data.message || "Не удалось загрузить очередь подтверждений");
         }
 
-        const data = await response.json();
         const items = data.items || [];
         const summary = data.summary || {};
 
@@ -506,7 +506,8 @@ async function loadWorkflowApprovalQueue() {
         `;
     } catch (err) {
         console.error(err);
-        container.innerHTML = `<div class="pill off">Не удалось загрузить очередь подтверждений</div>`;
+        const message = err.message || "Не удалось загрузить очередь подтверждений";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
@@ -536,12 +537,12 @@ async function loadWorkflowApprovalHistory() {
         const response = await fetch(
             "/api/a3/approval-history?" + buildWorkflowApprovalHistoryQuery()
         );
+        const data = await response.json();
 
         if (!response.ok) {
-            throw new Error("approval_history_load_failed");
+            throw new Error(data.message || "Не удалось загрузить историю решений");
         }
 
-        const data = await response.json();
         const items = data.items || [];
         const summary = data.summary || {};
 
@@ -577,7 +578,8 @@ async function loadWorkflowApprovalHistory() {
         `;
     } catch (err) {
         console.error(err);
-        container.innerHTML = `<div class="meta">Не удалось загрузить историю решений</div>`;
+        const message = err.message || "Не удалось загрузить историю решений";
+        container.innerHTML = `<div class="meta">${message}</div>`;
     }
 }
 
