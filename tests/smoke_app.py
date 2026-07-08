@@ -506,6 +506,8 @@ async def assert_automation_page():
     html = response.body.decode("utf-8")
     assert "Автоматизация" in html
     assert "Новое правило" in html
+    assert "A3 выполняет цепочки" in html
+    assert "исполнение подключается отдельным шагом" not in html
     assert "Правил пока нет" in html
     assert '<optgroup label="Заявки">' in html
     assert '<optgroup label="Финансы">' in html
