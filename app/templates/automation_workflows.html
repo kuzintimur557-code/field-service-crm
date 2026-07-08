@@ -795,9 +795,13 @@ async function approveWorkflowAction(actionId) {
     try {
         setWorkflowActionStatus("Одобрение действия...");
         const response = await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {method:"POST"});
+        const data = await response.json();
 
         if (!response.ok) {
-            throw new Error("approval_action_approve_failed");
+            const message = data.message || "Не удалось одобрить действие";
+            setWorkflowActionStatus(message, "error");
+            alert(message);
+            return;
         }
 
         await loadWorkflowApprovalQueue();
@@ -816,9 +820,13 @@ async function rejectWorkflowAction(actionId) {
     try {
         setWorkflowActionStatus("Отклонение действия...");
         const response = await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {method:"POST"});
+        const data = await response.json();
 
         if (!response.ok) {
-            throw new Error("approval_action_reject_failed");
+            const message = data.message || "Не удалось отклонить действие";
+            setWorkflowActionStatus(message, "error");
+            alert(message);
+            return;
         }
 
         await loadWorkflowApprovalQueue();
