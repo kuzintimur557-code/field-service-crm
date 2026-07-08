@@ -350,6 +350,7 @@ AUTOMATION_TRIGGERS = [
     ("worker_commission_updated", "Процент сотрудника изменён"),
     ("worker_deleted", "Сотрудник удалён"),
     ("worker_password_changed", "Пароль сотрудника изменён"),
+    ("company_settings_updated", "Настройки компании обновлены"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -406,6 +407,9 @@ AUTOMATION_TRIGGER_GROUPS = [
         "worker_commission_updated",
         "worker_deleted",
         "worker_password_changed",
+    )),
+    ("Компания", (
+        "company_settings_updated",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -27670,6 +27674,15 @@ async def update_settings(request: Request):
         )
     except Exception:
         pass
+
+    run_automation_event(
+        company_id,
+        "company_settings_updated",
+        "company",
+        company_id,
+        f"Настройки компании обновлены: {company_name or 'Без названия'}",
+        "/settings",
+    )
 
     return RedirectResponse("/settings?updated=1", status_code=302)
 

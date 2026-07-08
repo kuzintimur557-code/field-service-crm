@@ -1078,8 +1078,14 @@ async def assert_automation_page():
         "worker_password_changed",
         "Пароль сотрудника изменён",
     ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "company_settings_updated",
+        "Настройки компании обновлены",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert 'optgroup label="Компания"' in html
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
+    assert 'value="company_settings_updated"' in html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
     assert 'name="action_key" value="telegram_alert"' in builder_html
     assert 'name="action_key" value="ai_digest"' in builder_html
@@ -5416,6 +5422,50 @@ async def assert_settings_page():
     assert "✅" not in html
     assert "❌" not in html
     assert "💾 Сохранить настройки" not in html
+
+    current_settings = crm.get_company_settings(2)
+    current_features = crm.get_company_features(2)
+    settings_form = {
+        "company_name": current_settings["company_name"] or "Smoke Company",
+        "phone": current_settings["phone"] or "",
+        "email": current_settings["email"] or "",
+        "telegram_chat_id": "",
+        "address": current_settings["address"] or "",
+        "tax_number": current_settings["tax_number"] or "",
+        "bank_details": current_settings["bank_details"] or "",
+        "plan": current_settings["plan"] or "basic",
+        "industry": current_settings["industry"] or "field_service",
+        "task_label": current_settings["task_label"] or "Заявка",
+        "worker_label": current_settings["worker_label"] or "Исполнитель",
+        "client_label": current_settings["client_label"] or "Клиент",
+        "service_label": current_settings["service_label"] or "Услуга",
+    }
+
+    for feature_key, _, _ in crm.FEATURE_DEFINITIONS:
+        if current_features.get(feature_key):
+            settings_form[f"feature_{feature_key}"] = "1"
+
+    captured_events = []
+    original_run_automation_event = crm.run_automation_event
+    crm.run_automation_event = lambda *args, **kwargs: captured_events.append(args)
+
+    try:
+        update_response = await crm.update_settings(
+            make_form_request("owner2", "/settings", settings_form)
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert update_response.status_code == 302
+    assert update_response.headers["location"] == "/settings?updated=1"
+    assert captured_events[-1] == (
+        2,
+        "company_settings_updated",
+        "company",
+        2,
+        f"Настройки компании обновлены: {settings_form['company_name']}",
+        "/settings",
+    )
 
 
 async def assert_billing_page():
