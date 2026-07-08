@@ -966,6 +966,10 @@ async def assert_automation_page():
         "Финансы заявки изменены",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "sla_deadline_changed",
+        "Срок SLA изменён",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "recurring_task_generated",
         "Создана регулярная заявка",
     ) in crm.AUTOMATION_TRIGGERS
@@ -16519,16 +16523,56 @@ async def assert_overdue_sla(task):
 
     assert escalation_count == 1
 
-    soon_deadline = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
     conn = connect()
     c = conn.cursor()
-    c.execute("""
-    UPDATE tasks
-    SET deadline_at=?
+    previous_deadline = c.execute("""
+    SELECT deadline_at
+    FROM tasks
     WHERE id=?
-    """, (soon_deadline, task["id"]))
-    conn.commit()
+    """, (task["id"],)).fetchone()["deadline_at"]
     conn.close()
+
+    soon_deadline = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+    original_run_automation_event = crm.run_automation_event
+    deadline_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        deadline_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        deadline_response = await crm.update_task_deadline(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/deadline",
+                {"deadline_at": soon_deadline},
+            ),
+            task["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert deadline_response.status_code == 302
+    assert deadline_response.headers["location"] == f"/task/{task['id']}"
+    assert deadline_events == [{
+        "company_id": 2,
+        "trigger_key": "sla_deadline_changed",
+        "entity_type": "task",
+        "entity_id": task["id"],
+        "message": (
+            f"SLA заявки #{task['id']}: "
+            f"{previous_deadline or 'не задан'} → {soon_deadline}"
+        ),
+        "link": f"/task/{task['id']}",
+    }]
 
     soon_response = await crm.sla_page(
         make_asgi_request("owner2", "/sla"),

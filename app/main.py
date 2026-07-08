@@ -320,6 +320,7 @@ AUTOMATION_TRIGGERS = [
     ("task_comment_added", "Комментарий к заявке добавлен"),
     ("overdue_task", "Просрочена задача"),
     ("sla_overdue", "Просрочен SLA"),
+    ("sla_deadline_changed", "Срок SLA изменён"),
     ("unpaid_task", "Нет оплаты"),
     ("worker_overload", "Перегрузка сотрудника"),
     ("new_client", "Новый клиент"),
@@ -376,6 +377,7 @@ AUTOMATION_TRIGGER_GROUPS = [
     )),
     ("SLA и загрузка", (
         "sla_overdue",
+        "sla_deadline_changed",
         "worker_overload",
     )),
     ("ИИ-сводки", (
@@ -34669,6 +34671,8 @@ async def update_task_deadline(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/", status_code=302)
 
+    previous_deadline = (task["deadline_at"] or "").strip()
+
     c.execute("""
     UPDATE tasks
     SET deadline_at=?
@@ -34724,6 +34728,19 @@ async def update_task_deadline(request: Request, task_id: int):
 
     conn.commit()
     conn.close()
+
+    if previous_deadline != deadline_at:
+        run_automation_event(
+            company_id,
+            "sla_deadline_changed",
+            "task",
+            task_id,
+            (
+                f"SLA заявки #{task_id}: "
+                f"{previous_deadline or 'не задан'} → {deadline_at or 'очищен'}"
+            ),
+            f"/task/{task_id}",
+        )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
