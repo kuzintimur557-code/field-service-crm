@@ -15239,6 +15239,110 @@ async def assert_client_card(task):
     c = conn.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Комментарий заявки smoke",
+        "task_comment_added",
+        json.dumps({}, ensure_ascii=False),
+        1,
+        "owner2",
+        now,
+        now,
+    ))
+    comment_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        comment_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Comment trigger matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        now,
+    ))
+    conn.commit()
+    conn.close()
+
+    original_send_message = crm.send_message
+    original_send_message_to_chat = crm.send_message_to_chat
+    crm.send_message = lambda text: True
+    crm.send_message_to_chat = lambda chat_id, text: True
+
+    try:
+        comment_response = await crm.add_task_comment(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/comment",
+                {"message": "Automation comment smoke"},
+            ),
+            task["id"],
+        )
+    finally:
+        crm.send_message = original_send_message
+        crm.send_message_to_chat = original_send_message_to_chat
+
+    assert comment_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    comment_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='task_comment_added'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (comment_rule_id, task["id"])).fetchone()
+    comment_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Комментарий заявки smoke'
+      AND message='Comment trigger matched'
+    ORDER BY id DESC
+    """).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (comment_rule_id,))
+    c.execute("DELETE FROM notifications WHERE title='Комментарий заявки smoke'")
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (comment_rule_id,))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (comment_rule_id,))
+    c.execute("""
+    DELETE FROM task_comments
+    WHERE task_id=?
+      AND message='Automation comment smoke'
+    """, (task["id"],))
+    c.execute("""
+    DELETE FROM task_activity
+    WHERE task_id=?
+      AND action='Добавлен комментарий'
+      AND details='Automation comment smoke'
+    """, (task["id"],))
+    conn.commit()
+    conn.close()
+
+    assert comment_event is not None
+    assert comment_event["status"] == "done"
+    assert comment_notification is not None
+
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
     INSERT INTO tasks (
         client_id, client, phone, address, description, task_date,
         worker, workers, priority, price, photo, status, report,

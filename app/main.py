@@ -311,6 +311,7 @@ AUTOMATION_TRIGGERS = [
     ("task_status_changed", "Статус заявки изменён"),
     ("task_schedule_changed", "Расписание заявки изменено"),
     ("payment_status_changed", "Статус оплаты изменён"),
+    ("task_comment_added", "Комментарий к заявке добавлен"),
     ("overdue_task", "Просрочена задача"),
     ("sla_overdue", "Просрочен SLA"),
     ("unpaid_task", "Нет оплаты"),
@@ -33456,6 +33457,16 @@ async def add_task_comment(request: Request, task_id: int):
             print("Telegram comment notification error:", e)
 
     conn.close()
+
+    if message:
+        run_automation_event(
+            get_task_company_id(task),
+            "task_comment_added",
+            "task",
+            task_id,
+            f"Добавлен комментарий к заявке #{task_id}",
+            f"/task/{task_id}",
+        )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
