@@ -354,6 +354,7 @@ AUTOMATION_TRIGGERS = [
     ("ai_note_created", "ИИ-заметка создана"),
     ("ai_note_postponed", "ИИ-заметка перенесена"),
     ("ai_note_done", "ИИ-заметка выполнена"),
+    ("ai_follow_up_notifications_sent", "ИИ-контроль отправил уведомления"),
     ("ai_insights_digest_created", "ИИ-сводка создана вручную"),
     ("ai_digest_rules_created", "Правила ИИ-сводок настроены"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
@@ -425,6 +426,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "ai_note_created",
         "ai_note_postponed",
         "ai_note_done",
+        "ai_follow_up_notifications_sent",
     )),
     ("ИИ-сводки", (
         "ai_insights_digest_created",
@@ -27454,6 +27456,16 @@ async def notify_ai_assistant_follow_ups(request: Request):
         return disabled_response
 
     created_count = create_ai_follow_up_notifications(company_id, username)
+
+    if created_count:
+        run_automation_event(
+            company_id,
+            "ai_follow_up_notifications_sent",
+            "company",
+            company_id,
+            f"ИИ-контроль отправил уведомления: {created_count}",
+            "/ai/assistant",
+        )
 
     return RedirectResponse(
         f"/ai/assistant?follow_up_notifications={created_count}",

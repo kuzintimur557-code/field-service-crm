@@ -1095,6 +1095,10 @@ async def assert_automation_page():
         "ai_note_done",
         "ИИ-заметка выполнена",
     ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "ai_follow_up_notifications_sent",
+        "ИИ-контроль отправил уведомления",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'optgroup label="ИИ-помощник"' in html
     assert (
         "ai_insights_digest_created",
@@ -1110,6 +1114,7 @@ async def assert_automation_page():
     assert 'value="ai_note_created"' in html
     assert 'value="ai_note_postponed"' in html
     assert 'value="ai_note_done"' in html
+    assert 'value="ai_follow_up_notifications_sent"' in html
     assert 'value="ai_insights_digest_created"' in html
     assert 'value="ai_digest_rules_created"' in html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -4907,15 +4912,21 @@ async def assert_ai_assistant_page():
     conn.close()
 
     sent_follow_up_telegram_messages = []
+    captured_follow_up_events = []
     original_send_message_to_chat = crm.send_message_to_chat
+    original_run_automation_event = crm.run_automation_event
     crm.send_message_to_chat = (
         lambda chat_id, text: sent_follow_up_telegram_messages.append((chat_id, text)) or True
+    )
+    crm.run_automation_event = (
+        lambda *args, **kwargs: captured_follow_up_events.append(args)
     )
 
     try:
         follow_up_response = await crm.notify_ai_assistant_follow_ups(make_request("owner2"))
     finally:
         crm.send_message_to_chat = original_send_message_to_chat
+        crm.run_automation_event = original_run_automation_event
 
     assert follow_up_response.status_code == 302
     assert follow_up_response.headers["location"].startswith(
@@ -4924,6 +4935,14 @@ async def assert_ai_assistant_page():
     assert sent_follow_up_telegram_messages
     assert sent_follow_up_telegram_messages[-1][0] == "chat-owner2"
     assert "Проверить рекомендацию ИИ-помощника" in sent_follow_up_telegram_messages[-1][1]
+    assert captured_follow_up_events[-1] == (
+        2,
+        "ai_follow_up_notifications_sent",
+        "company",
+        2,
+        "ИИ-контроль отправил уведомления: 1",
+        "/ai/assistant",
+    )
 
     conn = connect()
     c = conn.cursor()
