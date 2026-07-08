@@ -983,6 +983,18 @@ async def assert_automation_page():
         "Создана регулярная заявка",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "recurring_job_created",
+        "Шаблон регулярной работы создан",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "recurring_job_toggled",
+        "Статус шаблона регулярной работы изменён",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "recurring_job_date_changed",
+        "Дата шаблона регулярной работы изменена",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "client_updated",
         "Клиент обновлён",
     ) in crm.AUTOMATION_TRIGGERS
@@ -16984,6 +16996,65 @@ async def assert_overdue_sla(task):
 
 
 async def assert_recurring_generate(task):
+    original_run_automation_event = crm.run_automation_event
+    recurring_create_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        recurring_create_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        create_job_response = await crm.create_recurring_job(
+            make_form_request(
+                "owner2",
+                "/recurring",
+                {
+                    "client_id": str(task["client_id"]),
+                    "title": "Created recurring smoke",
+                    "description": "Created recurring job",
+                    "interval_type": "weekly",
+                    "next_date": "2026-05-18",
+                    "workers": ["worker2"],
+                    "priority": "Обычный",
+                    "price": "900",
+                },
+            )
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert create_job_response.status_code == 302
+    assert create_job_response.headers["location"] == "/recurring?created=1"
+
+    conn = connect()
+    c = conn.cursor()
+    created_job = c.execute("""
+    SELECT *
+    FROM recurring_jobs
+    WHERE company_id=2 AND title='Created recurring smoke'
+    ORDER BY id DESC
+    LIMIT 1
+    """).fetchone()
+    conn.close()
+
+    assert created_job is not None
+    assert recurring_create_events == [{
+        "company_id": 2,
+        "trigger_key": "recurring_job_created",
+        "entity_type": "recurring_job",
+        "entity_id": created_job["id"],
+        "message": "Шаблон регулярной работы создан: Created recurring smoke",
+        "link": "/recurring",
+    }]
+
     conn = connect()
     c = conn.cursor()
 
@@ -17172,13 +17243,43 @@ async def assert_recurring_generate(task):
     conn.commit()
     conn.close()
 
-    date_response = await crm.update_recurring_job_date(make_form_request(
-        "owner2",
-        f"/recurring/{job_id}/date",
-        {"next_date": "2026-07-01"},
-    ), job_id)
+    original_run_automation_event = crm.run_automation_event
+    recurring_update_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        recurring_update_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        date_response = await crm.update_recurring_job_date(make_form_request(
+            "owner2",
+            f"/recurring/{job_id}/date",
+            {"next_date": "2026-07-01"},
+        ), job_id)
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert date_response.status_code == 302
     assert date_response.headers["location"] == "/recurring?updated=1"
+    assert recurring_update_events == [{
+        "company_id": 2,
+        "trigger_key": "recurring_job_date_changed",
+        "entity_type": "recurring_job",
+        "entity_id": job_id,
+        "message": (
+            "Дата шаблона регулярной работы Smoke recurring: "
+            "2026-06-17 → 2026-07-01"
+        ),
+        "link": "/recurring",
+    }]
 
     conn = connect()
     c = conn.cursor()
@@ -17191,9 +17292,39 @@ async def assert_recurring_generate(task):
 
     assert updated_job["next_date"] == "2026-07-01"
 
-    toggle_response = await crm.toggle_recurring_job(make_request("owner2"), job_id)
+    original_run_automation_event = crm.run_automation_event
+    recurring_toggle_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        recurring_toggle_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        toggle_response = await crm.toggle_recurring_job(
+            make_request("owner2"),
+            job_id,
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert toggle_response.status_code == 302
     assert toggle_response.headers["location"] == "/recurring"
+    assert recurring_toggle_events == [{
+        "company_id": 2,
+        "trigger_key": "recurring_job_toggled",
+        "entity_type": "recurring_job",
+        "entity_id": job_id,
+        "message": "Шаблон регулярной работы выключен: Smoke recurring",
+        "link": "/recurring",
+    }]
 
     conn = connect()
     c = conn.cursor()

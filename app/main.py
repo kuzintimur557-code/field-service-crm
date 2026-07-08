@@ -318,6 +318,9 @@ AUTOMATION_TRIGGERS = [
     ("task_photo_uploaded", "Фото заявки загружено"),
     ("task_report_updated", "Отчёт по заявке обновлён"),
     ("recurring_task_generated", "Создана регулярная заявка"),
+    ("recurring_job_created", "Шаблон регулярной работы создан"),
+    ("recurring_job_toggled", "Статус шаблона регулярной работы изменён"),
+    ("recurring_job_date_changed", "Дата шаблона регулярной работы изменена"),
     ("payment_status_changed", "Статус оплаты изменён"),
     ("task_comment_added", "Комментарий к заявке добавлен"),
     ("overdue_task", "Просрочена задача"),
@@ -361,6 +364,9 @@ AUTOMATION_TRIGGER_GROUPS = [
         "task_report_updated",
         "task_comment_added",
         "recurring_task_generated",
+        "recurring_job_created",
+        "recurring_job_toggled",
+        "recurring_job_date_changed",
         "overdue_task",
     )),
     ("Финансы", (
@@ -23734,8 +23740,18 @@ async def create_recurring_job(request: Request):
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
+    job_id = c.lastrowid
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "recurring_job_created",
+        "recurring_job",
+        job_id,
+        f"Шаблон регулярной работы создан: {title}",
+        "/recurring",
+    )
 
     return RedirectResponse("/recurring?created=1", status_code=302)
 
@@ -23982,6 +23998,18 @@ async def toggle_recurring_job(request: Request, job_id: int):
     conn.commit()
     conn.close()
 
+    run_automation_event(
+        company_id,
+        "recurring_job_toggled",
+        "recurring_job",
+        job_id,
+        (
+            f"Шаблон регулярной работы "
+            f"{'включён' if new_active else 'выключен'}: {job['title']}"
+        ),
+        "/recurring",
+    )
+
     return RedirectResponse("/recurring", status_code=302)
 
 
@@ -24017,7 +24045,7 @@ async def update_recurring_job_date(request: Request, job_id: int):
     c = conn.cursor()
 
     job = c.execute("""
-    SELECT id
+    SELECT id, title, next_date
     FROM recurring_jobs
     WHERE id=? AND company_id=?
     """, (job_id, company_id)).fetchone()
@@ -24034,6 +24062,19 @@ async def update_recurring_job_date(request: Request, job_id: int):
 
     conn.commit()
     conn.close()
+
+    if str(job["next_date"] or "") != next_date:
+        run_automation_event(
+            company_id,
+            "recurring_job_date_changed",
+            "recurring_job",
+            job_id,
+            (
+                f"Дата шаблона регулярной работы {job['title']}: "
+                f"{job['next_date'] or 'не задана'} → {next_date}"
+            ),
+            "/recurring",
+        )
 
     return RedirectResponse("/recurring?updated=1", status_code=302)
 
