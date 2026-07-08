@@ -6022,6 +6022,47 @@ async def assert_calls_page():
         assert "Smoke call transcript" in updated_call_detail_html
         assert "Smoke AI call summary" in updated_call_detail_html
 
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        UPDATE company_settings
+        SET ai_calls_enabled=0
+        WHERE company_id=2
+        """)
+        conn.commit()
+        conn.close()
+
+        disabled_ai_response = await crm.update_call_analysis(
+            make_form_request(
+                "owner2",
+                f"/calls/{call['id']}/analysis",
+                {
+                    "transcript": "Smoke call transcript",
+                    "ai_summary": "Should not overwrite AI summary",
+                },
+            ),
+            call["id"],
+        )
+        assert disabled_ai_response.status_code == 302
+
+        conn = connect()
+        c = conn.cursor()
+        protected_ai_call = c.execute("""
+        SELECT transcript, ai_summary
+        FROM call_records
+        WHERE id=? AND company_id=2
+        """, (call["id"],)).fetchone()
+        c.execute("""
+        UPDATE company_settings
+        SET ai_calls_enabled=1
+        WHERE company_id=2
+        """)
+        conn.commit()
+        conn.close()
+
+        assert protected_ai_call["transcript"] == "Smoke call transcript"
+        assert protected_ai_call["ai_summary"] == "Smoke AI call summary"
+
         filtered_response = await crm.calls_page(
             make_asgi_request(
                 "owner2",

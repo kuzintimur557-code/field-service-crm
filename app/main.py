@@ -27233,13 +27233,13 @@ async def update_call_analysis(request: Request, call_id: int):
 
     form = await request.form()
     transcript = str(form.get("transcript") or "").strip()[:10000]
-    ai_summary = str(form.get("ai_summary") or "").strip()[:5000]
+    requested_ai_summary = str(form.get("ai_summary") or "").strip()[:5000]
 
     conn = connect()
     c = conn.cursor()
 
     call = c.execute("""
-    SELECT id
+    SELECT id, ai_summary
     FROM call_records
     WHERE id=? AND company_id=?
     """, (call_id, company_id)).fetchone()
@@ -27247,6 +27247,8 @@ async def update_call_analysis(request: Request, call_id: int):
     if not call:
         conn.close()
         return RedirectResponse("/calls", status_code=302)
+
+    ai_summary = requested_ai_summary if settings["ai_calls_enabled"] else (call["ai_summary"] or "")
 
     c.execute("""
     UPDATE call_records
