@@ -26984,6 +26984,14 @@ async def calls_page(
             item for item in call_records
             if item["status"] == "follow_up"
         ]),
+        "with_audio": len([
+            item for item in call_records
+            if item["audio_filename"]
+        ]),
+        "with_analysis": len([
+            item for item in call_records
+            if item["transcript"] or item["ai_summary"]
+        ]),
     }
 
     conn.close()

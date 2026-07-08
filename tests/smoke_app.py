@@ -5821,6 +5821,8 @@ async def assert_calls_page():
         assert "Calls Outsider Client" not in html
         assert 'action="/calls"' in html
         assert "Фильтры" in html
+        assert "С аудио" in html
+        assert "С анализом" in html
         assert 'name="status"' in html
         assert 'placeholder="Клиент, телефон или заметка"' in html
         assert 'href="/calls/export?' in html
