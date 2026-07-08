@@ -12361,6 +12361,8 @@ async def notifications_page(request: Request):
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     conn = connect()
     c = conn.cursor()
 
@@ -12391,7 +12393,8 @@ async def notifications_page(request: Request):
             "username": username,
             "role": role,
             "notifications": notifications,
-            "unread_count": unread_count
+            "unread_count": unread_count,
+            "settings": settings
         }
     )
 
@@ -29388,15 +29391,21 @@ async def profile_page(request: Request):
         return RedirectResponse("/login", status_code=302)
 
     role = get_role(username)
+    company_id = get_user_company_id(username)
+
+    context = {
+        "request": request,
+        "username": username,
+        "role": role
+    }
+
+    if company_id:
+        context["settings"] = get_company_settings(company_id)
 
     return templates.TemplateResponse(
         request,
         "profile.html",
-        {
-            "request": request,
-            "username": username,
-            "role": role
-        }
+        context
     )
 
 
