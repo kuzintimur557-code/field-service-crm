@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ settings["task_label"] or "Заявка" }} #{{ task["id"] }}</title>
+{% set task_label = settings["task_label"] or "Заявка" %}
+{% set task_label_lower = task_label|lower %}
+{% set worker_label = settings["worker_label"] or "Исполнители" %}
+<title>{{ task_label }} #{{ task["id"] }}</title>
 
 <link rel="stylesheet" href="/static/app.css">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -468,7 +471,7 @@ button{
 <body>
 {% if request.query_params.get("date_error") == "worker_unavailable" %}
 <div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
-Перенос невозможен: исполнитель {{ request.query_params.get("worker") }} недоступен на выбранную дату.
+Перенос невозможен: сотрудник {{ request.query_params.get("worker") }} недоступен на выбранную дату.
 </div>
 {% elif request.query_params.get("date_error") == "invalid" %}
 <div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
@@ -480,7 +483,7 @@ button{
 </div>
 {% elif request.query_params.get("date_error") == "time_conflict" %}
 <div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
-Выбранное время пересекается с заявкой
+Выбранное время пересекается с {{ task_label_lower }}
 <a href="/task/{{ request.query_params.get('conflict_task_id') }}" style="color:#991b1b">#{{ request.query_params.get("conflict_task_id") }}</a>.
 </div>
 {% endif %}
@@ -493,7 +496,7 @@ button{
 <a href="/" class="back">← Назад</a>
 
 <div>
-<span class="title">{{ settings["task_label"] or "Заявка" }} #{{ task["id"] }}</span>
+<span class="title">{{ task_label }} #{{ task["id"] }}</span>
 <span class="badge">{{ task["status"] }}</span>
 
 {% if sla_status == "overdue" %}
@@ -673,7 +676,7 @@ button{
 {% if task["report"] %}
 <div class="card">
 
-<div class="section-title">Отчёт исполнителя</div>
+<div class="section-title">Отчёт сотрудника</div>
 
 <div class="comment">
 {{ task["report"] }}
@@ -985,11 +988,11 @@ button{
 
 {% if role in ["boss", "manager"] %}
 {% if task["archived"] == 1 %}
-<form method="post" action="/task/{{ task['id'] }}/unarchive" onsubmit="return confirm('Восстановить заявку #{{ task['id'] }} из архива?')">
+<form method="post" action="/task/{{ task['id'] }}/unarchive" onsubmit="return confirm('Восстановить {{ task_label_lower }} #{{ task['id'] }} из архива?')">
 <button class="btn green" type="submit">🗄 Восстановить из архива</button>
 </form>
 {% else %}
-<form method="post" action="/task/{{ task['id'] }}/delete" onsubmit="return confirm('Отправить заявку #{{ task['id'] }} в архив?')">
+<form method="post" action="/task/{{ task['id'] }}/delete" onsubmit="return confirm('Отправить {{ task_label_lower }} #{{ task['id'] }} в архив?')">
 <button class="btn red" type="submit">🗄 В архив</button>
 </form>
 {% endif %}
@@ -1050,7 +1053,7 @@ button{
 	<div class="modal" id="workersModal">
 	<div class="modal-content">
 
-	<h3>Назначить исполнителей</h3>
+	<h3>Назначить: {{ worker_label }}</h3>
 
 	<form method="post" action="/task/{{ task['id'] }}/workers">
 	<div style="display:grid;gap:10px;margin:14px 0">
@@ -1060,11 +1063,11 @@ button{
 	<span>{{ worker["full_name"] or worker["username"] }}</span>
 	</label>
 	{% else %}
-	<div class="muted">Нет активных исполнителей</div>
+	<div class="muted">Нет активных сотрудников</div>
 	{% endfor %}
 	</div>
 
-	<button class="btn blue">Сохранить исполнителей</button>
+	<button class="btn blue">Сохранить</button>
 
 	</form>
 
