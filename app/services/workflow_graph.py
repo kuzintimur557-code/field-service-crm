@@ -151,6 +151,20 @@ def _action_key_label(action_key):
     return labels.get(action_key or "", action_key or "Действие")
 
 
+def _trigger_key_label(trigger_key):
+    labels = {
+        "overdue_task": "Просрочена задача",
+        "sla_overdue": "Просрочен SLA",
+        "unpaid_task": "Нет оплаты",
+        "worker_overload": "Перегрузка сотрудника",
+        "new_client": "Новый клиент",
+        "daily_digest": "Ежедневная ИИ-сводка",
+        "weekly_digest": "Еженедельная ИИ-сводка",
+    }
+
+    return labels.get(trigger_key or "", trigger_key or "Триггер")
+
+
 def _ai_debug_recommendations(rule, actions, latest_problem_event):
     recommendations = []
 
@@ -483,12 +497,13 @@ def get_rule_workflow_graph(company_id, rule_id):
     problem_count = skipped_count + failed_count
     success_rate = round(done_count / max(done_count + skipped_count + failed_count, 1) * 100, 1)
     conditions = _condition_summary(rule["conditions_json"])
+    trigger_label = _trigger_key_label(rule["trigger_key"])
 
     nodes = [
         {
             "id": f"trigger:{rule_id}",
             "type": "trigger",
-            "label": rule["trigger_key"],
+            "label": trigger_label,
             "status": "active" if rule["active"] else "disabled",
         },
         {
@@ -560,6 +575,7 @@ def get_rule_workflow_graph(company_id, rule_id):
             "id": rule["id"],
             "name": rule["name"],
             "trigger_key": rule["trigger_key"],
+            "trigger_label": trigger_label,
             "active": bool(rule["active"]),
             "conditions": conditions,
         },
