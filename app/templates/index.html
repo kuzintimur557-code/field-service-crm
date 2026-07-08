@@ -68,7 +68,7 @@ h1{font-size:30px}
 
     <div class="nav">
         {% set f = features if features is defined else {} %}
-        <a href="/create-task">Новая {{ settings["task_label"] or "Заявка" }}</a>
+        <a href="/create-task">{{ settings["task_label"] or "Заявка" }}: создать</a>
         {% if f.get("calendar", True) %}
         <a href="/calendar">Календарь</a>
         {% endif %}

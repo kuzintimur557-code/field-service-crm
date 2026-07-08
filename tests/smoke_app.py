@@ -5473,7 +5473,7 @@ async def assert_home_page():
     assert response.status_code == 200
     html = response.body.decode("utf-8")
     assert "Бизнес CRM" in html
-    assert "Новая Заявка" in html
+    assert "Заявка: создать" in html
     assert "Календарь" in html
     assert "Каталог" in html
     assert "Финансы" in html
@@ -8762,6 +8762,14 @@ async def assert_platform_companies_page():
     assert "Описание перевозка" in logistics_create_html
     assert "Водитель" in logistics_create_html
     assert "Создать</button>" in logistics_create_html
+
+    logistics_home = await crm.home(
+        make_asgi_request("smoke_logistics_owner", "/"),
+    )
+    assert logistics_home.status_code == 200
+    logistics_home_html = logistics_home.body.decode("utf-8")
+    assert "Рейс: создать" in logistics_home_html
+    assert "Новая Рейс" not in logistics_home_html
 
     c.execute(
         "DELETE FROM company_features WHERE company_id=?",
