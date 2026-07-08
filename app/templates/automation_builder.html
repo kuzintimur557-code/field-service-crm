@@ -55,6 +55,9 @@
     </style>
 </head>
 <body>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <div class="container">
     <div class="header">
         <div>
@@ -148,7 +151,7 @@
                 <input type="hidden" name="trigger_key" value="sla_overdue">
                 <input type="hidden" name="action_key" value="notification">
                 <input type="hidden" name="target_username" value="{{ username }}">
-                <input type="hidden" name="message" value="SLA просрочен. Проверьте заявку и исполнителя.">
+                <input type="hidden" name="message" value="SLA просрочен. Проверьте работу и ответственного.">
                 <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
             </form>
 
@@ -159,48 +162,48 @@
                 <input type="hidden" name="trigger_key" value="overdue_task">
                 <input type="hidden" name="action_key" value="telegram_alert">
                 <input type="hidden" name="target_username" value="{{ username }}">
-                <input type="hidden" name="message" value="Есть просроченная задача. Проверьте календарь и исполнителя.">
+                <input type="hidden" name="message" value="Есть просроченная работа. Проверьте календарь и ответственного.">
                 <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
             </form>
 
             <form method="post" action="/automation/rules" class="chain">
-                <h2>Новая заявка без исполнителя</h2>
-                <div class="meta">Если создана заявка без назначенного исполнителя, владелец получает уведомление.</div>
-                <input type="hidden" name="name" value="Новая заявка без исполнителя">
+                <h2>Без назначения: {{ task_label }}</h2>
+                <div class="meta">Если создана запись типа "{{ task_label|lower }}" без {{ worker_label|lower }}, владелец получает уведомление.</div>
+                <input type="hidden" name="name" value="Без назначения: {{ task_label }}">
                 <input type="hidden" name="trigger_key" value="new_task">
                 <input type="hidden" name="condition_mode" value="worker_unassigned">
                 <input type="hidden" name="action_key" value="notification">
                 <input type="hidden" name="target_username" value="{{ username }}">
-                <input type="hidden" name="message" value="Новая заявка создана без исполнителя. Назначьте ответственного.">
+                <input type="hidden" name="message" value="Новая запись создана без ответственного. Назначьте исполнителя.">
                 <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
             </form>
 
             <form method="post" action="/automation/rules" class="chain">
-                <h2>Заявка завершена</h2>
-                <div class="meta">Когда заявка становится завершённой, владелец получает уведомление.</div>
-                <input type="hidden" name="name" value="Заявка завершена → уведомить владельца">
+                <h2>Завершено: {{ task_label }}</h2>
+                <div class="meta">Когда запись типа "{{ task_label|lower }}" становится завершённой, владелец получает уведомление.</div>
+                <input type="hidden" name="name" value="Завершено: {{ task_label }} → уведомить владельца">
                 <input type="hidden" name="trigger_key" value="task_status_changed">
                 <input type="hidden" name="condition_mode" value="status_done">
                 <input type="hidden" name="action_key" value="notification">
                 <input type="hidden" name="target_username" value="{{ username }}">
-                <input type="hidden" name="message" value="Заявка завершена. Проверьте отчёт и оплату.">
+                <input type="hidden" name="message" value="Работа завершена. Проверьте отчёт и оплату.">
                 <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
             </form>
 
             <form method="post" action="/automation/rules" class="chain">
-                <h2>Исполнители изменены</h2>
-                <div class="meta">Когда у заявки меняется состав исполнителей, владелец получает уведомление.</div>
-                <input type="hidden" name="name" value="Исполнители изменены → уведомить владельца">
+                <h2>Назначения изменены</h2>
+                <div class="meta">Когда у записи типа "{{ task_label|lower }}" меняется состав ответственных, владелец получает уведомление.</div>
+                <input type="hidden" name="name" value="Назначения изменены → уведомить владельца">
                 <input type="hidden" name="trigger_key" value="task_workers_changed">
                 <input type="hidden" name="action_key" value="notification">
                 <input type="hidden" name="target_username" value="{{ username }}">
-                <input type="hidden" name="message" value="У заявки изменились исполнители. Проверьте загрузку и календарь.">
+                <input type="hidden" name="message" value="У записи изменились ответственные. Проверьте загрузку и календарь.">
                 <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
             </form>
 
             <form method="post" action="/automation/rules" class="chain">
                 <h2>Оплата поступила</h2>
-                <div class="meta">Когда заявка отмечена как оплаченная, владелец получает уведомление.</div>
+                <div class="meta">Когда у записи типа "{{ task_label|lower }}" статус оплаты меняется на оплачено, владелец получает уведомление.</div>
                 <input type="hidden" name="name" value="Оплата поступила → уведомить владельца">
                 <input type="hidden" name="trigger_key" value="payment_status_changed">
                 <input type="hidden" name="condition_mode" value="payment_paid">
@@ -268,16 +271,16 @@
                         <input type="text" name="condition_text" data-condition-text="primary" maxlength="120"
                                value="{{ rule['condition_text'] }}"
                                placeholder="Ключевое слово или фраза" aria-label="Текст первого условия">
-                        <select name="condition_worker" data-condition-worker="primary" aria-label="Исполнитель первого условия">
-                            <option value="">Выберите исполнителя</option>
+                        <select name="condition_worker" data-condition-worker="primary" aria-label="{{ worker_label }} первого условия">
+                            <option value="">Выберите: {{ worker_label|lower }}</option>
                             {% for worker in workers %}
                             <option value="{{ worker['username'] }}" {% if rule["condition_worker"] == worker["username"] %}selected{% endif %}>
                                 {{ worker["full_name"] or worker["username"] }}
                             </option>
                             {% endfor %}
                         </select>
-                        <select name="condition_client" data-condition-client="primary" aria-label="Клиент первого условия">
-                            <option value="">Выберите клиента</option>
+                        <select name="condition_client" data-condition-client="primary" aria-label="{{ client_label }} первого условия">
+                            <option value="">Выберите: {{ client_label|lower }}</option>
                             {% for client in clients %}
                             <option value="{{ client['id'] }}" {% if rule["condition_client"] == client["id"]|string %}selected{% endif %}>
                                 {{ client["name"] }}{% if client["phone"] %} · {{ client["phone"] }}{% endif %}
@@ -311,16 +314,16 @@
                         <input type="text" name="condition_secondary_text" data-condition-text="secondary" maxlength="120"
                                value="{{ rule['condition_secondary_text'] }}"
                                placeholder="Ключевое слово или фраза" aria-label="Текст второго условия">
-                        <select name="condition_secondary_worker" data-condition-worker="secondary" aria-label="Исполнитель второго условия">
-                            <option value="">Выберите исполнителя</option>
+                        <select name="condition_secondary_worker" data-condition-worker="secondary" aria-label="{{ worker_label }} второго условия">
+                            <option value="">Выберите: {{ worker_label|lower }}</option>
                             {% for worker in workers %}
                             <option value="{{ worker['username'] }}" {% if rule["condition_secondary_worker"] == worker["username"] %}selected{% endif %}>
                                 {{ worker["full_name"] or worker["username"] }}
                             </option>
                             {% endfor %}
                         </select>
-                        <select name="condition_secondary_client" data-condition-client="secondary" aria-label="Клиент второго условия">
-                            <option value="">Выберите клиента</option>
+                        <select name="condition_secondary_client" data-condition-client="secondary" aria-label="{{ client_label }} второго условия">
+                            <option value="">Выберите: {{ client_label|lower }}</option>
                             {% for client in clients %}
                             <option value="{{ client['id'] }}" {% if rule["condition_secondary_client"] == client["id"]|string %}selected{% endif %}>
                                 {{ client["name"] }}{% if client["phone"] %} · {{ client["phone"] }}{% endif %}
@@ -350,16 +353,16 @@
                         <input type="text" name="condition_tertiary_text" data-condition-text="tertiary" maxlength="120"
                                value="{{ rule['condition_tertiary_text'] }}"
                                placeholder="Ключевое слово или фраза" aria-label="Текст третьего условия">
-                        <select name="condition_tertiary_worker" data-condition-worker="tertiary" aria-label="Исполнитель третьего условия">
-                            <option value="">Выберите исполнителя</option>
+                        <select name="condition_tertiary_worker" data-condition-worker="tertiary" aria-label="{{ worker_label }} третьего условия">
+                            <option value="">Выберите: {{ worker_label|lower }}</option>
                             {% for worker in workers %}
                             <option value="{{ worker['username'] }}" {% if rule["condition_tertiary_worker"] == worker["username"] %}selected{% endif %}>
                                 {{ worker["full_name"] or worker["username"] }}
                             </option>
                             {% endfor %}
                         </select>
-                        <select name="condition_tertiary_client" data-condition-client="tertiary" aria-label="Клиент третьего условия">
-                            <option value="">Выберите клиента</option>
+                        <select name="condition_tertiary_client" data-condition-client="tertiary" aria-label="{{ client_label }} третьего условия">
+                            <option value="">Выберите: {{ client_label|lower }}</option>
                             {% for client in clients %}
                             <option value="{{ client['id'] }}" {% if rule["condition_tertiary_client"] == client["id"]|string %}selected{% endif %}>
                                 {{ client["name"] }}{% if client["phone"] %} · {{ client["phone"] }}{% endif %}
@@ -377,11 +380,11 @@
                         <button class="small-button" type="submit">Сохранить условия</button>
                     </form>
                     <form method="post" action="/automation/rules/{{ rule['id'] }}/test-condition" style="margin-top:12px">
-                        <select name="task_id" aria-label="Заявка для проверки" required>
-                            <option value="">Выберите заявку для теста</option>
+                        <select name="task_id" aria-label="{{ task_label }} для проверки" required>
+                            <option value="">Выберите: {{ task_label|lower }} для теста</option>
                             {% for task in test_tasks %}
                             <option value="{{ task['id'] }}" {% if test_rule_id == rule["id"] and test_task_id == task["id"] %}selected{% endif %}>
-                                #{{ task["id"] }} · {{ task["client"] or "Без клиента" }} · {{ task["status"] }}
+                                #{{ task["id"] }} · {{ task["client"] or ("Без связи: " ~ (client_label|lower)) }} · {{ task["status"] }}
                             </option>
                             {% endfor %}
                         </select>
@@ -390,11 +393,11 @@
                     <form method="post" action="/automation/rules/{{ rule['id'] }}/test-condition-batch"
                           style="margin-top:8px">
                         <select name="batch_limit" aria-label="Количество заявок для проверки">
-                            <option value="20" {% if batch_rule_id == rule["id"] and batch_limit == 20 %}selected{% endif %}>Последние 20 заявок</option>
-                            <option value="50" {% if batch_rule_id == rule["id"] and batch_limit == 50 %}selected{% endif %}>Последние 50 заявок</option>
-                            <option value="100" {% if batch_rule_id == rule["id"] and batch_limit == 100 %}selected{% endif %}>Последние 100 заявок</option>
+                            <option value="20" {% if batch_rule_id == rule["id"] and batch_limit == 20 %}selected{% endif %}>Последние 20: {{ task_label|lower }}</option>
+                            <option value="50" {% if batch_rule_id == rule["id"] and batch_limit == 50 %}selected{% endif %}>Последние 50: {{ task_label|lower }}</option>
+                            <option value="100" {% if batch_rule_id == rule["id"] and batch_limit == 100 %}selected{% endif %}>Последние 100: {{ task_label|lower }}</option>
                         </select>
-                        <button class="small-button" type="submit">Проверить последние заявки</button>
+                        <button class="small-button" type="submit">Проверить последние</button>
                     </form>
                     {% if test_rule_id == rule["id"] and test_result %}
                     <div class="pill {% if test_result == 'match' %}ok{% elif test_result == 'no_match' %}warn{% else %}off{% endif %}"
@@ -507,23 +510,23 @@
                     </div>
                     {% endif %}
                     {% if batch_tasks %}
-                    <div class="meta" style="margin-top:10px">Подходящие заявки</div>
+                    <div class="meta" style="margin-top:10px">Подходящие: {{ task_label }}</div>
                     <div style="display:grid;gap:6px;margin-top:8px">
                         {% for task in batch_tasks %}
                         <a class="pill ok" href="/task/{{ task['id'] }}"
                            style="justify-content:flex-start;text-decoration:none">
-                            #{{ task["id"] }} · {{ task["client"] or "Без клиента" }} · {{ task["status"] }}
+                            #{{ task["id"] }} · {{ task["client"] or ("Без связи: " ~ (client_label|lower)) }} · {{ task["status"] }}
                         </a>
                         {% endfor %}
                     </div>
                     {% endif %}
                     {% if batch_rejected_tasks %}
-                    <div class="meta" style="margin-top:10px">Отклонённые заявки</div>
+                    <div class="meta" style="margin-top:10px">Отклонённые: {{ task_label }}</div>
                     <div style="display:grid;gap:6px;margin-top:8px">
                         {% for task in batch_rejected_tasks %}
                         <a class="pill warn" href="/task/{{ task['id'] }}"
                            style="justify-content:flex-start;text-decoration:none;display:block">
-                            #{{ task["id"] }} · {{ task["client"] or "Без клиента" }} · {{ task["status"] }}
+                            #{{ task["id"] }} · {{ task["client"] or ("Без связи: " ~ (client_label|lower)) }} · {{ task["status"] }}
                             {% if task["failed_conditions"] %}
                             <span style="display:block;margin-top:3px">
                                 Не выполнено: {{ task["failed_conditions"]|join(", ") }}

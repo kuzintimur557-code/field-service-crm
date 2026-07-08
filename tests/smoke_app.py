@@ -880,7 +880,7 @@ async def assert_automation_page():
     assert f"/automation/rules/{rule['id']}/test-condition" in builder_html
     assert "Сохранить условия" in builder_html
     assert "Проверить условие" in builder_html
-    assert "Выберите заявку для теста" in builder_html
+    assert "Выберите: заявка для теста" in builder_html
     assert '"mode":' not in builder_html
     assert 'name="condition_operator"' in builder_html
     assert 'name="condition_secondary_mode"' in builder_html
@@ -954,9 +954,9 @@ async def assert_automation_page():
     assert "currentBuilderFilter === \"conditions\"" in builder_html
     assert "SLA → уведомление" in builder_html
     assert "Просрочка → Telegram" in builder_html
-    assert "Новая заявка без исполнителя" in builder_html
-    assert "Заявка завершена" in builder_html
-    assert "Исполнители изменены" in builder_html
+    assert "Без назначения: Заявка" in builder_html
+    assert "Завершено: Заявка" in builder_html
+    assert "Назначения изменены" in builder_html
     assert "Оплата поступила" in builder_html
     assert "Ежедневная ИИ-сводка" in builder_html
     assert 'name="trigger_key" value="sla_overdue"' in builder_html
@@ -1602,10 +1602,10 @@ async def assert_automation_page():
         )
     )
     batch_result_html = batch_result_response.body.decode("utf-8")
-    assert "Проверить последние заявки" in batch_result_html
-    assert "Последние 20 заявок" in batch_result_html
-    assert "Последние 50 заявок" in batch_result_html
-    assert "Последние 100 заявок" in batch_result_html
+    assert "Проверить последние" in batch_result_html
+    assert "Последние 20: заявка" in batch_result_html
+    assert "Последние 50: заявка" in batch_result_html
+    assert "Последние 100: заявка" in batch_result_html
     assert "Подходит" in batch_result_html
     assert "Совпадение:" in batch_result_html
     assert "Правило подходит всем заявкам" in batch_result_html
@@ -1633,7 +1633,7 @@ async def assert_automation_page():
         )
     )
     rejected_preview_html = rejected_preview_response.body.decode("utf-8")
-    assert "Отклонённые заявки" in rejected_preview_html
+    assert "Отклонённые: Заявка" in rejected_preview_html
     assert "Не выполнено: Только завершённые заявки" in rejected_preview_html
     assert "Правило слишком узкое" in rejected_preview_html
 
