@@ -123,6 +123,25 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS call_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        client_id INTEGER,
+        username TEXT,
+        direction TEXT,
+        status TEXT,
+        phone TEXT,
+        summary TEXT,
+        call_at TEXT,
+        duration_minutes INTEGER DEFAULT 0,
+        audio_filename TEXT,
+        transcript TEXT,
+        ai_summary TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS catalog_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item_type TEXT,
@@ -703,6 +722,19 @@ def init_db():
     add_column_if_missing(c, "users", "daily_capacity", "INTEGER DEFAULT 3")
     add_column_if_missing(c, "task_items", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "client_notes", "company_id", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "call_records", "company_id", "INTEGER DEFAULT 1")
+    add_column_if_missing(c, "call_records", "client_id", "INTEGER")
+    add_column_if_missing(c, "call_records", "username", "TEXT")
+    add_column_if_missing(c, "call_records", "direction", "TEXT")
+    add_column_if_missing(c, "call_records", "status", "TEXT")
+    add_column_if_missing(c, "call_records", "phone", "TEXT")
+    add_column_if_missing(c, "call_records", "summary", "TEXT")
+    add_column_if_missing(c, "call_records", "call_at", "TEXT")
+    add_column_if_missing(c, "call_records", "duration_minutes", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "call_records", "audio_filename", "TEXT")
+    add_column_if_missing(c, "call_records", "transcript", "TEXT")
+    add_column_if_missing(c, "call_records", "ai_summary", "TEXT")
+    add_column_if_missing(c, "call_records", "created_at", "TEXT")
     add_column_if_missing(c, "catalog_items", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "clients", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "tasks", "company_id", "INTEGER DEFAULT 1")
@@ -1004,6 +1036,16 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_team_activity_company_user_created
     ON team_activity(company_id, user_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_call_records_company_created
+    ON call_records(company_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_call_records_company_client
+    ON call_records(company_id, client_id, created_at)
     """)
 
     c.execute("""

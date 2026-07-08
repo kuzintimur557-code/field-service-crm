@@ -494,6 +494,59 @@ def assert_automation_foundation():
     assert "created_task_id" in ai_note_columns
 
 
+def assert_calls_foundation():
+    conn = connect()
+    c = conn.cursor()
+
+    table = c.execute("""
+    SELECT name
+    FROM sqlite_master
+    WHERE type='table'
+      AND name='call_records'
+    """).fetchone()
+
+    indexes = {
+        row["name"]
+        for row in c.execute("""
+        SELECT name
+        FROM sqlite_master
+        WHERE type='index'
+          AND name IN (
+              'idx_call_records_company_created',
+              'idx_call_records_company_client'
+          )
+        """).fetchall()
+    }
+
+    columns = {
+        row["name"]
+        for row in c.execute("PRAGMA table_info(call_records)").fetchall()
+    }
+
+    conn.close()
+
+    assert table is not None
+    assert indexes == {
+        "idx_call_records_company_created",
+        "idx_call_records_company_client",
+    }
+    assert {
+        "company_id",
+        "client_id",
+        "username",
+        "direction",
+        "status",
+        "phone",
+        "summary",
+        "call_at",
+        "duration_minutes",
+        "audio_filename",
+        "transcript",
+        "ai_summary",
+        "created_at",
+    }.issubset(columns)
+
+
 async def assert_automation_page():
     conn = connect()
     c = conn.cursor()
@@ -5704,6 +5757,159 @@ async def assert_billing_page():
     assert "✅" not in html
     assert "❌" not in html
     assert "🔗 Настройка 1С" not in html
+
+
+async def assert_calls_page():
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    original_settings = c.execute("""
+    SELECT calls_enabled, ai_calls_enabled
+    FROM company_settings
+    WHERE company_id=2
+    """).fetchone()
+
+    c.execute("""
+    UPDATE company_settings
+    SET calls_enabled=1,
+        ai_calls_enabled=1
+    WHERE company_id=2
+    """)
+
+    c.execute("""
+    INSERT INTO clients (
+        company_id, name, phone, email, address, notes, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Calls Smoke Client",
+        "+7 900 111-22-33",
+        "",
+        "",
+        "",
+        now,
+    ))
+    client_id = c.lastrowid
+
+    c.execute("""
+    INSERT INTO clients (
+        company_id, name, phone, email, address, notes, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        1,
+        "Calls Outsider Client",
+        "+7 900 999-99-99",
+        "",
+        "",
+        "",
+        now,
+    ))
+    outsider_client_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    try:
+        response = await crm.calls_page(make_asgi_request("owner2", "/calls"))
+        assert response.status_code == 200
+        html = response.body.decode("utf-8")
+        assert "Добавить звонок" in html
+        assert "История звонков" in html
+        assert "Calls Smoke Client" in html
+        assert "Calls Outsider Client" not in html
+        assert 'action="/calls"' in html
+        assert "Сохранить звонок" in html
+
+        empty_response = await crm.create_call_record(
+            make_form_request("owner2", "/calls", {})
+        )
+        assert empty_response.status_code == 302
+        assert empty_response.headers["location"] == "/calls?error=empty"
+
+        outsider_response = await crm.create_call_record(
+            make_form_request(
+                "owner2",
+                "/calls",
+                {
+                    "client_id": str(outsider_client_id),
+                    "summary": "Should not attach",
+                },
+            )
+        )
+        assert outsider_response.status_code == 302
+        assert outsider_response.headers["location"] == "/calls?error=client"
+
+        create_response = await crm.create_call_record(
+            make_form_request(
+                "owner2",
+                "/calls",
+                {
+                    "client_id": str(client_id),
+                    "direction": "incoming",
+                    "status": "follow_up",
+                    "phone": "",
+                    "summary": "Перезвонить завтра по оплате",
+                    "duration_minutes": "7",
+                    "call_at": "2026-06-14T10:30",
+                },
+            )
+        )
+        assert create_response.status_code == 302
+        assert create_response.headers["location"] == "/calls?created=1"
+
+        conn = connect()
+        c = conn.cursor()
+        call = c.execute("""
+        SELECT *
+        FROM call_records
+        WHERE company_id=2
+          AND client_id=?
+        ORDER BY id DESC
+        """, (client_id,)).fetchone()
+        conn.close()
+
+        assert call is not None
+        assert call["username"] == "owner2"
+        assert call["direction"] == "incoming"
+        assert call["status"] == "follow_up"
+        assert call["phone"] == "+7 900 111-22-33"
+        assert call["summary"] == "Перезвонить завтра по оплате"
+        assert call["duration_minutes"] == 7
+        assert call["call_at"] == "2026-06-14 10:30"
+
+        history_response = await crm.calls_page(
+            make_asgi_request("owner2", "/calls", "created=1")
+        )
+        history_html = history_response.body.decode("utf-8")
+        assert "Звонок сохранён" in history_html
+        assert "Перезвонить завтра по оплате" in history_html
+        assert "Нужен контакт" in history_html
+        assert f'/clients/{client_id}' in history_html
+    finally:
+        conn = connect()
+        c = conn.cursor()
+        c.execute(
+            "DELETE FROM call_records WHERE client_id IN (?, ?)",
+            (client_id, outsider_client_id),
+        )
+        c.execute(
+            "DELETE FROM clients WHERE id IN (?, ?)",
+            (client_id, outsider_client_id),
+        )
+        if original_settings:
+            c.execute("""
+            UPDATE company_settings
+            SET calls_enabled=?,
+                ai_calls_enabled=?
+            WHERE company_id=2
+            """, (
+                original_settings["calls_enabled"],
+                original_settings["ai_calls_enabled"],
+            ))
+        conn.commit()
+        conn.close()
 
 
 async def assert_upload_access():
@@ -21291,6 +21497,7 @@ def main():
         assert_session_cookie_auth()
         assert_task_access(task)
         assert_automation_foundation()
+        assert_calls_foundation()
         asyncio.run(assert_automation_page())
         asyncio.run(assert_automation_runner(task))
         asyncio.run(assert_automation_delete())
@@ -21302,6 +21509,7 @@ def main():
         asyncio.run(assert_profile_page())
         asyncio.run(assert_settings_page())
         asyncio.run(assert_billing_page())
+        asyncio.run(assert_calls_page())
         asyncio.run(assert_upload_access())
         asyncio.run(assert_calendar_access())
         asyncio.run(assert_schedule_conflicts())

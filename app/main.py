@@ -1366,6 +1366,7 @@ COMPANY_CONTEXT_DIAGNOSTIC_TABLES = [
     ("task_items", "Позиции смет", "1=1"),
     ("client_notes", "Заметки клиентов", "1=1"),
     ("client_files", "Файлы клиентов", "1=1"),
+    ("call_records", "История звонков", "1=1"),
     ("recurring_jobs", "Повторяющиеся работы", "1=1"),
     ("custom_fields", "Настраиваемые поля", "1=1"),
     ("custom_field_values", "Значения настраиваемых полей", "1=1"),
@@ -26878,6 +26879,44 @@ async def calls_page(request: Request):
 
     settings = get_company_settings(company_id)
 
+    conn = connect()
+    c = conn.cursor()
+
+    clients = c.execute("""
+    SELECT id, name, phone
+    FROM clients
+    WHERE company_id=?
+    ORDER BY name, id
+    """, (company_id,)).fetchall()
+
+    call_records = c.execute("""
+    SELECT
+        call_records.*,
+        clients.name AS client_name
+    FROM call_records
+    LEFT JOIN clients
+      ON clients.id=call_records.client_id
+     AND clients.company_id=call_records.company_id
+    WHERE call_records.company_id=?
+    ORDER BY COALESCE(call_records.call_at, call_records.created_at) DESC,
+             call_records.id DESC
+    LIMIT 50
+    """, (company_id,)).fetchall()
+
+    call_stats = {
+        "total": len(call_records),
+        "missed": len([
+            item for item in call_records
+            if item["status"] == "missed"
+        ]),
+        "follow_up": len([
+            item for item in call_records
+            if item["status"] == "follow_up"
+        ]),
+    }
+
+    conn.close()
+
     return templates.TemplateResponse(
         request,
         "calls.html",
@@ -26885,9 +26924,124 @@ async def calls_page(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "settings": settings
+            "settings": settings,
+            "clients": clients,
+            "call_records": call_records,
+            "call_stats": call_stats
         }
     )
+
+
+@app.post("/calls")
+async def create_call_record(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calls")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    if not settings or not settings["calls_enabled"]:
+        return RedirectResponse("/calls?error=disabled", status_code=302)
+
+    form = await request.form()
+    client_id_raw = str(form.get("client_id") or "").strip()
+    phone = str(form.get("phone") or "").strip()[:80]
+    summary = str(form.get("summary") or "").strip()[:1000]
+    direction = str(form.get("direction") or "incoming").strip()
+    status = str(form.get("status") or "completed").strip()
+    call_at = str(form.get("call_at") or "").strip().replace("T", " ")
+
+    if direction not in ("incoming", "outgoing"):
+        direction = "incoming"
+
+    if status not in ("completed", "missed", "follow_up"):
+        status = "completed"
+
+    try:
+        duration_minutes = int(str(form.get("duration_minutes") or "0"))
+    except ValueError:
+        duration_minutes = 0
+
+    duration_minutes = max(0, min(duration_minutes, 1440))
+
+    conn = connect()
+    c = conn.cursor()
+
+    client_id = None
+    client = None
+
+    if client_id_raw:
+        try:
+            client_id = int(client_id_raw)
+        except ValueError:
+            client_id = None
+
+        if client_id:
+            client = c.execute("""
+            SELECT id, phone
+            FROM clients
+            WHERE id=?
+              AND company_id=?
+            """, (client_id, company_id)).fetchone()
+
+        if not client:
+            conn.close()
+            return RedirectResponse("/calls?error=client", status_code=302)
+
+        if not phone:
+            phone = str(client["phone"] or "").strip()[:80]
+
+    if not call_at:
+        call_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    if not client_id and not phone and not summary:
+        conn.close()
+        return RedirectResponse("/calls?error=empty", status_code=302)
+
+    c.execute("""
+    INSERT INTO call_records (
+        company_id,
+        client_id,
+        username,
+        direction,
+        status,
+        phone,
+        summary,
+        call_at,
+        duration_minutes,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        client_id,
+        username,
+        direction,
+        status,
+        phone,
+        summary,
+        call_at,
+        duration_minutes,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse("/calls?created=1", status_code=302)
 
 
 @app.get("/integrations/1c", response_class=HTMLResponse)

@@ -24,7 +24,19 @@ h2{margin:0 0 16px;font-size:22px}
 .box{background:#f9fafb;border-radius:18px;padding:18px}
 .label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
 .value{font-size:18px;font-weight:900}
-@media(max-width:800px){.container{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:28px}.card{padding:22px}}
+form{display:grid;gap:12px}
+input,select,textarea,button{width:100%;min-height:44px;padding:12px;border-radius:14px;font:inherit}
+input,select,textarea{border:1px solid #d1d5db;background:#fff}
+textarea{min-height:90px;resize:vertical}
+button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.table{display:grid;gap:10px}
+.row{display:grid;grid-template-columns:minmax(110px,.9fr) minmax(130px,1.1fr) minmax(90px,.8fr) minmax(0,1.6fr);gap:12px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:14px}
+.head{background:#e5e7eb;font-weight:900}
+.pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:12px;font-weight:900}
+.empty{text-align:center;color:#6b7280;font-weight:900;padding:24px}
+.mobile-label{display:none}
+@media(max-width:800px){.container{padding:16px 14px 92px}.grid,.form-grid,.row{grid-template-columns:1fr}h1{font-size:28px}.card{padding:22px}.head{display:none}.mobile-label{display:block}}
 </style>
 </head>
 
@@ -36,9 +48,27 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="card">
 <h1>☎️ Звонки</h1>
 <div class="small">
-Будущий модуль входящих звонков, записи разговоров, истории общения и ИИ-анализа скриптов.
+История звонков, ручные заметки по разговору и база для будущей телефонии.
 </div>
 </div>
+
+{% if request.query_params.get("created") == "1" %}
+<div class="card">
+<div class="notice open">Звонок сохранён.</div>
+</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "client" %}
+<div class="card">
+<div class="notice locked">Выбранный {{ client_label|lower }} недоступен.</div>
+</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "empty" %}
+<div class="card">
+<div class="notice locked">Укажите {{ client_label|lower }}, телефон или заметку.</div>
+</div>
+{% endif %}
 
 {% if not settings["calls_enabled"] %}
 <div class="card">
@@ -50,35 +80,126 @@ h2{margin:0 0 16px;font-size:22px}
 {% else %}
 <div class="card">
 <div class="notice open">
-✅ Модуль звонков включён на текущем тарифе.
+Модуль звонков включён на текущем тарифе.
 </div>
 </div>
 
 <div class="card">
-<h2>Будущие возможности</h2>
+<h2>Сводка</h2>
 
 <div class="grid">
     <div class="box">
-        <div class="label">Входящие звонки</div>
-        <div class="value">Привязка: {{ client_label }}</div>
+        <div class="label">Всего записей</div>
+        <div class="value">{{ call_stats.total }}</div>
     </div>
 
     <div class="box">
-        <div class="label">Запись разговоров</div>
-        <div class="value">Аудио в карточке</div>
+        <div class="label">Пропущено</div>
+        <div class="value">{{ call_stats.missed }}</div>
     </div>
 
     <div class="box">
-        <div class="label">ИИ-анализ</div>
-        <div class="value">
-            {% if settings["ai_calls_enabled"] %}
-            Включён
-            {% else %}
-            Только корпоративный тариф
-            {% endif %}
-        </div>
+        <div class="label">Нужен контакт</div>
+        <div class="value">{{ call_stats.follow_up }}</div>
     </div>
 </div>
+</div>
+
+<div class="card">
+<h2>Добавить звонок</h2>
+<form method="post" action="/calls">
+    <div class="form-grid">
+        <div>
+            <div class="label">{{ client_label }}</div>
+            <select name="client_id">
+                <option value="">Без привязки</option>
+                {% for client in clients %}
+                <option value="{{ client['id'] }}">{{ client["name"] }}{% if client["phone"] %} · {{ client["phone"] }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <div class="label">Телефон</div>
+            <input name="phone" placeholder="+7 ...">
+        </div>
+        <div>
+            <div class="label">Тип</div>
+            <select name="direction">
+                <option value="incoming">Входящий</option>
+                <option value="outgoing">Исходящий</option>
+            </select>
+        </div>
+        <div>
+            <div class="label">Результат</div>
+            <select name="status">
+                <option value="completed">Разговор состоялся</option>
+                <option value="missed">Пропущен</option>
+                <option value="follow_up">Нужно связаться</option>
+            </select>
+        </div>
+        <div>
+            <div class="label">Когда</div>
+            <input name="call_at" type="datetime-local">
+        </div>
+        <div>
+            <div class="label">Длительность, минут</div>
+            <input name="duration_minutes" type="number" min="0" max="1440" value="0">
+        </div>
+    </div>
+    <div>
+        <div class="label">Заметка</div>
+        <textarea name="summary" placeholder="Кратко: вопрос, итог, следующий шаг"></textarea>
+    </div>
+    <button type="submit">Сохранить звонок</button>
+</form>
+</div>
+
+<div class="card">
+<h2>История звонков</h2>
+{% set direction_labels = {"incoming": "Входящий", "outgoing": "Исходящий"} %}
+{% set status_labels = {"completed": "Состоялся", "missed": "Пропущен", "follow_up": "Нужен контакт"} %}
+
+{% if call_records %}
+<div class="table">
+    <div class="row head">
+        <div>Дата</div>
+        <div>{{ client_label }}</div>
+        <div>Результат</div>
+        <div>Заметка</div>
+    </div>
+    {% for call in call_records %}
+    <div class="row">
+        <div>
+            <span class="mobile-label label">Дата</span>
+            <b>{{ call["call_at"] or call["created_at"] }}</b>
+            <div class="small">{{ direction_labels.get(call["direction"], call["direction"]) }}</div>
+        </div>
+        <div>
+            <span class="mobile-label label">{{ client_label }}</span>
+            {% if call["client_id"] and call["client_name"] %}
+            <a href="/clients/{{ call['client_id'] }}" style="color:#111827;font-weight:900;text-decoration:none">{{ call["client_name"] }}</a>
+            {% else %}
+            <b>Без привязки</b>
+            {% endif %}
+            {% if call["phone"] %}<div class="small">{{ call["phone"] }}</div>{% endif %}
+        </div>
+        <div>
+            <span class="mobile-label label">Результат</span>
+            <span class="pill">{{ status_labels.get(call["status"], call["status"]) }}</span>
+            {% if call["duration_minutes"] %}
+            <div class="small">{{ call["duration_minutes"] }} мин.</div>
+            {% endif %}
+        </div>
+        <div>
+            <span class="mobile-label label">Заметка</span>
+            {{ call["summary"] or "Без заметки" }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty">История звонков пока пустая.</div>
+{% endif %}
 </div>
 {% endif %}
 
