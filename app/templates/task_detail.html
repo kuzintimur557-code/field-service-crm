@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% set task_label = settings["task_label"] or "Заявка" %}
 {% set task_label_lower = task_label|lower %}
-{% set worker_label = settings["worker_label"] or "Исполнители" %}
+{% set worker_label = settings["worker_label"] or "Исполнитель" %}
 <title>{{ task_label }} #{{ task["id"] }}</title>
 
 <link rel="stylesheet" href="/static/app.css">
@@ -590,7 +590,7 @@ button{
 
 	<div class="info-row">
 	<div class="icon">👷</div>
-	<div class="label">{{ settings["worker_label"] or "Исполнители" }}</div>
+	<div class="label">{{ worker_label }}</div>
 	<div class="value">
 	<div class="worker-list">
 	{% if task_workers %}
@@ -598,7 +598,7 @@ button{
 	<span class="worker-chip">{{ worker_name }}</span>
 	{% endfor %}
 	{% else %}
-	<span class="worker-chip">Не назначены</span>
+	<span class="worker-chip">Не назначено</span>
 	{% endif %}
 	</div>
 	</div>
@@ -876,12 +876,12 @@ button{
 </div>
 
 	<div class="mini">
-	<div class="mini-label">{{ settings["worker_label"] or "Исполнители" }}</div>
+	<div class="mini-label">{{ worker_label }}</div>
 	<div class="mini-value">
 	{% if task_workers %}
 	{{ task_workers|join(", ") }}
 	{% else %}
-	Не назначены
+	Не назначено
 	{% endif %}
 	</div>
 	</div>
