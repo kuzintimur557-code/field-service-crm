@@ -27107,24 +27107,31 @@ async def calls_page(
     LIMIT 50
     """, call_params).fetchall()
 
+    call_stats_row = c.execute(f"""
+    SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN call_records.status='missed' THEN 1 ELSE 0 END) AS missed,
+        SUM(CASE WHEN call_records.status='follow_up' THEN 1 ELSE 0 END) AS follow_up,
+        SUM(CASE WHEN COALESCE(call_records.audio_filename, '')!='' THEN 1 ELSE 0 END) AS with_audio,
+        SUM(
+            CASE
+            WHEN COALESCE(call_records.transcript, '')!=''
+              OR COALESCE(call_records.ai_summary, '')!=''
+            THEN 1 ELSE 0 END
+        ) AS with_analysis
+    FROM call_records
+    LEFT JOIN clients
+      ON clients.id=call_records.client_id
+     AND clients.company_id=call_records.company_id
+    WHERE {call_where_sql}
+    """, call_params).fetchone()
+
     call_stats = {
-        "total": len(call_records),
-        "missed": len([
-            item for item in call_records
-            if item["status"] == "missed"
-        ]),
-        "follow_up": len([
-            item for item in call_records
-            if item["status"] == "follow_up"
-        ]),
-        "with_audio": len([
-            item for item in call_records
-            if item["audio_filename"]
-        ]),
-        "with_analysis": len([
-            item for item in call_records
-            if item["transcript"] or item["ai_summary"]
-        ]),
+        "total": call_stats_row["total"] or 0,
+        "missed": call_stats_row["missed"] or 0,
+        "follow_up": call_stats_row["follow_up"] or 0,
+        "with_audio": call_stats_row["with_audio"] or 0,
+        "with_analysis": call_stats_row["with_analysis"] or 0,
     }
 
     conn.close()

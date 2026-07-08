@@ -6024,6 +6024,7 @@ async def assert_calls_page():
         history_response = await crm.calls_page(
             make_asgi_request("owner2", "/calls", "created=1")
         )
+        assert history_response.context["call_stats"]["follow_up"] >= 1
         history_html = history_response.body.decode("utf-8")
         assert "Звонок сохранён" in history_html
         assert "Перезвонить завтра по оплате" in history_html
@@ -6153,6 +6154,12 @@ async def assert_calls_page():
         assert "Карточка звонка обновлена" in updated_call_detail_html
         assert "Smoke call transcript" in updated_call_detail_html
         assert "Smoke AI call summary" in updated_call_detail_html
+
+        analyzed_history_response = await crm.calls_page(
+            make_asgi_request("owner2", "/calls")
+        )
+        assert analyzed_history_response.context["call_stats"]["with_audio"] >= 1
+        assert analyzed_history_response.context["call_stats"]["with_analysis"] >= 1
 
         conn = connect()
         c = conn.cursor()
