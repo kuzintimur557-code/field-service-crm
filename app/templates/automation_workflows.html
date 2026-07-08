@@ -1175,7 +1175,7 @@ async function loadChains() {
                     ${debug.latest_problem_event ? `
                         <div class="meta" style="margin-top:10px">
                             Последняя проблема:
-                            ${debug.latest_problem_event.status}
+                            ${debug.latest_problem_event.status_label || workflowSessionStatusLabel(debug.latest_problem_event.status)}
                             #${debug.latest_problem_event.id}
                             ${debug.latest_problem_event.message || ""}
                         </div>

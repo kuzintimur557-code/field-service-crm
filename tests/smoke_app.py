@@ -16393,6 +16393,7 @@ async def assert_a3_workflow_center():
     assert "Диагностика: данных пока недостаточно" in body
     assert "Безопасные исправления" in body
     assert "Автоисправления не требуются" in body
+    assert "debug.latest_problem_event.status_label || workflowSessionStatusLabel(debug.latest_problem_event.status)" in body
     assert "Требует подтверждения" in body
     assert "duplicate_pending_action" not in body
     assert "Очередь подтверждений" in body
