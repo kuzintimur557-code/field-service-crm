@@ -958,6 +958,10 @@ async def assert_automation_page():
         "Заявка восстановлена из архива",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "task_details_changed",
+        "Данные заявки изменены",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "task_finance_changed",
         "Финансы заявки изменены",
     ) in crm.AUTOMATION_TRIGGERS
@@ -3086,6 +3090,119 @@ async def assert_automation_runner(task):
     assert notification is not None
     assert notification["message"] == "Runner notification message"
     assert notification["link"] == f"/task/{task['id']}"
+
+    conn = connect()
+    c = conn.cursor()
+    original_task_values = c.execute("""
+    SELECT description, status, price
+    FROM tasks
+    WHERE id=?
+    """, (task["id"],)).fetchone()
+    conn.close()
+
+    quick_edit_status = (
+        "В работе"
+        if original_task_values["status"] != "В работе"
+        else "Новая"
+    )
+    quick_edit_price = (
+        "12345"
+        if str(original_task_values["price"]) != "12345"
+        else "12346"
+    )
+    original_run_automation_event = crm.run_automation_event
+    quick_edit_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        quick_edit_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        details_edit_response = await crm.edit_task_field(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/edit",
+                {
+                    "field": "description",
+                    "value": "Quick edit automation smoke",
+                },
+            ),
+            task["id"],
+        )
+        status_edit_response = await crm.edit_task_field(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/edit",
+                {
+                    "field": "status",
+                    "value": quick_edit_status,
+                },
+            ),
+            task["id"],
+        )
+        price_edit_response = await crm.edit_task_field(
+            make_form_request(
+                "owner2",
+                f"/task/{task['id']}/edit",
+                {
+                    "field": "price",
+                    "value": quick_edit_price,
+                },
+            ),
+            task["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert details_edit_response.status_code == 302
+    assert status_edit_response.status_code == 302
+    assert price_edit_response.status_code == 302
+    assert [event["trigger_key"] for event in quick_edit_events] == [
+        "task_details_changed",
+        "task_status_changed",
+        "task_finance_changed",
+    ]
+    assert all(event["company_id"] == 2 for event in quick_edit_events)
+    assert all(event["entity_type"] == "task" for event in quick_edit_events)
+    assert all(event["entity_id"] == task["id"] for event in quick_edit_events)
+    assert quick_edit_events[0]["message"] == (
+        f"Описание заявки #{task['id']}: "
+        f"{original_task_values['description'] or 'пусто'} → "
+        "Quick edit automation smoke"
+    )
+    assert quick_edit_events[1]["message"] == (
+        f"Статус заявки #{task['id']}: "
+        f"{original_task_values['status']} → {quick_edit_status}"
+    )
+    assert quick_edit_events[2]["message"] == (
+        f"Цена заявки #{task['id']}: "
+        f"{original_task_values['price'] or '0'} → {quick_edit_price}"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE tasks
+    SET description=?,
+        status=?,
+        price=?
+    WHERE id=?
+    """, (
+        original_task_values["description"],
+        original_task_values["status"],
+        original_task_values["price"],
+        task["id"],
+    ))
+    conn.commit()
+    conn.close()
 
     conn = connect()
     c = conn.cursor()

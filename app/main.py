@@ -313,6 +313,7 @@ AUTOMATION_TRIGGERS = [
     ("task_workers_changed", "Исполнители заявки изменены"),
     ("task_archived", "Заявка отправлена в архив"),
     ("task_restored", "Заявка восстановлена из архива"),
+    ("task_details_changed", "Данные заявки изменены"),
     ("task_finance_changed", "Финансы заявки изменены"),
     ("recurring_task_generated", "Создана регулярная заявка"),
     ("payment_status_changed", "Статус оплаты изменён"),
@@ -345,6 +346,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "task_workers_changed",
         "task_archived",
         "task_restored",
+        "task_details_changed",
         "task_comment_added",
         "recurring_task_generated",
         "overdue_task",
@@ -34202,6 +34204,8 @@ async def edit_task_field(request: Request, task_id: int):
         return RedirectResponse("/", status_code=302)
 
     column = allowed_fields[field]
+    company_id = get_task_company_id(task)
+    previous_value = "" if task[column] is None else str(task[column])
 
     c.execute(f"""
     UPDATE tasks
@@ -34230,6 +34234,49 @@ async def edit_task_field(request: Request, task_id: int):
 
     conn.commit()
     conn.close()
+
+    if previous_value != value:
+        field_labels = {
+            "client": "Клиент",
+            "phone": "Телефон",
+            "address": "Адрес",
+            "description": "Описание",
+            "priority": "Приоритет",
+            "price": "Цена",
+            "status": "Статус",
+        }
+        field_label = field_labels.get(field, field)
+
+        if field == "status":
+            run_automation_event(
+                company_id,
+                "task_status_changed",
+                "task",
+                task_id,
+                f"Статус заявки #{task_id}: {previous_value} → {value}",
+                f"/task/{task_id}",
+            )
+        elif field == "price":
+            run_automation_event(
+                company_id,
+                "task_finance_changed",
+                "task",
+                task_id,
+                f"Цена заявки #{task_id}: {previous_value or '0'} → {value or '0'}",
+                f"/task/{task_id}",
+            )
+        else:
+            run_automation_event(
+                company_id,
+                "task_details_changed",
+                "task",
+                task_id,
+                (
+                    f"{field_label} заявки #{task_id}: "
+                    f"{previous_value or 'пусто'} → {value or 'пусто'}"
+                ),
+                f"/task/{task_id}",
+            )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
