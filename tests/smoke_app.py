@@ -2358,6 +2358,7 @@ async def assert_automation_page():
 
     workflows_graph = crm.api_a3_workflows_graph(make_request("owner2"))
     assert workflows_graph["ok"] is True
+    assert workflows_graph["limit"] == 50
     assert workflows_graph["count"] >= 1
     assert "summary" in workflows_graph
     assert workflows_graph["summary"]["total"] == workflows_graph["count"]
@@ -2366,6 +2367,8 @@ async def assert_automation_page():
         item["rule"]["id"] == rule["id"]
         for item in workflows_graph["items"]
     )
+    oversized_workflows_graph = crm.get_company_workflow_graphs(2, limit=500)
+    assert oversized_workflows_graph["limit"] == 100
 
     rule_events_export_response = await crm.automation_rule_events_export(
         make_request("owner2"),

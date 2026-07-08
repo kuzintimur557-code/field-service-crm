@@ -3,9 +3,28 @@ import json
 from app.database import connect
 
 
+MIN_WORKFLOW_GRAPH_LIMIT = 1
+MAX_WORKFLOW_GRAPH_LIMIT = 100
+
+
 def require_company_id(company_id):
     if not company_id:
         raise ValueError("company_id is required")
+
+
+def normalize_workflow_graph_limit(limit):
+    try:
+        value = int(limit)
+    except (TypeError, ValueError):
+        return 50
+
+    if value < MIN_WORKFLOW_GRAPH_LIMIT:
+        return MIN_WORKFLOW_GRAPH_LIMIT
+
+    if value > MAX_WORKFLOW_GRAPH_LIMIT:
+        return MAX_WORKFLOW_GRAPH_LIMIT
+
+    return value
 
 
 def _safe_payload(payload_json):
@@ -558,6 +577,7 @@ def get_rule_workflow_graph(company_id, rule_id):
 
 def get_company_workflow_graphs(company_id, limit=50):
     require_company_id(company_id)
+    limit = normalize_workflow_graph_limit(limit)
 
     conn = connect()
     c = conn.cursor()
@@ -585,6 +605,7 @@ def get_company_workflow_graphs(company_id, limit=50):
 
     return {
         "ok": True,
+        "limit": limit,
         "count": len(items),
         "summary": _company_workflow_summary(items),
         "items": items,
