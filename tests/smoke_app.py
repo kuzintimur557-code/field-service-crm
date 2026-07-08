@@ -5886,6 +5886,7 @@ async def assert_calls_page():
     conn.commit()
     conn.close()
     created_call_task_id = None
+    created_call_ids = []
 
     try:
         response = await crm.calls_page(make_asgi_request("owner2", "/calls"))
@@ -5951,6 +5952,13 @@ async def assert_calls_page():
           AND client_id=?
         ORDER BY id DESC
         """, (client_id,)).fetchone()
+        conn.close()
+
+        assert call is not None
+        created_call_ids.append(call["id"])
+
+        conn = connect()
+        c = conn.cursor()
         call_notification = c.execute("""
         SELECT *
         FROM notifications
@@ -5959,10 +5967,9 @@ async def assert_calls_page():
           AND title='Нужен контакт по звонку'
           AND link=?
         ORDER BY id DESC
-        """, (f"/clients/{client_id}",)).fetchone()
+        """, (f"/calls/{call['id']}",)).fetchone()
         conn.close()
 
-        assert call is not None
         assert call["username"] == "owner2"
         assert call["direction"] == "incoming"
         assert call["status"] == "follow_up"
@@ -5971,6 +5978,7 @@ async def assert_calls_page():
         assert call["duration_minutes"] == 7
         assert call["call_at"] == "2026-06-14 10:30"
         assert call_notification is not None
+        assert call_notification["link"] == f"/calls/{call['id']}"
         assert "Calls Smoke Client" in call_notification["message"]
         assert "Перезвонить завтра по оплате" in call_notification["message"]
 
@@ -6362,6 +6370,13 @@ async def assert_calls_page():
           AND summary='Quick client card call'
         ORDER BY id DESC
         """, (client_id,)).fetchone()
+        conn.close()
+
+        assert quick_call is not None
+        created_call_ids.append(quick_call["id"])
+
+        conn = connect()
+        c = conn.cursor()
         quick_call_notification = c.execute("""
         SELECT *
         FROM notifications
@@ -6371,10 +6386,9 @@ async def assert_calls_page():
           AND link=?
           AND message LIKE '%Quick client card call%'
         ORDER BY id DESC
-        """, (f"/clients/{client_id}",)).fetchone()
+        """, (f"/calls/{quick_call['id']}",)).fetchone()
         conn.close()
 
-        assert quick_call is not None
         assert quick_call["username"] == "owner2"
         assert quick_call["direction"] == "outgoing"
         assert quick_call["status"] == "follow_up"
@@ -6382,6 +6396,7 @@ async def assert_calls_page():
         assert quick_call["duration_minutes"] == 3
         assert quick_call["call_at"] == "2026-06-14 11:15"
         assert quick_call_notification is not None
+        assert quick_call_notification["link"] == f"/calls/{quick_call['id']}"
 
         quick_detail_response = await crm.client_detail(
             make_asgi_request("owner2", f"/clients/{client_id}", "call_created=1"),
@@ -6409,6 +6424,13 @@ async def assert_calls_page():
           AND title='Нужен контакт по звонку'
           AND link=?
         """, (f"/clients/{client_id}",))
+        for call_id in created_call_ids:
+            c.execute("""
+            DELETE FROM notifications
+            WHERE company_id=2
+              AND title='Нужен контакт по звонку'
+              AND link=?
+            """, (f"/calls/{call_id}",))
         c.execute(
             "DELETE FROM clients WHERE id IN (?, ?)",
             (client_id, outsider_client_id),

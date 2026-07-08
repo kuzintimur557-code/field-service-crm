@@ -1568,9 +1568,10 @@ def create_call_follow_up_notification(
     client_name="",
     client_id=None,
     summary="",
-    phone=""
+    phone="",
+    call_id=None
 ):
-    link = f"/clients/{client_id}" if client_id else "/calls"
+    link = f"/calls/{call_id}" if call_id else (f"/clients/{client_id}" if client_id else "/calls")
     details = summary or phone or "Проверьте звонок и запланируйте следующий контакт."
     client_part = f"Клиент: {client_name}. " if client_name else ""
 
@@ -27593,6 +27594,7 @@ async def create_call_record(request: Request):
         duration_minutes,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
+    call_id = c.lastrowid
 
     conn.commit()
     conn.close()
@@ -27605,6 +27607,7 @@ async def create_call_record(request: Request):
             client_id,
             summary,
             phone,
+            call_id,
         )
 
     return RedirectResponse("/calls?created=1", status_code=302)
@@ -29604,6 +29607,7 @@ async def add_client_call(request: Request, client_id: int):
         duration_minutes,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
+    call_id = c.lastrowid
 
     conn.commit()
     conn.close()
@@ -29616,6 +29620,7 @@ async def add_client_call(request: Request, client_id: int):
             client_id,
             summary,
             phone,
+            call_id,
         )
 
     return RedirectResponse(f"/clients/{client_id}?call_created=1", status_code=302)
