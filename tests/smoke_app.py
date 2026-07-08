@@ -958,6 +958,10 @@ async def assert_automation_page():
         "Финансы заявки изменены",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "recurring_task_generated",
+        "Создана регулярная заявка",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "client_updated",
         "Клиент обновлён",
     ) in crm.AUTOMATION_TRIGGERS
@@ -16373,9 +16377,23 @@ async def assert_recurring_generate(task):
 
     recurring_telegram = []
     original_send_message_to_chat = crm.send_message_to_chat
+    original_run_automation_event = crm.run_automation_event
+    recurring_events = []
     crm.send_message_to_chat = (
         lambda chat_id, text:
         recurring_telegram.append((chat_id, text)) or True
+    )
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        recurring_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
 
     try:
@@ -16385,11 +16403,21 @@ async def assert_recurring_generate(task):
         )
     finally:
         crm.send_message_to_chat = original_send_message_to_chat
+        crm.run_automation_event = original_run_automation_event
 
     assert response.status_code == 302
     task_location = response.headers["location"]
     assert task_location.startswith("/task/")
     generated_task_id = int(task_location.rsplit("/", 1)[1])
+    assert len(recurring_events) == 1
+    assert recurring_events[0]["company_id"] == 2
+    assert recurring_events[0]["trigger_key"] == "recurring_task_generated"
+    assert recurring_events[0]["entity_type"] == "task"
+    assert recurring_events[0]["entity_id"] == generated_task_id
+    assert recurring_events[0]["message"] == (
+        f"Создана регулярная заявка #{generated_task_id}: Smoke recurring"
+    )
+    assert recurring_events[0]["link"] == f"/task/{generated_task_id}"
 
     conn = connect()
     c = conn.cursor()

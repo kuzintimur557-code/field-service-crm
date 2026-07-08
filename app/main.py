@@ -314,6 +314,7 @@ AUTOMATION_TRIGGERS = [
     ("task_archived", "Заявка отправлена в архив"),
     ("task_restored", "Заявка восстановлена из архива"),
     ("task_finance_changed", "Финансы заявки изменены"),
+    ("recurring_task_generated", "Создана регулярная заявка"),
     ("payment_status_changed", "Статус оплаты изменён"),
     ("task_comment_added", "Комментарий к заявке добавлен"),
     ("overdue_task", "Просрочена задача"),
@@ -338,6 +339,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "task_archived",
         "task_restored",
         "task_comment_added",
+        "recurring_task_generated",
         "overdue_task",
     )),
     ("Финансы", (
@@ -23863,6 +23865,15 @@ async def generate_recurring_task(request: Request, job_id: int):
         role,
         "Создана из регулярной работы",
         f"Шаблон: {job['title']}"
+    )
+
+    run_automation_event(
+        company_id,
+        "recurring_task_generated",
+        "task",
+        task_id,
+        f"Создана регулярная заявка #{task_id}: {job['title']}",
+        f"/task/{task_id}",
     )
 
     telegram_text = (
