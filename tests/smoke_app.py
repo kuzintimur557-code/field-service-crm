@@ -10502,6 +10502,8 @@ async def assert_platform_calendar_health():
         assert "HTTP за 24 часа" in system_html
         assert "HTTP-запросы" in system_html
         assert "Контроль деплоя" in system_html
+        assert "Адреса для Railway" in system_html
+        assert "Загрузки" in system_html
         assert "Готовность деплоя" in system_html
         assert "Коммит" in system_html
         assert "Сервис" in system_html
@@ -10512,6 +10514,9 @@ async def assert_platform_calendar_health():
         assert "/system/events/export" in system_html
         assert "/platform/readiness" in system_html
         assert "/backup" in system_html
+        assert "Endpoints для Railway" not in system_html
+        assert ">Uploads<" not in system_html
+        assert ">Backups<" not in system_html
         assert system_page.context["system_checks"]
         assert system_page.context["system_score"] >= 0
         assert "backup_status" in system_page.context
