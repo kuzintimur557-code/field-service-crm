@@ -5868,6 +5868,15 @@ async def assert_calls_page():
           AND client_id=?
         ORDER BY id DESC
         """, (client_id,)).fetchone()
+        call_notification = c.execute("""
+        SELECT *
+        FROM notifications
+        WHERE company_id=2
+          AND username='owner2'
+          AND title='Нужен контакт по звонку'
+          AND link=?
+        ORDER BY id DESC
+        """, (f"/clients/{client_id}",)).fetchone()
         conn.close()
 
         assert call is not None
@@ -5878,6 +5887,9 @@ async def assert_calls_page():
         assert call["summary"] == "Перезвонить завтра по оплате"
         assert call["duration_minutes"] == 7
         assert call["call_at"] == "2026-06-14 10:30"
+        assert call_notification is not None
+        assert "Calls Smoke Client" in call_notification["message"]
+        assert "Перезвонить завтра по оплате" in call_notification["message"]
 
         history_response = await crm.calls_page(
             make_asgi_request("owner2", "/calls", "created=1")
@@ -5915,7 +5927,7 @@ async def assert_calls_page():
                 f"/clients/{client_id}/calls",
                 {
                     "direction": "outgoing",
-                    "status": "missed",
+                    "status": "follow_up",
                     "phone": "",
                     "summary": "Quick client card call",
                     "duration_minutes": "3",
@@ -5937,15 +5949,26 @@ async def assert_calls_page():
           AND summary='Quick client card call'
         ORDER BY id DESC
         """, (client_id,)).fetchone()
+        quick_call_notification = c.execute("""
+        SELECT *
+        FROM notifications
+        WHERE company_id=2
+          AND username='owner2'
+          AND title='Нужен контакт по звонку'
+          AND link=?
+          AND message LIKE '%Quick client card call%'
+        ORDER BY id DESC
+        """, (f"/clients/{client_id}",)).fetchone()
         conn.close()
 
         assert quick_call is not None
         assert quick_call["username"] == "owner2"
         assert quick_call["direction"] == "outgoing"
-        assert quick_call["status"] == "missed"
+        assert quick_call["status"] == "follow_up"
         assert quick_call["phone"] == "+7 900 111-22-33"
         assert quick_call["duration_minutes"] == 3
         assert quick_call["call_at"] == "2026-06-14 11:15"
+        assert quick_call_notification is not None
 
         quick_detail_response = await crm.client_detail(
             make_asgi_request("owner2", f"/clients/{client_id}", "call_created=1"),
@@ -5955,7 +5978,7 @@ async def assert_calls_page():
         quick_detail_html = quick_detail_response.body.decode("utf-8")
         assert "Звонок добавлен" in quick_detail_html
         assert "Quick client card call" in quick_detail_html
-        assert "Пропущен" in quick_detail_html
+        assert "Нужен контакт" in quick_detail_html
     finally:
         conn = connect()
         c = conn.cursor()
@@ -5963,6 +5986,12 @@ async def assert_calls_page():
             "DELETE FROM call_records WHERE client_id IN (?, ?)",
             (client_id, outsider_client_id),
         )
+        c.execute("""
+        DELETE FROM notifications
+        WHERE company_id=2
+          AND title='Нужен контакт по звонку'
+          AND link=?
+        """, (f"/clients/{client_id}",))
         c.execute(
             "DELETE FROM clients WHERE id IN (?, ?)",
             (client_id, outsider_client_id),

@@ -1549,6 +1549,27 @@ def create_notification(
     conn.close()
 
 
+def create_call_follow_up_notification(
+    company_id,
+    username,
+    client_name="",
+    client_id=None,
+    summary="",
+    phone=""
+):
+    link = f"/clients/{client_id}" if client_id else "/calls"
+    details = summary or phone or "Проверьте звонок и запланируйте следующий контакт."
+    client_part = f"Клиент: {client_name}. " if client_name else ""
+
+    create_notification(
+        company_id,
+        username,
+        "Нужен контакт по звонку",
+        f"{client_part}{details}",
+        link,
+    )
+
+
 def log_ai_assistant_event(company_id, note_id, username, action, details=""):
     conn = connect()
     c = conn.cursor()
@@ -26991,7 +27012,7 @@ async def create_call_record(request: Request):
 
         if client_id:
             client = c.execute("""
-            SELECT id, phone
+            SELECT id, name, phone
             FROM clients
             WHERE id=?
               AND company_id=?
@@ -27040,6 +27061,16 @@ async def create_call_record(request: Request):
 
     conn.commit()
     conn.close()
+
+    if status == "follow_up":
+        create_call_follow_up_notification(
+            company_id,
+            username,
+            client["name"] if client else "",
+            client_id,
+            summary,
+            phone,
+        )
 
     return RedirectResponse("/calls?created=1", status_code=302)
 
@@ -28993,7 +29024,7 @@ async def add_client_call(request: Request, client_id: int):
     c = conn.cursor()
 
     client = c.execute("""
-    SELECT id, phone
+    SELECT id, name, phone
     FROM clients
     WHERE id=? AND company_id=?
     """, (client_id, company_id)).fetchone()
@@ -29041,6 +29072,16 @@ async def add_client_call(request: Request, client_id: int):
 
     conn.commit()
     conn.close()
+
+    if status == "follow_up":
+        create_call_follow_up_notification(
+            company_id,
+            username,
+            client["name"],
+            client_id,
+            summary,
+            phone,
+        )
 
     return RedirectResponse(f"/clients/{client_id}?call_created=1", status_code=302)
 
