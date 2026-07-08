@@ -6078,7 +6078,7 @@ async def assert_calendar_access():
         worker="helper2",
     )
     assert unavailable_create_page.context["selected_worker_unavailable"] is True
-    assert "Исполнитель недоступен на эту дату" in (
+    assert "Сотрудник недоступен на эту дату" in (
         unavailable_create_page.body.decode("utf-8")
     )
     helper_option = next(
@@ -8757,9 +8757,11 @@ async def assert_platform_companies_page():
     assert logistics_create_page.status_code == 200
     logistics_create_html = logistics_create_page.body.decode("utf-8")
     assert "Рейс: создание" in logistics_create_html
+    assert "После создания рейс появится" in logistics_create_html
     assert "Дата рейс" in logistics_create_html
     assert "Описание перевозка" in logistics_create_html
     assert "Водитель" in logistics_create_html
+    assert "Создать</button>" in logistics_create_html
 
     c.execute(
         "DELETE FROM company_features WHERE company_id=?",
@@ -17101,7 +17103,7 @@ async def assert_client_card(task):
     assert 'class="mobile-nav"' in create_html
     assert ".container{padding:16px 14px 92px}" in create_html
     assert "Заявка: создание" in create_html
-    assert "Создать заявку" in create_html
+    assert "Создать</button>" in create_html
     assert "➕ Новая заявка" not in create_html
     assert "🚀 Создать заявку" not in create_html
 
@@ -18420,13 +18422,13 @@ async def assert_task_custom_fields():
     assert 'name="task_date" type="date" value="2026-05-17"' in page_html
     assert 'value="worker2" data-at-capacity="1" checked' in page_html
     assert 'name="return_to" value="calendar"' in page_html
-    assert "У выбранного исполнителя на эту дату:" in page_html
+    assert "Загрузка выбранного сотрудника на эту дату:" in page_html
     assert page_response.context["selected_worker_daily_capacity"] == 1
     assert page_response.context["selected_worker_at_capacity"] is True
     assert "Свободных мест нет" in page_html
     assert "Назначение превысит дневной лимит" in page_html
     assert 'name="allow_capacity_override" value="1"' in page_html
-    assert "Назначить выбранных исполнителей сверх дневного лимита" in page_html
+    assert "Назначить сверх дневного лимита" in page_html
     assert "syncCapacityConfirmation" in page_html
     assert "syncWorkerSummary" in page_html
     assert "Выбрано: " in page_html

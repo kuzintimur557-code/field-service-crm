@@ -58,10 +58,16 @@ button:hover{background:#1d4ed8}
 
 <div class="card">
 
+{% set task_label = settings["task_label"] or "Заявка" %}
+{% set task_label_lower = task_label|lower %}
+{% set worker_label = settings["worker_label"] or "Исполнитель" %}
+{% set worker_label_lower = worker_label|lower %}
+{% set service_label_lower = (settings["service_label"] or "услуги")|lower %}
+
 <h1>{{ settings["task_label"] or "Заявка" }}: создание</h1>
 
 	<div class="note">
-	После создания заявка появится в CRM, а уведомление отправится в Telegram.
+	После создания {{ task_label_lower }} появится в CRM, а уведомление отправится в Telegram.
 	</div>
 
 	{% if request.query_params.get("error") == "custom_required" %}
@@ -72,7 +78,7 @@ button:hover{background:#1d4ed8}
 
 	{% if request.query_params.get("error") == "capacity_confirmation" %}
 	<div class="note" style="background:#fee2e2;color:#991b1b">
-	Подтвердите назначение сверх дневного лимита исполнителя.
+	Подтвердите назначение сверх дневного лимита сотрудника.
 	</div>
 	{% endif %}
 
@@ -90,9 +96,9 @@ button:hover{background:#1d4ed8}
 
 	{% if request.query_params.get("error") == "time_conflict" %}
 	<div class="note" style="background:#fee2e2;color:#991b1b">
-	У выбранного исполнителя уже есть заявка в это время.
+	У выбранного сотрудника уже есть {{ task_label_lower }} в это время.
 	{% if request.query_params.get("conflict_task_id") %}
-	<a href="/task/{{ request.query_params.get('conflict_task_id') }}" style="color:#991b1b;font-weight:900">Открыть конфликтующую заявку</a>
+	<a href="/task/{{ request.query_params.get('conflict_task_id') }}" style="color:#991b1b;font-weight:900">Открыть конфликт</a>
 	{% endif %}
 	</div>
 	{% endif %}
@@ -100,9 +106,9 @@ button:hover{background:#1d4ed8}
 	{% if selected_worker_active_count or selected_worker_unavailable %}
 	<div class="note" style="{% if selected_worker_at_capacity or selected_worker_unavailable %}background:#fee2e2;color:#991b1b{% else %}background:#fff7ed;color:#9a3412{% endif %}">
 	{% if selected_worker_unavailable %}
-	Исполнитель недоступен на эту дату{% if selected_worker_unavailable_reason %}: {{ selected_worker_unavailable_reason }}{% endif %}.
+	Сотрудник недоступен на эту дату{% if selected_worker_unavailable_reason %}: {{ selected_worker_unavailable_reason }}{% endif %}.
 	{% else %}
-	У выбранного исполнителя на эту дату: {{ selected_worker_active_count }} из {{ selected_worker_daily_capacity }}.
+	Загрузка выбранного сотрудника на эту дату: {{ selected_worker_active_count }} из {{ selected_worker_daily_capacity }}.
 	{% if selected_worker_at_capacity %}
 	Свободных мест нет. Назначение превысит дневной лимит.
 	{% else %}
@@ -150,7 +156,7 @@ button:hover{background:#1d4ed8}
 </div>
 
 <div>
-<label>Дата {{ (settings["task_label"] or "заявки")|lower }}</label>
+<label>Дата {{ task_label_lower }}</label>
 <input name="task_date" type="date" value="{{ selected_task_date }}">
 </div>
 </div>
@@ -170,13 +176,13 @@ button:hover{background:#1d4ed8}
 <input name="address" placeholder="Адрес" value="{{ selected_address if selected_client else '' }}">
 
 <label>Описание</label>
-<textarea name="description" placeholder="Описание {{ (settings["service_label"] or "услуги")|lower }}">{{ selected_description or "" }}</textarea>
+<textarea name="description" placeholder="Описание {{ service_label_lower }}">{{ selected_description or "" }}</textarea>
 
 <div class="grid">
 <div>
-<label>{{ settings["worker_label"] or "Исполнитель" }}</label>
+<label>{{ worker_label }}</label>
 <details class="worker-picker">
-    <summary>Выбрать {{ (settings["worker_label"] or "исполнителей")|lower }}</summary>
+    <summary>Выбрать {{ worker_label_lower }}</summary>
 
     <div class="worker-list">
         {% for worker in worker_options %}
@@ -202,11 +208,11 @@ button:hover{background:#1d4ed8}
         {% endfor %}
     </div>
 </details>
-<div id="worker-summary" class="worker-summary">Исполнители не выбраны</div>
-<div class="field-hint">Можно назначить одного или нескольких исполнителей.</div>
+<div id="worker-summary" class="worker-summary">{{ worker_label }} не выбран</div>
+<div class="field-hint">Можно назначить одного или нескольких.</div>
 <div id="capacity-confirm" class="capacity-confirm" {% if not selected_worker_at_capacity %}hidden{% endif %}>
     <input id="allow-capacity-override" type="checkbox" name="allow_capacity_override" value="1" {% if selected_worker_at_capacity %}required{% endif %}>
-    <label for="allow-capacity-override">Назначить выбранных исполнителей сверх дневного лимита</label>
+    <label for="allow-capacity-override">Назначить сверх дневного лимита</label>
 </div>
 </div>
 
@@ -253,7 +259,7 @@ button:hover{background:#1d4ed8}
 	<label>Фото / документ</label>
 <input name="photo" type="file" accept="image/*,application/pdf">
 
-<button type="submit">Создать заявку</button>
+<button type="submit">Создать</button>
 
 </form>
 
