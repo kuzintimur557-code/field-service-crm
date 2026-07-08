@@ -35548,6 +35548,15 @@ def api_a3_approval_queue(request: Request):
         elif reason == "unsupported_action":
             summary["unsupported"] += 1
 
+    summary.update({
+        "total_label": f"Всего: {summary['total']}",
+        "safe_label": f"Можно подтвердить: {summary['safe']}",
+        "unsafe_label": f"Небезопасные: {summary['unsafe']}",
+        "protected_label": f"Защищённые: {summary['protected']}",
+        "missing_target_label": f"Цель не найдена: {summary['missing_target']}",
+        "unsupported_label": f"Неподдерживаемые: {summary['unsupported']}",
+    })
+
     return {
         "count": len(items),
         "summary": summary,

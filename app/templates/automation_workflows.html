@@ -513,12 +513,12 @@ async function loadWorkflowApprovalQueue() {
 function renderWorkflowApprovalSummary(summary) {
     return `
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span class="pill">Всего: ${summary.total || 0}</span>
-            <span class="pill ok">Можно подтвердить: ${summary.safe || 0}</span>
-            <span class="pill off">Небезопасные: ${summary.unsafe || 0}</span>
-            <span class="pill off">Защищённые: ${summary.protected || 0}</span>
-            <span class="pill">Цель не найдена: ${summary.missing_target || 0}</span>
-            <span class="pill">Неподдерживаемые: ${summary.unsupported || 0}</span>
+            <span class="pill">${summary.total_label || `Всего: ${summary.total || 0}`}</span>
+            <span class="pill ok">${summary.safe_label || `Можно подтвердить: ${summary.safe || 0}`}</span>
+            <span class="pill off">${summary.unsafe_label || `Небезопасные: ${summary.unsafe || 0}`}</span>
+            <span class="pill off">${summary.protected_label || `Защищённые: ${summary.protected || 0}`}</span>
+            <span class="pill">${summary.missing_target_label || `Цель не найдена: ${summary.missing_target || 0}`}</span>
+            <span class="pill">${summary.unsupported_label || `Неподдерживаемые: ${summary.unsupported || 0}`}</span>
         </div>
     `;
 }

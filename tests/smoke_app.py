@@ -16390,6 +16390,8 @@ async def assert_a3_workflow_center():
     assert "renderWorkflowApprovalSummary" in body
     assert "Загрузка очереди подтверждений..." in body
     assert "approval_queue_load_failed" in body
+    assert "summary.total_label" in body
+    assert "summary.safe_label" in body
     assert "Можно подтвердить:" in body
     assert "Небезопасные:" in body
     assert "Защищённые:" in body
@@ -17130,6 +17132,8 @@ async def assert_a3_api_layer():
     assert approval_queue["summary"]["total"] >= 2
     assert approval_queue["summary"]["safe"] >= 2
     assert approval_queue["summary"]["unsafe"] == 0
+    assert approval_queue["summary"]["total_label"].startswith("Всего:")
+    assert approval_queue["summary"]["safe_label"].startswith("Можно подтвердить:")
     assert any(item["id"] == approve_action_id for item in approval_queue["items"])
     assert any(item["id"] == reject_action_id for item in approval_queue["items"])
     approval_queue_items = {
