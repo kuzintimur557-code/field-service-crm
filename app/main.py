@@ -323,6 +323,7 @@ AUTOMATION_TRIGGERS = [
     ("client_updated", "Клиент обновлён"),
     ("client_note_added", "Заметка клиента добавлена"),
     ("client_file_uploaded", "Файл клиента загружен"),
+    ("client_file_deleted", "Файл клиента удалён"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -344,6 +345,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "client_updated",
         "client_note_added",
         "client_file_uploaded",
+        "client_file_deleted",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -28642,6 +28644,18 @@ async def delete_client_file(request: Request, client_id: int, file_id: int):
             file_path.unlink()
         except Exception:
             pass
+
+    run_automation_event(
+        company_id,
+        "client_file_deleted",
+        "client",
+        client_id,
+        (
+            "Удалён файл клиента: "
+            f"{client_file['original_filename'] or stored_filename}"
+        ),
+        f"/clients/{client_id}",
+    )
 
     return RedirectResponse(f"/clients/{client_id}?file_deleted=1", status_code=302)
 
