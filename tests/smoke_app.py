@@ -17390,6 +17390,8 @@ async def assert_notifications(task):
     assert notifications_response.status_code == 200
     notifications_html = notifications_response.body.decode("utf-8")
     assert f"/notifications/{notification['id']}/open" in notifications_html
+    assert f"/notifications/{notification['id']}/read?filter=all" in notifications_html
+    assert "Отметить прочитанным" in notifications_html
     assert "Отметить все прочитанными" in notifications_html
     assert "Уведомления" in notifications_html
     assert "Всего:" in notifications_html
@@ -17418,6 +17420,27 @@ async def assert_notifications(task):
     unread_html = unread_response.body.decode("utf-8")
     assert "Smoke notification" in unread_html
     assert 'filter-link active' in unread_html
+
+    mark_one_response = await crm.mark_notification_read(
+        make_request("owner2"),
+        notification["id"],
+        filter="unread",
+    )
+    assert mark_one_response.status_code == 302
+    assert mark_one_response.headers["location"] == "/notifications?filter=unread"
+
+    conn = connect()
+    c = conn.cursor()
+    marked_one = c.execute("""
+    SELECT is_read
+    FROM notifications
+    WHERE id=?
+    """, (notification["id"],)).fetchone()
+    c.execute("UPDATE notifications SET is_read=0 WHERE id=?", (notification["id"],))
+    conn.commit()
+    conn.close()
+
+    assert marked_one["is_read"] == 1
 
     open_response = await crm.open_notification(
         make_request("owner2"),

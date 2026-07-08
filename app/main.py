@@ -12524,6 +12524,41 @@ async def mark_all_notifications_read(request: Request):
     return RedirectResponse("/notifications", status_code=302)
 
 
+@app.post("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    request: Request,
+    notification_id: int,
+    filter: str = "all"
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    company_id = get_user_company_id(username)
+    selected_filter = filter if filter in ("all", "unread", "read") else "all"
+
+    conn = connect()
+    c = conn.cursor()
+
+    c.execute("""
+    UPDATE notifications
+    SET is_read=1
+    WHERE id=?
+      AND company_id=?
+      AND username=?
+    """, (notification_id, company_id, username))
+
+    conn.commit()
+    conn.close()
+
+    if selected_filter == "all":
+        return RedirectResponse("/notifications", status_code=302)
+
+    return RedirectResponse(f"/notifications?filter={selected_filter}", status_code=302)
+
+
 @app.get("/notifications/{notification_id}/open")
 async def open_notification(request: Request, notification_id: int):
 
