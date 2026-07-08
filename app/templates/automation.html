@@ -729,6 +729,10 @@ async function runA3SelfHealing() {
 
         const data = await response.json();
 
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось запустить самовосстановление");
+        }
+
         const result = data.result || {};
 
         status.innerHTML = `
@@ -744,10 +748,11 @@ async function runA3SelfHealing() {
         `;
     } catch (err) {
         console.error(err);
+        const message = err.message || "Не удалось запустить самовосстановление";
 
         status.innerHTML = `
             <div class="pill off">
-                Ошибка самовосстановления
+                ${message}
             </div>
         `;
     } finally {
@@ -783,11 +788,19 @@ document
 
 <script>
 async function loadA3RecoveryHistory() {
+    const container = document.getElementById("a3-recovery-history");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/recovery-history");
         const data = await response.json();
 
-        const container = document.getElementById("a3-recovery-history");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить историю восстановления");
+        }
 
         container.innerHTML = "";
 
@@ -842,6 +855,8 @@ async function loadA3RecoveryHistory() {
         }
     } catch (err) {
         console.error("Ошибка загрузки истории восстановления", err);
+        const message = err.message || "Не удалось загрузить историю восстановления";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
@@ -871,11 +886,19 @@ setInterval(loadA3RecoveryHistory, 30000);
 
 <script>
 async function loadA3OpsTimeline() {
+    const container = document.getElementById("a3-ops-timeline");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/ops-timeline");
         const data = await response.json();
 
-        const container = document.getElementById("a3-ops-timeline");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить ленту операций");
+        }
 
         container.innerHTML = "";
 
@@ -951,6 +974,8 @@ async function loadA3OpsTimeline() {
         }
     } catch (err) {
         console.error("Ошибка загрузки ленты A3", err);
+        const message = err.message || "Не удалось загрузить ленту операций";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
@@ -985,15 +1010,32 @@ setInterval(loadA3OpsTimeline, 30000);
 
 <script>
 async function loadA3PredictiveSignals() {
+    const container = document.getElementById("a3-predictive-signals");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/predictive-signals");
         const data = await response.json();
 
-        const container = document.getElementById("a3-predictive-signals");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить прогнозы A3");
+        }
 
         container.innerHTML = "";
 
         const items = data.items || [];
+
+        if (!items.length) {
+            container.innerHTML = `
+                <div class="pill">
+                    Прогнозов пока нет
+                </div>
+            `;
+            return;
+        }
 
         for (const item of items) {
             const card = document.createElement("div");
@@ -1048,6 +1090,8 @@ async function loadA3PredictiveSignals() {
         }
     } catch (err) {
         console.error("Ошибка загрузки прогнозов A3", err);
+        const message = err.message || "Не удалось загрузить прогнозы A3";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
@@ -1077,11 +1121,19 @@ setInterval(loadA3PredictiveSignals, 30000);
 
 <script>
 async function loadA3DecisionEngine() {
+    const container = document.getElementById("a3-decision-engine");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/decision-engine");
         const data = await response.json();
 
-        const container = document.getElementById("a3-decision-engine");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить центр решений");
+        }
 
         container.innerHTML = "";
 
@@ -1160,6 +1212,8 @@ async function loadA3DecisionEngine() {
         }
     } catch (err) {
         console.error("Ошибка загрузки центра решений", err);
+        const message = err.message || "Не удалось загрузить центр решений";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 

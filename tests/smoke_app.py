@@ -544,6 +544,12 @@ async def assert_automation_page():
     assert 'data.message || "Не удалось загрузить состояние A3"' in html
     assert 'data.message || "Не удалось загрузить аналитику автоматизации"' in html
     assert 'data.message || "Не удалось загрузить операционные инсайты"' in html
+    assert 'data.message || "Не удалось запустить самовосстановление"' in html
+    assert 'data.message || "Не удалось загрузить историю восстановления"' in html
+    assert 'data.message || "Не удалось загрузить ленту операций"' in html
+    assert 'data.message || "Не удалось загрузить прогнозы A3"' in html
+    assert 'data.message || "Не удалось загрузить центр решений"' in html
+    assert "Прогнозов пока нет" in html
     assert "approval_safety_label" in html
     assert "Требует проверки" in html
     assert "autonomous_action: \"ИИ-действие\"" in html
