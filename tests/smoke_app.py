@@ -16577,7 +16577,8 @@ async def assert_finance_summary_page():
     assert html.startswith("<!DOCTYPE html>")
     assert "Финансовая сводка" in html
     assert "Помесячная динамика" in html
-    assert "Прибыльные клиенты" in html
+    assert "Прибыльные: Клиент" in html
+    assert "Выплаты: Исполнитель" in html
     assert "Скачать CSV" in html
     assert "mobile-label" in html
     assert "table-scroll" in html

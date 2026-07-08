@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
 <title>Финансовая сводка</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -89,7 +91,7 @@ td{font-weight:800}
     <div>
         <a href="/finance?month={{ month }}" class="back">← Назад к финансам</a>
         <h1>Финансовая сводка</h1>
-        <div class="meta">Главные показатели компании, динамика по месяцам и прибыльные клиенты</div>
+        <div class="meta">Главные показатели компании, динамика по месяцам и прибыльные направления</div>
     </div>
     <div class="actions">
         <a class="button green" href="/finance/summary/export?month={{ month }}">Скачать CSV</a>
@@ -204,13 +206,13 @@ td{font-weight:800}
 
 <div class="grid">
     <div class="card">
-        <h2>Прибыльные клиенты</h2>
+        <h2>Прибыльные: {{ client_label }}</h2>
         {% if top_profitable_clients %}
         <div class="table-scroll">
             <table>
                 <thead>
                     <tr>
-                        <th>Клиент</th>
+                        <th>{{ client_label }}</th>
                         <th>Выручка</th>
                         <th>Прибыль</th>
                     </tr>
@@ -218,7 +220,7 @@ td{font-weight:800}
                 <tbody>
                     {% for row in top_profitable_clients %}
                     <tr>
-                        <td><span class="mobile-label">Клиент</span>{{ row.client_name or "Без клиента" }}</td>
+                        <td><span class="mobile-label">{{ client_label }}</span>{{ row.client_name or client_label ~ " не указан" }}</td>
                         <td><span class="mobile-label">Выручка</span>{{ row.revenue or 0 }} ₽</td>
                         <td><span class="mobile-label">Прибыль</span>{{ row.total_profit or 0 }} ₽</td>
                     </tr>
@@ -227,18 +229,18 @@ td{font-weight:800}
             </table>
         </div>
         {% else %}
-        <div class="empty">За выбранный месяц пока нет прибыльных клиентов</div>
+        <div class="empty">За выбранный месяц пока нет прибыльных записей</div>
         {% endif %}
     </div>
 
     <div class="card">
-        <h2>Выплаты исполнителям</h2>
+        <h2>Выплаты: {{ worker_label }}</h2>
         {% if top_profitable_workers %}
         <div class="table-scroll">
             <table>
                 <thead>
                     <tr>
-                        <th>Исполнитель</th>
+                        <th>{{ worker_label }}</th>
                         <th>Выплачено</th>
                         <th>Выплат</th>
                     </tr>
@@ -246,7 +248,7 @@ td{font-weight:800}
                 <tbody>
                     {% for row in top_profitable_workers %}
                     <tr>
-                        <td><span class="mobile-label">Исполнитель</span>{{ row.worker_name }}</td>
+                        <td><span class="mobile-label">{{ worker_label }}</span>{{ row.worker_name }}</td>
                         <td><span class="mobile-label">Выплачено</span>{{ row.total_paid or 0 }} ₽</td>
                         <td><span class="mobile-label">Выплат</span>{{ row.payouts_count }}</td>
                     </tr>
@@ -255,7 +257,7 @@ td{font-weight:800}
             </table>
         </div>
         {% else %}
-        <div class="empty">За выбранный месяц выплат исполнителям пока нет</div>
+        <div class="empty">За выбранный месяц выплат сотрудникам пока нет</div>
         {% endif %}
     </div>
 </div>

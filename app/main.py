@@ -25409,6 +25409,8 @@ async def finance_summary_page(request: Request, month: str = ""):
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     if not month:
         month = datetime.now().strftime("%Y-%m")
 
@@ -25509,7 +25511,8 @@ async def finance_summary_page(request: Request, month: str = ""):
             "monthly_summary": monthly_summary,
             "monthly_chart_data": monthly_chart_data,
             "top_profitable_clients": top_profitable_clients,
-            "top_profitable_workers": top_profitable_workers
+            "top_profitable_workers": top_profitable_workers,
+            "settings": settings,
         }
     )
 
