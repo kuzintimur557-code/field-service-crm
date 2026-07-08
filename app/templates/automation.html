@@ -1522,11 +1522,20 @@ document
 
 <script>
 async function loadA3GovernanceSettings() {
+    const container = document.getElementById("a3-governance-settings");
+    const saveStatus = document.getElementById("a3-governance-save-status");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/governance-settings");
         const data = await response.json();
 
-        const container = document.getElementById("a3-governance-settings");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить настройки управления ИИ");
+        }
 
         container.innerHTML = "";
 
@@ -1579,6 +1588,12 @@ async function loadA3GovernanceSettings() {
         }
     } catch (err) {
         console.error("Ошибка загрузки настроек управления ИИ", err);
+        const message = err.message || "Не удалось загрузить настройки управления ИИ";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
+
+        if (saveStatus) {
+            saveStatus.innerHTML = `<div class="pill off">${message}</div>`;
+        }
     }
 }
 
@@ -2579,7 +2594,11 @@ async function saveA3GovernanceSettings() {
             }
         );
 
-        await response.json();
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось сохранить настройки управления ИИ");
+        }
 
         document.getElementById("a3-governance-save-status").innerHTML = `
             <div class="pill">
@@ -2591,10 +2610,11 @@ async function saveA3GovernanceSettings() {
 
     } catch (err) {
         console.error(err);
+        const message = err.message || "Не удалось сохранить настройки управления ИИ";
 
         document.getElementById("a3-governance-save-status").innerHTML = `
             <div class="pill off">
-                Ошибка сохранения
+                ${message}
             </div>
         `;
     }
