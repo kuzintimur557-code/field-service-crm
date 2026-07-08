@@ -1064,6 +1064,54 @@ async def assert_automation_page():
     assert worker_condition["value"] == "helper2"
     assert worker_condition["label"] == "Исполнитель: helper2"
 
+    worker_unassigned_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "worker_unassigned",
+            },
+        ),
+        rule["id"],
+    )
+    assert worker_unassigned_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    worker_unassigned_conditions = json.loads(c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()["conditions_json"])
+    conn.close()
+
+    assert worker_unassigned_conditions["mode"] == "worker_unassigned"
+    assert worker_unassigned_conditions["label"] == "Только задачи без исполнителя"
+
+    date_tomorrow_response = await crm.update_automation_rule_conditions(
+        make_form_request(
+            "owner2",
+            f"/automation/rules/{rule['id']}/conditions",
+            {
+                "condition_mode": "date_tomorrow",
+            },
+        ),
+        rule["id"],
+    )
+    assert date_tomorrow_response.status_code == 302
+
+    conn = connect()
+    c = conn.cursor()
+    date_tomorrow_conditions = json.loads(c.execute("""
+    SELECT conditions_json
+    FROM automation_rules
+    WHERE id=?
+    """, (rule["id"],)).fetchone()["conditions_json"])
+    conn.close()
+
+    assert date_tomorrow_conditions["mode"] == "date_tomorrow"
+    assert date_tomorrow_conditions["label"] == "Только задачи на завтра"
+
     outsider_worker_response = await crm.update_automation_rule_conditions(
         make_form_request(
             "owner2",
