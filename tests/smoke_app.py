@@ -932,12 +932,14 @@ async def assert_automation_page():
     assert "Просрочка → Telegram" in builder_html
     assert "Новая заявка без исполнителя" in builder_html
     assert "Заявка завершена" in builder_html
+    assert "Исполнители изменены" in builder_html
     assert "Оплата поступила" in builder_html
     assert "Ежедневная ИИ-сводка" in builder_html
     assert 'name="trigger_key" value="sla_overdue"' in builder_html
     assert 'name="trigger_key" value="new_task"' in builder_html
     assert 'name="condition_mode" value="worker_unassigned"' in builder_html
     assert 'name="trigger_key" value="task_status_changed"' in builder_html
+    assert 'name="trigger_key" value="task_workers_changed"' in builder_html
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -14199,6 +14201,47 @@ async def assert_finance_margin(task):
         for worker in task_detail_response.context["available_workers"]
     )
 
+    conn = connect()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Исполнители заявки smoke",
+        "task_workers_changed",
+        json.dumps({}, ensure_ascii=False),
+        1,
+        "owner2",
+        now,
+        now,
+    ))
+    workers_rule_id = c.lastrowid
+    c.execute("""
+    INSERT INTO automation_actions (
+        company_id, rule_id, action_key, payload_json,
+        sort_order, active, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        workers_rule_id,
+        "notification",
+        json.dumps({
+            "target_username": "owner2",
+            "message": "Workers changed trigger matched",
+        }, ensure_ascii=False),
+        1,
+        1,
+        now,
+    ))
+    conn.commit()
+    conn.close()
+
     update_workers_response = await crm.update_task_workers(
         make_multipart_request(
             "owner2",
@@ -14238,6 +14281,30 @@ async def assert_finance_margin(task):
       AND link=?
     ORDER BY id DESC
     """, (f"/task/{task['id']}",)).fetchone()
+    workers_change_event = c.execute("""
+    SELECT *
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND trigger_key='task_workers_changed'
+      AND entity_type='task'
+      AND entity_id=?
+    ORDER BY id DESC
+    """, (workers_rule_id, task["id"])).fetchone()
+    workers_change_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Исполнители заявки smoke'
+      AND message='Workers changed trigger matched'
+    ORDER BY id DESC
+    """).fetchone()
+    c.execute("DELETE FROM automation_events WHERE rule_id=?", (workers_rule_id,))
+    c.execute("DELETE FROM notifications WHERE title='Исполнители заявки smoke'")
+    c.execute("DELETE FROM automation_actions WHERE rule_id=?", (workers_rule_id,))
+    c.execute("DELETE FROM automation_rules WHERE id=?", (workers_rule_id,))
+    conn.commit()
     conn.close()
 
     assert reassigned_task["worker"] == "worker2"
@@ -14245,6 +14312,9 @@ async def assert_finance_margin(task):
     assert reassignment_activity["details"] == "worker2, free2"
     assert assignment_notification["title"] == f"Назначена заявка #{task['id']}"
     assert assignment_notification["link"] == f"/task/{task['id']}"
+    assert workers_change_event is not None
+    assert workers_change_event["status"] == "done"
+    assert workers_change_notification is not None
 
     create_task_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task")

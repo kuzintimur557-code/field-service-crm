@@ -310,6 +310,7 @@ AUTOMATION_TRIGGERS = [
     ("new_task", "Новая заявка"),
     ("task_status_changed", "Статус заявки изменён"),
     ("task_schedule_changed", "Расписание заявки изменено"),
+    ("task_workers_changed", "Исполнители заявки изменены"),
     ("payment_status_changed", "Статус оплаты изменён"),
     ("task_comment_added", "Комментарий к заявке добавлен"),
     ("overdue_task", "Просрочена задача"),
@@ -34008,6 +34009,21 @@ async def update_task_workers(request: Request, task_id: int):
 
     conn.commit()
     conn.close()
+
+    previous_workers_text = ", ".join(previous_workers) or "не назначены"
+    current_workers_text = ", ".join(valid_workers) or "не назначены"
+
+    run_automation_event(
+        company_id,
+        "task_workers_changed",
+        "task",
+        task_id,
+        (
+            f"Исполнители заявки #{task_id}: "
+            f"{previous_workers_text} → {current_workers_text}"
+        ),
+        f"/task/{task_id}",
+    )
 
     telegram_text = (
         f"Вам назначена заявка #{task_id}\n"

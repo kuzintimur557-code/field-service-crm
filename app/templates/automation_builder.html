@@ -188,6 +188,17 @@
             </form>
 
             <form method="post" action="/automation/rules" class="chain">
+                <h2>Исполнители изменены</h2>
+                <div class="meta">Когда у заявки меняется состав исполнителей, владелец получает уведомление.</div>
+                <input type="hidden" name="name" value="Исполнители изменены → уведомить владельца">
+                <input type="hidden" name="trigger_key" value="task_workers_changed">
+                <input type="hidden" name="action_key" value="notification">
+                <input type="hidden" name="target_username" value="{{ username }}">
+                <input type="hidden" name="message" value="У заявки изменились исполнители. Проверьте загрузку и календарь.">
+                <button type="submit" class="back" style="margin-top:14px">Создать шаблон</button>
+            </form>
+
+            <form method="post" action="/automation/rules" class="chain">
                 <h2>Оплата поступила</h2>
                 <div class="meta">Когда заявка отмечена как оплаченная, владелец получает уведомление.</div>
                 <input type="hidden" name="name" value="Оплата поступила → уведомить владельца">
