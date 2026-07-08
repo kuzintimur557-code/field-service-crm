@@ -16387,16 +16387,20 @@ async def assert_a3_workflow_center():
     assert "Обновить подтверждения" in body
     assert "workflow-approval-refresh-status" in body
     assert "Не удалось обновить подтверждения" in body
+    assert 'status.textContent = err.message || "Не удалось обновить цепочки"' in body
+    assert 'status.textContent = err.message || "Не удалось обновить подтверждения"' in body
     assert "Подтверждения обновляются автоматически" in body
     assert "Обновление подтверждений..." in body
     assert "Подтверждения обновлены:" in body
     assert "approveWorkflowAction" in body
     assert "Одобрение действия..." in body
     assert 'data.message || "Не удалось одобрить действие"' in body
+    assert 'const message = err.message || "Не удалось одобрить действие"' in body
     assert "Не удалось одобрить действие" in body
     assert "rejectWorkflowAction" in body
     assert "Отклонение действия..." in body
     assert 'data.message || "Не удалось отклонить действие"' in body
+    assert 'const message = err.message || "Не удалось отклонить действие"' in body
     assert "Не удалось отклонить действие" in body
     assert "approveSafeWorkflowActions" in body
     assert "Одобрить безопасные" in body

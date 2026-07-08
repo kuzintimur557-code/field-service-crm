@@ -316,7 +316,7 @@ async function refreshWorkflowCenter() {
         console.error(err);
 
         if (status) {
-            status.textContent = "Не удалось обновить цепочки";
+            status.textContent = err.message || "Не удалось обновить цепочки";
         }
     }
 }
@@ -343,7 +343,7 @@ async function refreshWorkflowApprovals() {
         console.error(err);
 
         if (status) {
-            status.textContent = "Не удалось обновить подтверждения";
+            status.textContent = err.message || "Не удалось обновить подтверждения";
         }
     }
 }
@@ -813,8 +813,9 @@ async function approveWorkflowAction(actionId) {
         alert("Действие одобрено");
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось одобрить действие", "error");
-        alert("Не удалось одобрить действие");
+        const message = err.message || "Не удалось одобрить действие";
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
@@ -838,8 +839,9 @@ async function rejectWorkflowAction(actionId) {
         alert("Действие отклонено");
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось отклонить действие", "error");
-        alert("Не удалось отклонить действие");
+        const message = err.message || "Не удалось отклонить действие";
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
@@ -869,8 +871,9 @@ async function approveSafeWorkflowActions() {
         );
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось одобрить безопасные действия", "error");
-        alert("Не удалось одобрить безопасные действия");
+        const message = err.message || "Не удалось одобрить безопасные действия";
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
@@ -900,8 +903,9 @@ async function rejectUnsafeWorkflowActions() {
         );
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось отклонить небезопасные действия", "error");
-        alert("Не удалось отклонить небезопасные действия");
+        const message = err.message || "Не удалось отклонить небезопасные действия";
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
@@ -1842,8 +1846,9 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
         alert("Действие отправлено на подтверждение");
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось отправить на подтверждение", "error");
-        alert("Не удалось отправить на подтверждение");
+        const message = err.message || "Не удалось отправить на подтверждение";
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
