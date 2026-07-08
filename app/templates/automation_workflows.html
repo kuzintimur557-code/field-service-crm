@@ -2107,13 +2107,37 @@ function renderChainTimeline(ruleId, timeline) {
 }
 
 
+async function workflowResponseErrorMessage(response, fallback) {
+    const contentType = response.headers.get("content-type") || "";
+
+    try {
+        if (contentType.includes("application/json")) {
+            const data = await response.json();
+            return data.message || data.detail || fallback;
+        }
+
+        const text = (await response.text()).trim();
+
+        if (text && text.length < 180 && !text.startsWith("<")) {
+            return text;
+        }
+    } catch (err) {
+        console.error(err);
+    }
+
+    return fallback;
+}
+
+
 async function runChain(ruleId) {
+    const fallback = "Не удалось запустить цепочку";
+
     try {
         setWorkflowActionStatus("Запуск цепочки...");
         const response = await fetch(`/automation/rules/${ruleId}/run`, {method:"POST"});
 
         if (!response.ok) {
-            throw new Error("workflow_rule_run_failed");
+            throw new Error(await workflowResponseErrorMessage(response, fallback));
         }
 
         await loadChainTimeline(ruleId);
@@ -2122,12 +2146,15 @@ async function runChain(ruleId) {
         alert("Цепочка запущена");
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось запустить цепочку", "error");
-        alert("Не удалось запустить цепочку");
+        const message = err.message || fallback;
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
 async function flagChain(ruleId) {
+    const fallback = "Не удалось пометить цепочку";
+
     try {
         setWorkflowActionStatus("Пометка цепочки как проблемной...");
         const response = await fetch("/api/a3/ops-timeline", {
@@ -2144,25 +2171,28 @@ async function flagChain(ruleId) {
         });
 
         if (!response.ok) {
-            throw new Error("workflow_rule_flag_failed");
+            throw new Error(await workflowResponseErrorMessage(response, fallback));
         }
 
         setWorkflowActionStatus("Цепочка помечена", "success");
         alert("Цепочка помечена");
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось пометить цепочку", "error");
-        alert("Не удалось пометить цепочку");
+        const message = err.message || fallback;
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
 async function enableChain(ruleId) {
+    const fallback = "Не удалось включить правило";
+
     try {
         setWorkflowActionStatus("Включение правила...");
         const response = await fetch(`/automation/rules/${ruleId}/enable`, {method:"POST"});
 
         if (!response.ok) {
-            throw new Error("workflow_rule_enable_failed");
+            throw new Error(await workflowResponseErrorMessage(response, fallback));
         }
 
         loadChains();
@@ -2170,18 +2200,21 @@ async function enableChain(ruleId) {
         alert("Правило включено");
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось включить правило", "error");
-        alert("Не удалось включить правило");
+        const message = err.message || fallback;
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
 async function retryChain(ruleId) {
+    const fallback = "Не удалось повторить запуск";
+
     try {
         setWorkflowActionStatus("Повтор пропущенных событий...");
         const response = await fetch(`/automation/rules/${ruleId}/retry-skipped`, {method:"POST"});
 
         if (!response.ok) {
-            throw new Error("workflow_rule_retry_failed");
+            throw new Error(await workflowResponseErrorMessage(response, fallback));
         }
 
         await loadChainTimeline(ruleId);
@@ -2190,12 +2223,15 @@ async function retryChain(ruleId) {
         alert("Повтор пропущенных событий отправлен");
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось повторить запуск", "error");
-        alert("Не удалось повторить запуск");
+        const message = err.message || fallback;
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 
 async function markChainFixed(ruleId) {
+    const fallback = "Не удалось обновить цепочку";
+
     try {
         setWorkflowActionStatus("Пометка цепочки как исправленной...");
         const response = await fetch("/api/a3/ops-timeline", {
@@ -2212,15 +2248,16 @@ async function markChainFixed(ruleId) {
         });
 
         if (!response.ok) {
-            throw new Error("workflow_rule_fix_failed");
+            throw new Error(await workflowResponseErrorMessage(response, fallback));
         }
 
         setWorkflowActionStatus("Цепочка помечена как исправленная", "success");
         alert("Цепочка помечена как исправленная");
     } catch (err) {
         console.error(err);
-        setWorkflowActionStatus("Не удалось обновить цепочку", "error");
-        alert("Не удалось обновить цепочку");
+        const message = err.message || fallback;
+        setWorkflowActionStatus(message, "error");
+        alert(message);
     }
 }
 

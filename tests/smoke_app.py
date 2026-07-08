@@ -16342,11 +16342,8 @@ async def assert_a3_workflow_center():
     assert "handleDebugAction" in body
     assert "/enable" in body
     assert "/retry-skipped" in body
-    assert "workflow_rule_run_failed" in body
-    assert "workflow_rule_flag_failed" in body
-    assert "workflow_rule_enable_failed" in body
-    assert "workflow_rule_retry_failed" in body
-    assert "workflow_rule_fix_failed" in body
+    assert "workflowResponseErrorMessage" in body
+    assert 'workflowResponseErrorMessage(response, fallback)' in body
     assert "Запуск цепочки..." in body
     assert "Пометка цепочки как проблемной..." in body
     assert "Включение правила..." in body
