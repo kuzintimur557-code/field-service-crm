@@ -350,6 +350,7 @@ AUTOMATION_TRIGGERS = [
     ("worker_commission_updated", "Процент сотрудника изменён"),
     ("worker_deleted", "Сотрудник удалён"),
     ("worker_password_changed", "Пароль сотрудника изменён"),
+    ("profile_password_changed", "Пользователь сменил свой пароль"),
     ("company_settings_updated", "Настройки компании обновлены"),
     ("ai_note_created", "ИИ-заметка создана"),
     ("ai_note_postponed", "ИИ-заметка перенесена"),
@@ -413,6 +414,7 @@ AUTOMATION_TRIGGER_GROUPS = [
         "worker_commission_updated",
         "worker_deleted",
         "worker_password_changed",
+        "profile_password_changed",
     )),
     ("Компания", (
         "company_settings_updated",
@@ -29415,6 +29417,18 @@ async def change_my_password(request: Request):
 
     conn.commit()
     conn.close()
+
+    company_id = user["company_id"] if "company_id" in user.keys() else None
+
+    if company_id:
+        run_automation_event(
+            company_id,
+            "profile_password_changed",
+            "user",
+            user["id"],
+            f"Пользователь {username} изменил свой пароль",
+            "/profile",
+        )
 
     response = RedirectResponse("/login?password_changed=1", status_code=302)
     response.delete_cookie("user")

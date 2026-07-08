@@ -1079,6 +1079,10 @@ async def assert_automation_page():
         "Пароль сотрудника изменён",
     ) in crm.AUTOMATION_TRIGGERS
     assert (
+        "profile_password_changed",
+        "Пользователь сменил свой пароль",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
         "company_settings_updated",
         "Настройки компании обновлены",
     ) in crm.AUTOMATION_TRIGGERS
@@ -1114,6 +1118,7 @@ async def assert_automation_page():
     assert 'value="ai_note_created"' in html
     assert 'value="ai_note_postponed"' in html
     assert 'value="ai_note_done"' in html
+    assert 'value="profile_password_changed"' in html
     assert 'value="ai_follow_up_notifications_sent"' in html
     assert 'value="ai_insights_digest_created"' in html
     assert 'value="ai_digest_rules_created"' in html
@@ -5538,6 +5543,66 @@ async def assert_profile_page():
     assert "✅ Пароль изменён" not in html
     assert "❌" not in html
     assert "💾 Сменить пароль" not in html
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO users (
+        username, password, role, company_id, telegram_chat_id
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        "profile_password_candidate",
+        crm.hash_password("oldpass123"),
+        "profile_test",
+        2,
+        "",
+    ))
+    profile_user_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    captured_events = []
+    original_run_automation_event = crm.run_automation_event
+    crm.run_automation_event = lambda *args, **kwargs: captured_events.append(args)
+
+    try:
+        change_response = await crm.change_my_password(
+            make_form_request(
+                "profile_password_candidate",
+                "/profile/password",
+                {
+                    "old_password": "oldpass123",
+                    "new_password": "newpass456",
+                },
+            )
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert change_response.status_code == 302
+    assert change_response.headers["location"] == "/login?password_changed=1"
+    assert captured_events[-1] == (
+        2,
+        "profile_password_changed",
+        "user",
+        profile_user_id,
+        "Пользователь profile_password_candidate изменил свой пароль",
+        "/profile",
+    )
+    assert "newpass456" not in captured_events[-1][4]
+
+    conn = connect()
+    c = conn.cursor()
+    updated_user = c.execute("""
+    SELECT password
+    FROM users
+    WHERE id=?
+    """, (profile_user_id,)).fetchone()
+    conn.close()
+
+    assert updated_user is not None
+    assert crm.verify_password("newpass456", updated_user["password"])
 
 
 async def assert_settings_page():
