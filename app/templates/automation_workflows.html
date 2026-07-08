@@ -1826,12 +1826,6 @@ async function requestDangerousFixApproval(actionType, targetType, targetId, lab
             return;
         }
 
-        if (!data.ok && data.reason === "duplicate_pending_action") {
-            setWorkflowActionStatus("Такое действие уже ждёт подтверждения", "error");
-            alert("Такое действие уже ждёт подтверждения");
-            return;
-        }
-
         if (!data.ok) {
             const message = data.message || "Не удалось отправить на подтверждение";
             setWorkflowActionStatus(message, "error");

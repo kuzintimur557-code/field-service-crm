@@ -16377,6 +16377,7 @@ async def assert_a3_workflow_center():
     assert "Безопасные исправления" in body
     assert "Автоисправления не требуются" in body
     assert "Требует подтверждения" in body
+    assert "duplicate_pending_action" not in body
     assert "Очередь подтверждений" in body
     assert "workflow-approval-queue" in body
     assert "workflow-approval-history" in body
