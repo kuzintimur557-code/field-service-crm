@@ -514,6 +514,7 @@ async def assert_automation_page():
     assert '<optgroup label="Клиенты">' in html
     assert '<optgroup label="Каталог">' in html
     assert '<optgroup label="Поля компании">' in html
+    assert '<optgroup label="Команда">' in html
     assert '<optgroup label="SLA и загрузка">' in html
     assert '<optgroup label="ИИ-сводки">' in html
     assert "Просрочен SLA" in html
@@ -1024,6 +1025,14 @@ async def assert_automation_page():
     assert (
         "task_custom_field_updated",
         "Значение поля заявки изменено",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "worker_created",
+        "Сотрудник создан",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "worker_status_changed",
+        "Статус сотрудника изменён",
     ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
@@ -13986,18 +13995,37 @@ async def assert_finance_margin(task):
     assert weak_password_response.status_code == 302
     assert weak_password_response.headers["location"] == "/workers?error=weak_password"
 
-    created_worker_response = await crm.create_worker(
-        make_form_request(
-            "owner2",
-            "/workers",
-            {
-                "username": "audit_manager2",
-                "password": "strong123",
-                "role": "manager",
-                "full_name": "Аудит Менеджер",
-            },
-        )
+    original_run_automation_event = crm.run_automation_event
+    created_worker_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        created_worker_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        created_worker_response = await crm.create_worker(
+            make_form_request(
+                "owner2",
+                "/workers",
+                {
+                    "username": "audit_manager2",
+                    "password": "strong123",
+                    "role": "manager",
+                    "full_name": "Аудит Менеджер",
+                },
+            )
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert created_worker_response.status_code == 302
     assert created_worker_response.headers["location"] == "/workers?created=1"
 
@@ -14023,6 +14051,14 @@ async def assert_finance_margin(task):
     assert created_worker_activity["action"] == "Пользователь создан"
     assert created_worker_activity["details"] == "Роль: Менеджер"
     assert created_worker_activity["actor_username"] == "owner2"
+    assert created_worker_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_created",
+        "entity_type": "worker",
+        "entity_id": created_worker["id"],
+        "message": "Сотрудник создан: audit_manager2",
+        "link": f"/workers/{created_worker['id']}",
+    }]
     c.execute("DELETE FROM users WHERE id=?", (created_worker["id"],))
     conn.commit()
     outsider = c.execute("""
@@ -14109,14 +14145,33 @@ async def assert_finance_margin(task):
         == "/workers?error=disable_before_delete"
     )
 
-    history_toggle_response = await crm.toggle_team_user_active(
-        make_form_request(
-            "owner2",
-            f"/workers/{history_candidate['id']}/toggle-active",
-            {"disabled_reason": "Сотрудник уволен"},
-        ),
-        history_candidate["id"],
+    original_run_automation_event = crm.run_automation_event
+    worker_disable_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        worker_disable_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        history_toggle_response = await crm.toggle_team_user_active(
+            make_form_request(
+                "owner2",
+                f"/workers/{history_candidate['id']}/toggle-active",
+                {"disabled_reason": "Сотрудник уволен"},
+            ),
+            history_candidate["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert history_toggle_response.status_code == 302
     assert history_toggle_response.headers["location"] == "/workers?status_updated=1"
 
@@ -14131,6 +14186,14 @@ async def assert_finance_margin(task):
     assert disabled_history_candidate["is_active"] == 0
     assert disabled_history_candidate["disabled_at"]
     assert disabled_history_candidate["disabled_reason"] == "Сотрудник уволен"
+    assert worker_disable_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_status_changed",
+        "entity_type": "worker",
+        "entity_id": history_candidate["id"],
+        "message": "Сотрудник history_candidate2 отключён",
+        "link": f"/workers/{history_candidate['id']}",
+    }]
 
     history_delete_response = await crm.delete_team_user(
         make_form_request(
@@ -14145,14 +14208,33 @@ async def assert_finance_margin(task):
         "/workers?error=user_has_history&count="
     )
 
-    history_reenable_response = await crm.toggle_team_user_active(
-        make_form_request(
-            "owner2",
-            f"/workers/{history_candidate['id']}/toggle-active",
-            {},
-        ),
-        history_candidate["id"],
+    original_run_automation_event = crm.run_automation_event
+    worker_enable_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        worker_enable_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        history_reenable_response = await crm.toggle_team_user_active(
+            make_form_request(
+                "owner2",
+                f"/workers/{history_candidate['id']}/toggle-active",
+                {},
+            ),
+            history_candidate["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert history_reenable_response.status_code == 302
     assert history_reenable_response.headers["location"] == "/workers?status_updated=1"
 
@@ -14166,6 +14248,14 @@ async def assert_finance_margin(task):
     assert reenabled_history_candidate["is_active"] == 1
     assert reenabled_history_candidate["disabled_at"] is None
     assert reenabled_history_candidate["disabled_reason"] is None
+    assert worker_enable_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_status_changed",
+        "entity_type": "worker",
+        "entity_id": history_candidate["id"],
+        "message": "Сотрудник history_candidate2 включён",
+        "link": f"/workers/{history_candidate['id']}",
+    }]
     history_activity = c.execute("""
     SELECT action, details, actor_username
     FROM team_activity

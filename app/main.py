@@ -337,6 +337,8 @@ AUTOMATION_TRIGGERS = [
     ("custom_field_ordered", "Порядок поля компании изменён"),
     ("custom_field_toggled", "Поле компании включено или выключено"),
     ("task_custom_field_updated", "Значение поля заявки изменено"),
+    ("worker_created", "Сотрудник создан"),
+    ("worker_status_changed", "Статус сотрудника изменён"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -378,6 +380,10 @@ AUTOMATION_TRIGGER_GROUPS = [
         "custom_field_ordered",
         "custom_field_toggled",
         "task_custom_field_updated",
+    )),
+    ("Команда", (
+        "worker_created",
+        "worker_status_changed",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -30140,6 +30146,15 @@ async def create_worker(request: Request):
     conn.commit()
     conn.close()
 
+    run_automation_event(
+        company_id,
+        "worker_created",
+        "worker",
+        created_user_id,
+        f"Сотрудник создан: {worker_username}",
+        f"/workers/{created_user_id}",
+    )
+
     return RedirectResponse("/workers?created=1", status_code=302)
 
 
@@ -30457,6 +30472,7 @@ async def toggle_team_user_active(request: Request, user_id: int):
             )
 
     if current_active:
+        new_active = 0
         changed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         c.execute("""
         UPDATE users
@@ -30484,6 +30500,7 @@ async def toggle_team_user_active(request: Request, user_id: int):
             changed_at,
         ))
     else:
+        new_active = 1
         changed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         c.execute("""
         UPDATE users
@@ -30508,6 +30525,18 @@ async def toggle_team_user_active(request: Request, user_id: int):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "worker_status_changed",
+        "worker",
+        user_id,
+        (
+            f"Сотрудник {user['username']} "
+            f"{'включён' if new_active else 'отключён'}"
+        ),
+        f"/workers/{user_id}",
+    )
 
     return RedirectResponse("/workers?status_updated=1", status_code=302)
 
