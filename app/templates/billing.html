@@ -39,6 +39,8 @@ h2{margin:0 0 16px;font-size:22px}
 </head>
 
 <body>
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <div class="container">
 
 <a href="/settings" class="back">← Назад к настройкам</a>
@@ -72,7 +74,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="plan {% if plan == 'basic' %}active{% endif %}">
     <div class="name">Базовый</div>
     <div class="price">до 3 пользователей</div>
-    <div class="feature"><span class="feature-state yes">Включено</span><span>Заявки</span></div>
+    <div class="feature"><span class="feature-state yes">Включено</span><span>{{ task_label }}</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Фото</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>PDF-акты</span></div>
     <div class="feature"><span class="feature-state no">Нет</span><span>1С</span></div>
@@ -83,7 +85,7 @@ h2{margin:0 0 16px;font-size:22px}
     <div class="name">Команда</div>
     <div class="price">до 10 пользователей</div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Всё из базового тарифа</span></div>
-    <div class="feature"><span class="feature-state yes">Включено</span><span>Клиенты</span></div>
+    <div class="feature"><span class="feature-state yes">Включено</span><span>{{ client_label }}</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Финансы</span></div>
     <div class="feature"><span class="feature-state no">Нет</span><span>1С</span></div>
     <div class="feature"><span class="feature-state no">Нет</span><span>Звонки</span></div>
@@ -104,7 +106,7 @@ h2{margin:0 0 16px;font-size:22px}
     <div class="price">до 30 пользователей</div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Всё из тарифа Бизнес</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>1С</span></div>
-    <div class="feature"><span class="feature-state yes">Включено</span><span>Обмен клиентами</span></div>
+    <div class="feature"><span class="feature-state yes">Включено</span><span>Обмен: {{ client_label|lower }}</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Счета / акты</span></div>
 </div>
 
