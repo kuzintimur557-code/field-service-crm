@@ -1038,6 +1038,14 @@ async def assert_automation_page():
         "worker_unavailability_changed",
         "Недоступность сотрудника изменена",
     ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "worker_profile_updated",
+        "Карточка сотрудника обновлена",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "worker_commission_updated",
+        "Процент сотрудника изменён",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -14289,19 +14297,46 @@ async def assert_finance_margin(task):
         == "/workers?password_changed=1"
     )
 
-    history_commission_response = await crm.update_worker_commission(
-        make_form_request(
-            "owner2",
-            f"/workers/{history_candidate['id']}/commission",
-            {"commission_percent": "7.5"},
-        ),
-        history_candidate["id"],
+    original_run_automation_event = crm.run_automation_event
+    commission_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        commission_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        history_commission_response = await crm.update_worker_commission(
+            make_form_request(
+                "owner2",
+                f"/workers/{history_candidate['id']}/commission",
+                {"commission_percent": "7.5"},
+            ),
+            history_candidate["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert history_commission_response.status_code == 302
     assert (
         history_commission_response.headers["location"]
         == "/workers?commission_updated=1"
     )
+    assert commission_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_commission_updated",
+        "entity_type": "worker",
+        "entity_id": history_candidate["id"],
+        "message": "Процент сотрудника history_candidate2: 0% → 7.5%",
+        "link": f"/workers/{history_candidate['id']}",
+    }]
 
     conn = connect()
     c = conn.cursor()
@@ -14319,25 +14354,56 @@ async def assert_finance_margin(task):
     assert management_activity[1]["details"] == "Пароль изменён владельцем компании"
     assert "secure456" not in management_activity[1]["details"]
 
-    profile_update_response = await crm.update_team_user_profile(
-        make_form_request(
-            "owner2",
-            f"/workers/{history_candidate['id']}/profile",
-            {
-                "full_name": "Исторический Сотрудник",
-                "position": "Старший специалист",
-                "phone": "+7 900 000-00-00",
-                "email": "history@example.test",
-                "telegram_chat_id": "history-chat",
-                "daily_capacity": "4",
-            },
-        ),
-        history_candidate["id"],
+    original_run_automation_event = crm.run_automation_event
+    profile_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        profile_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        profile_update_response = await crm.update_team_user_profile(
+            make_form_request(
+                "owner2",
+                f"/workers/{history_candidate['id']}/profile",
+                {
+                    "full_name": "Исторический Сотрудник",
+                    "position": "Старший специалист",
+                    "phone": "+7 900 000-00-00",
+                    "email": "history@example.test",
+                    "telegram_chat_id": "history-chat",
+                    "daily_capacity": "4",
+                },
+            ),
+            history_candidate["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert profile_update_response.status_code == 302
     assert profile_update_response.headers["location"] == (
         f"/workers/{history_candidate['id']}?profile_updated=1"
     )
+    assert profile_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_profile_updated",
+        "entity_type": "worker",
+        "entity_id": history_candidate["id"],
+        "message": (
+            "Карточка сотрудника history_candidate2 обновлена: "
+            "ФИО, Должность, Телефон, Электронная почта, "
+            "Номер чата Telegram, Дневной лимит заявок"
+        ),
+        "link": f"/workers/{history_candidate['id']}",
+    }]
 
     conn = connect()
     c = conn.cursor()

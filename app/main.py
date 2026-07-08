@@ -340,6 +340,8 @@ AUTOMATION_TRIGGERS = [
     ("worker_created", "Сотрудник создан"),
     ("worker_status_changed", "Статус сотрудника изменён"),
     ("worker_unavailability_changed", "Недоступность сотрудника изменена"),
+    ("worker_profile_updated", "Карточка сотрудника обновлена"),
+    ("worker_commission_updated", "Процент сотрудника изменён"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -386,6 +388,8 @@ AUTOMATION_TRIGGER_GROUPS = [
         "worker_created",
         "worker_status_changed",
         "worker_unavailability_changed",
+        "worker_profile_updated",
+        "worker_commission_updated",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -30292,6 +30296,19 @@ async def update_team_user_profile(request: Request, user_id: int):
     conn.commit()
     conn.close()
 
+    if changed_fields:
+        run_automation_event(
+            company_id,
+            "worker_profile_updated",
+            "worker",
+            user_id,
+            (
+                f"Карточка сотрудника {user['username']} обновлена: "
+                f"{', '.join(changed_fields)}"
+            ),
+            f"/workers/{user_id}",
+        )
+
     return RedirectResponse(
         f"/workers/{user_id}?profile_updated=1",
         status_code=302,
@@ -30434,6 +30451,19 @@ async def update_worker_commission(request: Request, user_id: int):
 
     conn.commit()
     conn.close()
+
+    if previous_commission != commission_percent:
+        run_automation_event(
+            company_id,
+            "worker_commission_updated",
+            "worker",
+            user_id,
+            (
+                f"Процент сотрудника {user['username']}: "
+                f"{previous_commission:g}% → {commission_percent:g}%"
+            ),
+            f"/workers/{user_id}",
+        )
 
     return RedirectResponse("/workers?commission_updated=1", status_code=302)
 
