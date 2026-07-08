@@ -29492,6 +29492,7 @@ async def workers_page(request: Request, status: str = "active"):
     c = conn.cursor()
 
     company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
 
     if status not in ("active", "inactive", "all"):
         status = "active"
@@ -29529,6 +29530,7 @@ async def workers_page(request: Request, status: str = "active"):
             "role": role,
             "status": status,
             "team_counts": team_counts,
+            "settings": settings
         }
     )
 

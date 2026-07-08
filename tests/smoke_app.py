@@ -15425,6 +15425,7 @@ async def assert_finance_margin(task):
         status="inactive",
     )
     workers_html = workers_response.body.decode("utf-8")
+    assert "Управление командой компании" in workers_html
     assert "Отключён" in workers_html
     assert "Включить пользователя" in workers_html
     assert "Активные" in workers_html
@@ -15438,6 +15439,7 @@ async def assert_finance_margin(task):
     assert ".container{padding:16px 14px 92px}" in workers_html
     assert "👥 Команда" not in workers_html
     assert "➕ Добавить пользователя" not in workers_html
+    assert "Управление менеджерами и исполнителями платформы" not in workers_html
     assert workers_response.context["status"] == "inactive"
     assert workers_response.context["team_counts"]["inactive_count"] >= 1
 

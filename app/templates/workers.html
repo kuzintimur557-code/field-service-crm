@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
 <title>Команда</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -62,14 +63,14 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 
 <div class="card">
 <h1>Команда</h1>
-<div class="meta">Управление менеджерами и исполнителями платформы</div>
+<div class="meta">Управление командой компании</div>
 
 {% if request.query_params.get("password_changed") == "1" %}
 <div class="notice ok">Пароль обновлён</div>
 {% endif %}
 
 {% if request.query_params.get("commission_updated") == "1" %}
-<div class="notice ok">Процент исполнителя обновлён</div>
+<div class="notice ok">Процент сотрудника обновлён</div>
 {% endif %}
 
 {% if request.query_params.get("status_updated") == "1" %}
@@ -93,7 +94,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 {% elif request.query_params.get("error") == "cannot_change_boss" %}
 <div class="notice err">Пароль владельца меняется только в его профиле</div>
 {% elif request.query_params.get("error") == "active_tasks" %}
-<div class="notice err">Нельзя отключить исполнителя: у него активных заявок — {{ request.query_params.get("count") or "1" }}. Сначала переназначьте их.</div>
+<div class="notice err">Нельзя отключить сотрудника: у него активные задачи — {{ request.query_params.get("count") or "1" }}. Сначала переназначьте их.</div>
 {% elif request.query_params.get("error") == "disable_before_delete" %}
 <div class="notice err">Сначала отключите пользователя, затем подтвердите удаление.</div>
 {% elif request.query_params.get("error") == "user_has_history" %}
@@ -117,7 +118,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     <input type="number" name="commission_percent" min="0" step="0.1" placeholder="Процент с прибыли">
 
     <select name="role">
-        <option value="worker">Исполнитель</option>
+        <option value="worker">{{ worker_label }}</option>
         <option value="manager">Менеджер</option>
     </select>
 
@@ -172,7 +173,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
             {% if worker["role"] == "manager" %}
             <div class="badge manager">Менеджер</div>
             {% else %}
-            <div class="badge worker">Исполнитель</div>
+            <div class="badge worker">{{ worker_label }}</div>
             {% endif %}
 
             {% if worker["is_active"] is none or worker["is_active"] %}
