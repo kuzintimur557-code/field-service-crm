@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <title>Звонки</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -59,12 +60,12 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="grid">
     <div class="box">
         <div class="label">Входящие звонки</div>
-        <div class="value">Привязка к клиенту</div>
+        <div class="value">Привязка: {{ client_label }}</div>
     </div>
 
     <div class="box">
         <div class="label">Запись разговоров</div>
-        <div class="value">Аудио в карточке клиента</div>
+        <div class="value">Аудио в карточке</div>
     </div>
 
     <div class="box">

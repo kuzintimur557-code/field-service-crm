@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+{% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <title>Интеграция 1С</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
@@ -34,7 +36,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="card">
 <h1>🔗 Интеграция с 1С</h1>
 <div class="small">
-Здесь будет настройка обмена CRM ↔ 1С: клиенты, заявки, счета, акты, оплаты и материалы.
+Здесь будет настройка обмена CRM ↔ 1С: база, {{ task_label|lower }}, счета, акты, оплаты и материалы.
 </div>
 </div>
 
@@ -62,7 +64,7 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="field">
     <div class="label">Что будет синхронизироваться</div>
-    <div class="value">Клиенты, заявки, счета, акты, оплаты, материалы</div>
+    <div class="value">{{ client_label }}, {{ task_label|lower }}, счета, акты, оплаты, материалы</div>
 </div>
 
 <div class="field">
