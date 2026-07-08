@@ -354,6 +354,8 @@ AUTOMATION_TRIGGERS = [
     ("ai_note_created", "ИИ-заметка создана"),
     ("ai_note_postponed", "ИИ-заметка перенесена"),
     ("ai_note_done", "ИИ-заметка выполнена"),
+    ("ai_insights_digest_created", "ИИ-сводка создана вручную"),
+    ("ai_digest_rules_created", "Правила ИИ-сводок настроены"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -425,6 +427,8 @@ AUTOMATION_TRIGGER_GROUPS = [
         "ai_note_done",
     )),
     ("ИИ-сводки", (
+        "ai_insights_digest_created",
+        "ai_digest_rules_created",
         "daily_digest",
         "weekly_digest",
     )),
@@ -27483,6 +27487,16 @@ async def setup_ai_assistant_digest_rules(request: Request):
 
     created_count = ensure_ai_digest_automation_rules(company_id, username)
 
+    if created_count:
+        run_automation_event(
+            company_id,
+            "ai_digest_rules_created",
+            "company",
+            company_id,
+            f"Правила ИИ-сводок настроены: {created_count}",
+            "/ai/assistant",
+        )
+
     return RedirectResponse(f"/ai/assistant?digest_rules={created_count}", status_code=302)
 
 
@@ -27562,6 +27576,15 @@ async def create_ai_insights_digest(request: Request):
 
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "ai_insights_digest_created",
+        "company",
+        company_id,
+        "Ручная ИИ-сводка создана",
+        "/ai/insights",
+    )
 
     return RedirectResponse("/ai/insights?digest=1", status_code=302)
 

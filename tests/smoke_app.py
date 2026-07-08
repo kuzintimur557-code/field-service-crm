@@ -1096,12 +1096,22 @@ async def assert_automation_page():
         "ИИ-заметка выполнена",
     ) in crm.AUTOMATION_TRIGGERS
     assert 'optgroup label="ИИ-помощник"' in html
+    assert (
+        "ai_insights_digest_created",
+        "ИИ-сводка создана вручную",
+    ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "ai_digest_rules_created",
+        "Правила ИИ-сводок настроены",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'value="company_settings_updated"' in html
     assert 'value="ai_note_created"' in html
     assert 'value="ai_note_postponed"' in html
     assert 'value="ai_note_done"' in html
+    assert 'value="ai_insights_digest_created"' in html
+    assert 'value="ai_digest_rules_created"' in html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
     assert 'name="action_key" value="telegram_alert"' in builder_html
     assert 'name="action_key" value="ai_digest"' in builder_html
@@ -5334,9 +5344,27 @@ async def assert_ai_assistant_page():
     conn.commit()
     conn.close()
 
-    setup_response = await crm.setup_ai_assistant_digest_rules(make_request("owner2"))
+    captured_digest_rule_events = []
+    original_run_automation_event = crm.run_automation_event
+    crm.run_automation_event = (
+        lambda *args, **kwargs: captured_digest_rule_events.append(args)
+    )
+
+    try:
+        setup_response = await crm.setup_ai_assistant_digest_rules(make_request("owner2"))
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert setup_response.status_code == 302
     assert setup_response.headers["location"] == "/ai/assistant?digest_rules=2"
+    assert captured_digest_rule_events[-1] == (
+        2,
+        "ai_digest_rules_created",
+        "company",
+        2,
+        "Правила ИИ-сводок настроены: 2",
+        "/ai/assistant",
+    )
 
     duplicate_setup_response = await crm.setup_ai_assistant_digest_rules(make_request("owner2"))
     assert duplicate_setup_response.status_code == 302
@@ -5376,6 +5404,28 @@ async def assert_ai_insights_page():
     assert 'class="table-wrap"' in html
     assert "Главное меню" in html
     assert "← Главное меню" not in html
+
+    captured_digest_events = []
+    original_run_automation_event = crm.run_automation_event
+    crm.run_automation_event = (
+        lambda *args, **kwargs: captured_digest_events.append(args)
+    )
+
+    try:
+        digest_response = await crm.create_ai_insights_digest(make_request("owner2"))
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert digest_response.status_code == 302
+    assert digest_response.headers["location"] == "/ai/insights?digest=1"
+    assert captured_digest_events[-1] == (
+        2,
+        "ai_insights_digest_created",
+        "company",
+        2,
+        "Ручная ИИ-сводка создана",
+        "/ai/insights",
+    )
 
 
 async def assert_more_page():
