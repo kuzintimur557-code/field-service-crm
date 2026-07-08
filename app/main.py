@@ -24989,6 +24989,8 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     if disabled_response:
         return disabled_response
 
+    settings = get_company_settings(company_id)
+
     if not month:
         month = datetime.now().strftime("%Y-%m")
 
@@ -25385,7 +25387,8 @@ async def owner_dashboard_page(request: Request, month: str = ""):
             "negative_months": negative_months,
             "owner_monthly_metrics": owner_monthly_metrics,
             "owner_chart_data": owner_chart_data,
-            "owner_month_comparison": owner_month_comparison
+            "owner_month_comparison": owner_month_comparison,
+            "settings": settings,
         }
     )
 

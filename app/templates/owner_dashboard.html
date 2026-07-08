@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% set task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
+    {% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+    {% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" %}
     <title>Аналитика владельца</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="stylesheet" href="/static/app.css">
@@ -332,7 +335,7 @@
   <div class="page-header mb-4">
     <div>
       <h2 class="mb-1">Аналитика владельца</h2>
-      <p class="text-muted mb-0">Сводка по финансам, выплатам, клиентам и рискам компании</p>
+      <p class="text-muted mb-0">Сводка по финансам, выплатам, базе и рискам компании</p>
     </div>
 
     <div class="header-actions">
@@ -622,8 +625,8 @@
 
           <thead>
             <tr>
-              <th>Заявка</th>
-              <th>Клиент</th>
+              <th>{{ task_label }}</th>
+              <th>{{ client_label }}</th>
               <th>Дата</th>
               <th>Просрочка</th>
               <th>Не оплачено</th>
@@ -633,12 +636,12 @@
           <tbody>
             {% for task in unpaid_risk_tasks %}
             <tr>
-              <td data-label="Заявка">
+              <td data-label="{{ task_label }}">
                 <a href="/task/{{ task.id }}">
                   #{{ task.id }}
                 </a>
               </td>
-              <td data-label="Клиент">{{ task.client_name }}</td>
+              <td data-label="{{ client_label }}">{{ task.client_name }}</td>
               <td data-label="Дата">{{ task.task_date }}</td>
               <td data-label="Просрочка">{{ task.age_days }} дн.</td>
               <td data-label="Не оплачено">₽{{ "%.2f"|format(task.unpaid_amount or 0) }}</td>
@@ -661,14 +664,14 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Повторные клиенты</h3>
+      <h3 class="mb-3">Повторные: {{ client_label }}</h3>
 
       <div class="row g-3 mb-3">
 
         <div class="col-md-6">
           <div class="card">
             <div class="card-body">
-              <div class="text-muted">Повторные клиенты</div>
+              <div class="text-muted">Повторные: {{ client_label }}</div>
               <h4>{{ repeat_clients_count or 0 }}</h4>
             </div>
           </div>
@@ -677,7 +680,7 @@
         <div class="col-md-6">
           <div class="card">
             <div class="card-body">
-              <div class="text-muted">Выручка повторных клиентов</div>
+              <div class="text-muted">Выручка повторных записей</div>
               <h4>₽{{ "%.2f"|format(repeat_clients_revenue or 0) }}</h4>
             </div>
           </div>
@@ -690,8 +693,8 @@
 
           <thead>
             <tr>
-              <th>Клиент</th>
-              <th>Задачи</th>
+              <th>{{ client_label }}</th>
+              <th>{{ task_label }}</th>
               <th>Выручка</th>
               <th>Выплаты</th>
               <th>Прибыль</th>
@@ -702,8 +705,8 @@
           <tbody>
             {% for client in top_repeat_clients %}
             <tr>
-              <td data-label="Клиент">{{ client.client_name }}</td>
-              <td data-label="Задачи">{{ client.jobs_count or 0 }}</td>
+              <td data-label="{{ client_label }}">{{ client.client_name }}</td>
+              <td data-label="{{ task_label }}">{{ client.jobs_count or 0 }}</td>
               <td data-label="Выручка">₽{{ "%.2f"|format(client.revenue or 0) }}</td>
               <td data-label="Выплаты">₽{{ "%.2f"|format(client.payroll or 0) }}</td>
               <td data-label="Прибыль">₽{{ "%.2f"|format(client.profit or 0) }}</td>
@@ -712,7 +715,7 @@
             {% else %}
             <tr>
               <td colspan="6" class="text-center text-muted">
-                Повторных клиентов пока нет
+                Повторных записей пока нет
               </td>
             </tr>
             {% endfor %}
@@ -727,36 +730,36 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Лучшие клиенты</h3>
+      <h3 class="mb-3">Лучшие: {{ client_label }}</h3>
 
       <div class="table-responsive">
         <table class="table table-striped table-bordered align-middle">
 
           <thead>
             <tr>
-              <th>Клиент</th>
+              <th>{{ client_label }}</th>
               <th>Выручка</th>
               <th>Выплаты</th>
               <th>Прибыль</th>
               <th>Чистая прибыль</th>
-              <th>Задачи</th>
+              <th>{{ task_label }}</th>
             </tr>
           </thead>
 
           <tbody>
             {% for client in top_owner_clients %}
             <tr>
-              <td data-label="Клиент">{{ client.client_name }}</td>
+              <td data-label="{{ client_label }}">{{ client.client_name }}</td>
               <td data-label="Выручка">₽{{ "%.2f"|format(client.revenue or 0) }}</td>
               <td data-label="Выплаты">₽{{ "%.2f"|format(client.payroll or 0) }}</td>
               <td data-label="Прибыль">₽{{ "%.2f"|format(client.profit or 0) }}</td>
               <td data-label="Чистая прибыль">₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
-              <td data-label="Задачи">{{ client.jobs_count or 0 }}</td>
+              <td data-label="{{ task_label }}">{{ client.jobs_count or 0 }}</td>
             </tr>
             {% else %}
             <tr>
               <td colspan="6" class="text-center text-muted">
-                Нет данных по клиентам
+                Нет данных по базе
               </td>
             </tr>
             {% endfor %}
@@ -771,14 +774,14 @@
   <div class="card mt-4">
     <div class="card-body">
 
-      <h3 class="mb-3">Лучшие исполнители</h3>
+      <h3 class="mb-3">Лучшие: {{ worker_label }}</h3>
 
       <div class="table-responsive">
         <table class="table table-striped table-bordered align-middle">
 
           <thead>
             <tr>
-              <th>Исполнитель</th>
+              <th>{{ worker_label }}</th>
               <th>Выплачено</th>
               <th>Кол-во выплат</th>
             </tr>
@@ -787,14 +790,14 @@
           <tbody>
             {% for worker in top_owner_workers %}
             <tr>
-              <td data-label="Исполнитель">{{ worker.worker_name }}</td>
+              <td data-label="{{ worker_label }}">{{ worker.worker_name }}</td>
               <td data-label="Выплачено">₽{{ "%.2f"|format(worker.total_paid or 0) }}</td>
               <td data-label="Кол-во выплат">{{ worker.payouts_count or 0 }}</td>
             </tr>
             {% else %}
             <tr>
               <td colspan="3" class="text-center text-muted">
-                Нет данных по исполнителям
+                Нет данных по сотрудникам
               </td>
             </tr>
             {% endfor %}
@@ -816,30 +819,30 @@
         <div class="col-md-6">
           <div class="card border-warning">
             <div class="card-body">
-              <h5>Клиенты с низкой маржой</h5>
+              <h5>{{ client_label }} с низкой маржой</h5>
 
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                   <thead>
                     <tr>
-                      <th>Клиент</th>
+                      <th>{{ client_label }}</th>
                       <th>Маржа</th>
                       <th>Чистая прибыль</th>
-                      <th>Задачи</th>
+                      <th>{{ task_label }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for client in low_margin_clients %}
                     <tr>
-                      <td data-label="Клиент">{{ client.client_name }}</td>
+                      <td data-label="{{ client_label }}">{{ client.client_name }}</td>
                       <td data-label="Маржа">{{ "%.1f"|format(client.margin or 0) }}%</td>
                       <td data-label="Чистая прибыль">₽{{ "%.2f"|format(client.net_profit or 0) }}</td>
-                      <td data-label="Задачи">{{ client.jobs_count or 0 }}</td>
+                      <td data-label="{{ task_label }}">{{ client.jobs_count or 0 }}</td>
                     </tr>
                     {% else %}
                     <tr>
                       <td colspan="4" class="text-muted text-center">
-                        Клиентов с низкой маржой нет
+                        Записей с низкой маржой нет
                       </td>
                     </tr>
                     {% endfor %}
