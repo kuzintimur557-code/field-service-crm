@@ -300,13 +300,23 @@ function refreshA3ApprovalWidgets() {
 }
 
 async function loadA3SystemHealth() {
+    const scoreEl = document.getElementById("a3-health-score");
+    const badgeEl = document.getElementById("a3-health-badge");
+    const warningsEl = document.getElementById("a3-health-warning-list");
+    const breakdownEl = document.getElementById("a3-health-breakdown");
+    const trendEl = document.getElementById("a3-health-trend");
+
+    if (!scoreEl || !badgeEl || !warningsEl || !breakdownEl || !trendEl) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/system-health");
         const data = await response.json();
 
-        const scoreEl = document.getElementById("a3-health-score");
-        const badgeEl = document.getElementById("a3-health-badge");
-        const warningsEl = document.getElementById("a3-health-warning-list");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить состояние A3");
+        }
 
         scoreEl.textContent = data.score;
 
@@ -338,7 +348,6 @@ async function loadA3SystemHealth() {
         };
         badgeEl.textContent = statusLabels[data.status] || data.status.toUpperCase();
 
-        const breakdownEl = document.getElementById("a3-health-breakdown");
         breakdownEl.innerHTML = "";
 
         const breakdownItems = [
@@ -359,7 +368,6 @@ async function loadA3SystemHealth() {
             breakdownEl.appendChild(item);
         }
 
-        const trendEl = document.getElementById("a3-health-trend");
         trendEl.innerHTML = "";
 
         try {
@@ -420,6 +428,15 @@ async function loadA3SystemHealth() {
         }
     } catch (err) {
         console.error("Ошибка загрузки состояния A3", err);
+        const message = err.message || "Не удалось загрузить состояние A3";
+
+        scoreEl.textContent = "--";
+        badgeEl.style.background = "#fee2e2";
+        badgeEl.style.color = "#991b1b";
+        badgeEl.textContent = "НЕДОСТУПНО";
+        breakdownEl.innerHTML = `<div class="pill off">${message}</div>`;
+        trendEl.innerHTML = '<div class="meta">Динамика недоступна</div>';
+        warningsEl.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
@@ -503,15 +520,23 @@ setInterval(loadA3SystemHealth, 30000);
 
 <script>
 async function loadA3Analytics() {
+    const successRateEl = document.getElementById("a3-analytics-success-rate");
+    const statsEl = document.getElementById("a3-analytics-stats");
+    const trendEl = document.getElementById("a3-analytics-trend");
+
+    if (!successRateEl || !statsEl || !trendEl) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/automation-analytics");
         const data = await response.json();
 
-        document.getElementById("a3-analytics-success-rate").textContent =
-            data.success_rate + "%";
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить аналитику автоматизации");
+        }
 
-        const statsEl = document.getElementById("a3-analytics-stats");
-
+        successRateEl.textContent = data.success_rate + "%";
         statsEl.innerHTML = "";
 
         const stats = [
@@ -543,8 +568,6 @@ async function loadA3Analytics() {
             statsEl.appendChild(card);
         }
 
-        const trendEl = document.getElementById("a3-analytics-trend");
-
         trendEl.innerHTML = "";
 
         for (const item of (data.daily || []).slice(-14)) {
@@ -563,6 +586,10 @@ async function loadA3Analytics() {
         }
     } catch (err) {
         console.error("Ошибка загрузки аналитики автоматизации", err);
+        const message = err.message || "Не удалось загрузить аналитику автоматизации";
+        successRateEl.textContent = "--";
+        statsEl.innerHTML = `<div class="pill off">${message}</div>`;
+        trendEl.innerHTML = `<div class="meta">${message}</div>`;
     }
 }
 
@@ -592,11 +619,19 @@ setInterval(loadA3Analytics, 30000);
 
 <script>
 async function loadA3OperationsInsights() {
+    const container = document.getElementById("a3-operations-insights");
+
+    if (!container) {
+        return;
+    }
+
     try {
         const response = await fetch("/api/a3/operations-insights");
         const data = await response.json();
 
-        const container = document.getElementById("a3-operations-insights");
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить операционные инсайты");
+        }
 
         container.innerHTML = "";
 
@@ -640,6 +675,8 @@ async function loadA3OperationsInsights() {
         }
     } catch (err) {
         console.error("Ошибка загрузки операционных инсайтов", err);
+        const message = err.message || "Не удалось загрузить операционные инсайты";
+        container.innerHTML = `<div class="pill off">${message}</div>`;
     }
 }
 
