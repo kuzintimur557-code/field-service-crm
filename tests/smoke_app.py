@@ -14178,6 +14178,91 @@ async def assert_finance_margin(task):
 
     conn = connect()
     c = conn.cursor()
+    c.execute("""
+    INSERT INTO task_items (
+        company_id,
+        task_id,
+        catalog_item_id,
+        item_name,
+        item_type,
+        unit,
+        qty,
+        price,
+        cost,
+        total,
+        profit,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        task["id"],
+        None,
+        "Temporary delete item",
+        "service",
+        "шт",
+        1,
+        10,
+        2,
+        10,
+        8,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    temporary_item_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    original_run_automation_event = crm.run_automation_event
+    delete_item_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        delete_item_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
+    )
+
+    try:
+        delete_item_response = await crm.delete_task_item(
+            make_request("owner2"),
+            task["id"],
+            temporary_item_id,
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert delete_item_response.status_code == 302
+    assert delete_item_response.headers["location"] == f"/task/{task['id']}"
+    assert delete_item_events == [{
+        "company_id": 2,
+        "trigger_key": "task_finance_changed",
+        "entity_type": "task",
+        "entity_id": task["id"],
+        "message": (
+            f"Удалена позиция из сметы заявки #{task['id']}: "
+            "Temporary delete item"
+        ),
+        "link": f"/task/{task['id']}",
+    }]
+
+    conn = connect()
+    c = conn.cursor()
+    deleted_item = c.execute("""
+    SELECT id
+    FROM task_items
+    WHERE id=?
+    """, (temporary_item_id,)).fetchone()
+    conn.close()
+
+    assert deleted_item is None
+
+    conn = connect()
+    c = conn.cursor()
     helper = c.execute("""
     SELECT id
     FROM users
