@@ -1034,6 +1034,10 @@ async def assert_automation_page():
         "worker_status_changed",
         "Статус сотрудника изменён",
     ) in crm.AUTOMATION_TRIGGERS
+    assert (
+        "worker_unavailability_changed",
+        "Недоступность сотрудника изменена",
+    ) in crm.AUTOMATION_TRIGGERS
     assert 'name="condition_mode" value="status_done"' in builder_html
     assert 'name="trigger_key" value="payment_status_changed"' in builder_html
     assert 'name="condition_mode" value="payment_paid"' in builder_html
@@ -14363,22 +14367,53 @@ async def assert_finance_margin(task):
 
     absence_start = datetime.now().date() + timedelta(days=10)
     absence_end = absence_start + timedelta(days=2)
-    absence_response = await crm.create_worker_unavailability(
-        make_form_request(
-            "manager2",
-            f"/workers/{history_candidate['id']}/unavailability",
-            {
-                "date_from": absence_start.strftime("%Y-%m-%d"),
-                "date_to": absence_end.strftime("%Y-%m-%d"),
-                "reason": "Учебный отпуск",
-            },
-        ),
-        history_candidate["id"],
+    original_run_automation_event = crm.run_automation_event
+    absence_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        absence_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        absence_response = await crm.create_worker_unavailability(
+            make_form_request(
+                "manager2",
+                f"/workers/{history_candidate['id']}/unavailability",
+                {
+                    "date_from": absence_start.strftime("%Y-%m-%d"),
+                    "date_to": absence_end.strftime("%Y-%m-%d"),
+                    "reason": "Учебный отпуск",
+                },
+            ),
+            history_candidate["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert absence_response.status_code == 302
     assert absence_response.headers["location"] == (
         f"/workers/{history_candidate['id']}?unavailability_created=1"
     )
+    assert absence_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_unavailability_changed",
+        "entity_type": "worker",
+        "entity_id": history_candidate["id"],
+        "message": (
+            "Недоступность сотрудника history_candidate2 добавлена: "
+            f"{absence_start.strftime('%Y-%m-%d')} — "
+            f"{absence_end.strftime('%Y-%m-%d')} · Учебный отпуск"
+        ),
+        "link": f"/workers/{history_candidate['id']}",
+    }]
 
     overlap_response = await crm.create_worker_unavailability(
         make_form_request(
@@ -14484,21 +14519,52 @@ async def assert_finance_margin(task):
     assert 'class="mobile-nav"' in history_worker_html
     assert "overflow-x:hidden" in history_worker_html
 
-    delete_absence_response = await crm.delete_worker_unavailability(
-        make_form_request(
-            "manager2",
-            (
-                f"/workers/{history_candidate['id']}/unavailability/"
-                f"{absence_period['id']}/delete"
-            ),
-            {},
-        ),
-        history_candidate["id"],
-        absence_period["id"],
+    original_run_automation_event = crm.run_automation_event
+    absence_delete_events = []
+    crm.run_automation_event = (
+        lambda company_id, trigger_key, entity_type="", entity_id=None,
+        message="", link="":
+        absence_delete_events.append({
+            "company_id": company_id,
+            "trigger_key": trigger_key,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "message": message,
+            "link": link,
+        }) or 1
     )
+
+    try:
+        delete_absence_response = await crm.delete_worker_unavailability(
+            make_form_request(
+                "manager2",
+                (
+                    f"/workers/{history_candidate['id']}/unavailability/"
+                    f"{absence_period['id']}/delete"
+                ),
+                {},
+            ),
+            history_candidate["id"],
+            absence_period["id"],
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert delete_absence_response.headers["location"] == (
         f"/workers/{history_candidate['id']}?unavailability_deleted=1"
     )
+    assert absence_delete_events == [{
+        "company_id": 2,
+        "trigger_key": "worker_unavailability_changed",
+        "entity_type": "worker",
+        "entity_id": history_candidate["id"],
+        "message": (
+            "Недоступность сотрудника history_candidate2 удалена: "
+            f"{absence_start.strftime('%Y-%m-%d')} — "
+            f"{absence_end.strftime('%Y-%m-%d')} · Учебный отпуск"
+        ),
+        "link": f"/workers/{history_candidate['id']}",
+    }]
     conn = connect()
     c = conn.cursor()
     assert c.execute("""

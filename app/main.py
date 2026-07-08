@@ -339,6 +339,7 @@ AUTOMATION_TRIGGERS = [
     ("task_custom_field_updated", "Значение поля заявки изменено"),
     ("worker_created", "Сотрудник создан"),
     ("worker_status_changed", "Статус сотрудника изменён"),
+    ("worker_unavailability_changed", "Недоступность сотрудника изменена"),
     ("daily_digest", "Ежедневная ИИ-сводка"),
     ("weekly_digest", "Еженедельная ИИ-сводка")
 ]
@@ -384,6 +385,7 @@ AUTOMATION_TRIGGER_GROUPS = [
     ("Команда", (
         "worker_created",
         "worker_status_changed",
+        "worker_unavailability_changed",
     )),
     ("SLA и загрузка", (
         "sla_overdue",
@@ -29962,6 +29964,18 @@ async def create_worker_unavailability(request: Request, user_id: int):
     conn.commit()
     conn.close()
 
+    run_automation_event(
+        company_id,
+        "worker_unavailability_changed",
+        "worker",
+        user_id,
+        (
+            f"Недоступность сотрудника {worker['username']} добавлена: "
+            f"{activity_details}"
+        ),
+        f"/workers/{user_id}",
+    )
+
     return RedirectResponse(
         f"/workers/{user_id}?unavailability_created=1",
         status_code=302,
@@ -30028,6 +30042,18 @@ async def delete_worker_unavailability(
     ))
     conn.commit()
     conn.close()
+
+    run_automation_event(
+        company_id,
+        "worker_unavailability_changed",
+        "worker",
+        user_id,
+        (
+            f"Недоступность сотрудника {period['worker_username']} удалена: "
+            f"{activity_details}"
+        ),
+        f"/workers/{user_id}",
+    )
 
     return RedirectResponse(
         f"/workers/{user_id}?unavailability_deleted=1",
