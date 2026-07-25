@@ -12530,6 +12530,94 @@ async def notifications_page(
     )
 
 
+@app.get("/notifications/export")
+async def notifications_export(
+    request: Request,
+    filter: str = "all",
+    search: str = ""
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "notifications")
+
+    if disabled_response:
+        return disabled_response
+
+    selected_filter = filter if filter in ("all", "unread", "read") else "all"
+    selected_search = str(search or "").strip()
+    notifications_where = """
+    WHERE company_id=?
+      AND username=?
+    """
+    notification_params = [company_id, username]
+
+    if selected_filter == "unread":
+        notifications_where += "\n      AND is_read=0"
+    elif selected_filter == "read":
+        notifications_where += "\n      AND is_read=1"
+
+    if selected_search:
+        search_pattern = f"%{selected_search.lower()}%"
+        notifications_where += """
+      AND (
+          LOWER(COALESCE(title, '')) LIKE ?
+          OR LOWER(COALESCE(message, '')) LIKE ?
+          OR LOWER(COALESCE(link, '')) LIKE ?
+      )
+        """
+        notification_params.extend([search_pattern, search_pattern, search_pattern])
+
+    conn = connect()
+    c = conn.cursor()
+
+    notifications = c.execute(f"""
+    SELECT *
+    FROM notifications
+    {notifications_where}
+    ORDER BY id DESC
+    """, notification_params).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Дата",
+        "Статус",
+        "Заголовок",
+        "Сообщение",
+        "Ссылка",
+    ])
+
+    for notification in notifications:
+        writer.writerow([
+            notification["created_at"] or "",
+            "Прочитано" if notification["is_read"] else "Новое",
+            notification["title"] or "",
+            notification["message"] or "",
+            notification["link"] or "",
+        ])
+
+    filename_parts = [
+        selected_filter,
+        "search" if selected_search else "all",
+    ]
+    filename = "notifications_" + "_".join(filename_parts) + ".csv"
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
 @app.post("/notifications/read-all")
 async def mark_all_notifications_read(request: Request):
 

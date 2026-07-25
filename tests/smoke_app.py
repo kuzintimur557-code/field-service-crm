@@ -17569,6 +17569,8 @@ async def assert_notifications(task):
     assert "Прочитанные" in notifications_html
     assert 'name="search"' in notifications_html
     assert "Поиск по уведомлениям" in notifications_html
+    assert "Экспорт CSV" in notifications_html
+    assert 'href="/notifications/export?filter=all' in notifications_html
     assert 'href="/notifications?filter=unread"' in notifications_html
     assert 'class="mobile-nav"' in notifications_html
     assert ".container{padding:14px 14px 92px}" in notifications_html
@@ -17597,6 +17599,27 @@ async def assert_notifications(task):
     assert "Smoke notification" in search_html
     assert 'name="search" value="Notification body"' in search_html
     assert "search=Notification%20body" in search_html
+
+    export_response = await crm.notifications_export(
+        make_asgi_request(
+            "owner2",
+            "/notifications/export",
+            "filter=all&search=Notification%20body",
+        ),
+        filter="all",
+        search="Notification body",
+    )
+    assert export_response.status_code == 200
+    assert export_response.media_type == "text/csv; charset=utf-8"
+    assert (
+        "notifications_all_search.csv"
+        in export_response.headers["Content-Disposition"]
+    )
+    export_csv = export_response.body.decode("utf-8")
+    assert export_csv.startswith("\ufeff")
+    assert "Дата,Статус,Заголовок,Сообщение,Ссылка" in export_csv
+    assert "Smoke notification" in export_csv
+    assert "Notification body" in export_csv
 
     empty_search_response = await crm.notifications_page(
         make_asgi_request(
