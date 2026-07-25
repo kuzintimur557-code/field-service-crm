@@ -16405,6 +16405,20 @@ async def assert_finance_margin(task):
     assert "Сбросить поиск" in searched_workers_html
     assert "status=active&search=inactive_candidate2" in searched_workers_html
 
+    empty_workers_search_response = await crm.workers_page(
+        make_asgi_request(
+            "owner2",
+            "/workers",
+            "status=all&search=no_such_team_member",
+        ),
+        status="all",
+        search="no_such_team_member",
+    )
+    assert empty_workers_search_response.status_code == 200
+    empty_workers_search_html = empty_workers_search_response.body.decode("utf-8")
+    assert "По выбранным условиям ничего не найдено" in empty_workers_search_html
+    assert "Команда пока пустая" not in empty_workers_search_html
+
     workers_export_response = await crm.workers_export(
         make_asgi_request(
             "owner2",

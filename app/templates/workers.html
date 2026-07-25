@@ -241,7 +241,9 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 {% endfor %}
 {% else %}
 <div class="meta">
-    {% if status == "inactive" %}
+    {% if search %}
+    По выбранным условиям ничего не найдено
+    {% elif status == "inactive" %}
     Отключённых пользователей нет
     {% elif status == "active" %}
     Активных пользователей нет
