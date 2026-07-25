@@ -12618,6 +12618,25 @@ async def notifications_export(
     )
 
 
+def build_notifications_redirect_url(filter_value="all", search_value=""):
+    selected_filter = filter_value if filter_value in ("all", "unread", "read") else "all"
+    selected_search = str(search_value or "").strip()
+    redirect_params = {}
+
+    if selected_filter != "all":
+        redirect_params["filter"] = selected_filter
+
+    if selected_search:
+        redirect_params["search"] = selected_search
+
+    redirect_url = "/notifications"
+
+    if redirect_params:
+        redirect_url += "?" + urlencode(redirect_params)
+
+    return redirect_url
+
+
 @app.post("/notifications/read-all")
 async def mark_all_notifications_read(
     request: Request,
@@ -12651,20 +12670,10 @@ async def mark_all_notifications_read(
     conn.commit()
     conn.close()
 
-    redirect_params = {}
-
-    if selected_filter != "all":
-        redirect_params["filter"] = selected_filter
-
-    if selected_search:
-        redirect_params["search"] = selected_search
-
-    redirect_url = "/notifications"
-
-    if redirect_params:
-        redirect_url += "?" + urlencode(redirect_params)
-
-    return RedirectResponse(redirect_url, status_code=302)
+    return RedirectResponse(
+        build_notifications_redirect_url(selected_filter, selected_search),
+        status_code=302
+    )
 
 
 @app.post("/notifications/delete-read")
@@ -12700,20 +12709,10 @@ async def delete_read_notifications(
     conn.commit()
     conn.close()
 
-    redirect_params = {}
-
-    if selected_filter != "all":
-        redirect_params["filter"] = selected_filter
-
-    if selected_search:
-        redirect_params["search"] = selected_search
-
-    redirect_url = "/notifications"
-
-    if redirect_params:
-        redirect_url += "?" + urlencode(redirect_params)
-
-    return RedirectResponse(redirect_url, status_code=302)
+    return RedirectResponse(
+        build_notifications_redirect_url(selected_filter, selected_search),
+        status_code=302
+    )
 
 
 @app.post("/notifications/{notification_id}/read")
@@ -12752,20 +12751,10 @@ async def mark_notification_read(
     conn.commit()
     conn.close()
 
-    redirect_params = {}
-
-    if selected_filter != "all":
-        redirect_params["filter"] = selected_filter
-
-    if selected_search:
-        redirect_params["search"] = selected_search
-
-    redirect_url = "/notifications"
-
-    if redirect_params:
-        redirect_url += "?" + urlencode(redirect_params)
-
-    return RedirectResponse(redirect_url, status_code=302)
+    return RedirectResponse(
+        build_notifications_redirect_url(selected_filter, selected_search),
+        status_code=302
+    )
 
 
 @app.get("/notifications/{notification_id}/open")
