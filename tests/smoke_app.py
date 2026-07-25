@@ -5915,6 +5915,7 @@ async def assert_calls_page():
         assert 'name="status"' in html
         assert 'placeholder="Клиент, телефон или заметка"' in html
         assert 'href="/calls/export?' in html
+        assert "Сбросить фильтры" in html
         assert "☎️ Звонки" not in html
         assert "Сохранить звонок" in html
 
@@ -6209,6 +6210,19 @@ async def assert_calls_page():
         analysis_filter_html = analysis_filter_response.body.decode("utf-8")
         assert '<option value="analysis" selected>С анализом</option>' in analysis_filter_html
         assert "Перезвонить завтра по оплате" in analysis_filter_html
+
+        empty_filter_response = await crm.calls_page(
+            make_asgi_request(
+                "owner2",
+                "/calls",
+                "search=NoSuchCallRecord",
+            ),
+            search="NoSuchCallRecord",
+        )
+        assert empty_filter_response.status_code == 200
+        empty_filter_html = empty_filter_response.body.decode("utf-8")
+        assert "По выбранным условиям ничего не найдено." in empty_filter_html
+        assert "История звонков пока пустая." not in empty_filter_html
 
         conn = connect()
         c = conn.cursor()

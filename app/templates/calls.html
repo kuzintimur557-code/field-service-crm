@@ -158,7 +158,7 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
         </div>
         <div>
             <button type="submit">Показать</button>
-            <a class="reset-link" href="/calls">Сбросить</a>
+            <a class="reset-link" href="/calls">Сбросить фильтры</a>
             <a class="reset-link" href="/calls/export?status={{ selected_call_status }}&client_id={{ selected_call_client_id or '' }}&content={{ selected_call_content }}&search={{ selected_call_search|urlencode }}">Экспорт CSV</a>
         </div>
     </div>
@@ -270,10 +270,14 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
             </div>
         </div>
     </div>
-    {% endfor %}
+{% endfor %}
 </div>
 {% else %}
+{% if selected_call_status or selected_call_client_id or selected_call_content or selected_call_search %}
+<div class="empty">По выбранным условиям ничего не найдено.</div>
+{% else %}
 <div class="empty">История звонков пока пустая.</div>
+{% endif %}
 {% endif %}
 </div>
 {% endif %}
