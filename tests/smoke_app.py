@@ -17767,6 +17767,14 @@ async def assert_notifications(task):
     assert mark_one_search_response.headers["location"] == (
         "/notifications?filter=unread&search=Notification+body"
     )
+    long_notification_search = "x" * 150
+    long_redirect_url = crm.build_notifications_redirect_url(
+        "unread",
+        long_notification_search,
+    )
+    assert long_redirect_url == (
+        "/notifications?filter=unread&search=" + ("x" * 100)
+    )
 
     conn = connect()
     c = conn.cursor()

@@ -12626,7 +12626,7 @@ async def notifications_export(
 
 def build_notifications_redirect_url(filter_value="all", search_value=""):
     selected_filter = filter_value if filter_value in ("all", "unread", "read") else "all"
-    selected_search = str(search_value or "").strip()
+    selected_search = str(search_value or "").strip()[:100]
     redirect_params = {}
 
     if selected_filter != "all":
