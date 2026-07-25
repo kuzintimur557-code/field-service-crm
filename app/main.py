@@ -24885,7 +24885,7 @@ async def sla_analytics_export(request: Request):
             row["workers"] or "",
             row["task_date"] or "",
             row["status"] or "",
-            "yes" if is_overdue else "no",
+            "да" if is_overdue else "нет",
             age_days
         ])
 

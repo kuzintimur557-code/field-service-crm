@@ -18928,7 +18928,10 @@ async def assert_overdue_sla(task):
     sla_export_csv = sla_export_response.body.decode("utf-8")
     assert sla_export_response.status_code == 200
     assert "Без клиента" in sla_export_csv
+    assert ",да," in sla_export_csv
     assert "Unknown" not in sla_export_csv
+    assert ",yes," not in sla_export_csv
+    assert ",no," not in sla_export_csv
 
     conn = connect()
     c = conn.cursor()
