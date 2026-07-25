@@ -27098,11 +27098,19 @@ async def calls_page(
         call_filters.append("""
         (
             LOWER(COALESCE(call_records.summary, '')) LIKE ?
+            OR LOWER(COALESCE(call_records.transcript, '')) LIKE ?
+            OR LOWER(COALESCE(call_records.ai_summary, '')) LIKE ?
             OR LOWER(COALESCE(call_records.phone, '')) LIKE ?
             OR LOWER(COALESCE(clients.name, '')) LIKE ?
         )
         """)
-        call_params.extend([search_pattern, search_pattern, search_pattern])
+        call_params.extend([
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+        ])
 
     call_where_sql = " AND ".join(call_filters)
 
@@ -27235,11 +27243,19 @@ async def calls_export(
         call_filters.append("""
         (
             LOWER(COALESCE(call_records.summary, '')) LIKE ?
+            OR LOWER(COALESCE(call_records.transcript, '')) LIKE ?
+            OR LOWER(COALESCE(call_records.ai_summary, '')) LIKE ?
             OR LOWER(COALESCE(call_records.phone, '')) LIKE ?
             OR LOWER(COALESCE(clients.name, '')) LIKE ?
         )
         """)
-        call_params.extend([search_pattern, search_pattern, search_pattern])
+        call_params.extend([
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+        ])
 
     call_where_sql = " AND ".join(call_filters)
 

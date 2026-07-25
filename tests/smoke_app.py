@@ -6178,6 +6178,18 @@ async def assert_calls_page():
         assert "Аудио загружено" in analyzed_history_html
         assert "Анализ есть" in analyzed_history_html
 
+        analysis_search_response = await crm.calls_page(
+            make_asgi_request(
+                "owner2",
+                "/calls",
+                "search=Smoke%20AI%20call%20summary",
+            ),
+            search="Smoke AI call summary",
+        )
+        assert analysis_search_response.status_code == 200
+        analysis_search_html = analysis_search_response.body.decode("utf-8")
+        assert "Перезвонить завтра по оплате" in analysis_search_html
+
         audio_filter_response = await crm.calls_page(
             make_asgi_request("owner2", "/calls", "content=audio"),
             content="audio",
