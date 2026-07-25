@@ -74,8 +74,12 @@ h1{margin:0 0 8px;font-size:34px}
     <a href="{{ activity_filter_links['access'] }}" class="{% if action == 'access' %}active{% endif %}">Доступ</a>
     <a href="{{ activity_filter_links['password'] }}" class="{% if action == 'password' %}active{% endif %}">Пароли</a>
     <a href="{{ activity_filter_links['commission'] }}" class="{% if action == 'commission' %}active{% endif %}">Проценты</a>
+    {% if action != 'all' or search or date_from or date_to %}
+    <a href="/workers/activity">Сбросить фильтры</a>
+    {% endif %}
 </div>
 
+<div class="meta">Показано событий: {{ events|length }}</div>
 <a class="export" href="{{ export_url }}">Скачать CSV</a>
 
 {% if events %}
@@ -97,7 +101,11 @@ h1{margin:0 0 8px;font-size:34px}
 </div>
 {% endfor %}
 {% else %}
+{% if action != 'all' or search or date_from or date_to %}
+<div class="meta">По выбранным условиям событий не найдено</div>
+{% else %}
 <div class="meta">Событий по выбранному фильтру пока нет</div>
+{% endif %}
 {% endif %}
 </div>
 

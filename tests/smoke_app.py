@@ -16307,6 +16307,21 @@ async def assert_finance_margin(task):
     assert 'value="delete_candidate2"' in searched_activity_html
     assert "date_from=2020-01-01" in searched_activity_html
     assert "date_to=2030-12-31" in searched_activity_html
+    assert "Показано событий:" in searched_activity_html
+    assert "Сбросить фильтры" in searched_activity_html
+
+    empty_activity_response = await crm.team_activity_page(
+        make_asgi_request(
+            "owner2",
+            "/workers/activity",
+        ),
+        action="all",
+        search="no_such_team_event",
+    )
+    empty_activity_html = empty_activity_response.body.decode("utf-8")
+    assert empty_activity_response.status_code == 200
+    assert "По выбранным условиям событий не найдено" in empty_activity_html
+    assert "Событий по выбранному фильтру пока нет" not in empty_activity_html
 
     searched_export_response = await crm.team_activity_export(
         make_request("owner2"),
