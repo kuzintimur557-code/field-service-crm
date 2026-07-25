@@ -996,6 +996,7 @@ async def assert_automation_page():
     assert "Поиск: без поиска" in builder_html
     assert "builder-empty-state" in builder_html
     assert "Ничего не найдено" in builder_html
+    assert builder_html.count("Сбросить поиск") >= 2
     assert "resetBuilderSearch" in builder_html
     assert "showAllBuilderChains" in builder_html
     assert "builderSearchTimer" in builder_html
