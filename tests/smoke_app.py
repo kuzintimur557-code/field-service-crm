@@ -17600,6 +17600,8 @@ async def assert_notifications(task):
     assert "Smoke notification" in search_html
     assert 'name="search" value="Notification body"' in search_html
     assert "search=Notification%20body" in search_html
+    assert "Сбросить поиск" in search_html
+    assert 'href="/notifications"' in search_html
     assert (
         'action="/notifications/read-all?filter=all&search=Notification%20body"'
         in search_html

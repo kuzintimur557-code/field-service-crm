@@ -81,6 +81,11 @@ h1{margin:0 0 8px;font-size:34px;line-height:1.12}
     <input name="search" value="{{ selected_search }}" placeholder="Поиск по уведомлениям">
     <button type="submit">Найти</button>
 </form>
+{% if selected_search %}
+<div class="filters">
+    <a class="filter-link" href="/notifications{% if selected_filter != 'all' %}?filter={{ selected_filter }}{% endif %}">Сбросить поиск</a>
+</div>
+{% endif %}
 </div>
 
 <div class="card">
