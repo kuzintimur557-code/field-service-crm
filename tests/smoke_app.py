@@ -16374,6 +16374,7 @@ async def assert_finance_margin(task):
     assert "Управление менеджерами и исполнителями платформы" not in workers_html
     assert workers_response.context["status"] == "inactive"
     assert workers_response.context["team_counts"]["inactive_count"] >= 1
+    assert "Создать пользователя" in workers_html
 
     active_workers_response = await crm.workers_page(
         make_asgi_request("owner2", "/workers"),
@@ -16386,6 +16387,16 @@ async def assert_finance_margin(task):
     assert "История управления командой" in (
         active_workers_response.body.decode("utf-8")
     )
+
+    manager_workers_response = await crm.workers_page(
+        make_asgi_request("manager2", "/workers"),
+    )
+    assert manager_workers_response.status_code == 200
+    manager_workers_html = manager_workers_response.body.decode("utf-8")
+    assert "Создавать и удалять пользователей может только владелец компании" in (
+        manager_workers_html
+    )
+    assert "Создать пользователя" not in manager_workers_html
 
     searched_workers_response = await crm.workers_page(
         make_asgi_request(

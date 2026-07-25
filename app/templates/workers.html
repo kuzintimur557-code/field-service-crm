@@ -111,6 +111,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 {% endif %}
 </div>
 
+{% if role == "boss" %}
 <div class="card">
 <h2>Добавить пользователя</h2>
 
@@ -132,6 +133,12 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     <button type="submit" style="background:#2563eb">Создать пользователя</button>
 </form>
 </div>
+{% else %}
+<div class="card">
+<h2>Добавить пользователя</h2>
+<div class="meta">Создавать и удалять пользователей может только владелец компании.</div>
+</div>
+{% endif %}
 
 <div class="card">
 <h2>Список команды</h2>
