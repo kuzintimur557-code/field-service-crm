@@ -6909,10 +6909,24 @@ async def update_platform_company_settings(request: Request, company_id: int):
     if industry not in allowed_industries:
         industry = "field_service"
 
-    return_url = build_platform_companies_url(
+    return_search, return_industry, return_plan = normalize_platform_company_filters(
         form.get("return_search") or "",
         form.get("return_industry") or "all",
         form.get("return_plan") or "all",
+    )
+    visible_return_industry = return_industry
+    visible_return_plan = return_plan
+
+    if visible_return_industry != "all" and visible_return_industry != industry:
+        visible_return_industry = industry
+
+    if visible_return_plan != "all" and visible_return_plan != plan:
+        visible_return_plan = plan
+
+    return_url = build_platform_companies_url(
+        return_search,
+        visible_return_industry,
+        visible_return_plan,
     )
 
     conn = connect()
@@ -6927,9 +6941,9 @@ async def update_platform_company_settings(request: Request, company_id: int):
         conn.close()
         return RedirectResponse(
             build_platform_companies_url(
-                form.get("return_search") or "",
-                form.get("return_industry") or "all",
-                form.get("return_plan") or "all",
+                return_search,
+                return_industry,
+                return_plan,
                 {"error": "company_not_found"},
             ),
             status_code=302,

@@ -10012,7 +10012,7 @@ async def assert_platform_companies_page():
     assert updated_response.status_code == 302
     assert updated_response.headers["location"] == (
         "/platform/companies?search=Smoke+Logistics"
-        "&industry=logistics&plan=basic&updated=1"
+        "&industry=beauty&plan=team&updated=1"
     )
 
     conn = connect()
