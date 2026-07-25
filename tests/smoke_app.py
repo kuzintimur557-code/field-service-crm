@@ -17571,6 +17571,7 @@ async def assert_notifications(task):
     assert "Поиск по уведомлениям" in notifications_html
     assert "Экспорт CSV" in notifications_html
     assert 'href="/notifications/export?filter=all' in notifications_html
+    assert 'action="/notifications/read-all?filter=all' in notifications_html
     assert 'href="/notifications?filter=unread"' in notifications_html
     assert 'class="mobile-nav"' in notifications_html
     assert ".container{padding:14px 14px 92px}" in notifications_html
@@ -17599,6 +17600,10 @@ async def assert_notifications(task):
     assert "Smoke notification" in search_html
     assert 'name="search" value="Notification body"' in search_html
     assert "search=Notification%20body" in search_html
+    assert (
+        'action="/notifications/read-all?filter=all&search=Notification%20body"'
+        in search_html
+    )
 
     export_response = await crm.notifications_export(
         make_asgi_request(
@@ -17664,6 +17669,23 @@ async def assert_notifications(task):
 
     assert marked_one["is_read"] == 1
 
+    mark_one_search_response = await crm.mark_notification_read(
+        make_request("owner2"),
+        notification["id"],
+        filter="unread",
+        search="Notification body",
+    )
+    assert mark_one_search_response.status_code == 302
+    assert mark_one_search_response.headers["location"] == (
+        "/notifications?filter=unread&search=Notification+body"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("UPDATE notifications SET is_read=0 WHERE id=?", (notification["id"],))
+    conn.commit()
+    conn.close()
+
     open_response = await crm.open_notification(
         make_request("owner2"),
         notification["id"],
@@ -17698,6 +17720,16 @@ async def assert_notifications(task):
     assert delete_read_response.status_code == 302
     assert delete_read_response.headers["location"] == "/notifications?filter=read"
 
+    delete_read_search_response = await crm.delete_read_notifications(
+        make_request("owner2"),
+        filter="read",
+        search="Notification body",
+    )
+    assert delete_read_search_response.status_code == 302
+    assert delete_read_search_response.headers["location"] == (
+        "/notifications?filter=read&search=Notification+body"
+    )
+
     conn = connect()
     c = conn.cursor()
     deleted_read_notification = c.execute("""
@@ -17721,6 +17753,16 @@ async def assert_notifications(task):
     read_all_response = await crm.mark_all_notifications_read(make_request("owner2"))
     assert read_all_response.status_code == 302
     assert read_all_response.headers["location"] == "/notifications"
+
+    read_all_search_response = await crm.mark_all_notifications_read(
+        make_request("owner2"),
+        filter="unread",
+        search="Unread",
+    )
+    assert read_all_search_response.status_code == 302
+    assert read_all_search_response.headers["location"] == (
+        "/notifications?filter=unread&search=Unread"
+    )
 
     conn = connect()
     c = conn.cursor()

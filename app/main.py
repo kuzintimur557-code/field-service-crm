@@ -12619,7 +12619,11 @@ async def notifications_export(
 
 
 @app.post("/notifications/read-all")
-async def mark_all_notifications_read(request: Request):
+async def mark_all_notifications_read(
+    request: Request,
+    filter: str = "all",
+    search: str = ""
+):
 
     username = get_user(request)
 
@@ -12628,6 +12632,8 @@ async def mark_all_notifications_read(request: Request):
 
     company_id = get_user_company_id(username)
     disabled_response = require_feature(company_id, "notifications")
+    selected_filter = filter if filter in ("all", "unread", "read") else "all"
+    selected_search = str(search or "").strip()
 
     if disabled_response:
         return disabled_response
@@ -12645,11 +12651,28 @@ async def mark_all_notifications_read(request: Request):
     conn.commit()
     conn.close()
 
-    return RedirectResponse("/notifications", status_code=302)
+    redirect_params = {}
+
+    if selected_filter != "all":
+        redirect_params["filter"] = selected_filter
+
+    if selected_search:
+        redirect_params["search"] = selected_search
+
+    redirect_url = "/notifications"
+
+    if redirect_params:
+        redirect_url += "?" + urlencode(redirect_params)
+
+    return RedirectResponse(redirect_url, status_code=302)
 
 
 @app.post("/notifications/delete-read")
-async def delete_read_notifications(request: Request):
+async def delete_read_notifications(
+    request: Request,
+    filter: str = "read",
+    search: str = ""
+):
 
     username = get_user(request)
 
@@ -12658,6 +12681,8 @@ async def delete_read_notifications(request: Request):
 
     company_id = get_user_company_id(username)
     disabled_response = require_feature(company_id, "notifications")
+    selected_filter = filter if filter in ("all", "unread", "read") else "read"
+    selected_search = str(search or "").strip()
 
     if disabled_response:
         return disabled_response
@@ -12675,7 +12700,20 @@ async def delete_read_notifications(request: Request):
     conn.commit()
     conn.close()
 
-    return RedirectResponse("/notifications?filter=read", status_code=302)
+    redirect_params = {}
+
+    if selected_filter != "all":
+        redirect_params["filter"] = selected_filter
+
+    if selected_search:
+        redirect_params["search"] = selected_search
+
+    redirect_url = "/notifications"
+
+    if redirect_params:
+        redirect_url += "?" + urlencode(redirect_params)
+
+    return RedirectResponse(redirect_url, status_code=302)
 
 
 @app.post("/notifications/{notification_id}/read")

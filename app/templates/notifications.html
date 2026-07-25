@@ -58,12 +58,12 @@ h1{margin:0 0 8px;font-size:34px;line-height:1.12}
     <div class="header-actions">
     <a class="export-link" href="/notifications/export?filter={{ selected_filter }}{% if selected_search %}&search={{ selected_search|urlencode }}{% endif %}">Экспорт CSV</a>
     {% if unread_count and unread_count > 0 %}
-    <form method="post" action="/notifications/read-all">
+    <form method="post" action="/notifications/read-all?filter={{ selected_filter }}{% if selected_search %}&search={{ selected_search|urlencode }}{% endif %}">
         <button class="read-all" type="submit">Отметить все прочитанными</button>
     </form>
     {% endif %}
     {% if read_count and read_count > 0 %}
-    <form method="post" action="/notifications/delete-read">
+    <form method="post" action="/notifications/delete-read?filter={{ selected_filter }}{% if selected_search %}&search={{ selected_search|urlencode }}{% endif %}">
         <button class="delete-read" type="submit">Удалить прочитанные</button>
     </form>
     {% endif %}
