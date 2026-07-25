@@ -29372,41 +29372,21 @@ async def toggle_catalog_item(request: Request, item_id: int):
     return RedirectResponse("/catalog", status_code=302)
 
 
-@app.get("/clients", response_class=HTMLResponse)
-async def clients_page(
-    request: Request,
+def get_clients_with_metrics(
+    company_id: int,
     search: str = "",
     client_filter: str = "",
-    client_sort: str = ""
+    client_sort: str = "",
 ):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role == "superadmin":
-        return RedirectResponse("/platform", status_code=302)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    disabled_response = require_feature(company_id, "clients")
-
-    if disabled_response:
-        return disabled_response
-
-    settings = get_company_settings(company_id)
-    conn = connect()
-    c = conn.cursor()
-
     today = datetime.now().strftime("%Y-%m-%d")
     selected_search = str(search or "").strip()
-    selected_client_filter = client_filter if client_filter in ("active", "overdue", "empty") else ""
-    selected_client_sort = client_sort if client_sort in ("name", "tasks", "active", "overdue") else "newest"
+    selected_client_filter = (
+        client_filter if client_filter in ("active", "overdue", "empty") else ""
+    )
+    selected_client_sort = (
+        client_sort if client_sort in ("name", "tasks", "active", "overdue")
+        else "newest"
+    )
     search_value = f"%{selected_search.lower()}%"
 
     search_condition = ""
@@ -29422,7 +29402,16 @@ async def clients_page(
             OR lower(clients.notes) LIKE ?
           )
         """
-        params.extend([search_value, search_value, search_value, search_value, search_value])
+        params.extend([
+            search_value,
+            search_value,
+            search_value,
+            search_value,
+            search_value,
+        ])
+
+    conn = connect()
+    c = conn.cursor()
 
     clients = c.execute(f"""
     SELECT
@@ -29456,6 +29445,8 @@ async def clients_page(
     ORDER BY clients.id DESC
     """, params).fetchall()
 
+    conn.close()
+
     if selected_client_filter == "active":
         clients = [client for client in clients if client["active_task_count"]]
     elif selected_client_filter == "overdue":
@@ -29471,6 +29462,51 @@ async def clients_page(
         clients = sorted(clients, key=lambda client: client["active_task_count"] or 0, reverse=True)
     elif selected_client_sort == "overdue":
         clients = sorted(clients, key=lambda client: client["overdue_task_count"] or 0, reverse=True)
+
+    return {
+        "clients": clients,
+        "selected_search": selected_search,
+        "selected_client_filter": selected_client_filter,
+        "selected_client_sort": selected_client_sort,
+    }
+
+
+@app.get("/clients", response_class=HTMLResponse)
+async def clients_page(
+    request: Request,
+    search: str = "",
+    client_filter: str = "",
+    client_sort: str = ""
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "clients")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+    client_data = get_clients_with_metrics(
+        company_id,
+        search=search,
+        client_filter=client_filter,
+        client_sort=client_sort,
+    )
+    conn = connect()
+    c = conn.cursor()
 
     custom_fields = c.execute("""
     SELECT *
@@ -29490,10 +29526,10 @@ async def clients_page(
             "request": request,
             "username": username,
             "role": role,
-            "clients": clients,
-            "selected_search": selected_search,
-            "selected_client_filter": selected_client_filter,
-            "selected_client_sort": selected_client_sort,
+            "clients": client_data["clients"],
+            "selected_search": client_data["selected_search"],
+            "selected_client_filter": client_data["selected_client_filter"],
+            "selected_client_sort": client_data["selected_client_sort"],
             "custom_fields": custom_fields,
             "settings": settings,
         }
@@ -29528,79 +29564,16 @@ async def clients_export(
         return disabled_response
 
     settings = get_company_settings(company_id)
-    today = datetime.now().strftime("%Y-%m-%d")
-    selected_search = str(search or "").strip()
-    selected_client_filter = client_filter if client_filter in ("active", "overdue", "empty") else ""
-    selected_client_sort = client_sort if client_sort in ("name", "tasks", "active", "overdue") else "newest"
-    search_value = f"%{selected_search.lower()}%"
-
-    search_condition = ""
-    params = [today, company_id]
-
-    if selected_search:
-        search_condition = """
-          AND (
-            lower(clients.name) LIKE ?
-            OR lower(clients.phone) LIKE ?
-            OR lower(clients.email) LIKE ?
-            OR lower(clients.address) LIKE ?
-            OR lower(clients.notes) LIKE ?
-          )
-        """
-        params.extend([search_value, search_value, search_value, search_value, search_value])
-
-    conn = connect()
-    c = conn.cursor()
-
-    clients = c.execute(f"""
-    SELECT
-        clients.*,
-        COUNT(tasks.id) AS task_count,
-        MAX(tasks.task_date) AS last_task_date,
-        SUM(CASE
-            WHEN tasks.status='Завершено'
-            THEN CAST(REPLACE(COALESCE(tasks.price, '0'), ',', '.') AS REAL)
-            ELSE 0
-        END) AS completed_revenue,
-        SUM(CASE
-            WHEN tasks.archived=0
-             AND tasks.status IN ('Новая', 'В работе')
-            THEN 1 ELSE 0
-        END) AS active_task_count,
-        SUM(CASE
-            WHEN tasks.archived=0
-             AND tasks.task_date IS NOT NULL
-             AND substr(tasks.task_date, 1, 10) < ?
-             AND tasks.status NOT IN ('Завершено', 'Отменено')
-            THEN 1 ELSE 0
-        END) AS overdue_task_count
-    FROM clients
-    LEFT JOIN tasks
-      ON tasks.client_id=clients.id
-      AND tasks.company_id=clients.company_id
-    WHERE clients.company_id=?
-    {search_condition}
-    GROUP BY clients.id
-    ORDER BY clients.id DESC
-    """, params).fetchall()
-
-    conn.close()
-
-    if selected_client_filter == "active":
-        clients = [client for client in clients if client["active_task_count"]]
-    elif selected_client_filter == "overdue":
-        clients = [client for client in clients if client["overdue_task_count"]]
-    elif selected_client_filter == "empty":
-        clients = [client for client in clients if not client["task_count"]]
-
-    if selected_client_sort == "name":
-        clients = sorted(clients, key=lambda client: str(client["name"] or "").lower())
-    elif selected_client_sort == "tasks":
-        clients = sorted(clients, key=lambda client: client["task_count"] or 0, reverse=True)
-    elif selected_client_sort == "active":
-        clients = sorted(clients, key=lambda client: client["active_task_count"] or 0, reverse=True)
-    elif selected_client_sort == "overdue":
-        clients = sorted(clients, key=lambda client: client["overdue_task_count"] or 0, reverse=True)
+    client_data = get_clients_with_metrics(
+        company_id,
+        search=search,
+        client_filter=client_filter,
+        client_sort=client_sort,
+    )
+    clients = client_data["clients"]
+    selected_search = client_data["selected_search"]
+    selected_client_filter = client_data["selected_client_filter"]
+    selected_client_sort = client_data["selected_client_sort"]
 
     client_label = (
         settings["client_label"]
