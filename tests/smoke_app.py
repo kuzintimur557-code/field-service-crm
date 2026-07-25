@@ -17609,6 +17609,43 @@ async def assert_finance_summary_page():
     assert "534}" not in html[:80]
     assert 'class="mobile-nav"' in html
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO finance_summary (
+        company_id, month, client_name, price, expense_total,
+        payroll_total, profit, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "2099-01",
+        "",
+        1000,
+        100,
+        200,
+        900,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    empty_client_summary_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    export_response = await crm.finance_summary_export(
+        make_request("owner2"),
+        month="2099-01",
+    )
+    export_csv = export_response.body.decode("utf-8")
+    assert export_response.status_code == 200
+    assert "Без клиента" in export_csv
+    assert "Unknown" not in export_csv
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("DELETE FROM finance_summary WHERE id=?", (empty_client_summary_id,))
+    conn.commit()
+    conn.close()
+
 
 async def assert_owner_dashboard_page():
     response = await crm.owner_dashboard_page(
@@ -18874,6 +18911,30 @@ async def assert_overdue_sla(task):
     assert "data-label=\"Клиент\"" in sla_analytics_html
     assert 'class="mobile-nav"' in sla_analytics_html
     assert "Unknown" not in sla_analytics_html
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, task_date, status, workers, archived
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (2, "", "2000-01-02", "Новая", "", 0))
+    empty_client_task_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    sla_export_response = await crm.sla_analytics_export(make_request("owner2"))
+    sla_export_csv = sla_export_response.body.decode("utf-8")
+    assert sla_export_response.status_code == 200
+    assert "Без клиента" in sla_export_csv
+    assert "Unknown" not in sla_export_csv
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("DELETE FROM tasks WHERE id=?", (empty_client_task_id,))
+    conn.commit()
+    conn.close()
 
     worker_sla_response = await crm.sla_page(
         make_asgi_request("owner2", "/sla"),

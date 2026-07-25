@@ -24792,7 +24792,7 @@ async def finance_summary_export(request: Request, month: str = ""):
 
         writer.writerow([
             row["month"],
-            row["client_name"] or "Unknown",
+            row["client_name"] or "Без клиента",
             round(float(row["price"] or 0), 2),
             round(float(row["expense_total"] or 0), 2),
             round(row_payroll, 2),
@@ -24881,7 +24881,7 @@ async def sla_analytics_export(request: Request):
 
         writer.writerow([
             row["id"],
-            row["client"] or "Unknown",
+            row["client"] or "Без клиента",
             row["workers"] or "",
             row["task_date"] or "",
             row["status"] or "",
