@@ -9722,6 +9722,12 @@ async def assert_platform_companies_page():
     assert "Сервис / выездные работы" in html
     assert "Бьюти" in html
     assert 'name="industry"' in html
+    assert 'name="company_name"' in html
+    assert 'autocomplete="organization"' in html
+    assert 'name="owner_username"' in html
+    assert 'autocomplete="username"' in html
+    assert 'name="owner_password" type="password"' in html
+    assert 'autocomplete="new-password"' in html
     assert 'class="platform-mobile-nav"' in html
     assert 'class="platform-mobile-nav-grid"' in html
     assert "/platform/readiness" in html

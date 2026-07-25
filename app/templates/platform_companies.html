@@ -59,9 +59,9 @@ h1{margin:0 0 12px;font-size:36px}
 {% endif %}
 
 <form method="post" action="/platform/companies" style="display:grid;gap:12px">
-    <input name="company_name" placeholder="Название компании" style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
-    <input name="owner_username" placeholder="Логин владельца" style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
-    <input name="owner_password" placeholder="Пароль владельца" style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
+    <input name="company_name" placeholder="Название компании" autocomplete="organization" required style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
+    <input name="owner_username" placeholder="Логин владельца" autocomplete="username" required style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
+    <input name="owner_password" type="password" placeholder="Пароль владельца" autocomplete="new-password" required style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
 
     <select name="industry" style="padding:14px;border-radius:14px;border:1px solid #d1d5db">
         {% for industry_key, industry_title in industry_options %}
