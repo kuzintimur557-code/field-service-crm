@@ -29500,6 +29500,166 @@ async def clients_page(
     )
 
 
+@app.get("/clients/export")
+async def clients_export(
+    request: Request,
+    search: str = "",
+    client_filter: str = "",
+    client_sort: str = ""
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "clients")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+    today = datetime.now().strftime("%Y-%m-%d")
+    selected_search = str(search or "").strip()
+    selected_client_filter = client_filter if client_filter in ("active", "overdue", "empty") else ""
+    selected_client_sort = client_sort if client_sort in ("name", "tasks", "active", "overdue") else "newest"
+    search_value = f"%{selected_search.lower()}%"
+
+    search_condition = ""
+    params = [today, company_id]
+
+    if selected_search:
+        search_condition = """
+          AND (
+            lower(clients.name) LIKE ?
+            OR lower(clients.phone) LIKE ?
+            OR lower(clients.email) LIKE ?
+            OR lower(clients.address) LIKE ?
+            OR lower(clients.notes) LIKE ?
+          )
+        """
+        params.extend([search_value, search_value, search_value, search_value, search_value])
+
+    conn = connect()
+    c = conn.cursor()
+
+    clients = c.execute(f"""
+    SELECT
+        clients.*,
+        COUNT(tasks.id) AS task_count,
+        MAX(tasks.task_date) AS last_task_date,
+        SUM(CASE
+            WHEN tasks.status='Завершено'
+            THEN CAST(REPLACE(COALESCE(tasks.price, '0'), ',', '.') AS REAL)
+            ELSE 0
+        END) AS completed_revenue,
+        SUM(CASE
+            WHEN tasks.archived=0
+             AND tasks.status IN ('Новая', 'В работе')
+            THEN 1 ELSE 0
+        END) AS active_task_count,
+        SUM(CASE
+            WHEN tasks.archived=0
+             AND tasks.task_date IS NOT NULL
+             AND substr(tasks.task_date, 1, 10) < ?
+             AND tasks.status NOT IN ('Завершено', 'Отменено')
+            THEN 1 ELSE 0
+        END) AS overdue_task_count
+    FROM clients
+    LEFT JOIN tasks
+      ON tasks.client_id=clients.id
+      AND tasks.company_id=clients.company_id
+    WHERE clients.company_id=?
+    {search_condition}
+    GROUP BY clients.id
+    ORDER BY clients.id DESC
+    """, params).fetchall()
+
+    conn.close()
+
+    if selected_client_filter == "active":
+        clients = [client for client in clients if client["active_task_count"]]
+    elif selected_client_filter == "overdue":
+        clients = [client for client in clients if client["overdue_task_count"]]
+    elif selected_client_filter == "empty":
+        clients = [client for client in clients if not client["task_count"]]
+
+    if selected_client_sort == "name":
+        clients = sorted(clients, key=lambda client: str(client["name"] or "").lower())
+    elif selected_client_sort == "tasks":
+        clients = sorted(clients, key=lambda client: client["task_count"] or 0, reverse=True)
+    elif selected_client_sort == "active":
+        clients = sorted(clients, key=lambda client: client["active_task_count"] or 0, reverse=True)
+    elif selected_client_sort == "overdue":
+        clients = sorted(clients, key=lambda client: client["overdue_task_count"] or 0, reverse=True)
+
+    client_label = (
+        settings["client_label"]
+        if settings and settings["client_label"]
+        else "Клиент"
+    )
+    task_label = (
+        settings["task_label"]
+        if settings and settings["task_label"]
+        else "Заявка"
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        client_label,
+        "Телефон",
+        "Электронная почта",
+        "Адрес",
+        "Заметки",
+        f"{task_label}: всего",
+        "Активных",
+        "Просрочено",
+        "Последняя запись",
+        "Выручка",
+        "Создан",
+    ])
+
+    for client in clients:
+        writer.writerow([
+            client["name"] or "",
+            client["phone"] or "",
+            client["email"] or "",
+            client["address"] or "",
+            client["notes"] or "",
+            client["task_count"] or 0,
+            client["active_task_count"] or 0,
+            client["overdue_task_count"] or 0,
+            client["last_task_date"] or "",
+            client["completed_revenue"] or 0,
+            client["created_at"] or "",
+        ])
+
+    filename_parts = [
+        selected_client_filter or "all",
+        selected_client_sort,
+        "search" if selected_search else "all",
+    ]
+    filename = "clients_" + "_".join(filename_parts) + ".csv"
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
 @app.get("/clients/{client_id}", response_class=HTMLResponse)
 async def client_detail(
     request: Request,

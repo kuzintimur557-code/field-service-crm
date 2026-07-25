@@ -151,10 +151,11 @@ h1{font-size:28px;margin-bottom:12px}
 <h2>Список</h2>
 
 <div class="filters">
-    <a href="/clients{% if selected_search %}?search={{ selected_search }}{% endif %}" class="{% if not selected_client_filter %}active{% endif %}">Все</a>
-    <a href="/clients?client_filter=active{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'active' %}active{% endif %}">Активные</a>
-    <a href="/clients?client_filter=overdue{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'overdue' %}active{% endif %}">С просрочками</a>
-    <a href="/clients?client_filter=empty{% if selected_search %}&search={{ selected_search }}{% endif %}" class="{% if selected_client_filter == 'empty' %}active{% endif %}">Без записей</a>
+    <a href="/clients{% if selected_search %}?search={{ selected_search|urlencode }}{% endif %}" class="{% if not selected_client_filter %}active{% endif %}">Все</a>
+    <a href="/clients?client_filter=active{% if selected_search %}&search={{ selected_search|urlencode }}{% endif %}" class="{% if selected_client_filter == 'active' %}active{% endif %}">Активные</a>
+    <a href="/clients?client_filter=overdue{% if selected_search %}&search={{ selected_search|urlencode }}{% endif %}" class="{% if selected_client_filter == 'overdue' %}active{% endif %}">С просрочками</a>
+    <a href="/clients?client_filter=empty{% if selected_search %}&search={{ selected_search|urlencode }}{% endif %}" class="{% if selected_client_filter == 'empty' %}active{% endif %}">Без записей</a>
+    <a href="/clients/export?client_filter={{ selected_client_filter }}&client_sort={{ selected_client_sort }}{% if selected_search %}&search={{ selected_search|urlencode }}{% endif %}">Экспорт CSV</a>
 </div>
 
 <form class="search-row" method="get" action="/clients">
