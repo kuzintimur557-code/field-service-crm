@@ -12431,30 +12431,13 @@ async def home(
     )
 
 
-@app.get("/notifications", response_class=HTMLResponse)
-async def notifications_page(
-    request: Request,
+def get_notifications_for_user(
+    company_id: int,
+    username: str,
     filter: str = "all",
-    search: str = ""
+    search: str = "",
+    limit=100,
 ):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-    company_id = get_user_company_id(username)
-    disabled_response = require_feature(company_id, "notifications")
-
-    if disabled_response:
-        return disabled_response
-
-    settings = get_company_settings(company_id)
-
-    conn = connect()
-    c = conn.cursor()
-
     selected_filter = filter if filter in ("all", "unread", "read") else "all"
     selected_search = str(search or "").strip()
     notifications_where = """
@@ -12479,13 +12462,22 @@ async def notifications_page(
         """
         notification_params.extend([search_pattern, search_pattern, search_pattern])
 
+    conn = connect()
+    c = conn.cursor()
+    limit_clause = ""
+    list_params = list(notification_params)
+
+    if limit is not None:
+        limit_clause = "LIMIT ?"
+        list_params.append(limit)
+
     notifications = c.execute(f"""
     SELECT *
     FROM notifications
     {notifications_where}
     ORDER BY id DESC
-    LIMIT 100
-    """, notification_params).fetchall()
+    {limit_clause}
+    """, list_params).fetchall()
 
     filtered_count = c.execute(f"""
     SELECT COUNT(*)
@@ -12511,6 +12503,45 @@ async def notifications_page(
 
     conn.close()
 
+    return {
+        "notifications": notifications,
+        "unread_count": unread_count,
+        "total_count": total_count,
+        "read_count": read_count,
+        "filtered_count": filtered_count,
+        "selected_filter": selected_filter,
+        "selected_search": selected_search,
+    }
+
+
+@app.get("/notifications", response_class=HTMLResponse)
+async def notifications_page(
+    request: Request,
+    filter: str = "all",
+    search: str = ""
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "notifications")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+    notification_data = get_notifications_for_user(
+        company_id,
+        username,
+        filter=filter,
+        search=search,
+        limit=100,
+    )
+
     return templates.TemplateResponse(
         request,
         "notifications.html",
@@ -12518,13 +12549,13 @@ async def notifications_page(
             "request": request,
             "username": username,
             "role": role,
-            "notifications": notifications,
-            "unread_count": unread_count,
-            "total_count": total_count,
-            "read_count": read_count,
-            "filtered_count": filtered_count,
-            "selected_filter": selected_filter,
-            "selected_search": selected_search,
+            "notifications": notification_data["notifications"],
+            "unread_count": notification_data["unread_count"],
+            "total_count": notification_data["total_count"],
+            "read_count": notification_data["read_count"],
+            "filtered_count": notification_data["filtered_count"],
+            "selected_filter": notification_data["selected_filter"],
+            "selected_search": notification_data["selected_search"],
             "settings": settings
         }
     )
@@ -12548,41 +12579,16 @@ async def notifications_export(
     if disabled_response:
         return disabled_response
 
-    selected_filter = filter if filter in ("all", "unread", "read") else "all"
-    selected_search = str(search or "").strip()
-    notifications_where = """
-    WHERE company_id=?
-      AND username=?
-    """
-    notification_params = [company_id, username]
-
-    if selected_filter == "unread":
-        notifications_where += "\n      AND is_read=0"
-    elif selected_filter == "read":
-        notifications_where += "\n      AND is_read=1"
-
-    if selected_search:
-        search_pattern = f"%{selected_search.lower()}%"
-        notifications_where += """
-      AND (
-          LOWER(COALESCE(title, '')) LIKE ?
-          OR LOWER(COALESCE(message, '')) LIKE ?
-          OR LOWER(COALESCE(link, '')) LIKE ?
-      )
-        """
-        notification_params.extend([search_pattern, search_pattern, search_pattern])
-
-    conn = connect()
-    c = conn.cursor()
-
-    notifications = c.execute(f"""
-    SELECT *
-    FROM notifications
-    {notifications_where}
-    ORDER BY id DESC
-    """, notification_params).fetchall()
-
-    conn.close()
+    notification_data = get_notifications_for_user(
+        company_id,
+        username,
+        filter=filter,
+        search=search,
+        limit=None,
+    )
+    notifications = notification_data["notifications"]
+    selected_filter = notification_data["selected_filter"]
+    selected_search = notification_data["selected_search"]
 
     output = io.StringIO()
     writer = csv.writer(output)
