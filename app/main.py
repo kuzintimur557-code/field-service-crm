@@ -30933,46 +30933,15 @@ async def change_my_password(request: Request):
     return response
 
 
-@app.get("/workers", response_class=HTMLResponse)
-async def workers_page(
-    request: Request,
+def get_workers_for_company(
+    company_id: int,
     status: str = "active",
-    search: str = ""
+    search: str = "",
 ):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    update_last_seen(username)
-    role = get_role(username)
-
-    if role == "superadmin":
-        return RedirectResponse("/platform", status_code=302)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    conn = connect()
-    c = conn.cursor()
-
-    company_id = get_user_company_id(username)
-    settings = get_company_settings(company_id)
-
     if status not in ("active", "inactive", "all"):
         status = "active"
 
     selected_search = str(search or "").strip()[:100]
-
-    team_counts = c.execute("""
-    SELECT
-        COUNT(*) AS total_count,
-        SUM(CASE WHEN COALESCE(is_active, 1)=1 THEN 1 ELSE 0 END) AS active_count,
-        SUM(CASE WHEN is_active=0 THEN 1 ELSE 0 END) AS inactive_count
-    FROM users
-    WHERE role IN ('manager', 'worker') AND company_id=?
-    """, (company_id,)).fetchone()
 
     status_condition = ""
     if status == "active":
@@ -31004,6 +30973,9 @@ async def workers_page(
             search_pattern,
         ])
 
+    conn = connect()
+    c = conn.cursor()
+
     workers = c.execute(f"""
     SELECT * FROM users
     WHERE role IN ('manager', 'worker') AND company_id=?
@@ -31014,15 +30986,65 @@ async def workers_page(
 
     conn.close()
 
+    return {
+        "workers": workers,
+        "status": status,
+        "search": selected_search,
+    }
+
+
+@app.get("/workers", response_class=HTMLResponse)
+async def workers_page(
+    request: Request,
+    status: str = "active",
+    search: str = ""
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    update_last_seen(username)
+    role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
+    worker_data = get_workers_for_company(
+        company_id,
+        status=status,
+        search=search,
+    )
+
+    conn = connect()
+    c = conn.cursor()
+
+    team_counts = c.execute("""
+    SELECT
+        COUNT(*) AS total_count,
+        SUM(CASE WHEN COALESCE(is_active, 1)=1 THEN 1 ELSE 0 END) AS active_count,
+        SUM(CASE WHEN is_active=0 THEN 1 ELSE 0 END) AS inactive_count
+    FROM users
+    WHERE role IN ('manager', 'worker') AND company_id=?
+    """, (company_id,)).fetchone()
+
+    conn.close()
+
     return templates.TemplateResponse(
         request=request,
         name="workers.html",
         context={
-            "workers": workers,
+            "workers": worker_data["workers"],
             "username": username,
             "role": role,
-            "status": status,
-            "search": selected_search,
+            "status": worker_data["status"],
+            "search": worker_data["search"],
             "team_counts": team_counts,
             "settings": settings
         }
@@ -31052,54 +31074,14 @@ async def workers_export(
 
     company_id = get_user_company_id(username)
     settings = get_company_settings(company_id)
-
-    if status not in ("active", "inactive", "all"):
-        status = "active"
-
-    selected_search = str(search or "").strip()[:100]
-    status_condition = ""
-
-    if status == "active":
-        status_condition = "AND COALESCE(is_active, 1)=1"
-    elif status == "inactive":
-        status_condition = "AND is_active=0"
-
-    search_condition = ""
-    worker_params = [company_id]
-
-    if selected_search:
-        search_pattern = f"%{selected_search.lower()}%"
-        search_condition = """
-      AND (
-          LOWER(COALESCE(username, '')) LIKE ?
-          OR LOWER(COALESCE(full_name, '')) LIKE ?
-          OR LOWER(COALESCE(position, '')) LIKE ?
-          OR LOWER(COALESCE(phone, '')) LIKE ?
-          OR LOWER(COALESCE(email, '')) LIKE ?
-          OR LOWER(COALESCE(telegram_chat_id, '')) LIKE ?
-      )
-        """
-        worker_params.extend([
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-        ])
-
-    conn = connect()
-    c = conn.cursor()
-
-    workers = c.execute(f"""
-    SELECT * FROM users
-    WHERE role IN ('manager', 'worker') AND company_id=?
-      {status_condition}
-      {search_condition}
-    ORDER BY role, is_active DESC, username
-    """, worker_params).fetchall()
-
-    conn.close()
+    worker_data = get_workers_for_company(
+        company_id,
+        status=status,
+        search=search,
+    )
+    workers = worker_data["workers"]
+    status = worker_data["status"]
+    selected_search = worker_data["search"]
 
     worker_label = (
         settings["worker_label"]
