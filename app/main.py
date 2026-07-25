@@ -12539,6 +12539,10 @@ async def mark_all_notifications_read(request: Request):
         return RedirectResponse("/login", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "notifications")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -12565,6 +12569,10 @@ async def delete_read_notifications(request: Request):
         return RedirectResponse("/login", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "notifications")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
@@ -12596,6 +12604,11 @@ async def mark_notification_read(
         return RedirectResponse("/login", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "notifications")
+
+    if disabled_response:
+        return disabled_response
+
     selected_filter = filter if filter in ("all", "unread", "read") else "all"
     selected_search = str(search or "").strip()
 
@@ -12638,6 +12651,10 @@ async def open_notification(request: Request, notification_id: int):
         return RedirectResponse("/login", status_code=302)
 
     company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "notifications")
+
+    if disabled_response:
+        return disabled_response
 
     conn = connect()
     c = conn.cursor()
