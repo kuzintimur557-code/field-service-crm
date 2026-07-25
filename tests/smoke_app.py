@@ -18092,7 +18092,8 @@ async def assert_client_card(task):
     assert "task_search" in html
     assert "Сортировка" in html
     assert 'name="task_sort"' in html
-    assert f'href="/clients/{task["client_id"]}">Сбросить</a>' in html
+    assert f'href="/clients/{task["client_id"]}">Сбросить поиск</a>' in html
+    assert f'href="/clients/{task["client_id"]}">Сбросить фильтры</a>' in html
     assert "Показано:" in html
     assert "Заявка #" in html
     assert ": последнее" in html

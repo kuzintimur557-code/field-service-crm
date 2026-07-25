@@ -350,7 +350,7 @@ h1{font-size:28px}
         <input type="text" name="note_search" value="{{ selected_note_search }}" placeholder="Текст заметки">
     </div>
     <button type="submit">Найти</button>
-    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить</a>
+    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить поиск</a>
 </form>
 
 <div class="task-count">Заметок: {{ shown_note_count }} из {{ client_note_count }}</div>
@@ -534,7 +534,7 @@ h1{font-size:28px}
         <input type="text" name="file_search" value="{{ selected_file_search }}" placeholder="Название файла или автор">
     </div>
     <button type="submit">Найти</button>
-    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить</a>
+    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить поиск</a>
 </form>
 
 <div class="task-count">Файлов: {{ shown_file_count }} из {{ client_file_count }}</div>
@@ -610,7 +610,7 @@ h1{font-size:28px}
         </select>
     </div>
     <button type="submit">Найти</button>
-    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить</a>
+    <a class="reset-link" href="/clients/{{ client['id'] }}">Сбросить фильтры</a>
 </form>
 
 <div class="task-filters">
