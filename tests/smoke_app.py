@@ -10362,6 +10362,10 @@ async def assert_platform_calendar_health():
         export_csv = export_response.body.decode("utf-8")
         assert export_csv.startswith("\ufeff")
         assert "Сводка" in export_csv
+        assert "Фильтр состояния,Проблемные" in export_csv
+        assert "Фильтр ответственного,Все" in export_csv
+        assert "Фильтр состояния,problem" not in export_csv
+        assert "Фильтр ответственного,all" not in export_csv
         assert "Общий статус,Критично" in export_csv
         assert "Старейший активный инцидент" in export_csv
         assert "Просрочена реакция" in export_csv
