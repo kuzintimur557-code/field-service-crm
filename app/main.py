@@ -12432,7 +12432,11 @@ async def home(
 
 
 @app.get("/notifications", response_class=HTMLResponse)
-async def notifications_page(request: Request, filter: str = "all"):
+async def notifications_page(
+    request: Request,
+    filter: str = "all",
+    search: str = ""
+):
 
     username = get_user(request)
 
@@ -12452,6 +12456,7 @@ async def notifications_page(request: Request, filter: str = "all"):
     c = conn.cursor()
 
     selected_filter = filter if filter in ("all", "unread", "read") else "all"
+    selected_search = str(search or "").strip()
     notifications_where = """
     WHERE company_id=?
       AND username=?
@@ -12463,6 +12468,17 @@ async def notifications_page(request: Request, filter: str = "all"):
     elif selected_filter == "read":
         notifications_where += "\n      AND is_read=1"
 
+    if selected_search:
+        search_pattern = f"%{selected_search.lower()}%"
+        notifications_where += """
+      AND (
+          LOWER(COALESCE(title, '')) LIKE ?
+          OR LOWER(COALESCE(message, '')) LIKE ?
+          OR LOWER(COALESCE(link, '')) LIKE ?
+      )
+        """
+        notification_params.extend([search_pattern, search_pattern, search_pattern])
+
     notifications = c.execute(f"""
     SELECT *
     FROM notifications
@@ -12470,6 +12486,12 @@ async def notifications_page(request: Request, filter: str = "all"):
     ORDER BY id DESC
     LIMIT 100
     """, notification_params).fetchall()
+
+    filtered_count = c.execute(f"""
+    SELECT COUNT(*)
+    FROM notifications
+    {notifications_where}
+    """, notification_params).fetchone()[0]
 
     unread_count = c.execute("""
     SELECT COUNT(*)
@@ -12500,7 +12522,9 @@ async def notifications_page(request: Request, filter: str = "all"):
             "unread_count": unread_count,
             "total_count": total_count,
             "read_count": read_count,
+            "filtered_count": filtered_count,
             "selected_filter": selected_filter,
+            "selected_search": selected_search,
             "settings": settings
         }
     )
@@ -12562,7 +12586,8 @@ async def delete_read_notifications(request: Request):
 async def mark_notification_read(
     request: Request,
     notification_id: int,
-    filter: str = "all"
+    filter: str = "all",
+    search: str = ""
 ):
 
     username = get_user(request)
@@ -12572,6 +12597,7 @@ async def mark_notification_read(
 
     company_id = get_user_company_id(username)
     selected_filter = filter if filter in ("all", "unread", "read") else "all"
+    selected_search = str(search or "").strip()
 
     conn = connect()
     c = conn.cursor()
@@ -12587,10 +12613,20 @@ async def mark_notification_read(
     conn.commit()
     conn.close()
 
-    if selected_filter == "all":
-        return RedirectResponse("/notifications", status_code=302)
+    redirect_params = {}
 
-    return RedirectResponse(f"/notifications?filter={selected_filter}", status_code=302)
+    if selected_filter != "all":
+        redirect_params["filter"] = selected_filter
+
+    if selected_search:
+        redirect_params["search"] = selected_search
+
+    redirect_url = "/notifications"
+
+    if redirect_params:
+        redirect_url += "?" + urlencode(redirect_params)
+
+    return RedirectResponse(redirect_url, status_code=302)
 
 
 @app.get("/notifications/{notification_id}/open")

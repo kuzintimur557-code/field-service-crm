@@ -17564,8 +17564,11 @@ async def assert_notifications(task):
     assert "Отметить все прочитанными" in notifications_html
     assert "Уведомления" in notifications_html
     assert "Всего:" in notifications_html
+    assert "найдено:" in notifications_html
     assert "Непрочитанные" in notifications_html
     assert "Прочитанные" in notifications_html
+    assert 'name="search"' in notifications_html
+    assert "Поиск по уведомлениям" in notifications_html
     assert 'href="/notifications?filter=unread"' in notifications_html
     assert 'class="mobile-nav"' in notifications_html
     assert ".container{padding:14px 14px 92px}" in notifications_html
@@ -17580,6 +17583,20 @@ async def assert_notifications(task):
     assert more_response.status_code == 200
     more_html = more_response.body.decode("utf-8")
     assert "Уведомления ·" in more_html
+
+    search_response = await crm.notifications_page(
+        make_asgi_request(
+            "owner2",
+            "/notifications",
+            "search=Notification%20body",
+        ),
+        search="Notification body",
+    )
+    assert search_response.status_code == 200
+    search_html = search_response.body.decode("utf-8")
+    assert "Smoke notification" in search_html
+    assert 'name="search" value="Notification body"' in search_html
+    assert "search=Notification%20body" in search_html
 
     unread_response = await crm.notifications_page(
         make_asgi_request("owner2", "/notifications", "filter=unread"),
