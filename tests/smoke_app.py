@@ -17598,6 +17598,19 @@ async def assert_notifications(task):
     assert 'name="search" value="Notification body"' in search_html
     assert "search=Notification%20body" in search_html
 
+    empty_search_response = await crm.notifications_page(
+        make_asgi_request(
+            "owner2",
+            "/notifications",
+            "search=NothingFound",
+        ),
+        search="NothingFound",
+    )
+    assert empty_search_response.status_code == 200
+    empty_search_html = empty_search_response.body.decode("utf-8")
+    assert "По выбранным условиям ничего не найдено" in empty_search_html
+    assert "Уведомлений пока нет" not in empty_search_html
+
     unread_response = await crm.notifications_page(
         make_asgi_request("owner2", "/notifications", "filter=unread"),
         filter="unread",

@@ -98,7 +98,11 @@ h1{margin:0 0 8px;font-size:34px;line-height:1.12}
 </div>
 {% endfor %}
 {% else %}
+{% if selected_search or selected_filter != 'all' %}
+<div class="meta">По выбранным условиям ничего не найдено</div>
+{% else %}
 <div class="meta">Уведомлений пока нет</div>
+{% endif %}
 {% endif %}
 </div>
 
