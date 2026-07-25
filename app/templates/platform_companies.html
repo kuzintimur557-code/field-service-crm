@@ -149,7 +149,11 @@ h1{margin:0 0 12px;font-size:36px}
         Тариф: {{ company["plan_label"] }}<br>
         Лимит пользователей: {{ company["user_limit_label"] }}
     </div>
-    <div class="meta">Статус: активна</div>
+    <div class="meta">
+        Статус: активна<br>
+        Пользователи: {{ company["active_users_count"] }} / {{ company["users_count"] }}<br>
+        Заявки: {{ company["active_tasks_count"] }} активные · {{ company["archived_tasks_count"] }} архив
+    </div>
     <form class="company-settings" method="post" action="/platform/companies/{{ company['id'] }}/settings">
         <input type="hidden" name="return_search" value="{{ search }}">
         <input type="hidden" name="return_industry" value="{{ selected_industry }}">

@@ -6691,7 +6691,32 @@ def get_platform_company_items(search="", industry="all", plan="all"):
         companies.owner_username,
         companies.created_at,
         settings.plan,
-        settings.industry
+        settings.industry,
+        (
+            SELECT COUNT(*)
+            FROM users
+            WHERE users.company_id=companies.id
+              AND users.role!='superadmin'
+        ) AS users_count,
+        (
+            SELECT COUNT(*)
+            FROM users
+            WHERE users.company_id=companies.id
+              AND users.role!='superadmin'
+              AND COALESCE(users.is_active, 1)=1
+        ) AS active_users_count,
+        (
+            SELECT COUNT(*)
+            FROM tasks
+            WHERE tasks.company_id=companies.id
+              AND COALESCE(tasks.archived, 0)=0
+        ) AS active_tasks_count,
+        (
+            SELECT COUNT(*)
+            FROM tasks
+            WHERE tasks.company_id=companies.id
+              AND COALESCE(tasks.archived, 0)=1
+        ) AS archived_tasks_count
     FROM companies
     LEFT JOIN company_settings AS settings
       ON settings.company_id=companies.id
@@ -6737,6 +6762,16 @@ def get_platform_company_items(search="", industry="all", plan="all"):
         company["industry_label"] = industry_labels.get(
             industry,
             "Сфера не указана",
+        )
+        company["users_count"] = int(company.get("users_count") or 0)
+        company["active_users_count"] = int(
+            company.get("active_users_count") or 0
+        )
+        company["active_tasks_count"] = int(
+            company.get("active_tasks_count") or 0
+        )
+        company["archived_tasks_count"] = int(
+            company.get("archived_tasks_count") or 0
         )
         companies.append(company)
 
@@ -6981,6 +7016,10 @@ async def platform_companies_export(
         "Сфера",
         "Тариф",
         "Лимит пользователей",
+        "Активные пользователи",
+        "Пользователи всего",
+        "Активные заявки",
+        "Архивные заявки",
         "Создана",
     ])
 
@@ -6992,6 +7031,10 @@ async def platform_companies_export(
             company["industry_label"],
             company["plan_label"],
             company["user_limit_label"],
+            company["active_users_count"],
+            company["users_count"],
+            company["active_tasks_count"],
+            company["archived_tasks_count"],
             company["created_at"],
         ])
 

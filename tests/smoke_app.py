@@ -9825,6 +9825,8 @@ async def assert_platform_companies_page():
     assert "Сфера: Грузоперевозки" in list_html
     assert "Тариф: Базовый" in list_html
     assert "Лимит пользователей: 3" in list_html
+    assert "Пользователи: 1 / 1" in list_html
+    assert "Заявки: 0 активные · 0 архив" in list_html
     assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
     assert 'name="return_search"' in list_html
     assert "Сохранить" in list_html
@@ -9893,11 +9895,16 @@ async def assert_platform_companies_page():
     assert export_response.headers["content-disposition"] == (
         "attachment; filename=platform_companies_logistics_basic.csv"
     )
-    assert "ID,Компания,Владелец,Сфера,Тариф,Лимит пользователей,Создана" in export_csv
+    assert (
+        "ID,Компания,Владелец,Сфера,Тариф,Лимит пользователей,"
+        "Активные пользователи,Пользователи всего,Активные заявки,"
+        "Архивные заявки,Создана"
+    ) in export_csv
     assert "Smoke Logistics Company" in export_csv
     assert "smoke_logistics_owner" in export_csv
     assert "Грузоперевозки" in export_csv
     assert "Базовый" in export_csv
+    assert ",1,1,0,0," in export_csv
     assert "Smoke Company 1" not in export_csv
 
     logistics_create_page = await crm.create_task_page(
