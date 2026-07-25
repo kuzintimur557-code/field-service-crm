@@ -19542,6 +19542,7 @@ async def assert_client_custom_fields():
     assert "client_filter=empty" in page_html
     assert "Экспорт CSV" in page_html
     assert "clients/export" in page_html
+    assert "Показано:" in page_html
     assert 'name="client_sort"' in page_html
     assert 'placeholder="+7 900 000-00-00"' in page_html
     assert 'placeholder="client@example.ru"' in page_html
@@ -19584,6 +19585,19 @@ async def assert_client_custom_fields():
     assert export_csv.startswith("\ufeff")
     assert "Клиент,Телефон,Электронная почта" in export_csv
     assert "Client 2" in export_csv
+
+    empty_search_response = await crm.clients_page(
+        make_asgi_request(
+            "owner2",
+            "/clients",
+            "search=no_such_client",
+        ),
+        search="no_such_client",
+    )
+    assert empty_search_response.status_code == 200
+    empty_search_html = empty_search_response.body.decode("utf-8")
+    assert "По выбранным условиям ничего не найдено" in empty_search_html
+    assert "Записей пока нет" not in empty_search_html
 
     filtered_response = await crm.clients_page(
         make_asgi_request("owner2", "/clients"),

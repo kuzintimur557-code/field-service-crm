@@ -180,6 +180,8 @@ h1{font-size:28px;margin-bottom:12px}
     <a class="reset-link" href="/clients">Сбросить</a>
 </form>
 
+<div class="meta">Показано: {{ clients|length }}</div>
+
 {% if clients %}
 {% for client in clients %}
 <div class="client">
@@ -214,7 +216,11 @@ h1{font-size:28px;margin-bottom:12px}
 </div>
 {% endfor %}
 {% else %}
+{% if selected_search or selected_client_filter %}
+<div class="empty">По выбранным условиям ничего не найдено</div>
+{% else %}
 <div class="empty">Записей пока нет</div>
+{% endif %}
 {% endif %}
 
 </div>
