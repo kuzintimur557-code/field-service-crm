@@ -29583,7 +29583,13 @@ async def client_detail(
     ORDER BY COALESCE(call_at, created_at) DESC, id DESC
     LIMIT 10
     """, call_params).fetchall()
-    latest_client_call = client_calls[0] if client_calls else None
+    latest_client_call = c.execute("""
+    SELECT *
+    FROM call_records
+    WHERE client_id=? AND company_id=?
+    ORDER BY COALESCE(call_at, created_at) DESC, id DESC
+    LIMIT 1
+    """, (client_id, company_id)).fetchone()
     client_call_count = c.execute("""
     SELECT COUNT(*)
     FROM call_records

@@ -17989,7 +17989,8 @@ async def assert_client_card(task):
     assert call_filter_response.status_code == 200
     call_filter_html = call_filter_response.body.decode("utf-8")
     assert "Smoke client call note" in call_filter_html
-    assert "Smoke completed client call" not in call_filter_html
+    assert "Smoke completed client call" in call_filter_html
+    assert "Звонков: 1 из" in call_filter_html
     assert 'class="active">Нужен контакт</a>' in call_filter_html
     assert "call_filter=follow_up&call_content=analysis#calls" in call_filter_html
 
@@ -18005,7 +18006,8 @@ async def assert_client_card(task):
     assert call_content_response.status_code == 200
     call_content_html = call_content_response.body.decode("utf-8")
     assert "Smoke client call note" in call_content_html
-    assert "Smoke completed client call" not in call_content_html
+    assert "Smoke completed client call" in call_content_html
+    assert "Звонков: 1 из" in call_content_html
     assert 'class="active">С анализом</a>' in call_content_html
     assert "call_filter=follow_up&call_content=analysis#calls" in call_content_html
 
