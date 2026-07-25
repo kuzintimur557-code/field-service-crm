@@ -9828,6 +9828,10 @@ async def assert_platform_companies_page():
     assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
     assert 'name="return_search"' in list_html
     assert "Сохранить" in list_html
+    assert (
+        "/platform/companies/export?search=&amp;industry=all&amp;plan=all"
+        in list_html
+    )
 
     filtered_response = await crm.platform_companies_page(
         make_asgi_request(
@@ -9861,6 +9865,40 @@ async def assert_platform_companies_page():
     assert empty_filter_response.status_code == 200
     assert "По выбранным условиям компаний не найдено" in empty_filter_html
     assert "Компаний пока нет" not in empty_filter_html
+
+    anonymous_export = await crm.platform_companies_export(
+        make_public_asgi_request("/platform/companies/export"),
+    )
+    assert anonymous_export.status_code == 302
+    assert anonymous_export.headers["location"] == "/login"
+
+    boss_export = await crm.platform_companies_export(
+        make_asgi_request("owner2", "/platform/companies/export"),
+    )
+    assert boss_export.status_code == 302
+    assert boss_export.headers["location"] == "/"
+
+    export_response = await crm.platform_companies_export(
+        make_asgi_request(
+            "super",
+            "/platform/companies/export",
+            "search=Smoke%20Logistics&industry=logistics&plan=basic",
+        ),
+        search="Smoke Logistics",
+        industry="logistics",
+        plan="basic",
+    )
+    export_csv = export_response.body.decode("utf-8")
+    assert export_response.status_code == 200
+    assert export_response.headers["content-disposition"] == (
+        "attachment; filename=platform_companies_logistics_basic.csv"
+    )
+    assert "ID,Компания,Владелец,Сфера,Тариф,Лимит пользователей,Создана" in export_csv
+    assert "Smoke Logistics Company" in export_csv
+    assert "smoke_logistics_owner" in export_csv
+    assert "Грузоперевозки" in export_csv
+    assert "Базовый" in export_csv
+    assert "Smoke Company 1" not in export_csv
 
     logistics_create_page = await crm.create_task_page(
         make_asgi_request("smoke_logistics_owner", "/create-task"),

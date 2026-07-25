@@ -17,7 +17,7 @@ h1{margin:0 0 12px;font-size:36px}
 .company{display:grid;grid-template-columns:.5fr 1.5fr 1fr 1fr 1fr 1fr;gap:14px;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px;align-items:center}
 .name{font-size:18px;font-weight:900}
 .meta{font-size:14px;color:#6b7280;font-weight:800}
-.filters{display:grid;grid-template-columns:1.6fr 1fr 1fr auto;gap:10px;margin-bottom:18px;align-items:end}
+.filters{display:grid;grid-template-columns:1.6fr 1fr 1fr auto auto;gap:10px;margin-bottom:18px;align-items:end}
 .filters label{display:grid;gap:6px;color:#6b7280;font-size:13px;font-weight:900}
 .filters input,.filters select{padding:12px;border:1px solid #d1d5db;border-radius:12px;font-size:14px}
 .filters button,.filters a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;text-decoration:none;font-weight:900;cursor:pointer}
@@ -130,6 +130,7 @@ h1{margin:0 0 12px;font-size:36px}
     {% if search or selected_industry != "all" or selected_plan != "all" %}
     <a href="/platform/companies">Сбросить</a>
     {% endif %}
+    <a href="/platform/companies/export?search={{ search|urlencode }}&amp;industry={{ selected_industry|urlencode }}&amp;plan={{ selected_plan|urlencode }}">Экспорт CSV</a>
 </form>
 
 <div class="meta">Показано компаний: {{ companies|length }}</div>

@@ -6637,10 +6637,11 @@ def build_platform_companies_url(
     extra_params=None,
 ):
     params = {}
-    search = str(search or "").strip()[:80]
-    allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
-    industry = industry if industry in allowed_industries else "all"
-    plan = plan if plan in PLAN_DEFINITIONS else "all"
+    search, industry, plan = normalize_platform_company_filters(
+        search,
+        industry,
+        plan,
+    )
 
     if search:
         params["search"] = search
@@ -6658,6 +6659,93 @@ def build_platform_companies_url(
         return "/platform/companies"
 
     return "/platform/companies?" + urlencode(params)
+
+
+def normalize_platform_company_filters(
+    search="",
+    industry="all",
+    plan="all",
+):
+    search = str(search or "").strip()[:80]
+    allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
+    industry = industry if industry in allowed_industries else "all"
+    plan = plan if plan in PLAN_DEFINITIONS else "all"
+
+    return search, industry, plan
+
+
+def get_platform_company_items(search="", industry="all", plan="all"):
+    search, selected_industry, selected_plan = normalize_platform_company_filters(
+        search,
+        industry,
+        plan,
+    )
+
+    conn = connect()
+    c = conn.cursor()
+
+    query = """
+    SELECT
+        companies.id,
+        companies.name,
+        companies.owner_username,
+        companies.created_at,
+        settings.plan,
+        settings.industry
+    FROM companies
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=companies.id
+    WHERE 1=1
+    """
+    params = []
+
+    if search:
+        query += """
+          AND (
+              lower(companies.name) LIKE ?
+              OR lower(companies.owner_username) LIKE ?
+          )
+        """
+        search_like = f"%{search.lower()}%"
+        params.extend([search_like, search_like])
+
+    if selected_industry != "all":
+        query += " AND COALESCE(settings.industry, 'field_service')=?"
+        params.append(selected_industry)
+
+    if selected_plan != "all":
+        query += " AND COALESCE(settings.plan, 'basic')=?"
+        params.append(selected_plan)
+
+    query += " ORDER BY companies.id DESC"
+    company_rows = c.execute(query, params).fetchall()
+
+    conn.close()
+    industry_labels = dict(INDUSTRY_OPTIONS)
+    companies = []
+
+    for row in company_rows:
+        company = dict(row)
+        plan = normalize_plan(company.get("plan"))
+        user_limit = get_plan_user_limit(plan)
+        industry = str(company.get("industry") or "field_service")
+        company["plan"] = plan
+        company["plan_label"] = get_plan_label(plan)
+        company["user_limit_label"] = (
+            str(user_limit) if user_limit else "без лимита"
+        )
+        company["industry_label"] = industry_labels.get(
+            industry,
+            "Сфера не указана",
+        )
+        companies.append(company)
+
+    return {
+        "companies": companies,
+        "search": search,
+        "selected_industry": selected_industry,
+        "selected_plan": selected_plan,
+    }
 
 
 @app.post("/platform/companies")
@@ -6864,6 +6952,64 @@ async def update_platform_company_settings(request: Request, company_id: int):
     )
 
 
+@app.get("/platform/companies/export")
+async def platform_companies_export(
+    request: Request,
+    search: str = "",
+    industry: str = "all",
+    plan: str = "all",
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    company_data = get_platform_company_items(search, industry, plan)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID",
+        "Компания",
+        "Владелец",
+        "Сфера",
+        "Тариф",
+        "Лимит пользователей",
+        "Создана",
+    ])
+
+    for company in company_data["companies"]:
+        writer.writerow([
+            company["id"],
+            company["name"],
+            company["owner_username"],
+            company["industry_label"],
+            company["plan_label"],
+            company["user_limit_label"],
+            company["created_at"],
+        ])
+
+    filename = (
+        "platform_companies_"
+        f"{company_data['selected_industry']}_"
+        f"{company_data['selected_plan']}.csv"
+    )
+
+    return Response(
+        output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        },
+    )
+
+
 @app.get("/platform/companies", response_class=HTMLResponse)
 async def platform_companies_page(
     request: Request,
@@ -6882,69 +7028,7 @@ async def platform_companies_page(
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    search = str(search or "").strip()[:80]
-    allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
-    selected_industry = industry if industry in allowed_industries else "all"
-    selected_plan = plan if plan in PLAN_DEFINITIONS else "all"
-
-    conn = connect()
-    c = conn.cursor()
-
-    query = """
-    SELECT
-        companies.id,
-        companies.name,
-        companies.owner_username,
-        companies.created_at,
-        settings.plan,
-        settings.industry
-    FROM companies
-    LEFT JOIN company_settings AS settings
-      ON settings.company_id=companies.id
-    WHERE 1=1
-    """
-    params = []
-
-    if search:
-        query += """
-          AND (
-              lower(companies.name) LIKE ?
-              OR lower(companies.owner_username) LIKE ?
-          )
-        """
-        search_like = f"%{search.lower()}%"
-        params.extend([search_like, search_like])
-
-    if selected_industry != "all":
-        query += " AND COALESCE(settings.industry, 'field_service')=?"
-        params.append(selected_industry)
-
-    if selected_plan != "all":
-        query += " AND COALESCE(settings.plan, 'basic')=?"
-        params.append(selected_plan)
-
-    query += " ORDER BY companies.id DESC"
-    company_rows = c.execute(query, params).fetchall()
-
-    conn.close()
-    industry_labels = dict(INDUSTRY_OPTIONS)
-    companies = []
-
-    for row in company_rows:
-        company = dict(row)
-        plan = normalize_plan(company.get("plan"))
-        user_limit = get_plan_user_limit(plan)
-        industry = str(company.get("industry") or "field_service")
-        company["plan"] = plan
-        company["plan_label"] = get_plan_label(plan)
-        company["user_limit_label"] = (
-            str(user_limit) if user_limit else "без лимита"
-        )
-        company["industry_label"] = industry_labels.get(
-            industry,
-            "Сфера не указана",
-        )
-        companies.append(company)
+    company_data = get_platform_company_items(search, industry, plan)
 
     return templates.TemplateResponse(
         request,
@@ -6953,12 +7037,12 @@ async def platform_companies_page(
             "request": request,
             "username": username,
             "role": role,
-            "companies": companies,
+            "companies": company_data["companies"],
             "industry_options": INDUSTRY_OPTIONS,
             "plan_options": get_plan_options(),
-            "search": search,
-            "selected_industry": selected_industry,
-            "selected_plan": selected_plan,
+            "search": company_data["search"],
+            "selected_industry": company_data["selected_industry"],
+            "selected_plan": company_data["selected_plan"],
         }
     )
 
