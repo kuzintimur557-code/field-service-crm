@@ -27453,7 +27453,7 @@ async def calls_export(
         "Длительность, минут",
         "Заметка",
         "Расшифровка",
-        "AI-резюме",
+        "ИИ-резюме",
         "Автор"
     ])
 
@@ -34265,7 +34265,7 @@ async def create_task_page(
                     call_parts.append(selected_call["summary"])
 
                 if selected_call["ai_summary"]:
-                    call_parts.append(f"AI-резюме: {selected_call['ai_summary']}")
+                    call_parts.append(f"ИИ-резюме: {selected_call['ai_summary']}")
 
                 if selected_call["transcript"] and not call_parts:
                     call_parts.append(selected_call["transcript"])

@@ -6064,7 +6064,7 @@ async def assert_calls_page():
         assert f"Звонок #{call['id']}" in call_detail_html
         assert "Основная информация" in call_detail_html
         assert "Расшифровка" in call_detail_html
-        assert "AI-резюме" in call_detail_html
+        assert "ИИ-резюме" in call_detail_html
         assert "Calls Smoke Client" in call_detail_html
         assert "Перезвонить завтра по оплате" in call_detail_html
         assert "Нужен контакт" in call_detail_html
@@ -6382,7 +6382,7 @@ async def assert_calls_page():
         export_csv = export_response.body.decode("utf-8")
         assert export_csv.startswith("\ufeff")
         assert "Дата,Клиент,Телефон,Тип,Результат" in export_csv
-        assert "Расшифровка,AI-резюме" in export_csv
+        assert "Расшифровка,ИИ-резюме" in export_csv
         assert "Calls Smoke Client" in export_csv
         assert "Перезвонить завтра по оплате" in export_csv
         assert "Smoke call transcript" in export_csv

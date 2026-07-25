@@ -172,10 +172,10 @@ h1{font-size:28px}
     <label>Расшифровка</label>
     <textarea name="transcript" placeholder="Текст разговора">{{ call["transcript"] or "" }}</textarea>
     {% if settings["ai_calls_enabled"] or call["ai_summary"] %}
-    <label>AI-резюме</label>
+    <label>ИИ-резюме</label>
     <textarea name="ai_summary" placeholder="Ключевой итог, риск, следующий шаг">{{ call["ai_summary"] or "" }}</textarea>
     {% else %}
-    <div class="empty" style="margin-top:12px">AI-анализ звонков недоступен на текущем тарифе.</div>
+    <div class="empty" style="margin-top:12px">ИИ-анализ звонков недоступен на текущем тарифе.</div>
     {% endif %}
     <button type="submit">Сохранить анализ</button>
 </form>
@@ -191,13 +191,13 @@ h1{font-size:28px}
 </div>
 
 <div class="card">
-<h2>AI-резюме</h2>
+<h2>ИИ-резюме</h2>
 {% if call["ai_summary"] %}
 <div class="text-block">{{ call["ai_summary"] }}</div>
 {% elif not settings["ai_calls_enabled"] %}
-<div class="empty">AI-анализ звонков недоступен на текущем тарифе.</div>
+<div class="empty">ИИ-анализ звонков недоступен на текущем тарифе.</div>
 {% else %}
-<div class="empty">AI-резюме пока нет.</div>
+<div class="empty">ИИ-резюме пока нет.</div>
 {% endif %}
 </div>
 
