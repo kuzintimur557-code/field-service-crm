@@ -6174,6 +6174,9 @@ async def assert_calls_page():
         )
         assert analyzed_history_response.context["call_stats"]["with_audio"] >= 1
         assert analyzed_history_response.context["call_stats"]["with_analysis"] >= 1
+        analyzed_history_html = analyzed_history_response.body.decode("utf-8")
+        assert "Аудио загружено" in analyzed_history_html
+        assert "Анализ есть" in analyzed_history_html
 
         audio_filter_response = await crm.calls_page(
             make_asgi_request("owner2", "/calls", "content=audio"),
@@ -17921,6 +17924,8 @@ async def assert_client_card(task):
     assert "С анализом" in html
     assert "Smoke client call note" in html
     assert "Smoke completed client call" in html
+    assert "аудио загружено" in html
+    assert "анализ есть" in html
     assert "Нужен контакт" in html
     assert "Поиск по заметкам" in html
     assert "note_search" in html

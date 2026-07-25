@@ -250,6 +250,12 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
             {% if call["duration_minutes"] %}
             <div class="small">{{ call["duration_minutes"] }} мин.</div>
             {% endif %}
+            {% if call["audio_filename"] %}
+            <div class="small">Аудио загружено</div>
+            {% endif %}
+            {% if call["transcript"] or call["ai_summary"] %}
+            <div class="small">Анализ есть</div>
+            {% endif %}
         </div>
         <div>
             <span class="mobile-label label">Заметка</span>

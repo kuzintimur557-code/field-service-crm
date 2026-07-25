@@ -482,6 +482,12 @@ h1{font-size:28px}
         {% if call["duration_minutes"] %}
         / {{ call["duration_minutes"] }} мин.
         {% endif %}
+        {% if call["audio_filename"] %}
+        / аудио загружено
+        {% endif %}
+        {% if call["transcript"] or call["ai_summary"] %}
+        / анализ есть
+        {% endif %}
     </div>
     <div style="margin-top:10px">
         <a class="btn" href="/calls/{{ call['id'] }}">Открыть звонок</a>
