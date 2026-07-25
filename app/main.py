@@ -12439,7 +12439,7 @@ def get_notifications_for_user(
     limit=100,
 ):
     selected_filter = filter if filter in ("all", "unread", "read") else "all"
-    selected_search = str(search or "").strip()
+    selected_search = str(search or "").strip()[:100]
     notifications_where = """
     WHERE company_id=?
       AND username=?
@@ -27209,7 +27209,7 @@ def get_call_history_for_company(
 ):
     selected_call_status = status if status in ("completed", "missed", "follow_up") else ""
     selected_call_content = content if content in ("audio", "analysis") else ""
-    selected_call_search = str(search or "").strip()
+    selected_call_search = str(search or "").strip()[:100]
     selected_call_client_id = None
 
     try:
@@ -29366,7 +29366,7 @@ def get_clients_with_metrics(
     client_sort: str = "",
 ):
     today = datetime.now().strftime("%Y-%m-%d")
-    selected_search = str(search or "").strip()
+    selected_search = str(search or "").strip()[:100]
     selected_client_filter = (
         client_filter if client_filter in ("active", "overdue", "empty") else ""
     )
