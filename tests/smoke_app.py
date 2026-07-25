@@ -6741,6 +6741,7 @@ async def assert_calendar_access():
     assert "Умный подбор окна" in manager_html
     assert "Найти окно" in manager_html
     assert "Начать поиск" in manager_html
+    assert "Сбросить фильтры" in manager_html
     assert "Проверено дней:" in manager_html
     assert "Дней с нужной командой:" in manager_html
     assert "Средняя загрузка после назначения:" in manager_html
@@ -7504,6 +7505,7 @@ async def assert_schedule_conflicts():
     assert "Сохранить команду" in page_html
     assert "Сохранить дату" in page_html
     assert "Лучший вариант" in page_html
+    assert "Сбросить фильтры" in page_html
     assert "/calendar/conflicts/" in page_html
     assert "только активные заявки" not in page_html
     assert "Открыть заявку" not in page_html
@@ -7905,6 +7907,7 @@ async def assert_dispatch_board():
     assert page.status_code == 200
     page_html = page.body.decode("utf-8")
     assert "Диспетчерская доска" in page_html
+    assert "Сбросить фильтры" in page_html
     assert "Dispatch mover" in page_html
     assert "Dispatch blocker" in page_html
     assert "Dispatch backlog" in page_html
