@@ -22,6 +22,8 @@ h2{margin:0 0 16px;font-size:22px}
 .small{color:#6b7280;font-weight:800;line-height:1.5}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .box{background:#f9fafb;border-radius:18px;padding:18px}
+.box-link{display:block;color:inherit;text-decoration:none}
+.box-link:hover{background:#eef2ff}
 .label{font-size:13px;color:#6b7280;font-weight:800;margin-bottom:6px}
 .value{font-size:18px;font-weight:900}
 form{display:grid;gap:12px}
@@ -93,30 +95,30 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
 <h2>Сводка</h2>
 
 <div class="grid">
-    <div class="box">
+    <a class="box box-link" href="/calls">
         <div class="label">Всего записей</div>
         <div class="value">{{ call_stats.total }}</div>
-    </div>
+    </a>
 
-    <div class="box">
+    <a class="box box-link" href="/calls?status=missed">
         <div class="label">Пропущено</div>
         <div class="value">{{ call_stats.missed }}</div>
-    </div>
+    </a>
 
-    <div class="box">
+    <a class="box box-link" href="/calls?status=follow_up">
         <div class="label">Нужен контакт</div>
         <div class="value">{{ call_stats.follow_up }}</div>
-    </div>
+    </a>
 
-    <div class="box">
+    <a class="box box-link" href="/calls?content=audio">
         <div class="label">С аудио</div>
         <div class="value">{{ call_stats.with_audio }}</div>
-    </div>
+    </a>
 
-    <div class="box">
+    <a class="box box-link" href="/calls?content=analysis">
         <div class="label">С анализом</div>
         <div class="value">{{ call_stats.with_analysis }}</div>
-    </div>
+    </a>
 </div>
 </div>
 
