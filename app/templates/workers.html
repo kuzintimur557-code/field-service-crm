@@ -43,6 +43,9 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 .filters a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
 .filters a.active{background:#111827;color:white}
+.search-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin:16px 0}
+.search-form input{width:100%;margin-top:0}
+.search-form button{width:auto;margin-top:0;background:#2563eb;padding-left:18px;padding-right:18px}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
@@ -52,6 +55,8 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     .team-stats{grid-template-columns:1fr}
     .filters{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
     .filters a{flex:0 0 auto}
+    .search-form{grid-template-columns:1fr}
+    .search-form button{width:100%}
 }
 </style>
 </head>
@@ -146,10 +151,19 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     </div>
 </div>
 
+<form class="search-form" method="get" action="/workers">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input name="search" value="{{ search }}" placeholder="Поиск по команде">
+    <button type="submit">Найти</button>
+</form>
+
 <div class="filters">
-    <a href="/workers?status=active" class="{% if status == 'active' %}active{% endif %}">Активные</a>
-    <a href="/workers?status=inactive" class="{% if status == 'inactive' %}active{% endif %}">Отключённые</a>
-    <a href="/workers?status=all" class="{% if status == 'all' %}active{% endif %}">Все</a>
+    <a href="/workers?status=active{% if search %}&search={{ search|urlencode }}{% endif %}" class="{% if status == 'active' %}active{% endif %}">Активные</a>
+    <a href="/workers?status=inactive{% if search %}&search={{ search|urlencode }}{% endif %}" class="{% if status == 'inactive' %}active{% endif %}">Отключённые</a>
+    <a href="/workers?status=all{% if search %}&search={{ search|urlencode }}{% endif %}" class="{% if status == 'all' %}active{% endif %}">Все</a>
+    {% if search %}
+    <a href="/workers?status={{ status }}">Сбросить поиск</a>
+    {% endif %}
 </div>
 
 {% if workers %}

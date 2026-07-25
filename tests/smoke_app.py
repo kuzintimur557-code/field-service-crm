@@ -16361,6 +16361,8 @@ async def assert_finance_margin(task):
     assert 'placeholder="user@example.ru"' in workers_html
     assert "Номер чата Telegram" in workers_html
     assert "ID чата Telegram" not in workers_html
+    assert "Поиск по команде" in workers_html
+    assert 'name="search"' in workers_html
     assert ".contact-link" in workers_html
     assert 'class="mobile-nav"' in workers_html
     assert ".container{padding:16px 14px 92px}" in workers_html
@@ -16381,6 +16383,24 @@ async def assert_finance_margin(task):
     assert "История управления командой" in (
         active_workers_response.body.decode("utf-8")
     )
+
+    searched_workers_response = await crm.workers_page(
+        make_asgi_request(
+            "owner2",
+            "/workers",
+            "status=all&search=inactive_candidate2",
+        ),
+        status="all",
+        search="inactive_candidate2",
+    )
+    assert searched_workers_response.status_code == 200
+    searched_workers_html = searched_workers_response.body.decode("utf-8")
+    assert searched_workers_response.context["status"] == "all"
+    assert searched_workers_response.context["search"] == "inactive_candidate2"
+    assert "inactive_candidate2" in searched_workers_html
+    assert 'name="search" value="inactive_candidate2"' in searched_workers_html
+    assert "Сбросить поиск" in searched_workers_html
+    assert "status=active&search=inactive_candidate2" in searched_workers_html
 
     workload_response = await crm.workload_page(
         make_asgi_request("owner2", "/workload")

@@ -30801,7 +30801,11 @@ async def change_my_password(request: Request):
 
 
 @app.get("/workers", response_class=HTMLResponse)
-async def workers_page(request: Request, status: str = "active"):
+async def workers_page(
+    request: Request,
+    status: str = "active",
+    search: str = ""
+):
 
     username = get_user(request)
 
@@ -30826,6 +30830,8 @@ async def workers_page(request: Request, status: str = "active"):
     if status not in ("active", "inactive", "all"):
         status = "active"
 
+    selected_search = str(search or "").strip()[:100]
+
     team_counts = c.execute("""
     SELECT
         COUNT(*) AS total_count,
@@ -30841,12 +30847,37 @@ async def workers_page(request: Request, status: str = "active"):
     elif status == "inactive":
         status_condition = "AND is_active=0"
 
+    search_condition = ""
+    worker_params = [company_id]
+
+    if selected_search:
+        search_pattern = f"%{selected_search.lower()}%"
+        search_condition = """
+      AND (
+          LOWER(COALESCE(username, '')) LIKE ?
+          OR LOWER(COALESCE(full_name, '')) LIKE ?
+          OR LOWER(COALESCE(position, '')) LIKE ?
+          OR LOWER(COALESCE(phone, '')) LIKE ?
+          OR LOWER(COALESCE(email, '')) LIKE ?
+          OR LOWER(COALESCE(telegram_chat_id, '')) LIKE ?
+      )
+        """
+        worker_params.extend([
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+        ])
+
     workers = c.execute(f"""
     SELECT * FROM users
     WHERE role IN ('manager', 'worker') AND company_id=?
       {status_condition}
+      {search_condition}
     ORDER BY role, is_active DESC, username
-    """, (company_id,)).fetchall()
+    """, worker_params).fetchall()
 
     conn.close()
 
@@ -30858,6 +30889,7 @@ async def workers_page(request: Request, status: str = "active"):
             "username": username,
             "role": role,
             "status": status,
+            "search": selected_search,
             "team_counts": team_counts,
             "settings": settings
         }
