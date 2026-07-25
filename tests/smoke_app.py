@@ -5761,6 +5761,30 @@ async def assert_profile_page():
 
 
 async def assert_settings_page():
+    assert crm.normalize_plan("unknown") == "basic"
+    assert crm.get_plan_label("team") == "Команда"
+    assert crm.get_plan_user_limit("enterprise_1c") is None
+    assert crm.get_plan_feature_flags("basic") == {
+        "one_c_enabled": 0,
+        "calls_enabled": 0,
+        "ai_calls_enabled": 0,
+    }
+    assert crm.get_plan_feature_flags("team") == {
+        "one_c_enabled": 0,
+        "calls_enabled": 1,
+        "ai_calls_enabled": 0,
+    }
+    assert crm.get_plan_feature_flags("business_1c") == {
+        "one_c_enabled": 1,
+        "calls_enabled": 1,
+        "ai_calls_enabled": 0,
+    }
+    assert crm.get_plan_feature_flags("enterprise_1c") == {
+        "one_c_enabled": 1,
+        "calls_enabled": 1,
+        "ai_calls_enabled": 1,
+    }
+
     response = await crm.settings_page(make_asgi_request("owner2", "/settings"))
     assert response.status_code == 200
     html = response.body.decode("utf-8")

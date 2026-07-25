@@ -1274,15 +1274,65 @@ def is_password_strong(password):
     return len(password or "") >= 6
 
 
+PLAN_DEFINITIONS = {
+    "basic": {
+        "label": "Базовый",
+        "user_limit": 3,
+        "one_c_enabled": 0,
+        "calls_enabled": 0,
+        "ai_calls_enabled": 0,
+    },
+    "team": {
+        "label": "Команда",
+        "user_limit": 10,
+        "one_c_enabled": 0,
+        "calls_enabled": 1,
+        "ai_calls_enabled": 0,
+    },
+    "business": {
+        "label": "Бизнес",
+        "user_limit": 30,
+        "one_c_enabled": 0,
+        "calls_enabled": 1,
+        "ai_calls_enabled": 0,
+    },
+    "business_1c": {
+        "label": "Бизнес + 1С",
+        "user_limit": 30,
+        "one_c_enabled": 1,
+        "calls_enabled": 1,
+        "ai_calls_enabled": 0,
+    },
+    "enterprise_1c": {
+        "label": "Корпоративный + 1С",
+        "user_limit": None,
+        "one_c_enabled": 1,
+        "calls_enabled": 1,
+        "ai_calls_enabled": 1,
+    },
+}
+
+
+def normalize_plan(plan):
+    normalized_plan = str(plan or "basic").strip()
+    return normalized_plan if normalized_plan in PLAN_DEFINITIONS else "basic"
+
+
+def get_plan_label(plan):
+    return PLAN_DEFINITIONS[normalize_plan(plan)]["label"]
+
+
 def get_plan_user_limit(plan):
-    limits = {
-        "basic": 3,
-        "team": 10,
-        "business": 30,
-        "business_1c": 30,
-        "enterprise_1c": None
+    return PLAN_DEFINITIONS[normalize_plan(plan)]["user_limit"]
+
+
+def get_plan_feature_flags(plan):
+    definition = PLAN_DEFINITIONS[normalize_plan(plan)]
+    return {
+        "one_c_enabled": definition["one_c_enabled"],
+        "calls_enabled": definition["calls_enabled"],
+        "ai_calls_enabled": definition["ai_calls_enabled"],
     }
-    return limits.get(plan, 3)
 
 
 def require_company_id_value(company_id):
@@ -28024,8 +28074,14 @@ async def billing_page(request: Request):
         return missing_company_response
 
     settings = get_company_settings(company_id)
-    plan = settings["plan"] if settings and "plan" in settings.keys() else "basic"
+    plan = normalize_plan(
+        settings["plan"] if settings and "plan" in settings.keys() else "basic"
+    )
     user_limit = get_plan_user_limit(plan)
+    plan_names = {
+        plan_key: definition["label"]
+        for plan_key, definition in PLAN_DEFINITIONS.items()
+    }
 
     return templates.TemplateResponse(
         request,
@@ -28036,7 +28092,8 @@ async def billing_page(request: Request):
             "role": role,
             "settings": settings,
             "plan": plan,
-            "user_limit": user_limit
+            "user_limit": user_limit,
+            "plan_names": plan_names
         }
     )
 
@@ -28800,18 +28857,16 @@ async def update_settings(request: Request):
     client_label = (form.get("client_label") or "Клиент").strip()
     service_label = (form.get("service_label") or "Услуга").strip()
 
-    allowed_plans = ["basic", "team", "business", "business_1c", "enterprise_1c"]
     allowed_industries = [industry_key for industry_key, _ in INDUSTRY_OPTIONS]
 
-    if plan not in allowed_plans:
-        plan = "basic"
-
+    plan = normalize_plan(plan)
     if industry not in allowed_industries:
         industry = "field_service"
 
-    one_c_enabled = 1 if plan in ("business_1c", "enterprise_1c") else 0
-    calls_enabled = 1 if plan in ("team", "business", "business_1c", "enterprise_1c") else 0
-    ai_calls_enabled = 1 if plan == "enterprise_1c" else 0
+    plan_features = get_plan_feature_flags(plan)
+    one_c_enabled = plan_features["one_c_enabled"]
+    calls_enabled = plan_features["calls_enabled"]
+    ai_calls_enabled = plan_features["ai_calls_enabled"]
     company_id, missing_company_response = require_route_company_context(username, role)
 
     if missing_company_response:
@@ -33849,6 +33904,10 @@ async def debug_page(request: Request):
         return missing_company_response
 
     settings = get_company_settings(company_id)
+    plan_names = {
+        plan_key: definition["label"]
+        for plan_key, definition in PLAN_DEFINITIONS.items()
+    }
 
     recent_users = c.execute("""
     SELECT username, role, last_seen
@@ -33887,6 +33946,7 @@ async def debug_page(request: Request):
             "catalog_count": catalog_count,
             "company_context_diagnostics": company_context_diagnostics,
             "settings": settings,
+            "plan_names": plan_names,
             "recent_users": recent_users,
             "login_events": login_events,
             "login_attempts": login_attempts
