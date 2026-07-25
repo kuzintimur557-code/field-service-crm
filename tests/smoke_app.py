@@ -12802,9 +12802,12 @@ async def assert_platform_calendar_health():
         assert "Пользователи" in debug_html
         assert "без компании:" in debug_html
         assert "Блокировки входа очищены" in debug_html
+        assert "Тарифные функции" in debug_html
+        assert "Базовый" in debug_html
         assert "Вкл" in debug_html or "Выкл" in debug_html
         assert "🧪 Диагностика / проверка системы" not in debug_html
         assert "✅ Блокировки входа очищены" not in debug_html
+        assert ">basic<" not in debug_html
         assert ">ON<" not in debug_html
         assert ">OFF<" not in debug_html
         anonymous_system_events_export = await crm.system_events_export(

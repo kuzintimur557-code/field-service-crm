@@ -102,13 +102,21 @@ h1{margin:0 0 20px;font-size:34px}
 {% endif %}
 </div>
 
+{% set plan_names = {
+    "basic": "Базовый",
+    "team": "Команда",
+    "business": "Бизнес",
+    "business_1c": "Бизнес + 1С",
+    "enterprise_1c": "Корпоративный + 1С"
+} %}
+
 <div class="card">
 <h2>Тарифные функции</h2>
 
 <div class="grid">
     <div class="stat">
         <div class="label">Тариф</div>
-        <div class="value">{{ settings["plan"] }}</div>
+        <div class="value">{{ plan_names.get(settings["plan"], settings["plan"]) }}</div>
     </div>
 
     <div class="stat">
