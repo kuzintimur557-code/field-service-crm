@@ -5849,6 +5849,26 @@ async def assert_settings_page():
     assert team_settings["one_c_enabled"] == 0
     assert team_settings["ai_calls_enabled"] == 0
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_settings
+    SET plan='team',
+        calls_enabled=0,
+        one_c_enabled=1,
+        ai_calls_enabled=1
+    WHERE company_id=2
+    """)
+    conn.commit()
+    conn.close()
+
+    crm.init_db()
+    migrated_team_settings = crm.get_company_settings(2)
+    assert migrated_team_settings["plan"] == "team"
+    assert migrated_team_settings["calls_enabled"] == 1
+    assert migrated_team_settings["one_c_enabled"] == 0
+    assert migrated_team_settings["ai_calls_enabled"] == 0
+
     restore_events = []
     crm.run_automation_event = (
         lambda *args, **kwargs: restore_events.append(args)

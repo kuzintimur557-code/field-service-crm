@@ -832,6 +832,33 @@ def init_db():
     """)
 
     c.execute("""
+    UPDATE company_settings
+    SET plan='basic'
+    WHERE COALESCE(TRIM(plan), '')=''
+       OR plan NOT IN (
+           'basic', 'team', 'business', 'business_1c', 'enterprise_1c'
+       )
+    """)
+
+    c.execute("""
+    UPDATE company_settings
+    SET
+        one_c_enabled=CASE
+            WHEN plan IN ('business_1c', 'enterprise_1c') THEN 1
+            ELSE 0
+        END,
+        calls_enabled=CASE
+            WHEN plan IN ('team', 'business', 'business_1c', 'enterprise_1c')
+            THEN 1
+            ELSE 0
+        END,
+        ai_calls_enabled=CASE
+            WHEN plan='enterprise_1c' THEN 1
+            ELSE 0
+        END
+    """)
+
+    c.execute("""
     DELETE FROM company_settings
     WHERE id NOT IN (
         SELECT MIN(id)
