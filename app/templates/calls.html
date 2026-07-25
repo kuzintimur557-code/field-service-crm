@@ -216,6 +216,7 @@ button{border:0;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}
 
 <div class="card">
 <h2>История звонков</h2>
+<div class="small">Показано: {{ call_records|length }} из {{ call_stats.total }}</div>
 {% set direction_labels = {"incoming": "Входящий", "outgoing": "Исходящий"} %}
 {% set status_labels = {"completed": "Состоялся", "missed": "Пропущен", "follow_up": "Нужен контакт"} %}
 

@@ -6029,6 +6029,7 @@ async def assert_calls_page():
         assert "Звонок сохранён" in history_html
         assert "Перезвонить завтра по оплате" in history_html
         assert "Нужен контакт" in history_html
+        assert "Показано:" in history_html
         assert 'href="/calls?status=missed"' in history_html
         assert 'href="/calls?status=follow_up"' in history_html
         assert 'href="/calls?content=audio"' in history_html
