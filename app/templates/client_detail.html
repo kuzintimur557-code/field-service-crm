@@ -494,7 +494,7 @@ h1{font-size:28px}
 
 {% if client_calls_enabled %}
 <div style="margin-top:12px">
-    <a class="btn" href="/calls">Открыть все звонки</a>
+    <a class="btn" href="/calls?client_id={{ client['id'] }}">Открыть все звонки клиента</a>
 </div>
 {% endif %}
 </div>

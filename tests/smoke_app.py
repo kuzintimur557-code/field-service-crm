@@ -6037,6 +6037,15 @@ async def assert_calls_page():
         assert f'href="/calls/{call["id"]}"' in history_html
         assert f'action="/calls/{call["id"]}/complete"' in history_html
 
+        call_client_response = await crm.client_detail(
+            make_asgi_request("owner2", f"/clients/{client_id}"),
+            client_id,
+        )
+        assert call_client_response.status_code == 200
+        call_client_html = call_client_response.body.decode("utf-8")
+        assert f'href="/calls?client_id={client_id}"' in call_client_html
+        assert "Открыть все звонки клиента" in call_client_html
+
         dashboard_response = await crm.home(make_asgi_request("owner2", "/"))
         assert dashboard_response.status_code == 200
         dashboard_html = dashboard_response.body.decode("utf-8")
