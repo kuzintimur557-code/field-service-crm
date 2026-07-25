@@ -370,12 +370,16 @@ h1{font-size:28px}
 </div>
 {% endfor %}
 {% else %}
+{% if selected_note_search %}
+<div class="empty">Поиск по заметкам ничего не нашёл.</div>
+{% else %}
 <div class="empty">История пока пустая: {{ client_label }}</div>
+{% endif %}
 {% endif %}
 </div>
 </div>
 
-{% if client_calls_enabled or client_calls %}
+{% if client_calls_enabled or client_calls or selected_call_filter or selected_call_content %}
 <div class="card" id="calls">
 <h2>Звонки: {{ client_label }}</h2>
 
@@ -495,7 +499,11 @@ h1{font-size:28px}
 </div>
 {% endfor %}
 {% else %}
+{% if selected_call_filter or selected_call_content %}
+<div class="empty">По выбранным условиям звонков ничего не найдено.</div>
+{% else %}
 <div class="empty">Звонков пока нет: {{ client_label }}</div>
+{% endif %}
 {% endif %}
 
 {% if client_calls_enabled %}
@@ -556,7 +564,11 @@ h1{font-size:28px}
 </div>
 {% endfor %}
 {% else %}
+{% if selected_file_search %}
+<div class="empty">Поиск по файлам ничего не нашёл.</div>
+{% else %}
 <div class="empty">Файлов пока нет: {{ client_label }}</div>
+{% endif %}
 {% endif %}
 </div>
 </div>
@@ -585,7 +597,11 @@ h1{font-size:28px}
 </div>
 {% endfor %}
 {% else %}
+{% if selected_activity_filter %}
+<div class="empty">По выбранному фильтру событий ничего не найдено.</div>
+{% else %}
 <div class="empty">Активности пока нет: {{ task_label }}</div>
+{% endif %}
 {% endif %}
 </div>
 
@@ -656,7 +672,11 @@ h1{font-size:28px}
 </div>
 {% endfor %}
 {% else %}
+{% if selected_task_filter or selected_task_search %}
+<div class="empty">По выбранным условиям ничего не найдено: {{ task_label }}</div>
+{% else %}
 <div class="empty">Нет записей: {{ task_label }}</div>
+{% endif %}
 {% endif %}
 
 </div>

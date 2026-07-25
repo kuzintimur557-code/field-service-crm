@@ -18011,7 +18011,6 @@ async def assert_client_card(task):
     DELETE FROM call_records
     WHERE company_id=2
       AND client_id=?
-      AND summary IN ('Smoke client call note', 'Smoke completed client call')
     """, (task["client_id"],))
     c.execute("""
     INSERT INTO call_records (
@@ -18159,6 +18158,87 @@ async def assert_client_card(task):
     assert 'input[type="hidden"]{display:none}' in html
     assert "💾 Сохранить изменения" not in html
     assert "📝 Добавить заметку" not in html
+
+    empty_notes_response = await crm.client_detail(
+        make_asgi_request(
+            "owner2",
+            f"/clients/{task['client_id']}",
+            "note_search=NoSuchNote",
+        ),
+        task["client_id"],
+        note_search="NoSuchNote",
+    )
+    assert empty_notes_response.status_code == 200
+    empty_notes_html = empty_notes_response.body.decode("utf-8")
+    assert "Поиск по заметкам ничего не нашёл." in empty_notes_html
+    assert "История пока пустая: Клиент" not in empty_notes_html
+
+    empty_files_response = await crm.client_detail(
+        make_asgi_request(
+            "owner2",
+            f"/clients/{task['client_id']}",
+            "file_search=NoSuchFile",
+        ),
+        task["client_id"],
+        file_search="NoSuchFile",
+    )
+    assert empty_files_response.status_code == 200
+    empty_files_html = empty_files_response.body.decode("utf-8")
+    assert "Поиск по файлам ничего не нашёл." in empty_files_html
+    assert "Файлов пока нет: Клиент" not in empty_files_html
+
+    empty_tasks_response = await crm.client_detail(
+        make_asgi_request(
+            "owner2",
+            f"/clients/{task['client_id']}",
+            "task_search=NoSuchTask",
+        ),
+        task["client_id"],
+        task_search="NoSuchTask",
+    )
+    assert empty_tasks_response.status_code == 200
+    empty_tasks_html = empty_tasks_response.body.decode("utf-8")
+    assert "По выбранным условиям ничего не найдено: Заявка" in empty_tasks_html
+    assert "Нет записей: Заявка" not in empty_tasks_html
+
+    empty_activity_response = await crm.client_detail(
+        make_asgi_request(
+            "owner2",
+            f"/clients/{task['client_id']}",
+            "activity_filter=comment",
+        ),
+        task["client_id"],
+        activity_filter="comment",
+    )
+    assert empty_activity_response.status_code == 200
+    empty_activity_html = empty_activity_response.body.decode("utf-8")
+    assert "По выбранному фильтру событий ничего не найдено." in empty_activity_html
+    assert "Активности пока нет: Заявка" not in empty_activity_html
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    DELETE FROM call_records
+    WHERE company_id=2
+      AND client_id=?
+      AND status='missed'
+    """, (task["client_id"],))
+    conn.commit()
+    conn.close()
+
+    empty_call_response = await crm.client_detail(
+        make_asgi_request(
+            "owner2",
+            f"/clients/{task['client_id']}",
+            "call_filter=missed",
+        ),
+        task["client_id"],
+        call_filter="missed",
+    )
+    assert empty_call_response.status_code == 200
+    empty_call_html = empty_call_response.body.decode("utf-8")
+    assert "По выбранным условиям звонков ничего не найдено." in empty_call_html
+    assert "Звонков пока нет: Клиент" not in empty_call_html
 
     call_filter_response = await crm.client_detail(
         make_asgi_request(
