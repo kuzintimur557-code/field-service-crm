@@ -19543,6 +19543,7 @@ async def assert_client_custom_fields():
     assert "Экспорт CSV" in page_html
     assert "clients/export" in page_html
     assert "Показано:" in page_html
+    assert "Сбросить поиск" in page_html
     assert 'name="client_sort"' in page_html
     assert 'placeholder="+7 900 000-00-00"' in page_html
     assert 'placeholder="client@example.ru"' in page_html
