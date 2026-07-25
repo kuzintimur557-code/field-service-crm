@@ -17811,11 +17811,14 @@ async def assert_client_card(task):
         status,
         phone,
         summary,
+        audio_filename,
+        transcript,
+        ai_summary,
         call_at,
         duration_minutes,
         created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         2,
         task["client_id"],
@@ -17824,6 +17827,9 @@ async def assert_client_card(task):
         "follow_up",
         "+70000000000",
         "Smoke client call note",
+        "smoke-client-call.wav",
+        "Smoke client call transcript",
+        "Smoke client call AI summary",
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         4,
         datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -17893,6 +17899,8 @@ async def assert_client_card(task):
     assert "call_filter=follow_up#calls" in html
     assert "call_filter=missed#calls" in html
     assert "call_filter=completed#calls" in html
+    assert "call_content=audio#calls" in html
+    assert "call_content=analysis#calls" in html
     assert "Всего звонков" in html
     assert "Нужен контакт по звонкам" in html
     assert "С аудио" in html
@@ -17952,6 +17960,23 @@ async def assert_client_card(task):
     assert "Smoke client call note" in call_filter_html
     assert "Smoke completed client call" not in call_filter_html
     assert 'class="active">Нужен контакт</a>' in call_filter_html
+    assert "call_filter=follow_up&call_content=analysis#calls" in call_filter_html
+
+    call_content_response = await crm.client_detail(
+        make_asgi_request(
+            "owner2",
+            f"/clients/{task['client_id']}",
+            "call_content=analysis",
+        ),
+        task["client_id"],
+        call_content="analysis",
+    )
+    assert call_content_response.status_code == 200
+    call_content_html = call_content_response.body.decode("utf-8")
+    assert "Smoke client call note" in call_content_html
+    assert "Smoke completed client call" not in call_content_html
+    assert 'class="active">С анализом</a>' in call_content_html
+    assert "call_filter=follow_up&call_content=analysis#calls" in call_content_html
 
     worker_tasks_response = await crm.my_tasks_page(
         make_asgi_request("worker2", "/my-tasks")

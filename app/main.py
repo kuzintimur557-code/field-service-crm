@@ -29326,7 +29326,8 @@ async def client_detail(
     activity_filter: str = "",
     note_search: str = "",
     file_search: str = "",
-    call_filter: str = ""
+    call_filter: str = "",
+    call_content: str = ""
 ):
 
     username = get_user(request)
@@ -29534,12 +29535,29 @@ async def client_detail(
     """, (client_id, company_id)).fetchall()
     latest_activity = client_timeline[0] if client_timeline else None
 
-    call_filter_sql = ""
+    selected_call_content = call_content if call_content in ("audio", "analysis") else ""
+    call_filter_parts = []
     call_params = [client_id, company_id]
 
     if selected_call_filter:
-        call_filter_sql = "AND status=?"
+        call_filter_parts.append("status=?")
         call_params.append(selected_call_filter)
+
+    if selected_call_content == "audio":
+        call_filter_parts.append("COALESCE(audio_filename, '')!=''")
+
+    if selected_call_content == "analysis":
+        call_filter_parts.append("""
+        (
+            COALESCE(transcript, '')!=''
+            OR COALESCE(ai_summary, '')!=''
+        )
+        """)
+
+    call_filter_sql = ""
+
+    if call_filter_parts:
+        call_filter_sql = "AND " + " AND ".join(call_filter_parts)
 
     client_calls = c.execute(f"""
     SELECT *
@@ -29683,6 +29701,7 @@ async def client_detail(
             "selected_note_search": selected_note_search,
             "selected_file_search": selected_file_search,
             "selected_call_filter": selected_call_filter,
+            "selected_call_content": selected_call_content,
             "client_notes": client_notes,
             "client_files": client_files,
             "latest_client_note": latest_client_note,
