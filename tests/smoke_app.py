@@ -6046,6 +6046,8 @@ async def assert_calls_page():
         call_client_html = call_client_response.body.decode("utf-8")
         assert f'href="/calls?client_id={client_id}"' in call_client_html
         assert "Открыть все звонки клиента" in call_client_html
+        assert f'href="/calls/export?client_id={client_id}"' in call_client_html
+        assert "Экспорт звонков клиента" in call_client_html
 
         dashboard_response = await crm.home(make_asgi_request("owner2", "/"))
         assert dashboard_response.status_code == 200
