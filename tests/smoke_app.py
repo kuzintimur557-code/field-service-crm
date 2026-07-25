@@ -9789,12 +9789,13 @@ async def assert_platform_companies_page():
     WHERE owner_username=?
     """, ("smoke_logistics_owner",)).fetchone()
     assert logistics_company is not None
+    logistics_company_id = logistics_company["id"]
 
     logistics_settings = c.execute("""
     SELECT *
     FROM company_settings
     WHERE company_id=?
-    """, (logistics_company["id"],)).fetchone()
+    """, (logistics_company_id,)).fetchone()
     assert logistics_settings is not None
     assert logistics_settings["industry"] == "logistics"
     assert logistics_settings["task_label"] == "Рейс"
@@ -9807,12 +9808,13 @@ async def assert_platform_companies_page():
         SELECT feature_key, enabled
         FROM company_features
         WHERE company_id=?
-        """, (logistics_company["id"],)).fetchall()
+        """, (logistics_company_id,)).fetchall()
     }
     assert logistics_features["tasks"] == 1
     assert logistics_features["notifications"] == 1
     assert logistics_features["recurring"] == 1
     assert logistics_features["catalog"] == 0
+    conn.close()
 
     list_response = await crm.platform_companies_page(
         make_asgi_request("super", "/platform/companies")
@@ -9823,6 +9825,9 @@ async def assert_platform_companies_page():
     assert "Сфера: Грузоперевозки" in list_html
     assert "Тариф: Базовый" in list_html
     assert "Лимит пользователей: 3" in list_html
+    assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
+    assert 'name="return_search"' in list_html
+    assert "Сохранить" in list_html
 
     filtered_response = await crm.platform_companies_page(
         make_asgi_request(
@@ -9877,6 +9882,8 @@ async def assert_platform_companies_page():
     assert "Рейс: создать" in logistics_home_html
     assert "Новая Рейс" not in logistics_home_html
 
+    conn = connect()
+    c = conn.cursor()
     c.execute("""
     INSERT INTO users (
         username, password, role, company_id, telegram_chat_id
@@ -9886,10 +9893,11 @@ async def assert_platform_companies_page():
         "smoke_logistics_driver",
         crm.hash_password("driver123"),
         "worker",
-        logistics_company["id"],
+        logistics_company_id,
         "",
     ))
     conn.commit()
+    conn.close()
 
     logistics_worker_tasks = await crm.my_tasks_page(
         make_asgi_request("smoke_logistics_driver", "/my-tasks"),
@@ -9899,21 +9907,113 @@ async def assert_platform_companies_page():
     assert "Рейс: рабочий список" in logistics_worker_html
     assert "Мои заявки" not in logistics_worker_html
 
+    anonymous_update = await crm.update_platform_company_settings(
+        make_public_asgi_request(
+            f"/platform/companies/{logistics_company_id}/settings",
+        ),
+        logistics_company_id,
+    )
+    assert anonymous_update.status_code == 302
+    assert anonymous_update.headers["location"] == "/login"
+
+    boss_update = await crm.update_platform_company_settings(
+        make_form_request(
+            "owner2",
+            f"/platform/companies/{logistics_company_id}/settings",
+            {
+                "plan": "team",
+                "industry": "beauty",
+            },
+        ),
+        logistics_company_id,
+    )
+    assert boss_update.status_code == 302
+    assert boss_update.headers["location"] == "/"
+
+    missing_update = await crm.update_platform_company_settings(
+        make_form_request(
+            "super",
+            "/platform/companies/999999/settings",
+            {
+                "plan": "team",
+                "industry": "beauty",
+                "return_search": "Smoke Logistics",
+                "return_industry": "logistics",
+                "return_plan": "basic",
+            },
+        ),
+        999999,
+    )
+    assert missing_update.status_code == 302
+    assert missing_update.headers["location"] == (
+        "/platform/companies?search=Smoke+Logistics"
+        "&industry=logistics&plan=basic&error=company_not_found"
+    )
+
+    updated_response = await crm.update_platform_company_settings(
+        make_form_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}/settings",
+            {
+                "plan": "team",
+                "industry": "beauty",
+                "return_search": "Smoke Logistics",
+                "return_industry": "logistics",
+                "return_plan": "basic",
+            },
+        ),
+        logistics_company_id,
+    )
+    assert updated_response.status_code == 302
+    assert updated_response.headers["location"] == (
+        "/platform/companies?search=Smoke+Logistics"
+        "&industry=logistics&plan=basic&updated=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    updated_settings = c.execute("""
+    SELECT *
+    FROM company_settings
+    WHERE company_id=?
+    """, (logistics_company_id,)).fetchone()
+    assert updated_settings is not None
+    assert updated_settings["industry"] == "beauty"
+    assert updated_settings["plan"] == "team"
+    assert updated_settings["task_label"] == "Запись"
+    assert updated_settings["worker_label"] == "Мастер"
+    assert updated_settings["calls_enabled"] == 1
+    assert updated_settings["one_c_enabled"] == 0
+    assert updated_settings["ai_calls_enabled"] == 0
+
+    updated_features = {
+        row["feature_key"]: row["enabled"]
+        for row in c.execute("""
+        SELECT feature_key, enabled
+        FROM company_features
+        WHERE company_id=?
+        """, (logistics_company_id,)).fetchall()
+    }
+    assert updated_features["tasks"] == 1
+    assert updated_features["notifications"] == 1
+    assert updated_features["catalog"] == 1
+    assert updated_features["recurring"] == 0
+
     c.execute(
         "DELETE FROM company_features WHERE company_id=?",
-        (logistics_company["id"],),
+        (logistics_company_id,),
     )
     c.execute(
         "DELETE FROM company_settings WHERE company_id=?",
-        (logistics_company["id"],),
+        (logistics_company_id,),
     )
     c.execute(
         "DELETE FROM users WHERE company_id=?",
-        (logistics_company["id"],),
+        (logistics_company_id,),
     )
     c.execute(
         "DELETE FROM companies WHERE id=?",
-        (logistics_company["id"],),
+        (logistics_company_id,),
     )
     conn.commit()
     conn.close()

@@ -22,8 +22,13 @@ h1{margin:0 0 12px;font-size:36px}
 .filters input,.filters select{padding:12px;border:1px solid #d1d5db;border-radius:12px;font-size:14px}
 .filters button,.filters a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;text-decoration:none;font-weight:900;cursor:pointer}
 .filters a{background:#e5e7eb;color:#111827}
+.company-settings{display:grid;grid-column:1/-1;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:10px;padding-top:12px;border-top:1px solid #e5e7eb}
+.company-settings label{display:grid;gap:6px;color:#6b7280;font-size:12px;font-weight:900}
+.company-settings select{padding:10px;border:1px solid #d1d5db;border-radius:11px;background:white;font-size:13px}
+.company-settings button{min-height:39px;padding:10px 13px;border:0;border-radius:11px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 @media(max-width:850px){.container{padding:16px}.company{grid-template-columns:1fr}h1{font-size:30px}}
 @media(max-width:850px){.filters{grid-template-columns:1fr}.filters button,.filters a{width:100%}}
+@media(max-width:850px){.company-settings{grid-template-columns:1fr}.company-settings button{width:100%}}
 </style>
 </head>
 
@@ -86,6 +91,18 @@ h1{margin:0 0 12px;font-size:36px}
 <div class="card">
 <h2>Список компаний</h2>
 
+{% if request.query_params.get("updated") == "1" %}
+<div style="padding:14px;border-radius:16px;background:#dcfce7;color:#166534;font-weight:900;margin-bottom:16px">
+Компания обновлена
+</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "company_not_found" %}
+<div style="padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900;margin-bottom:16px">
+Компания не найдена
+</div>
+{% endif %}
+
 <form class="filters" method="get" action="/platform/companies">
     <label>
         Поиск
@@ -132,6 +149,28 @@ h1{margin:0 0 12px;font-size:36px}
         Лимит пользователей: {{ company["user_limit_label"] }}
     </div>
     <div class="meta">Статус: активна</div>
+    <form class="company-settings" method="post" action="/platform/companies/{{ company['id'] }}/settings">
+        <input type="hidden" name="return_search" value="{{ search }}">
+        <input type="hidden" name="return_industry" value="{{ selected_industry }}">
+        <input type="hidden" name="return_plan" value="{{ selected_plan }}">
+        <label>
+            Сфера
+            <select name="industry">
+                {% for industry_key, industry_title in industry_options %}
+                <option value="{{ industry_key }}" {% if company["industry"] == industry_key %}selected{% endif %}>{{ industry_title }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Тариф
+            <select name="plan">
+                {% for plan_key, plan_label in plan_options %}
+                <option value="{{ plan_key }}" {% if company["plan"] == plan_key %}selected{% endif %}>{{ plan_label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit">Сохранить</button>
+    </form>
 </div>
 {% endfor %}
 {% else %}

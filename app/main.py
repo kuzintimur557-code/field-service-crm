@@ -6630,6 +6630,36 @@ def get_platform_calendar_company_detail(
     }
 
 
+def build_platform_companies_url(
+    search="",
+    industry="all",
+    plan="all",
+    extra_params=None,
+):
+    params = {}
+    search = str(search or "").strip()[:80]
+    allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
+    industry = industry if industry in allowed_industries else "all"
+    plan = plan if plan in PLAN_DEFINITIONS else "all"
+
+    if search:
+        params["search"] = search
+
+    if industry != "all":
+        params["industry"] = industry
+
+    if plan != "all":
+        params["plan"] = plan
+
+    if extra_params:
+        params.update(extra_params)
+
+    if not params:
+        return "/platform/companies"
+
+    return "/platform/companies?" + urlencode(params)
+
+
 @app.post("/platform/companies")
 async def create_platform_company(request: Request):
 
@@ -6733,6 +6763,105 @@ async def create_platform_company(request: Request):
     apply_business_preset(company_id, industry)
 
     return RedirectResponse("/platform/companies?created=1", status_code=302)
+
+
+@app.post("/platform/companies/{company_id}/settings")
+async def update_platform_company_settings(request: Request, company_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    plan = normalize_plan(form.get("plan") or "basic")
+    industry = (form.get("industry") or "field_service").strip()
+    allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
+
+    if industry not in allowed_industries:
+        industry = "field_service"
+
+    return_url = build_platform_companies_url(
+        form.get("return_search") or "",
+        form.get("return_industry") or "all",
+        form.get("return_plan") or "all",
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    company = c.execute("""
+    SELECT id, name
+    FROM companies
+    WHERE id=?
+    """, (company_id,)).fetchone()
+
+    if not company:
+        conn.close()
+        return RedirectResponse(
+            build_platform_companies_url(
+                form.get("return_search") or "",
+                form.get("return_industry") or "all",
+                form.get("return_plan") or "all",
+                {"error": "company_not_found"},
+            ),
+            status_code=302,
+        )
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    c.execute("""
+    INSERT OR IGNORE INTO company_settings (
+        company_id, company_name, phone, email, address, tax_number,
+        bank_details, plan, industry, task_label, worker_label,
+        client_label, service_label, one_c_enabled, calls_enabled,
+        ai_calls_enabled, updated_at
+    )
+    VALUES (?, ?, '', '', '', '', '', 'basic', 'field_service',
+            'Заявка', 'Исполнитель', 'Клиент', 'Услуга', 0, 0, 0, ?)
+    """, (
+        company_id,
+        company["name"] or "",
+        now,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    apply_business_preset(company_id, industry)
+    plan_features = get_plan_feature_flags(plan)
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_settings
+    SET plan=?,
+        one_c_enabled=?,
+        calls_enabled=?,
+        ai_calls_enabled=?,
+        updated_at=?
+    WHERE company_id=?
+    """, (
+        plan,
+        plan_features["one_c_enabled"],
+        plan_features["calls_enabled"],
+        plan_features["ai_calls_enabled"],
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        company_id,
+    ))
+    conn.commit()
+    conn.close()
+
+    separator = "&" if "?" in return_url else "?"
+
+    return RedirectResponse(
+        f"{return_url}{separator}updated=1",
+        status_code=302,
+    )
 
 
 @app.get("/platform/companies", response_class=HTMLResponse)
