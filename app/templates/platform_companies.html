@@ -14,7 +14,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
 .card{background:white;padding:28px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
 h1{margin:0 0 12px;font-size:36px}
-.company{display:grid;grid-template-columns:.5fr 1.5fr 1fr 1fr;gap:14px;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px;align-items:center}
+.company{display:grid;grid-template-columns:.5fr 1.5fr 1fr 1fr 1fr 1fr;gap:14px;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px;align-items:center}
 .name{font-size:18px;font-weight:900}
 .meta{font-size:14px;color:#6b7280;font-weight:800}
 @media(max-width:850px){.container{padding:16px}.company{grid-template-columns:1fr}h1{font-size:30px}}
@@ -89,6 +89,11 @@ h1{margin:0 0 12px;font-size:36px}
         <div class="meta">Создана: {{ company["created_at"] }}</div>
     </div>
     <div class="meta">Владелец: {{ company["owner_username"] }}</div>
+    <div class="meta">Сфера: {{ company["industry_label"] }}</div>
+    <div class="meta">
+        Тариф: {{ company["plan_label"] }}<br>
+        Лимит пользователей: {{ company["user_limit_label"] }}
+    </div>
     <div class="meta">Статус: активна</div>
 </div>
 {% endfor %}

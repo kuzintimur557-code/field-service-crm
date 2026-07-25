@@ -6739,13 +6739,39 @@ async def platform_companies_page(request: Request):
     conn = connect()
     c = conn.cursor()
 
-    companies = c.execute("""
-    SELECT *
+    company_rows = c.execute("""
+    SELECT
+        companies.id,
+        companies.name,
+        companies.owner_username,
+        companies.created_at,
+        settings.plan,
+        settings.industry
     FROM companies
-    ORDER BY id DESC
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=companies.id
+    ORDER BY companies.id DESC
     """).fetchall()
 
     conn.close()
+    industry_labels = dict(INDUSTRY_OPTIONS)
+    companies = []
+
+    for row in company_rows:
+        company = dict(row)
+        plan = normalize_plan(company.get("plan"))
+        user_limit = get_plan_user_limit(plan)
+        industry = str(company.get("industry") or "field_service")
+        company["plan"] = plan
+        company["plan_label"] = get_plan_label(plan)
+        company["user_limit_label"] = (
+            str(user_limit) if user_limit else "без лимита"
+        )
+        company["industry_label"] = industry_labels.get(
+            industry,
+            "Сфера не указана",
+        )
+        companies.append(company)
 
     return templates.TemplateResponse(
         request,

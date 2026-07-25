@@ -9806,6 +9806,16 @@ async def assert_platform_companies_page():
     assert logistics_features["recurring"] == 1
     assert logistics_features["catalog"] == 0
 
+    list_response = await crm.platform_companies_page(
+        make_asgi_request("super", "/platform/companies")
+    )
+    list_html = list_response.body.decode("utf-8")
+    assert list_response.status_code == 200
+    assert "Smoke Logistics Company" in list_html
+    assert "Сфера: Грузоперевозки" in list_html
+    assert "Тариф: Базовый" in list_html
+    assert "Лимит пользователей: 3" in list_html
+
     logistics_create_page = await crm.create_task_page(
         make_asgi_request("smoke_logistics_owner", "/create-task"),
     )
