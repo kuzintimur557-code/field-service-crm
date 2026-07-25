@@ -13,6 +13,8 @@
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
 .container{max-width:950px;margin:auto;padding:28px;width:100%}
 .back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.top-links{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.top-links .back{margin-bottom:0}
 .card{background:white;padding:28px;border:1px solid #e5e7eb;border-radius:22px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:22px}
 h1{margin:0 0 22px;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
@@ -134,7 +136,10 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="card">
 <h2>Список команды</h2>
 
-<a href="/workers/activity" class="back" style="margin-bottom:4px">История управления командой →</a>
+<div class="top-links">
+    <a href="/workers/activity" class="back">История управления командой →</a>
+    <a href="/workers/export?status={{ status }}{% if search %}&search={{ search|urlencode }}{% endif %}" class="back">Экспорт CSV</a>
+</div>
 
 <div class="team-stats">
     <div class="team-stat">

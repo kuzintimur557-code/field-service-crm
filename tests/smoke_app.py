@@ -16363,6 +16363,8 @@ async def assert_finance_margin(task):
     assert "ID чата Telegram" not in workers_html
     assert "Поиск по команде" in workers_html
     assert 'name="search"' in workers_html
+    assert "Экспорт CSV" in workers_html
+    assert 'href="/workers/export?status=inactive' in workers_html
     assert ".contact-link" in workers_html
     assert 'class="mobile-nav"' in workers_html
     assert ".container{padding:16px 14px 92px}" in workers_html
@@ -16401,6 +16403,26 @@ async def assert_finance_margin(task):
     assert 'name="search" value="inactive_candidate2"' in searched_workers_html
     assert "Сбросить поиск" in searched_workers_html
     assert "status=active&search=inactive_candidate2" in searched_workers_html
+
+    workers_export_response = await crm.workers_export(
+        make_asgi_request(
+            "owner2",
+            "/workers/export",
+            "status=all&search=inactive_candidate2",
+        ),
+        status="all",
+        search="inactive_candidate2",
+    )
+    assert workers_export_response.status_code == 200
+    assert workers_export_response.media_type == "text/csv; charset=utf-8"
+    assert (
+        "workers_all_search.csv"
+        in workers_export_response.headers["Content-Disposition"]
+    )
+    workers_export_csv = workers_export_response.body.decode("utf-8")
+    assert workers_export_csv.startswith("\ufeff")
+    assert "Логин,ФИО,Роль,Статус" in workers_export_csv
+    assert "inactive_candidate2" in workers_export_csv
 
     workload_response = await crm.workload_page(
         make_asgi_request("owner2", "/workload")

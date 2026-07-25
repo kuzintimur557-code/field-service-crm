@@ -30896,6 +30896,132 @@ async def workers_page(
     )
 
 
+@app.get("/workers/export")
+async def workers_export(
+    request: Request,
+    status: str = "active",
+    search: str = ""
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    update_last_seen(username)
+    role = get_role(username)
+
+    if role == "superadmin":
+        return RedirectResponse("/platform", status_code=302)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
+
+    if status not in ("active", "inactive", "all"):
+        status = "active"
+
+    selected_search = str(search or "").strip()[:100]
+    status_condition = ""
+
+    if status == "active":
+        status_condition = "AND COALESCE(is_active, 1)=1"
+    elif status == "inactive":
+        status_condition = "AND is_active=0"
+
+    search_condition = ""
+    worker_params = [company_id]
+
+    if selected_search:
+        search_pattern = f"%{selected_search.lower()}%"
+        search_condition = """
+      AND (
+          LOWER(COALESCE(username, '')) LIKE ?
+          OR LOWER(COALESCE(full_name, '')) LIKE ?
+          OR LOWER(COALESCE(position, '')) LIKE ?
+          OR LOWER(COALESCE(phone, '')) LIKE ?
+          OR LOWER(COALESCE(email, '')) LIKE ?
+          OR LOWER(COALESCE(telegram_chat_id, '')) LIKE ?
+      )
+        """
+        worker_params.extend([
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+        ])
+
+    conn = connect()
+    c = conn.cursor()
+
+    workers = c.execute(f"""
+    SELECT * FROM users
+    WHERE role IN ('manager', 'worker') AND company_id=?
+      {status_condition}
+      {search_condition}
+    ORDER BY role, is_active DESC, username
+    """, worker_params).fetchall()
+
+    conn.close()
+
+    worker_label = (
+        settings["worker_label"]
+        if settings and settings["worker_label"]
+        else "Исполнитель"
+    )
+    role_labels = {
+        "manager": "Менеджер",
+        "worker": worker_label,
+    }
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Логин",
+        "ФИО",
+        "Роль",
+        "Статус",
+        "Должность",
+        "Телефон",
+        "Электронная почта",
+        "Номер чата Telegram",
+        "Процент с прибыли",
+        "Был онлайн",
+    ])
+
+    for worker in workers:
+        writer.writerow([
+            worker["username"] or "",
+            worker["full_name"] or "",
+            role_labels.get(worker["role"], worker["role"] or ""),
+            "Активен" if worker["is_active"] is None or worker["is_active"] else "Отключён",
+            worker["position"] or "",
+            worker["phone"] or "",
+            worker["email"] or "",
+            worker["telegram_chat_id"] or "",
+            worker["commission_percent"] or 0,
+            worker["last_seen"] or "",
+        ])
+
+    filename_parts = [
+        status,
+        "search" if selected_search else "all",
+    ]
+    filename = "workers_" + "_".join(filename_parts) + ".csv"
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
 @app.get("/workers/activity", response_class=HTMLResponse)
 async def team_activity_page(
     request: Request,
