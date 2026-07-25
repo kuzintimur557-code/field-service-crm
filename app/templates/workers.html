@@ -171,6 +171,8 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
     {% endif %}
 </div>
 
+<div class="meta">Показано: {{ workers|length }}</div>
+
 {% if workers %}
 {% for worker in workers %}
 <div class="user">

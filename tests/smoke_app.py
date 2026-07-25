@@ -16363,6 +16363,7 @@ async def assert_finance_margin(task):
     assert "ID чата Telegram" not in workers_html
     assert "Поиск по команде" in workers_html
     assert 'name="search"' in workers_html
+    assert "Показано:" in workers_html
     assert "Экспорт CSV" in workers_html
     assert 'href="/workers/export?status=inactive' in workers_html
     assert ".contact-link" in workers_html
