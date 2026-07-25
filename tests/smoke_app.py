@@ -6161,6 +6161,24 @@ async def assert_calls_page():
         assert analyzed_history_response.context["call_stats"]["with_audio"] >= 1
         assert analyzed_history_response.context["call_stats"]["with_analysis"] >= 1
 
+        audio_filter_response = await crm.calls_page(
+            make_asgi_request("owner2", "/calls", "content=audio"),
+            content="audio",
+        )
+        assert audio_filter_response.status_code == 200
+        audio_filter_html = audio_filter_response.body.decode("utf-8")
+        assert '<option value="audio" selected>С аудио</option>' in audio_filter_html
+        assert "Перезвонить завтра по оплате" in audio_filter_html
+
+        analysis_filter_response = await crm.calls_page(
+            make_asgi_request("owner2", "/calls", "content=analysis"),
+            content="analysis",
+        )
+        assert analysis_filter_response.status_code == 200
+        analysis_filter_html = analysis_filter_response.body.decode("utf-8")
+        assert '<option value="analysis" selected>С анализом</option>' in analysis_filter_html
+        assert "Перезвонить завтра по оплате" in analysis_filter_html
+
         conn = connect()
         c = conn.cursor()
         c.execute("""
@@ -6317,16 +6335,17 @@ async def assert_calls_page():
             make_asgi_request(
                 "owner2",
                 "/calls/export",
-                f"status=follow_up&client_id={client_id}&search=оплате",
+                f"status=follow_up&client_id={client_id}&content=analysis&search=оплате",
             ),
             status="follow_up",
             client_id=str(client_id),
             search="оплате",
+            content="analysis",
         )
         assert export_response.status_code == 200
         assert export_response.media_type == "text/csv; charset=utf-8"
         assert (
-            f"calls_follow_up_{client_id}_search.csv"
+            f"calls_follow_up_{client_id}_search_analysis.csv"
             in export_response.headers["Content-Disposition"]
         )
         export_csv = export_response.body.decode("utf-8")

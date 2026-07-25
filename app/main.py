@@ -27030,7 +27030,8 @@ async def calls_page(
     request: Request,
     status: str = "",
     client_id: str = "",
-    search: str = ""
+    search: str = "",
+    content: str = ""
 ):
 
     username = get_user(request)
@@ -27051,6 +27052,7 @@ async def calls_page(
 
     settings = get_company_settings(company_id)
     selected_call_status = status if status in ("completed", "missed", "follow_up") else ""
+    selected_call_content = content if content in ("audio", "analysis") else ""
     selected_call_search = str(search or "").strip()
     selected_call_client_id = None
 
@@ -27079,6 +27081,17 @@ async def calls_page(
     if selected_call_client_id:
         call_filters.append("call_records.client_id=?")
         call_params.append(selected_call_client_id)
+
+    if selected_call_content == "audio":
+        call_filters.append("COALESCE(call_records.audio_filename, '')!=''")
+
+    if selected_call_content == "analysis":
+        call_filters.append("""
+        (
+            COALESCE(call_records.transcript, '')!=''
+            OR COALESCE(call_records.ai_summary, '')!=''
+        )
+        """)
 
     if selected_call_search:
         search_pattern = f"%{selected_call_search.lower()}%"
@@ -27148,6 +27161,7 @@ async def calls_page(
             "call_records": call_records,
             "call_stats": call_stats,
             "selected_call_status": selected_call_status,
+            "selected_call_content": selected_call_content,
             "selected_call_client_id": selected_call_client_id,
             "selected_call_search": selected_call_search
         }
@@ -27159,7 +27173,8 @@ async def calls_export(
     request: Request,
     status: str = "",
     client_id: str = "",
-    search: str = ""
+    search: str = "",
+    content: str = ""
 ):
 
     username = get_user(request)
@@ -27184,6 +27199,7 @@ async def calls_export(
         return RedirectResponse("/calls", status_code=302)
 
     selected_call_status = status if status in ("completed", "missed", "follow_up") else ""
+    selected_call_content = content if content in ("audio", "analysis") else ""
     selected_call_search = str(search or "").strip()
     selected_call_client_id = None
 
@@ -27202,6 +27218,17 @@ async def calls_export(
     if selected_call_client_id:
         call_filters.append("call_records.client_id=?")
         call_params.append(selected_call_client_id)
+
+    if selected_call_content == "audio":
+        call_filters.append("COALESCE(call_records.audio_filename, '')!=''")
+
+    if selected_call_content == "analysis":
+        call_filters.append("""
+        (
+            COALESCE(call_records.transcript, '')!=''
+            OR COALESCE(call_records.ai_summary, '')!=''
+        )
+        """)
 
     if selected_call_search:
         search_pattern = f"%{selected_call_search.lower()}%"
@@ -27277,6 +27304,7 @@ async def calls_export(
         selected_call_status or "all",
         str(selected_call_client_id or "all"),
         "search" if selected_call_search else "all",
+        selected_call_content or "all",
     ]
     filename = "calls_" + "_".join(filename_parts) + ".csv"
 
