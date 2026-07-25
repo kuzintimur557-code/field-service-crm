@@ -17,7 +17,13 @@ h1{margin:0 0 12px;font-size:36px}
 .company{display:grid;grid-template-columns:.5fr 1.5fr 1fr 1fr 1fr 1fr;gap:14px;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px;align-items:center}
 .name{font-size:18px;font-weight:900}
 .meta{font-size:14px;color:#6b7280;font-weight:800}
+.filters{display:grid;grid-template-columns:1.6fr 1fr 1fr auto;gap:10px;margin-bottom:18px;align-items:end}
+.filters label{display:grid;gap:6px;color:#6b7280;font-size:13px;font-weight:900}
+.filters input,.filters select{padding:12px;border:1px solid #d1d5db;border-radius:12px;font-size:14px}
+.filters button,.filters a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;text-decoration:none;font-weight:900;cursor:pointer}
+.filters a{background:#e5e7eb;color:#111827}
 @media(max-width:850px){.container{padding:16px}.company{grid-template-columns:1fr}h1{font-size:30px}}
+@media(max-width:850px){.filters{grid-template-columns:1fr}.filters button,.filters a{width:100%}}
 </style>
 </head>
 
@@ -80,6 +86,37 @@ h1{margin:0 0 12px;font-size:36px}
 <div class="card">
 <h2>Список компаний</h2>
 
+<form class="filters" method="get" action="/platform/companies">
+    <label>
+        Поиск
+        <input name="search" value="{{ search }}" placeholder="Название или владелец" maxlength="80">
+    </label>
+    <label>
+        Сфера
+        <select name="industry">
+            <option value="all" {% if selected_industry == "all" %}selected{% endif %}>Все сферы</option>
+            {% for industry_key, industry_title in industry_options %}
+            <option value="{{ industry_key }}" {% if selected_industry == industry_key %}selected{% endif %}>{{ industry_title }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>
+        Тариф
+        <select name="plan">
+            <option value="all" {% if selected_plan == "all" %}selected{% endif %}>Все тарифы</option>
+            {% for plan_key, plan_label in plan_options %}
+            <option value="{{ plan_key }}" {% if selected_plan == plan_key %}selected{% endif %}>{{ plan_label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <button type="submit">Найти</button>
+    {% if search or selected_industry != "all" or selected_plan != "all" %}
+    <a href="/platform/companies">Сбросить</a>
+    {% endif %}
+</form>
+
+<div class="meta">Показано компаний: {{ companies|length }}</div>
+
 {% if companies %}
 {% for company in companies %}
 <div class="company">
@@ -98,7 +135,11 @@ h1{margin:0 0 12px;font-size:36px}
 </div>
 {% endfor %}
 {% else %}
+{% if search or selected_industry != "all" or selected_plan != "all" %}
+<div class="meta">По выбранным условиям компаний не найдено</div>
+{% else %}
 <div class="meta">Компаний пока нет</div>
+{% endif %}
 {% endif %}
 </div>
 

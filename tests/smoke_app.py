@@ -9824,6 +9824,39 @@ async def assert_platform_companies_page():
     assert "Тариф: Базовый" in list_html
     assert "Лимит пользователей: 3" in list_html
 
+    filtered_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            "search=Smoke%20Logistics&industry=logistics&plan=basic",
+        ),
+        search="Smoke Logistics",
+        industry="logistics",
+        plan="basic",
+    )
+    filtered_html = filtered_response.body.decode("utf-8")
+    assert filtered_response.status_code == 200
+    assert filtered_response.context["search"] == "Smoke Logistics"
+    assert filtered_response.context["selected_industry"] == "logistics"
+    assert filtered_response.context["selected_plan"] == "basic"
+    assert "Smoke Logistics Company" in filtered_html
+    assert 'value="Smoke Logistics"' in filtered_html
+    assert "Сбросить" in filtered_html
+    assert "Показано компаний:" in filtered_html
+
+    empty_filter_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            "search=no_such_company",
+        ),
+        search="no_such_company",
+    )
+    empty_filter_html = empty_filter_response.body.decode("utf-8")
+    assert empty_filter_response.status_code == 200
+    assert "По выбранным условиям компаний не найдено" in empty_filter_html
+    assert "Компаний пока нет" not in empty_filter_html
+
     logistics_create_page = await crm.create_task_page(
         make_asgi_request("smoke_logistics_owner", "/create-task"),
     )

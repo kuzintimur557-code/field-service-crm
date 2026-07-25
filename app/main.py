@@ -6736,7 +6736,12 @@ async def create_platform_company(request: Request):
 
 
 @app.get("/platform/companies", response_class=HTMLResponse)
-async def platform_companies_page(request: Request):
+async def platform_companies_page(
+    request: Request,
+    search: str = "",
+    industry: str = "all",
+    plan: str = "all",
+):
 
     username = get_user(request)
 
@@ -6748,10 +6753,15 @@ async def platform_companies_page(request: Request):
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
+    search = str(search or "").strip()[:80]
+    allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
+    selected_industry = industry if industry in allowed_industries else "all"
+    selected_plan = plan if plan in PLAN_DEFINITIONS else "all"
+
     conn = connect()
     c = conn.cursor()
 
-    company_rows = c.execute("""
+    query = """
     SELECT
         companies.id,
         companies.name,
@@ -6762,8 +6772,30 @@ async def platform_companies_page(request: Request):
     FROM companies
     LEFT JOIN company_settings AS settings
       ON settings.company_id=companies.id
-    ORDER BY companies.id DESC
-    """).fetchall()
+    WHERE 1=1
+    """
+    params = []
+
+    if search:
+        query += """
+          AND (
+              lower(companies.name) LIKE ?
+              OR lower(companies.owner_username) LIKE ?
+          )
+        """
+        search_like = f"%{search.lower()}%"
+        params.extend([search_like, search_like])
+
+    if selected_industry != "all":
+        query += " AND COALESCE(settings.industry, 'field_service')=?"
+        params.append(selected_industry)
+
+    if selected_plan != "all":
+        query += " AND COALESCE(settings.plan, 'basic')=?"
+        params.append(selected_plan)
+
+    query += " ORDER BY companies.id DESC"
+    company_rows = c.execute(query, params).fetchall()
 
     conn.close()
     industry_labels = dict(INDUSTRY_OPTIONS)
@@ -6793,7 +6825,11 @@ async def platform_companies_page(request: Request):
             "username": username,
             "role": role,
             "companies": companies,
-            "industry_options": INDUSTRY_OPTIONS
+            "industry_options": INDUSTRY_OPTIONS,
+            "plan_options": get_plan_options(),
+            "search": search,
+            "selected_industry": selected_industry,
+            "selected_plan": selected_plan,
         }
     )
 
