@@ -1277,6 +1277,7 @@ def is_password_strong(password):
 PLAN_DEFINITIONS = {
     "basic": {
         "label": "Базовый",
+        "settings_label": "Базовый — без 1С",
         "user_limit": 3,
         "one_c_enabled": 0,
         "calls_enabled": 0,
@@ -1284,6 +1285,7 @@ PLAN_DEFINITIONS = {
     },
     "team": {
         "label": "Команда",
+        "settings_label": "Команда — звонки без 1С",
         "user_limit": 10,
         "one_c_enabled": 0,
         "calls_enabled": 1,
@@ -1291,6 +1293,7 @@ PLAN_DEFINITIONS = {
     },
     "business": {
         "label": "Бизнес",
+        "settings_label": "Бизнес — звонки без 1С",
         "user_limit": 30,
         "one_c_enabled": 0,
         "calls_enabled": 1,
@@ -1298,6 +1301,7 @@ PLAN_DEFINITIONS = {
     },
     "business_1c": {
         "label": "Бизнес + 1С",
+        "settings_label": "Бизнес + 1С",
         "user_limit": 30,
         "one_c_enabled": 1,
         "calls_enabled": 1,
@@ -1305,6 +1309,7 @@ PLAN_DEFINITIONS = {
     },
     "enterprise_1c": {
         "label": "Корпоративный + 1С",
+        "settings_label": "Корпоративный + 1С + ИИ-звонки",
         "user_limit": None,
         "one_c_enabled": 1,
         "calls_enabled": 1,
@@ -1320,6 +1325,13 @@ def normalize_plan(plan):
 
 def get_plan_label(plan):
     return PLAN_DEFINITIONS[normalize_plan(plan)]["label"]
+
+
+def get_plan_options():
+    return [
+        (plan_key, definition["settings_label"])
+        for plan_key, definition in PLAN_DEFINITIONS.items()
+    ]
 
 
 def get_plan_user_limit(plan):
@@ -28848,6 +28860,7 @@ async def settings_page(request: Request):
             "features": features,
             "feature_definitions": FEATURE_DEFINITIONS,
             "core_features": CORE_FEATURES,
+            "plan_options": get_plan_options(),
             "industry_options": INDUSTRY_OPTIONS,
             "business_presets": BUSINESS_PRESETS
         }

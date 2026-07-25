@@ -5763,6 +5763,7 @@ async def assert_profile_page():
 async def assert_settings_page():
     assert crm.normalize_plan("unknown") == "basic"
     assert crm.get_plan_label("team") == "Команда"
+    assert ("team", "Команда — звонки без 1С") in crm.get_plan_options()
     assert crm.get_plan_user_limit("enterprise_1c") is None
     assert crm.get_plan_feature_flags("basic") == {
         "one_c_enabled": 0,
@@ -5787,6 +5788,7 @@ async def assert_settings_page():
 
     response = await crm.settings_page(make_asgi_request("owner2", "/settings"))
     assert response.status_code == 200
+    assert ("team", "Команда — звонки без 1С") in response.context["plan_options"]
     html = response.body.decode("utf-8")
     assert "Настройки компании" in html
     assert "Диагностика системы" in html
