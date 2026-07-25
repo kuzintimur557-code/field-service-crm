@@ -29676,11 +29676,11 @@ async def client_detail(
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
     selected_task_filter = task_filter if task_filter in ("active", "completed", "overdue") else ""
-    selected_task_search = str(task_search or "").strip()
+    selected_task_search = str(task_search or "").strip()[:100]
     selected_task_sort = task_sort if task_sort in ("oldest", "date_asc", "date_desc") else "newest"
     selected_activity_filter = activity_filter if activity_filter in ("status", "date", "comment") else ""
-    selected_note_search = str(note_search or "").strip()
-    selected_file_search = str(file_search or "").strip()
+    selected_note_search = str(note_search or "").strip()[:100]
+    selected_file_search = str(file_search or "").strip()[:100]
     selected_call_filter = call_filter if call_filter in ("follow_up", "missed", "completed") else ""
     search_value = selected_task_search.lower()
     note_search_value = selected_note_search.lower()
