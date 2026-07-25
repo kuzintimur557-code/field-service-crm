@@ -169,7 +169,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 	<label>Тариф</label>
 <select name="plan">
     <option value="basic" {% if settings["plan"] == "basic" %}selected{% endif %}>Базовый — без 1С</option>
-    <option value="team" {% if settings["plan"] == "team" %}selected{% endif %}>Команда — без 1С</option>
+    <option value="team" {% if settings["plan"] == "team" %}selected{% endif %}>Команда — звонки без 1С</option>
     <option value="business" {% if settings["plan"] == "business" %}selected{% endif %}>Бизнес — звонки без 1С</option>
     <option value="business_1c" {% if settings["plan"] == "business_1c" %}selected{% endif %}>Бизнес + 1С</option>
     <option value="enterprise_1c" {% if settings["plan"] == "enterprise_1c" %}selected{% endif %}>Корпоративный + 1С + ИИ-звонки</option>

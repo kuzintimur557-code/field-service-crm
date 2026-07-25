@@ -28810,7 +28810,7 @@ async def update_settings(request: Request):
         industry = "field_service"
 
     one_c_enabled = 1 if plan in ("business_1c", "enterprise_1c") else 0
-    calls_enabled = 1 if plan in ("business", "business_1c", "enterprise_1c") else 0
+    calls_enabled = 1 if plan in ("team", "business", "business_1c", "enterprise_1c") else 0
     ai_calls_enabled = 1 if plan == "enterprise_1c" else 0
     company_id, missing_company_response = require_route_company_context(username, role)
 

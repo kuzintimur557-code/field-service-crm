@@ -5770,6 +5770,7 @@ async def assert_settings_page():
     assert "Поля компании" in html
     assert "Сохранить настройки" in html
     assert "Реквизиты, банк, получатель..." in html
+    assert "Команда — звонки без 1С" in html
     assert "status-on" in html
     assert "status-off" in html
     assert 'class="mobile-nav"' in html
@@ -5827,6 +5828,41 @@ async def assert_settings_page():
         "/settings",
     )
 
+    team_settings_form = dict(settings_form)
+    team_settings_form["plan"] = "team"
+    team_captured_events = []
+    crm.run_automation_event = (
+        lambda *args, **kwargs: team_captured_events.append(args)
+    )
+
+    try:
+        team_update_response = await crm.update_settings(
+            make_form_request("owner2", "/settings", team_settings_form)
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert team_update_response.status_code == 302
+    team_settings = crm.get_company_settings(2)
+    assert team_settings["plan"] == "team"
+    assert team_settings["calls_enabled"] == 1
+    assert team_settings["one_c_enabled"] == 0
+    assert team_settings["ai_calls_enabled"] == 0
+
+    restore_events = []
+    crm.run_automation_event = (
+        lambda *args, **kwargs: restore_events.append(args)
+    )
+
+    try:
+        restore_response = await crm.update_settings(
+            make_form_request("owner2", "/settings", settings_form)
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert restore_response.status_code == 302
+
 
 async def assert_billing_page():
     response = await crm.billing_page(make_asgi_request("owner2", "/billing"))
@@ -5837,6 +5873,22 @@ async def assert_billing_page():
     assert "Доступные тарифы" in html
     assert "Включено" in html
     assert "Настройка 1С" in html
+    basic_section = html.split('<div class="name">Базовый</div>', 1)[1].split(
+        '<div class="name">Команда</div>',
+        1,
+    )[0]
+    team_section = html.split('<div class="name">Команда</div>', 1)[1].split(
+        '<div class="name">Бизнес</div>',
+        1,
+    )[0]
+    assert (
+        '<span class="feature-state no">Нет</span><span>Звонки</span>'
+        in basic_section
+    )
+    assert (
+        '<span class="feature-state yes">Включено</span><span>Звонки</span>'
+        in team_section
+    )
     assert "feature-state yes" in html
     assert "feature-state no" in html
     assert 'class="mobile-nav"' in html
