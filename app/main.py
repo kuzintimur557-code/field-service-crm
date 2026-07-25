@@ -27199,32 +27199,14 @@ async def reports_page(request: Request, month: str = ""):
     )
 
 
-@app.get("/calls", response_class=HTMLResponse)
-async def calls_page(
-    request: Request,
+def get_call_history_for_company(
+    company_id: int,
     status: str = "",
     client_id: str = "",
     search: str = "",
-    content: str = ""
+    content: str = "",
+    limit=50,
 ):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    disabled_response = require_feature(company_id, "calls")
-
-    if disabled_response:
-        return disabled_response
-
-    settings = get_company_settings(company_id)
     selected_call_status = status if status in ("completed", "missed", "follow_up") else ""
     selected_call_content = content if content in ("audio", "analysis") else ""
     selected_call_search = str(search or "").strip()
@@ -27234,16 +27216,6 @@ async def calls_page(
         selected_call_client_id = int(str(client_id or "").strip()) if str(client_id or "").strip() else None
     except ValueError:
         selected_call_client_id = None
-
-    conn = connect()
-    c = conn.cursor()
-
-    clients = c.execute("""
-    SELECT id, name, phone
-    FROM clients
-    WHERE company_id=?
-    ORDER BY name, id
-    """, (company_id,)).fetchall()
 
     call_filters = ["call_records.company_id=?"]
     call_params = [company_id]
@@ -27287,6 +27259,15 @@ async def calls_page(
         ])
 
     call_where_sql = " AND ".join(call_filters)
+    limit_clause = ""
+    list_params = list(call_params)
+
+    if limit is not None:
+        limit_clause = "LIMIT ?"
+        list_params.append(limit)
+
+    conn = connect()
+    c = conn.cursor()
 
     call_records = c.execute(f"""
     SELECT
@@ -27299,8 +27280,8 @@ async def calls_page(
     WHERE {call_where_sql}
     ORDER BY COALESCE(call_records.call_at, call_records.created_at) DESC,
              call_records.id DESC
-    LIMIT 50
-    """, call_params).fetchall()
+    {limit_clause}
+    """, list_params).fetchall()
 
     call_stats_row = c.execute(f"""
     SELECT
@@ -27331,6 +27312,63 @@ async def calls_page(
 
     conn.close()
 
+    return {
+        "call_records": call_records,
+        "call_stats": call_stats,
+        "selected_call_status": selected_call_status,
+        "selected_call_content": selected_call_content,
+        "selected_call_client_id": selected_call_client_id,
+        "selected_call_search": selected_call_search,
+    }
+
+
+@app.get("/calls", response_class=HTMLResponse)
+async def calls_page(
+    request: Request,
+    status: str = "",
+    client_id: str = "",
+    search: str = "",
+    content: str = ""
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "calls")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+    call_data = get_call_history_for_company(
+        company_id,
+        status=status,
+        client_id=client_id,
+        search=search,
+        content=content,
+        limit=50,
+    )
+
+    conn = connect()
+    c = conn.cursor()
+
+    clients = c.execute("""
+    SELECT id, name, phone
+    FROM clients
+    WHERE company_id=?
+    ORDER BY name, id
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
     return templates.TemplateResponse(
         request,
         "calls.html",
@@ -27340,12 +27378,12 @@ async def calls_page(
             "role": role,
             "settings": settings,
             "clients": clients,
-            "call_records": call_records,
-            "call_stats": call_stats,
-            "selected_call_status": selected_call_status,
-            "selected_call_content": selected_call_content,
-            "selected_call_client_id": selected_call_client_id,
-            "selected_call_search": selected_call_search
+            "call_records": call_data["call_records"],
+            "call_stats": call_data["call_stats"],
+            "selected_call_status": call_data["selected_call_status"],
+            "selected_call_content": call_data["selected_call_content"],
+            "selected_call_client_id": call_data["selected_call_client_id"],
+            "selected_call_search": call_data["selected_call_search"]
         }
     )
 
@@ -27380,76 +27418,19 @@ async def calls_export(
     if not settings or not settings["calls_enabled"]:
         return RedirectResponse("/calls", status_code=302)
 
-    selected_call_status = status if status in ("completed", "missed", "follow_up") else ""
-    selected_call_content = content if content in ("audio", "analysis") else ""
-    selected_call_search = str(search or "").strip()
-    selected_call_client_id = None
-
-    try:
-        selected_call_client_id = int(str(client_id or "").strip()) if str(client_id or "").strip() else None
-    except ValueError:
-        selected_call_client_id = None
-
-    call_filters = ["call_records.company_id=?"]
-    call_params = [company_id]
-
-    if selected_call_status:
-        call_filters.append("call_records.status=?")
-        call_params.append(selected_call_status)
-
-    if selected_call_client_id:
-        call_filters.append("call_records.client_id=?")
-        call_params.append(selected_call_client_id)
-
-    if selected_call_content == "audio":
-        call_filters.append("COALESCE(call_records.audio_filename, '')!=''")
-
-    if selected_call_content == "analysis":
-        call_filters.append("""
-        (
-            COALESCE(call_records.transcript, '')!=''
-            OR COALESCE(call_records.ai_summary, '')!=''
-        )
-        """)
-
-    if selected_call_search:
-        search_pattern = f"%{selected_call_search.lower()}%"
-        call_filters.append("""
-        (
-            LOWER(COALESCE(call_records.summary, '')) LIKE ?
-            OR LOWER(COALESCE(call_records.transcript, '')) LIKE ?
-            OR LOWER(COALESCE(call_records.ai_summary, '')) LIKE ?
-            OR LOWER(COALESCE(call_records.phone, '')) LIKE ?
-            OR LOWER(COALESCE(clients.name, '')) LIKE ?
-        )
-        """)
-        call_params.extend([
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-        ])
-
-    call_where_sql = " AND ".join(call_filters)
-
-    conn = connect()
-    c = conn.cursor()
-
-    call_records = c.execute(f"""
-    SELECT
-        call_records.*,
-        clients.name AS client_name
-    FROM call_records
-    LEFT JOIN clients
-      ON clients.id=call_records.client_id
-     AND clients.company_id=call_records.company_id
-    WHERE {call_where_sql}
-    ORDER BY COALESCE(call_records.call_at, call_records.created_at) DESC,
-             call_records.id DESC
-    """, call_params).fetchall()
-
-    conn.close()
+    call_data = get_call_history_for_company(
+        company_id,
+        status=status,
+        client_id=client_id,
+        search=search,
+        content=content,
+        limit=None,
+    )
+    call_records = call_data["call_records"]
+    selected_call_status = call_data["selected_call_status"]
+    selected_call_content = call_data["selected_call_content"]
+    selected_call_search = call_data["selected_call_search"]
+    selected_call_client_id = call_data["selected_call_client_id"]
 
     direction_labels = {
         "incoming": "Входящий",
