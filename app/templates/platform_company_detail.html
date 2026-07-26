@@ -175,7 +175,10 @@ h2{margin:0 0 16px;font-size:22px}
         <div class="row">
             <div>
                 <div class="name">{{ user["full_name"] or user["username"] }}</div>
-                <div class="meta">{{ user["username"] }}</div>
+                <div class="meta">
+                    {{ user["username"] }} ·
+                    последний вход: {{ user["last_seen"] or "нет данных" }}
+                </div>
             </div>
             <div class="meta">{{ role_label(user["role"]) }}</div>
             <div>

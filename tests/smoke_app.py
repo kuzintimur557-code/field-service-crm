@@ -10130,6 +10130,7 @@ async def assert_platform_companies_page():
     assert f"/platform/companies/{logistics_company_id}/export" in detail_html
     assert 'name="return_to" value="detail"' in detail_html
     assert "smoke_logistics_owner" in detail_html
+    assert "последний вход:" in detail_html
     assert "Заявок пока нет" in detail_html
 
     anonymous_apply_preset = await crm.apply_platform_company_preset(
