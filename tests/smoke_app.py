@@ -10087,24 +10087,42 @@ async def assert_platform_companies_page():
         "&industry=logistics&plan=basic&error=company_not_found"
     )
 
-    updated_response = await crm.update_platform_company_settings(
-        make_form_request(
-            "super",
-            f"/platform/companies/{logistics_company_id}/settings",
-            {
-                "plan": "team",
-                "industry": "beauty",
-                "return_search": "Smoke Logistics",
-                "return_industry": "logistics",
-                "return_plan": "basic",
-            },
-        ),
-        logistics_company_id,
+    platform_update_events = []
+    original_run_automation_event = crm.run_automation_event
+    crm.run_automation_event = (
+        lambda *args, **kwargs: platform_update_events.append(args) or 1
     )
+
+    try:
+        updated_response = await crm.update_platform_company_settings(
+            make_form_request(
+                "super",
+                f"/platform/companies/{logistics_company_id}/settings",
+                {
+                    "plan": "team",
+                    "industry": "beauty",
+                    "return_search": "Smoke Logistics",
+                    "return_industry": "logistics",
+                    "return_plan": "basic",
+                },
+            ),
+            logistics_company_id,
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
     assert updated_response.status_code == 302
     assert updated_response.headers["location"] == (
         "/platform/companies?search=Smoke+Logistics"
         "&industry=beauty&plan=team&updated=1"
+    )
+    assert platform_update_events[-1] == (
+        logistics_company_id,
+        "company_settings_updated",
+        "company",
+        logistics_company_id,
+        "Платформа обновила настройки компании: Команда / Бьюти",
+        "/settings",
     )
 
     conn = connect()
@@ -10123,6 +10141,21 @@ async def assert_platform_companies_page():
     assert updated_settings["one_c_enabled"] == 0
     assert updated_settings["ai_calls_enabled"] == 0
 
+    platform_notification = c.execute("""
+    SELECT title, message, link
+    FROM notifications
+    WHERE company_id=?
+      AND username='smoke_logistics_owner'
+      AND title='Настройки компании обновлены'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (logistics_company_id,)).fetchone()
+    assert platform_notification is not None
+    assert platform_notification["message"] == (
+        "Платформа изменила тариф: Команда, сфера: Бьюти"
+    )
+    assert platform_notification["link"] == "/settings"
+
     updated_features = {
         row["feature_key"]: row["enabled"]
         for row in c.execute("""
@@ -10136,6 +10169,10 @@ async def assert_platform_companies_page():
     assert updated_features["catalog"] == 1
     assert updated_features["recurring"] == 0
 
+    c.execute(
+        "DELETE FROM notifications WHERE company_id=?",
+        (logistics_company_id,),
+    )
     c.execute(
         "DELETE FROM company_features WHERE company_id=?",
         (logistics_company_id,),

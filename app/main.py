@@ -7141,7 +7141,7 @@ async def update_platform_company_settings(request: Request, company_id: int):
     conn = connect()
     c = conn.cursor()
     company = c.execute("""
-    SELECT id, name
+    SELECT id, name, owner_username
     FROM companies
     WHERE id=?
     """, (company_id,)).fetchone()
@@ -7202,6 +7202,33 @@ async def update_platform_company_settings(request: Request, company_id: int):
     ))
     conn.commit()
     conn.close()
+
+    industry_label = dict(INDUSTRY_OPTIONS).get(industry, "Сфера не указана")
+    owner_username = str(company["owner_username"] or "").strip()
+
+    if owner_username:
+        create_notification(
+            company_id,
+            owner_username,
+            "Настройки компании обновлены",
+            (
+                f"Платформа изменила тариф: {get_plan_label(plan)}, "
+                f"сфера: {industry_label}"
+            ),
+            "/settings",
+        )
+
+    run_automation_event(
+        company_id,
+        "company_settings_updated",
+        "company",
+        company_id,
+        (
+            f"Платформа обновила настройки компании: "
+            f"{get_plan_label(plan)} / {industry_label}"
+        ),
+        "/settings",
+    )
 
     separator = "&" if "?" in return_url else "?"
 
