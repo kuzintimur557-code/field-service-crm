@@ -10492,6 +10492,7 @@ async def assert_platform_presets_page():
     assert "Заявка:" in html
     assert "/platform/companies?industry=beauty" in html
     assert "/platform/modules/calendar" in html
+    assert "/platform/presets/export" in html
     assert 'class="platform-mobile-nav"' in html
     assert response.context["summary"]["presets_count"] == len(
         crm.INDUSTRY_OPTIONS
@@ -10500,6 +10501,30 @@ async def assert_platform_presets_page():
         crm.FEATURE_DEFINITIONS
     )
     assert response.context["summary"]["companies_count"] >= 1
+
+    anonymous_export = await crm.platform_presets_export(
+        make_public_asgi_request("/platform/presets/export"),
+    )
+    assert anonymous_export.status_code == 302
+    assert anonymous_export.headers["location"] == "/login"
+
+    boss_export = await crm.platform_presets_export(
+        make_asgi_request("owner2", "/platform/presets/export"),
+    )
+    assert boss_export.status_code == 302
+    assert boss_export.headers["location"] == "/"
+
+    export_response = await crm.platform_presets_export(
+        make_asgi_request("super", "/platform/presets/export"),
+    )
+    export_csv = export_response.body.decode("utf-8")
+    assert export_response.status_code == 200
+    assert export_response.headers["content-disposition"] == (
+        "attachment; filename=platform_presets.csv"
+    )
+    assert "Сфера,Ключ,Компаний" in export_csv
+    assert "Бьюти,beauty" in export_csv
+    assert "Грузоперевозки,logistics" in export_csv
 
     platform_page = await crm.platform_dashboard(
         make_asgi_request("super", "/platform"),

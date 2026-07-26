@@ -7854,6 +7854,59 @@ async def platform_presets_page(request: Request):
     )
 
 
+@app.get("/platform/presets/export")
+async def platform_presets_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    preset_usage = get_platform_preset_usage()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Сфера",
+        "Ключ",
+        "Компаний",
+        "Модулей в пресете",
+        "Заявка",
+        "Исполнитель",
+        "Клиент",
+        "Услуга",
+        "Модули",
+    ])
+
+    for preset in preset_usage["presets"]:
+        writer.writerow([
+            preset["title"],
+            preset["key"],
+            preset["companies_count"],
+            preset["modules_count"],
+            preset["labels"]["task_label"],
+            preset["labels"]["worker_label"],
+            preset["labels"]["client_label"],
+            preset["labels"]["service_label"],
+            "; ".join(feature["title"] for feature in preset["features"]),
+        ])
+
+    return Response(
+        output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=platform_presets.csv"
+            )
+        },
+    )
+
+
 def format_file_size(size):
     size = int(size or 0)
     units = ["байт", "КБ", "МБ", "ГБ"]
