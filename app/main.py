@@ -6821,8 +6821,24 @@ def get_platform_company_items(
             if company["user_limit_tone"] == selected_limit
         ]
 
+    summary = {
+        "companies": len(companies),
+        "active_users": sum(
+            company["active_users_count"] for company in companies
+        ),
+        "active_tasks": sum(
+            company["active_tasks_count"] for company in companies
+        ),
+        "limit_alerts": sum(
+            1
+            for company in companies
+            if company["user_limit_tone"] in {"warning", "danger"}
+        ),
+    }
+
     return {
         "companies": companies,
+        "summary": summary,
         "search": search,
         "selected_industry": selected_industry,
         "selected_plan": selected_plan,
@@ -7155,6 +7171,7 @@ async def platform_companies_page(
             "username": username,
             "role": role,
             "companies": company_data["companies"],
+            "summary": company_data["summary"],
             "industry_options": INDUSTRY_OPTIONS,
             "plan_options": get_plan_options(),
             "search": company_data["search"],

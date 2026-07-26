@@ -22,6 +22,10 @@ h1{margin:0 0 12px;font-size:36px}
 .filters input,.filters select{padding:12px;border:1px solid #d1d5db;border-radius:12px;font-size:14px}
 .filters button,.filters a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;text-decoration:none;font-weight:900;cursor:pointer}
 .filters a{background:#e5e7eb;color:#111827}
+.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0 18px}
+.summary-item{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.summary-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
+.summary-value{margin-top:5px;font-size:22px;font-weight:900}
 .company-settings{display:grid;grid-column:1/-1;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:10px;padding-top:12px;border-top:1px solid #e5e7eb}
 .company-settings label{display:grid;gap:6px;color:#6b7280;font-size:12px;font-weight:900}
 .company-settings select{padding:10px;border:1px solid #d1d5db;border-radius:11px;background:white;font-size:13px}
@@ -32,6 +36,7 @@ h1{margin:0 0 12px;font-size:36px}
 @media(max-width:850px){.container{padding:16px}.company{grid-template-columns:1fr}h1{font-size:30px}}
 @media(max-width:850px){.filters{grid-template-columns:1fr}.filters button,.filters a{width:100%}}
 @media(max-width:850px){.company-settings{grid-template-columns:1fr}.company-settings button{width:100%}}
+@media(max-width:850px){.summary-grid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 
@@ -144,6 +149,25 @@ h1{margin:0 0 12px;font-size:36px}
     {% endif %}
     <a href="/platform/companies/export?search={{ search|urlencode }}&amp;industry={{ selected_industry|urlencode }}&amp;plan={{ selected_plan|urlencode }}&amp;limit={{ selected_limit|urlencode }}">Экспорт CSV</a>
 </form>
+
+<div class="summary-grid">
+    <div class="summary-item">
+        <div class="summary-label">Компаний</div>
+        <div class="summary-value">{{ summary["companies"] }}</div>
+    </div>
+    <div class="summary-item">
+        <div class="summary-label">Активных пользователей</div>
+        <div class="summary-value">{{ summary["active_users"] }}</div>
+    </div>
+    <div class="summary-item">
+        <div class="summary-label">Активных заявок</div>
+        <div class="summary-value">{{ summary["active_tasks"] }}</div>
+    </div>
+    <div class="summary-item">
+        <div class="summary-label">Проблем с лимитом</div>
+        <div class="summary-value">{{ summary["limit_alerts"] }}</div>
+    </div>
+</div>
 
 <div class="meta">Показано компаний: {{ companies|length }}</div>
 

@@ -9721,6 +9721,8 @@ async def assert_platform_companies_page():
     html = response.body.decode("utf-8")
     assert "Компании" in html
     assert "Создать компанию" in html
+    assert "Активных пользователей" in html
+    assert "Проблем с лимитом" in html
     assert "Сервис / выездные работы" in html
     assert "Бьюти" in html
     assert 'name="industry"' in html
@@ -9829,6 +9831,10 @@ async def assert_platform_companies_page():
     assert "Осталось мест: 2" in list_html
     assert "Пользователи: 1 / 1" in list_html
     assert "Заявки: 0 активные · 0 архив" in list_html
+    assert list_response.context["summary"]["companies"] >= 1
+    assert list_response.context["summary"]["active_users"] >= 1
+    assert list_response.context["summary"]["active_tasks"] >= 0
+    assert list_response.context["summary"]["limit_alerts"] >= 0
     assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
     assert 'name="return_search"' in list_html
     assert 'name="return_limit"' in list_html
@@ -9873,6 +9879,7 @@ async def assert_platform_companies_page():
     limit_filter_html = limit_filter_response.body.decode("utf-8")
     assert limit_filter_response.status_code == 200
     assert limit_filter_response.context["selected_limit"] == "ok"
+    assert limit_filter_response.context["summary"]["companies"] >= 1
     assert "Smoke Logistics Company" in limit_filter_html
     assert "Осталось мест: 2" in limit_filter_html
 
@@ -9901,6 +9908,7 @@ async def assert_platform_companies_page():
     empty_limit_html = empty_limit_response.body.decode("utf-8")
     assert empty_limit_response.status_code == 200
     assert empty_limit_response.context["selected_limit"] == "danger"
+    assert empty_limit_response.context["summary"]["companies"] == 0
     assert "По выбранным условиям компаний не найдено" in empty_limit_html
 
     anonymous_export = await crm.platform_companies_export(
