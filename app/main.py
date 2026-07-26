@@ -7116,19 +7116,37 @@ def get_platform_module_usage():
 def get_platform_preset_usage():
     conn = connect()
     c = conn.cursor()
-    industry_rows = c.execute("""
+    company_rows = c.execute("""
     SELECT
+        companies.id,
         COALESCE(industry, 'field_service') AS industry,
-        COUNT(*) AS companies_count
-    FROM company_settings
-    GROUP BY COALESCE(industry, 'field_service')
+        companies.name
+    FROM companies
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=companies.id
     """).fetchall()
     conn.close()
 
-    company_counts = {
-        row["industry"]: int(row["companies_count"] or 0)
-        for row in industry_rows
-    }
+    feature_keys = [feature_key for feature_key, _, _ in FEATURE_DEFINITIONS]
+    company_counts = {}
+    drift_counts = {}
+
+    for row in company_rows:
+        industry = str(row["industry"] or "field_service")
+        company_counts[industry] = company_counts.get(industry, 0) + 1
+        expected_features = set(
+            BUSINESS_PRESETS.get(industry, BUSINESS_PRESETS["other"])
+        ) | CORE_FEATURES
+        current_features = get_company_features(row["id"])
+        has_drift = any(
+            bool(current_features.get(feature_key))
+            != (feature_key in expected_features)
+            for feature_key in feature_keys
+        )
+
+        if has_drift:
+            drift_counts[industry] = drift_counts.get(industry, 0) + 1
+
     feature_titles = {
         feature_key: title
         for feature_key, title, _ in FEATURE_DEFINITIONS
@@ -7139,7 +7157,7 @@ def get_platform_preset_usage():
         enabled_features = BUSINESS_PRESETS.get(
             industry_key,
             BUSINESS_PRESETS["other"],
-        )
+        ) | CORE_FEATURES
         labels = INDUSTRY_LABEL_PRESETS.get(
             industry_key,
             INDUSTRY_LABEL_PRESETS["field_service"],
@@ -7157,6 +7175,7 @@ def get_platform_preset_usage():
             "key": industry_key,
             "title": industry_title,
             "companies_count": company_counts.get(industry_key, 0),
+            "drift_count": drift_counts.get(industry_key, 0),
             "modules_count": len(feature_items),
             "features": feature_items,
             "labels": labels,
@@ -7170,6 +7189,7 @@ def get_platform_preset_usage():
             for preset in preset_rows
             if preset["companies_count"] > 0
         ),
+        "drift_count": sum(drift_counts.values()),
         "modules_count": len(FEATURE_DEFINITIONS),
     }
 
@@ -7875,6 +7895,7 @@ async def platform_presets_export(request: Request):
         "Сфера",
         "Ключ",
         "Компаний",
+        "Отклонений",
         "Модулей в пресете",
         "Заявка",
         "Исполнитель",
@@ -7888,6 +7909,7 @@ async def platform_presets_export(request: Request):
             preset["title"],
             preset["key"],
             preset["companies_count"],
+            preset["drift_count"],
             preset["modules_count"],
             preset["labels"]["task_label"],
             preset["labels"]["worker_label"],

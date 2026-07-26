@@ -10489,6 +10489,7 @@ async def assert_platform_presets_page():
     assert "Сферы бизнеса" in html
     assert "Бьюти" in html
     assert "Грузоперевозки" in html
+    assert "Отклонений" in html
     assert "Заявка:" in html
     assert "/platform/companies?industry=beauty" in html
     assert "/platform/modules/calendar" in html
@@ -10501,6 +10502,7 @@ async def assert_platform_presets_page():
         crm.FEATURE_DEFINITIONS
     )
     assert response.context["summary"]["companies_count"] >= 1
+    assert response.context["summary"]["drift_count"] >= 0
 
     anonymous_export = await crm.platform_presets_export(
         make_public_asgi_request("/platform/presets/export"),
@@ -10523,6 +10525,7 @@ async def assert_platform_presets_page():
         "attachment; filename=platform_presets.csv"
     )
     assert "Сфера,Ключ,Компаний" in export_csv
+    assert "Отклонений" in export_csv
     assert "Бьюти,beauty" in export_csv
     assert "Грузоперевозки,logistics" in export_csv
 
@@ -13028,6 +13031,7 @@ async def assert_platform_calendar_health():
         assert platform_page.context["preset_usage_summary"]["presets_count"] == len(
             crm.INDUSTRY_OPTIONS
         )
+        assert platform_page.context["preset_usage_summary"]["drift_count"] >= 0
         assert "secret_key" in {
             item["key"]
             for item in platform_page.context["release_readiness"]["checks"]
