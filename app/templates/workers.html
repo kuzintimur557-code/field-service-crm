@@ -39,8 +39,10 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 .notice{margin-top:16px;padding:14px;border-radius:16px;font-weight:900}
 .ok{background:#dcfce7;color:#166534}
 .err{background:#fee2e2;color:#991b1b}
-.team-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.team-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
 .team-stat{background:#f9fafb;padding:14px;border-radius:14px}
+.team-stat.warning{background:#fffbeb;border:1px solid #fde68a}
+.team-stat.danger{background:#fef2f2;border:1px solid #fecaca}
 .team-stat strong{display:block;font-size:22px;margin-top:4px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 .filters a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border-radius:12px;background:#f3f4f6;color:#374151;text-decoration:none;font-size:13px;font-weight:900;white-space:nowrap}
@@ -161,7 +163,18 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
         <div class="meta">Отключённые</div>
         <strong>{{ team_counts["inactive_count"] or 0 }}</strong>
     </div>
+    <div class="team-stat {{ user_limit_usage['tone'] }}">
+        <div class="meta">Лимит тарифа</div>
+        <strong>{{ user_limit_usage["active_users_count"] }} / {{ user_limit_usage["user_limit_label"] }}</strong>
+        <div class="meta">{{ user_limit_usage["status"] }}</div>
+    </div>
 </div>
+
+{% if user_limit_usage["tone"] in ["warning", "danger"] %}
+<div class="notice err">
+Лимит тарифа: {{ user_limit_usage["status"] }}. Текущий тариф: {{ user_limit_usage["plan_label"] }}.
+</div>
+{% endif %}
 
 <form class="search-form" method="get" action="/workers">
     <input type="hidden" name="status" value="{{ status }}">

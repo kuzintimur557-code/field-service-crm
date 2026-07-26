@@ -1347,6 +1347,79 @@ def get_plan_feature_flags(plan):
     }
 
 
+def get_user_limit_status(active_users_count, user_limit):
+    active_users_count = int(active_users_count or 0)
+
+    if user_limit is None:
+        return {
+            "label": "Без лимита",
+            "tone": "ok",
+            "remaining": None,
+        }
+
+    user_limit = int(user_limit or 0)
+
+    if active_users_count > user_limit:
+        return {
+            "label": f"Превышен лимит на {active_users_count - user_limit}",
+            "tone": "danger",
+            "remaining": 0,
+        }
+
+    if active_users_count == user_limit:
+        return {
+            "label": "Лимит заполнен",
+            "tone": "warning",
+            "remaining": 0,
+        }
+
+    return {
+        "label": f"Осталось мест: {user_limit - active_users_count}",
+        "tone": "ok",
+        "remaining": user_limit - active_users_count,
+    }
+
+
+def get_company_user_limit_usage(company_id, settings=None):
+    company_id = require_company_id_value(company_id)
+    settings = settings or get_company_settings(company_id)
+    plan = normalize_plan(
+        settings["plan"] if settings and "plan" in settings.keys() else "basic"
+    )
+    user_limit = get_plan_user_limit(plan)
+
+    conn = connect()
+    c = conn.cursor()
+    row = c.execute("""
+    SELECT
+        COUNT(*) AS users_count,
+        SUM(CASE WHEN COALESCE(is_active, 1)=1 THEN 1 ELSE 0 END)
+            AS active_users_count
+    FROM users
+    WHERE company_id=?
+      AND role!='superadmin'
+    """, (company_id,)).fetchone()
+    conn.close()
+
+    users_count = int(row["users_count"] or 0) if row else 0
+    active_users_count = (
+        int(row["active_users_count"] or 0) if row else 0
+    )
+    status = get_user_limit_status(active_users_count, user_limit)
+
+    return {
+        "plan": plan,
+        "plan_label": get_plan_label(plan),
+        "user_limit": user_limit,
+        "user_limit_label": str(user_limit) if user_limit else "без лимита",
+        "users_count": users_count,
+        "active_users_count": active_users_count,
+        "status": status["label"],
+        "tone": status["tone"],
+        "remaining": status["remaining"],
+    }
+
+
 def require_company_id_value(company_id):
     if not company_id:
         raise ValueError("company_id is required")
@@ -6793,24 +6866,12 @@ def get_platform_company_items(
             company.get("archived_tasks_count") or 0
         )
 
-        if user_limit is None:
-            company["user_limit_status"] = "Без лимита"
-            company["user_limit_tone"] = "ok"
-        elif company["active_users_count"] > user_limit:
-            company["user_limit_status"] = (
-                f"Превышен лимит на "
-                f"{company['active_users_count'] - user_limit}"
-            )
-            company["user_limit_tone"] = "danger"
-        elif company["active_users_count"] == user_limit:
-            company["user_limit_status"] = "Лимит заполнен"
-            company["user_limit_tone"] = "warning"
-        else:
-            company["user_limit_status"] = (
-                f"Осталось мест: "
-                f"{user_limit - company['active_users_count']}"
-            )
-            company["user_limit_tone"] = "ok"
+        user_limit_status = get_user_limit_status(
+            company["active_users_count"],
+            user_limit,
+        )
+        company["user_limit_status"] = user_limit_status["label"]
+        company["user_limit_tone"] = user_limit_status["tone"]
 
         companies.append(company)
 
@@ -31503,6 +31564,7 @@ async def workers_page(
 
     company_id = get_user_company_id(username)
     settings = get_company_settings(company_id)
+    user_limit_usage = get_company_user_limit_usage(company_id, settings)
     worker_data = get_workers_for_company(
         company_id,
         status=status,
@@ -31533,6 +31595,7 @@ async def workers_page(
             "status": worker_data["status"],
             "search": worker_data["search"],
             "team_counts": team_counts,
+            "user_limit_usage": user_limit_usage,
             "settings": settings
         }
     )
