@@ -7498,6 +7498,63 @@ async def update_platform_company_settings(request: Request, company_id: int):
     )
 
 
+@app.post("/platform/companies/{company_id}/apply-preset")
+async def apply_platform_company_preset(request: Request, company_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    profile = get_platform_company_profile(company_id)
+
+    if not profile:
+        return RedirectResponse(
+            "/platform/companies?error=company_not_found",
+            status_code=302,
+        )
+
+    company = profile["company"]
+    settings = profile["settings"]
+    industry = str(settings["industry"] or "field_service")
+    industry_label = dict(INDUSTRY_OPTIONS).get(
+        industry,
+        "Сфера не указана",
+    )
+
+    apply_business_preset(company_id, industry)
+
+    owner_username = str(company["owner_username"] or "").strip()
+
+    if owner_username:
+        create_notification(
+            company_id,
+            owner_username,
+            "Пресет компании применён",
+            f"Платформа повторно применила пресет: {industry_label}",
+            "/settings",
+        )
+
+    run_automation_event(
+        company_id,
+        "company_settings_updated",
+        "company",
+        company_id,
+        f"Платформа повторно применила пресет: {industry_label}",
+        "/settings",
+    )
+
+    return RedirectResponse(
+        f"/platform/companies/{company_id}?updated=1",
+        status_code=302,
+    )
+
+
 @app.get("/platform/companies/export")
 async def platform_companies_export(
     request: Request,

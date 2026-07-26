@@ -10132,6 +10132,107 @@ async def assert_platform_companies_page():
     assert "smoke_logistics_owner" in detail_html
     assert "Заявок пока нет" in detail_html
 
+    anonymous_apply_preset = await crm.apply_platform_company_preset(
+        make_public_asgi_request(
+            f"/platform/companies/{logistics_company_id}/apply-preset",
+        ),
+        logistics_company_id,
+    )
+    assert anonymous_apply_preset.status_code == 302
+    assert anonymous_apply_preset.headers["location"] == "/login"
+
+    boss_apply_preset = await crm.apply_platform_company_preset(
+        make_asgi_request(
+            "owner2",
+            f"/platform/companies/{logistics_company_id}/apply-preset",
+        ),
+        logistics_company_id,
+    )
+    assert boss_apply_preset.status_code == 302
+    assert boss_apply_preset.headers["location"] == "/"
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_features
+    SET enabled=0
+    WHERE company_id=?
+      AND feature_key='recurring'
+    """, (logistics_company_id,))
+    conn.commit()
+    conn.close()
+
+    drift_response = await crm.platform_company_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    drift_html = drift_response.body.decode("utf-8")
+    assert drift_response.context["preset_drift"]["count"] >= 1
+    assert "Применить пресет" in drift_html
+    assert (
+        f"/platform/companies/{logistics_company_id}/apply-preset"
+        in drift_html
+    )
+
+    apply_preset_events = []
+    original_run_automation_event = crm.run_automation_event
+    crm.run_automation_event = (
+        lambda *args, **kwargs: apply_preset_events.append(args) or 1
+    )
+
+    try:
+        apply_preset_response = await crm.apply_platform_company_preset(
+            make_form_request(
+                "super",
+                f"/platform/companies/{logistics_company_id}/apply-preset",
+                {},
+            ),
+            logistics_company_id,
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert apply_preset_response.status_code == 302
+    assert apply_preset_response.headers["location"] == (
+        f"/platform/companies/{logistics_company_id}?updated=1"
+    )
+    assert apply_preset_events[-1] == (
+        logistics_company_id,
+        "company_settings_updated",
+        "company",
+        logistics_company_id,
+        "Платформа повторно применила пресет: Грузоперевозки",
+        "/settings",
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    restored_recurring = c.execute("""
+    SELECT enabled
+    FROM company_features
+    WHERE company_id=?
+      AND feature_key='recurring'
+    """, (logistics_company_id,)).fetchone()
+    assert restored_recurring["enabled"] == 1
+    preset_notification = c.execute("""
+    SELECT title, message, link
+    FROM notifications
+    WHERE company_id=?
+      AND username='smoke_logistics_owner'
+      AND title='Пресет компании применён'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (logistics_company_id,)).fetchone()
+    assert preset_notification is not None
+    assert preset_notification["message"] == (
+        "Платформа повторно применила пресет: Грузоперевозки"
+    )
+    assert preset_notification["link"] == "/settings"
+    conn.close()
+
     logistics_create_page = await crm.create_task_page(
         make_asgi_request("smoke_logistics_owner", "/create-task"),
     )
