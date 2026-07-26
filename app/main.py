@@ -7068,6 +7068,11 @@ def get_platform_module_usage():
             for company in companies
             if company["features"].get(feature_key)
         ]
+        disabled_companies = [
+            company
+            for company in companies
+            if not company["features"].get(feature_key)
+        ]
         enabled_count = len(enabled_companies)
         coverage_percent = (
             int(round((enabled_count / companies_count) * 100))
@@ -7080,8 +7085,10 @@ def get_platform_module_usage():
             "title": title,
             "description": description,
             "enabled_count": enabled_count,
-            "disabled_count": companies_count - enabled_count,
+            "disabled_count": len(disabled_companies),
             "coverage_percent": coverage_percent,
+            "enabled_companies": enabled_companies,
+            "disabled_companies": disabled_companies,
             "companies": enabled_companies[:5],
         })
 
@@ -7706,6 +7713,49 @@ async def platform_modules_export(request: Request):
             "Content-Disposition": (
                 "attachment; filename=platform_modules.csv"
             )
+        },
+    )
+
+
+@app.get("/platform/modules/{feature_key}", response_class=HTMLResponse)
+async def platform_module_detail_page(request: Request, feature_key: str):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    module_usage = get_platform_module_usage()
+    feature_key = str(feature_key or "").strip()
+    module = next(
+        (
+            item
+            for item in module_usage["modules"]
+            if item["key"] == feature_key
+        ),
+        None,
+    )
+
+    if not module:
+        return RedirectResponse(
+            "/platform/modules?error=module_not_found",
+            status_code=302,
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_module_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "summary": module_usage["summary"],
+            "module": module,
         },
     )
 

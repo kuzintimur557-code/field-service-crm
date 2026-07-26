@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Модуль платформы</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1120px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border-radius:22px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+.header{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:18px;align-items:center}
+h1{margin:0;font-size:34px}
+h2{margin:0 0 14px;font-size:22px}
+.meta{color:#6b7280;font-size:13px;font-weight:800;line-height:1.45}
+.key{margin-top:7px;color:#374151;font-size:12px;font-weight:900}
+.coverage-value{font-size:32px;font-weight:900;text-align:right}
+.bar{height:10px;border-radius:999px;background:#e5e7eb;overflow:hidden;margin-top:8px}
+.bar-fill{height:100%;border-radius:999px;background:#2563eb}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.stat-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
+.stat-value{margin-top:5px;font-size:24px;font-weight:900}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.company{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #e5e7eb}
+.company:last-child{border-bottom:0}
+.company-name{font-size:14px;font-weight:900}
+.company-name a{color:#111827;text-decoration:none}
+.company-name a:hover{color:#2563eb}
+.pill{display:inline-flex;padding:6px 8px;border-radius:8px;background:#f3f4f6;color:#374151;font-size:11px;font-weight:900}
+@media(max-width:850px){
+    .container{padding:16px 14px 92px}
+    .header,.stats,.grid{grid-template-columns:1fr}
+    .coverage-value{text-align:left}
+    h1{font-size:28px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/platform/modules" class="back">Назад к модулям</a>
+
+<div class="card header">
+    <div>
+        <h1>Модуль: {{ module["title"] }}</h1>
+        <div class="meta">{{ module["description"] }}</div>
+        <div class="key">{{ module["key"] }}</div>
+    </div>
+    <div>
+        <div class="coverage-value">{{ module["coverage_percent"] }}%</div>
+        <div class="bar">
+            <div class="bar-fill" style="width:{{ module['coverage_percent'] }}%"></div>
+        </div>
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat">
+        <div class="stat-label">Компаний всего</div>
+        <div class="stat-value">{{ summary["companies_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Включено</div>
+        <div class="stat-value">{{ module["enabled_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Выключено</div>
+        <div class="stat-value">{{ module["disabled_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Покрытие</div>
+        <div class="stat-value">{{ module["coverage_percent"] }}%</div>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h2>Компании с модулем</h2>
+        {% if module["enabled_companies"] %}
+        {% for company in module["enabled_companies"] %}
+        <div class="company">
+            <div>
+                <div class="company-name">
+                    <a href="/platform/companies/{{ company['id'] }}">{{ company["name"] }}</a>
+                </div>
+                <div class="meta">{{ company["industry_label"] }} · {{ company["owner_username"] }}</div>
+            </div>
+            <span class="pill">{{ company["plan_label"] }}</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="meta">Пока нет компаний с этим модулем</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Компании без модуля</h2>
+        {% if module["disabled_companies"] %}
+        {% for company in module["disabled_companies"] %}
+        <div class="company">
+            <div>
+                <div class="company-name">
+                    <a href="/platform/companies/{{ company['id'] }}">{{ company["name"] }}</a>
+                </div>
+                <div class="meta">{{ company["industry_label"] }} · {{ company["owner_username"] }}</div>
+            </div>
+            <span class="pill">{{ company["plan_label"] }}</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="meta">У всех компаний модуль включён</div>
+        {% endif %}
+    </div>
+</div>
+
+</div>
+{% include 'platform_mobile_nav.html' %}
+</body>
+</html>

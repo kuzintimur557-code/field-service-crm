@@ -10383,6 +10383,7 @@ async def assert_platform_modules_page():
     assert "Автоматизация" in html
     assert "ИИ-инсайты" in html
     assert "/platform/companies/" in html
+    assert "/platform/modules/automation" in html
     assert "/platform/modules/export" in html
     assert 'class="platform-mobile-nav"' in html
     assert response.context["summary"]["modules_count"] == len(
@@ -10418,6 +10419,41 @@ async def assert_platform_modules_page():
     assert "Модуль,Ключ,Описание" in export_csv
     assert "Автоматизация,automation" in export_csv
     assert "ИИ-инсайты,ai_insights" in export_csv
+
+    anonymous_detail = await crm.platform_module_detail_page(
+        make_public_asgi_request("/platform/modules/automation"),
+        "automation",
+    )
+    assert anonymous_detail.status_code == 302
+    assert anonymous_detail.headers["location"] == "/login"
+
+    boss_detail = await crm.platform_module_detail_page(
+        make_asgi_request("owner2", "/platform/modules/automation"),
+        "automation",
+    )
+    assert boss_detail.status_code == 302
+    assert boss_detail.headers["location"] == "/"
+
+    missing_detail = await crm.platform_module_detail_page(
+        make_asgi_request("super", "/platform/modules/no_such_module"),
+        "no_such_module",
+    )
+    assert missing_detail.status_code == 302
+    assert missing_detail.headers["location"] == (
+        "/platform/modules?error=module_not_found"
+    )
+
+    detail_response = await crm.platform_module_detail_page(
+        make_asgi_request("super", "/platform/modules/automation"),
+        "automation",
+    )
+    detail_html = detail_response.body.decode("utf-8")
+    assert detail_response.status_code == 200
+    assert detail_response.context["module"]["key"] == "automation"
+    assert "Модуль: Автоматизация" in detail_html
+    assert "Компании с модулем" in detail_html
+    assert "Компании без модуля" in detail_html
+    assert 'class="platform-mobile-nav"' in detail_html
 
     platform_page = await crm.platform_dashboard(
         make_asgi_request("super", "/platform"),
