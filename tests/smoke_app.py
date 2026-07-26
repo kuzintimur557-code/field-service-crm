@@ -9735,6 +9735,8 @@ async def assert_platform_companies_page():
     assert "Бьюти" in html
     assert 'name="industry"' in html
     assert 'name="limit"' in html
+    assert 'name="feature"' in html
+    assert "Все модули" in html
     assert 'name="company_name"' in html
     assert 'autocomplete="organization"' in html
     assert 'name="owner_username"' in html
@@ -9847,9 +9849,11 @@ async def assert_platform_companies_page():
     assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
     assert 'name="return_search"' in list_html
     assert 'name="return_limit"' in list_html
+    assert 'name="return_feature"' in list_html
     assert "Сохранить" in list_html
     assert (
-        "/platform/companies/export?search=&amp;industry=all&amp;plan=all&amp;limit=all"
+        "/platform/companies/export?search=&amp;industry=all&amp;plan=all"
+        "&amp;limit=all&amp;feature=all"
         in list_html
     )
 
@@ -9869,6 +9873,7 @@ async def assert_platform_companies_page():
     assert filtered_response.context["selected_industry"] == "logistics"
     assert filtered_response.context["selected_plan"] == "basic"
     assert filtered_response.context["selected_limit"] == "all"
+    assert filtered_response.context["selected_feature"] == "all"
     assert "Smoke Logistics Company" in filtered_html
     assert 'value="Smoke Logistics"' in filtered_html
     assert "Сбросить" in filtered_html
@@ -9891,6 +9896,41 @@ async def assert_platform_companies_page():
     assert limit_filter_response.context["summary"]["companies"] >= 1
     assert "Smoke Logistics Company" in limit_filter_html
     assert "Осталось мест: 2" in limit_filter_html
+
+    module_filter_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            (
+                "search=Smoke%20Logistics&industry=logistics"
+                "&plan=basic&feature=recurring"
+            ),
+        ),
+        search="Smoke Logistics",
+        industry="logistics",
+        plan="basic",
+        feature="recurring",
+    )
+    module_filter_html = module_filter_response.body.decode("utf-8")
+    assert module_filter_response.status_code == 200
+    assert module_filter_response.context["selected_feature"] == "recurring"
+    assert module_filter_response.context["summary"]["companies"] >= 1
+    assert "Smoke Logistics Company" in module_filter_html
+
+    empty_module_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            "search=Smoke%20Logistics&feature=catalog",
+        ),
+        search="Smoke Logistics",
+        feature="catalog",
+    )
+    empty_module_html = empty_module_response.body.decode("utf-8")
+    assert empty_module_response.status_code == 200
+    assert empty_module_response.context["selected_feature"] == "catalog"
+    assert empty_module_response.context["summary"]["companies"] == 0
+    assert "По выбранным условиям компаний не найдено" in empty_module_html
 
     empty_filter_response = await crm.platform_companies_page(
         make_asgi_request(
@@ -9959,6 +9999,27 @@ async def assert_platform_companies_page():
     assert "Осталось мест: 2" in export_csv
     assert ",1,1,0,0," in export_csv
     assert "Smoke Company 1" not in export_csv
+
+    module_export_response = await crm.platform_companies_export(
+        make_asgi_request(
+            "super",
+            "/platform/companies/export",
+            (
+                "search=Smoke%20Logistics&industry=logistics"
+                "&plan=basic&feature=recurring"
+            ),
+        ),
+        search="Smoke Logistics",
+        industry="logistics",
+        plan="basic",
+        feature="recurring",
+    )
+    module_export_csv = module_export_response.body.decode("utf-8")
+    assert module_export_response.status_code == 200
+    assert module_export_response.headers["content-disposition"] == (
+        "attachment; filename=platform_companies_logistics_basic_all_recurring.csv"
+    )
+    assert "Smoke Logistics Company" in module_export_csv
 
     anonymous_detail = await crm.platform_company_detail_page(
         make_public_asgi_request(

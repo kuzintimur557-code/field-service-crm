@@ -6709,13 +6709,15 @@ def build_platform_companies_url(
     plan="all",
     extra_params=None,
     limit="all",
+    feature="all",
 ):
     params = {}
-    search, industry, plan, limit = normalize_platform_company_filters(
+    search, industry, plan, limit, feature = normalize_platform_company_filters(
         search,
         industry,
         plan,
         limit,
+        feature,
     )
 
     if search:
@@ -6729,6 +6731,9 @@ def build_platform_companies_url(
 
     if limit != "all":
         params["limit"] = limit
+
+    if feature != "all":
+        params["feature"] = feature
 
     if extra_params:
         params.update(extra_params)
@@ -6744,15 +6749,18 @@ def normalize_platform_company_filters(
     industry="all",
     plan="all",
     limit="all",
+    feature="all",
 ):
     search = str(search or "").strip()[:80]
     allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
     allowed_limits = {"all", "ok", "warning", "danger"}
+    allowed_features = {feature_key for feature_key, _, _ in FEATURE_DEFINITIONS}
     industry = industry if industry in allowed_industries else "all"
     plan = plan if plan in PLAN_DEFINITIONS else "all"
     limit = limit if limit in allowed_limits else "all"
+    feature = feature if feature in allowed_features else "all"
 
-    return search, industry, plan, limit
+    return search, industry, plan, limit, feature
 
 
 def get_platform_company_items(
@@ -6760,17 +6768,20 @@ def get_platform_company_items(
     industry="all",
     plan="all",
     limit="all",
+    feature="all",
 ):
     (
         search,
         selected_industry,
         selected_plan,
         selected_limit,
+        selected_feature,
     ) = normalize_platform_company_filters(
         search,
         industry,
         plan,
         limit,
+        feature,
     )
 
     conn = connect()
@@ -6882,6 +6893,13 @@ def get_platform_company_items(
             if company["user_limit_tone"] == selected_limit
         ]
 
+    if selected_feature != "all":
+        companies = [
+            company
+            for company in companies
+            if get_company_features(company["id"]).get(selected_feature)
+        ]
+
     summary = {
         "companies": len(companies),
         "active_users": sum(
@@ -6904,6 +6922,7 @@ def get_platform_company_items(
         "selected_industry": selected_industry,
         "selected_plan": selected_plan,
         "selected_limit": selected_limit,
+        "selected_feature": selected_feature,
     }
 
 
@@ -7141,11 +7160,13 @@ async def update_platform_company_settings(request: Request, company_id: int):
         return_industry,
         return_plan,
         return_limit,
+        return_feature,
     ) = normalize_platform_company_filters(
         form.get("return_search") or "",
         form.get("return_industry") or "all",
         form.get("return_plan") or "all",
         form.get("return_limit") or "all",
+        form.get("return_feature") or "all",
     )
     visible_return_industry = return_industry
     visible_return_plan = return_plan
@@ -7164,6 +7185,7 @@ async def update_platform_company_settings(request: Request, company_id: int):
             visible_return_industry,
             visible_return_plan,
             limit=return_limit,
+            feature=return_feature,
         )
 
     conn = connect()
@@ -7183,6 +7205,7 @@ async def update_platform_company_settings(request: Request, company_id: int):
                 return_plan,
                 {"error": "company_not_found"},
                 limit=return_limit,
+                feature=return_feature,
             ),
             status_code=302,
         )
@@ -7273,6 +7296,7 @@ async def platform_companies_export(
     industry: str = "all",
     plan: str = "all",
     limit: str = "all",
+    feature: str = "all",
 ):
 
     username = get_user(request)
@@ -7285,7 +7309,13 @@ async def platform_companies_export(
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    company_data = get_platform_company_items(search, industry, plan, limit)
+    company_data = get_platform_company_items(
+        search,
+        industry,
+        plan,
+        limit,
+        feature,
+    )
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -7320,12 +7350,17 @@ async def platform_companies_export(
             company["created_at"],
         ])
 
-    filename = (
-        "platform_companies_"
-        f"{company_data['selected_industry']}_"
-        f"{company_data['selected_plan']}_"
-        f"{company_data['selected_limit']}.csv"
-    )
+    filename_parts = [
+        "platform_companies",
+        company_data["selected_industry"],
+        company_data["selected_plan"],
+        company_data["selected_limit"],
+    ]
+
+    if company_data["selected_feature"] != "all":
+        filename_parts.append(company_data["selected_feature"])
+
+    filename = "_".join(filename_parts) + ".csv"
 
     return Response(
         output.getvalue(),
@@ -7478,6 +7513,7 @@ async def platform_companies_page(
     industry: str = "all",
     plan: str = "all",
     limit: str = "all",
+    feature: str = "all",
 ):
 
     username = get_user(request)
@@ -7490,7 +7526,13 @@ async def platform_companies_page(
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    company_data = get_platform_company_items(search, industry, plan, limit)
+    company_data = get_platform_company_items(
+        search,
+        industry,
+        plan,
+        limit,
+        feature,
+    )
 
     return templates.TemplateResponse(
         request,
@@ -7503,10 +7545,12 @@ async def platform_companies_page(
             "summary": company_data["summary"],
             "industry_options": INDUSTRY_OPTIONS,
             "plan_options": get_plan_options(),
+            "feature_options": FEATURE_DEFINITIONS,
             "search": company_data["search"],
             "selected_industry": company_data["selected_industry"],
             "selected_plan": company_data["selected_plan"],
             "selected_limit": company_data["selected_limit"],
+            "selected_feature": company_data["selected_feature"],
         }
     )
 
