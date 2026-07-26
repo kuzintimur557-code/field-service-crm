@@ -6635,12 +6635,14 @@ def build_platform_companies_url(
     industry="all",
     plan="all",
     extra_params=None,
+    limit="all",
 ):
     params = {}
-    search, industry, plan = normalize_platform_company_filters(
+    search, industry, plan, limit = normalize_platform_company_filters(
         search,
         industry,
         plan,
+        limit,
     )
 
     if search:
@@ -6651,6 +6653,9 @@ def build_platform_companies_url(
 
     if plan != "all":
         params["plan"] = plan
+
+    if limit != "all":
+        params["limit"] = limit
 
     if extra_params:
         params.update(extra_params)
@@ -6665,20 +6670,34 @@ def normalize_platform_company_filters(
     search="",
     industry="all",
     plan="all",
+    limit="all",
 ):
     search = str(search or "").strip()[:80]
     allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
+    allowed_limits = {"all", "ok", "warning", "danger"}
     industry = industry if industry in allowed_industries else "all"
     plan = plan if plan in PLAN_DEFINITIONS else "all"
+    limit = limit if limit in allowed_limits else "all"
 
-    return search, industry, plan
+    return search, industry, plan, limit
 
 
-def get_platform_company_items(search="", industry="all", plan="all"):
-    search, selected_industry, selected_plan = normalize_platform_company_filters(
+def get_platform_company_items(
+    search="",
+    industry="all",
+    plan="all",
+    limit="all",
+):
+    (
+        search,
+        selected_industry,
+        selected_plan,
+        selected_limit,
+    ) = normalize_platform_company_filters(
         search,
         industry,
         plan,
+        limit,
     )
 
     conn = connect()
@@ -6795,11 +6814,19 @@ def get_platform_company_items(search="", industry="all", plan="all"):
 
         companies.append(company)
 
+    if selected_limit != "all":
+        companies = [
+            company
+            for company in companies
+            if company["user_limit_tone"] == selected_limit
+        ]
+
     return {
         "companies": companies,
         "search": search,
         "selected_industry": selected_industry,
         "selected_plan": selected_plan,
+        "selected_limit": selected_limit,
     }
 
 
@@ -6929,10 +6956,16 @@ async def update_platform_company_settings(request: Request, company_id: int):
     if industry not in allowed_industries:
         industry = "field_service"
 
-    return_search, return_industry, return_plan = normalize_platform_company_filters(
+    (
+        return_search,
+        return_industry,
+        return_plan,
+        return_limit,
+    ) = normalize_platform_company_filters(
         form.get("return_search") or "",
         form.get("return_industry") or "all",
         form.get("return_plan") or "all",
+        form.get("return_limit") or "all",
     )
     visible_return_industry = return_industry
     visible_return_plan = return_plan
@@ -6947,6 +6980,7 @@ async def update_platform_company_settings(request: Request, company_id: int):
         return_search,
         visible_return_industry,
         visible_return_plan,
+        limit=return_limit,
     )
 
     conn = connect()
@@ -6965,6 +6999,7 @@ async def update_platform_company_settings(request: Request, company_id: int):
                 return_industry,
                 return_plan,
                 {"error": "company_not_found"},
+                limit=return_limit,
             ),
             status_code=302,
         )
@@ -7027,6 +7062,7 @@ async def platform_companies_export(
     search: str = "",
     industry: str = "all",
     plan: str = "all",
+    limit: str = "all",
 ):
 
     username = get_user(request)
@@ -7039,7 +7075,7 @@ async def platform_companies_export(
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    company_data = get_platform_company_items(search, industry, plan)
+    company_data = get_platform_company_items(search, industry, plan, limit)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -7077,7 +7113,8 @@ async def platform_companies_export(
     filename = (
         "platform_companies_"
         f"{company_data['selected_industry']}_"
-        f"{company_data['selected_plan']}.csv"
+        f"{company_data['selected_plan']}_"
+        f"{company_data['selected_limit']}.csv"
     )
 
     return Response(
@@ -7095,6 +7132,7 @@ async def platform_companies_page(
     search: str = "",
     industry: str = "all",
     plan: str = "all",
+    limit: str = "all",
 ):
 
     username = get_user(request)
@@ -7107,7 +7145,7 @@ async def platform_companies_page(
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    company_data = get_platform_company_items(search, industry, plan)
+    company_data = get_platform_company_items(search, industry, plan, limit)
 
     return templates.TemplateResponse(
         request,
@@ -7122,6 +7160,7 @@ async def platform_companies_page(
             "search": company_data["search"],
             "selected_industry": company_data["selected_industry"],
             "selected_plan": company_data["selected_plan"],
+            "selected_limit": company_data["selected_limit"],
         }
     )
 

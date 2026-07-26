@@ -9724,6 +9724,7 @@ async def assert_platform_companies_page():
     assert "Сервис / выездные работы" in html
     assert "Бьюти" in html
     assert 'name="industry"' in html
+    assert 'name="limit"' in html
     assert 'name="company_name"' in html
     assert 'autocomplete="organization"' in html
     assert 'name="owner_username"' in html
@@ -9830,9 +9831,10 @@ async def assert_platform_companies_page():
     assert "Заявки: 0 активные · 0 архив" in list_html
     assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
     assert 'name="return_search"' in list_html
+    assert 'name="return_limit"' in list_html
     assert "Сохранить" in list_html
     assert (
-        "/platform/companies/export?search=&amp;industry=all&amp;plan=all"
+        "/platform/companies/export?search=&amp;industry=all&amp;plan=all&amp;limit=all"
         in list_html
     )
 
@@ -9851,10 +9853,28 @@ async def assert_platform_companies_page():
     assert filtered_response.context["search"] == "Smoke Logistics"
     assert filtered_response.context["selected_industry"] == "logistics"
     assert filtered_response.context["selected_plan"] == "basic"
+    assert filtered_response.context["selected_limit"] == "all"
     assert "Smoke Logistics Company" in filtered_html
     assert 'value="Smoke Logistics"' in filtered_html
     assert "Сбросить" in filtered_html
     assert "Показано компаний:" in filtered_html
+
+    limit_filter_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            "search=Smoke%20Logistics&industry=logistics&plan=basic&limit=ok",
+        ),
+        search="Smoke Logistics",
+        industry="logistics",
+        plan="basic",
+        limit="ok",
+    )
+    limit_filter_html = limit_filter_response.body.decode("utf-8")
+    assert limit_filter_response.status_code == 200
+    assert limit_filter_response.context["selected_limit"] == "ok"
+    assert "Smoke Logistics Company" in limit_filter_html
+    assert "Осталось мест: 2" in limit_filter_html
 
     empty_filter_response = await crm.platform_companies_page(
         make_asgi_request(
@@ -9868,6 +9888,20 @@ async def assert_platform_companies_page():
     assert empty_filter_response.status_code == 200
     assert "По выбранным условиям компаний не найдено" in empty_filter_html
     assert "Компаний пока нет" not in empty_filter_html
+
+    empty_limit_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            "search=Smoke%20Logistics&limit=danger",
+        ),
+        search="Smoke Logistics",
+        limit="danger",
+    )
+    empty_limit_html = empty_limit_response.body.decode("utf-8")
+    assert empty_limit_response.status_code == 200
+    assert empty_limit_response.context["selected_limit"] == "danger"
+    assert "По выбранным условиям компаний не найдено" in empty_limit_html
 
     anonymous_export = await crm.platform_companies_export(
         make_public_asgi_request("/platform/companies/export"),
@@ -9894,7 +9928,7 @@ async def assert_platform_companies_page():
     export_csv = export_response.body.decode("utf-8")
     assert export_response.status_code == 200
     assert export_response.headers["content-disposition"] == (
-        "attachment; filename=platform_companies_logistics_basic.csv"
+        "attachment; filename=platform_companies_logistics_basic_all.csv"
     )
     assert (
         "ID,Компания,Владелец,Сфера,Тариф,Лимит пользователей,"
