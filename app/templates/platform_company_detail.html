@@ -121,6 +121,18 @@ h2{margin:0 0 16px;font-size:22px}
         <div class="stat-label">Модули</div>
         <div class="stat-value">{{ enabled_features_count }} / {{ enabled_features_count + disabled_features_count }}</div>
     </div>
+    <div class="stat">
+        <div class="stat-label">Заявки</div>
+        <div class="stat-value">{{ task_stats["active"] }} / {{ task_stats["total"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">В работе</div>
+        <div class="stat-value">{{ task_stats["in_progress"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Завершено</div>
+        <div class="stat-value">{{ task_stats["completed"] }}</div>
+    </div>
 </div>
 
 <div class="grid">

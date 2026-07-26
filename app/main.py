@@ -6963,6 +6963,18 @@ def get_platform_company_profile(company_id):
     LIMIT 8
     """, (company_id,)).fetchall()
 
+    task_stats = c.execute("""
+    SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN COALESCE(archived, 0)=0 THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN COALESCE(archived, 0)=1 THEN 1 ELSE 0 END) AS archived,
+        SUM(CASE WHEN status='Новая' THEN 1 ELSE 0 END) AS new_tasks,
+        SUM(CASE WHEN status='В работе' THEN 1 ELSE 0 END) AS in_progress,
+        SUM(CASE WHEN status='Завершено' THEN 1 ELSE 0 END) AS completed
+    FROM tasks
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+
     conn.close()
 
     feature_rows = []
@@ -6984,6 +6996,14 @@ def get_platform_company_profile(company_id):
         "features": feature_rows,
         "enabled_features_count": enabled_features_count,
         "disabled_features_count": len(feature_rows) - enabled_features_count,
+        "task_stats": {
+            "total": int(task_stats["total"] or 0),
+            "active": int(task_stats["active"] or 0),
+            "archived": int(task_stats["archived"] or 0),
+            "new_tasks": int(task_stats["new_tasks"] or 0),
+            "in_progress": int(task_stats["in_progress"] or 0),
+            "completed": int(task_stats["completed"] or 0),
+        },
         "users": [dict(user) for user in users],
         "recent_tasks": [dict(task) for task in recent_tasks],
     }
@@ -7355,6 +7375,12 @@ async def platform_company_export(request: Request, company_id: int):
     writer.writerow(["Пользователи всего", usage["users_count"]])
     writer.writerow(["Модулей включено", profile["enabled_features_count"]])
     writer.writerow(["Модулей выключено", profile["disabled_features_count"]])
+    writer.writerow(["Заявки всего", profile["task_stats"]["total"]])
+    writer.writerow(["Активные заявки", profile["task_stats"]["active"]])
+    writer.writerow(["Архивные заявки", profile["task_stats"]["archived"]])
+    writer.writerow(["Новые заявки", profile["task_stats"]["new_tasks"]])
+    writer.writerow(["Заявки в работе", profile["task_stats"]["in_progress"]])
+    writer.writerow(["Завершённые заявки", profile["task_stats"]["completed"]])
     writer.writerow(["Создана", company["created_at"]])
     writer.writerow([])
 

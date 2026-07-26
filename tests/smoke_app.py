@@ -10036,6 +10036,8 @@ async def assert_platform_companies_page():
     assert "Пользователи" in company_export_csv
     assert "Модулей включено" in company_export_csv
     assert "Модулей выключено" in company_export_csv
+    assert "Заявки всего" in company_export_csv
+    assert "Активные заявки" in company_export_csv
     assert "Модули" in company_export_csv
     assert "Последние заявки" in company_export_csv
 
@@ -10052,6 +10054,8 @@ async def assert_platform_companies_page():
     assert detail_response.context["usage"]["active_users_count"] == 1
     assert detail_response.context["enabled_features_count"] >= 1
     assert detail_response.context["disabled_features_count"] >= 0
+    assert detail_response.context["task_stats"]["total"] == 0
+    assert detail_response.context["task_stats"]["active"] == 0
     assert "Карточка компании" in detail_html
     assert "Настройки компании" in detail_html
     assert "Smoke Logistics Company" in detail_html
