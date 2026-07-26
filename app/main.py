@@ -6773,6 +6773,26 @@ def get_platform_company_items(search="", industry="all", plan="all"):
         company["archived_tasks_count"] = int(
             company.get("archived_tasks_count") or 0
         )
+
+        if user_limit is None:
+            company["user_limit_status"] = "Без лимита"
+            company["user_limit_tone"] = "ok"
+        elif company["active_users_count"] > user_limit:
+            company["user_limit_status"] = (
+                f"Превышен лимит на "
+                f"{company['active_users_count'] - user_limit}"
+            )
+            company["user_limit_tone"] = "danger"
+        elif company["active_users_count"] == user_limit:
+            company["user_limit_status"] = "Лимит заполнен"
+            company["user_limit_tone"] = "warning"
+        else:
+            company["user_limit_status"] = (
+                f"Осталось мест: "
+                f"{user_limit - company['active_users_count']}"
+            )
+            company["user_limit_tone"] = "ok"
+
         companies.append(company)
 
     return {
@@ -7030,6 +7050,7 @@ async def platform_companies_export(
         "Сфера",
         "Тариф",
         "Лимит пользователей",
+        "Статус лимита",
         "Активные пользователи",
         "Пользователи всего",
         "Активные заявки",
@@ -7045,6 +7066,7 @@ async def platform_companies_export(
             company["industry_label"],
             company["plan_label"],
             company["user_limit_label"],
+            company["user_limit_status"],
             company["active_users_count"],
             company["users_count"],
             company["active_tasks_count"],

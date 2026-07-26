@@ -26,6 +26,9 @@ h1{margin:0 0 12px;font-size:36px}
 .company-settings label{display:grid;gap:6px;color:#6b7280;font-size:12px;font-weight:900}
 .company-settings select{padding:10px;border:1px solid #d1d5db;border-radius:11px;background:white;font-size:13px}
 .company-settings button{min-height:39px;padding:10px 13px;border:0;border-radius:11px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+.limit-pill{display:inline-flex;margin-top:5px;padding:5px 7px;border-radius:8px;background:#dcfce7;color:#166534;font-size:11px;font-weight:900}
+.limit-pill.warning{background:#fef3c7;color:#92400e}
+.limit-pill.danger{background:#fee2e2;color:#991b1b}
 @media(max-width:850px){.container{padding:16px}.company{grid-template-columns:1fr}h1{font-size:30px}}
 @media(max-width:850px){.filters{grid-template-columns:1fr}.filters button,.filters a{width:100%}}
 @media(max-width:850px){.company-settings{grid-template-columns:1fr}.company-settings button{width:100%}}
@@ -148,6 +151,7 @@ h1{margin:0 0 12px;font-size:36px}
     <div class="meta">
         Тариф: {{ company["plan_label"] }}<br>
         Лимит пользователей: {{ company["user_limit_label"] }}
+        <span class="limit-pill {{ company['user_limit_tone'] }}">{{ company["user_limit_status"] }}</span>
     </div>
     <div class="meta">
         Статус: активна<br>
