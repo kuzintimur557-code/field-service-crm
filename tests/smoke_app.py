@@ -10598,6 +10598,7 @@ async def assert_platform_presets_page():
     assert "Отклонений" in html
     assert "Заявка:" in html
     assert "/platform/companies?industry=beauty" in html
+    assert "/platform/presets/beauty" in html
     assert "/platform/modules/calendar" in html
     assert "/platform/presets/export" in html
     assert 'class="platform-mobile-nav"' in html
@@ -10634,6 +10635,43 @@ async def assert_platform_presets_page():
     assert "Отклонений" in export_csv
     assert "Бьюти,beauty" in export_csv
     assert "Грузоперевозки,logistics" in export_csv
+
+    anonymous_detail = await crm.platform_preset_detail_page(
+        make_public_asgi_request("/platform/presets/beauty"),
+        "beauty",
+    )
+    assert anonymous_detail.status_code == 302
+    assert anonymous_detail.headers["location"] == "/login"
+
+    boss_detail = await crm.platform_preset_detail_page(
+        make_asgi_request("owner2", "/platform/presets/beauty"),
+        "beauty",
+    )
+    assert boss_detail.status_code == 302
+    assert boss_detail.headers["location"] == "/"
+
+    missing_detail = await crm.platform_preset_detail_page(
+        make_asgi_request("super", "/platform/presets/no_such_preset"),
+        "no_such_preset",
+    )
+    assert missing_detail.status_code == 302
+    assert missing_detail.headers["location"] == (
+        "/platform/presets?error=preset_not_found"
+    )
+
+    detail_response = await crm.platform_preset_detail_page(
+        make_asgi_request("super", "/platform/presets/beauty"),
+        "beauty",
+    )
+    detail_html = detail_response.body.decode("utf-8")
+    assert detail_response.status_code == 200
+    assert detail_response.context["preset"]["key"] == "beauty"
+    assert "Пресет: Бьюти" in detail_html
+    assert "Названия интерфейса" in detail_html
+    assert "Модули пресета" in detail_html
+    assert "Компании сферы" in detail_html
+    assert "/platform/companies?industry=beauty" in detail_html
+    assert 'class="platform-mobile-nav"' in detail_html
 
     platform_page = await crm.platform_dashboard(
         make_asgi_request("super", "/platform"),

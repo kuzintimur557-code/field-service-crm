@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Пресет платформы</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1120px;margin:auto;padding:28px}
+.top-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.back{display:inline-block;color:#2563eb;text-decoration:none;font-weight:900}
+.action-link{display:inline-block;color:#059669;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border-radius:22px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+h1{margin:0;font-size:34px}
+h2{margin:0 0 14px;font-size:22px}
+.meta{color:#6b7280;font-size:13px;font-weight:800;line-height:1.45}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.stat{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.stat-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
+.stat-value{margin-top:5px;font-size:24px;font-weight:900}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.labels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.label-chip{padding:10px;border-radius:10px;background:#f9fafb;border:1px solid #e5e7eb;font-size:12px;font-weight:900}
+.features{display:flex;gap:6px;flex-wrap:wrap}
+.feature{display:inline-flex;padding:7px 9px;border-radius:9px;background:#f9fafb;border:1px solid #d1d5db;color:#111827;text-decoration:none;font-size:12px;font-weight:900}
+.company{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #e5e7eb}
+.company:last-child{border-bottom:0}
+.company-name{font-size:14px;font-weight:900}
+.company-name a{color:#111827;text-decoration:none}
+.company-name a:hover{color:#2563eb}
+.pill{display:inline-flex;padding:6px 8px;border-radius:8px;background:#dcfce7;color:#166534;font-size:11px;font-weight:900}
+.pill.warning{background:#fef3c7;color:#92400e}
+@media(max-width:850px){
+    .container{padding:16px 14px 92px}
+    .grid,.labels{grid-template-columns:1fr}
+    h1{font-size:28px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="top-actions">
+    <a href="/platform/presets" class="back">Назад к пресетам</a>
+    <a class="action-link" href="/platform/companies?industry={{ preset['key'] }}">Компании сферы</a>
+</div>
+
+<div class="card">
+    <h1>Пресет: {{ preset["title"] }}</h1>
+    <div class="meta">
+        Отраслевой набор модулей и названий интерфейса для новых компаний.
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat">
+        <div class="stat-label">Компаний</div>
+        <div class="stat-value">{{ preset["companies_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Отклонений</div>
+        <div class="stat-value">{{ preset["drift_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Модулей</div>
+        <div class="stat-value">{{ preset["modules_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Всего пресетов</div>
+        <div class="stat-value">{{ summary["presets_count"] }}</div>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h2>Названия интерфейса</h2>
+        <div class="labels">
+            <div class="label-chip">Заявка: {{ preset["labels"]["task_label"] }}</div>
+            <div class="label-chip">Исполнитель: {{ preset["labels"]["worker_label"] }}</div>
+            <div class="label-chip">Клиент: {{ preset["labels"]["client_label"] }}</div>
+            <div class="label-chip">Услуга: {{ preset["labels"]["service_label"] }}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Модули пресета</h2>
+        <div class="features">
+            {% for feature in preset["features"] %}
+            <a class="feature" href="/platform/modules/{{ feature['key'] }}">
+                {{ feature["title"] }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Компании сферы</h2>
+    {% if companies %}
+    {% for company in companies %}
+    <div class="company">
+        <div>
+            <div class="company-name">
+                <a href="/platform/companies/{{ company['id'] }}">{{ company["name"] }}</a>
+            </div>
+            <div class="meta">
+                {{ company["owner_username"] }} · {{ company["created_at"] }}
+            </div>
+        </div>
+        <span class="pill {% if company['drift']['count'] %}warning{% endif %}">
+            {{ company["drift"]["status_label"] }}
+        </span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="meta">Компаний в этой сфере пока нет</div>
+    {% endif %}
+</div>
+
+</div>
+{% include 'platform_mobile_nav.html' %}
+</body>
+</html>

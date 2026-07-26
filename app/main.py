@@ -7237,6 +7237,61 @@ def get_platform_preset_usage():
     }
 
 
+def get_platform_preset_profile(industry_key):
+    industry_key = str(industry_key or "").strip()
+    allowed_industries = {key for key, _ in INDUSTRY_OPTIONS}
+
+    if industry_key not in allowed_industries:
+        return None
+
+    preset_usage = get_platform_preset_usage()
+    preset = next(
+        (
+            item
+            for item in preset_usage["presets"]
+            if item["key"] == industry_key
+        ),
+        None,
+    )
+
+    if not preset:
+        return None
+
+    conn = connect()
+    c = conn.cursor()
+    company_rows = c.execute("""
+    SELECT
+        companies.id,
+        companies.name,
+        companies.owner_username,
+        companies.created_at,
+        COALESCE(settings.plan, 'basic') AS plan
+    FROM companies
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=companies.id
+    WHERE COALESCE(settings.industry, 'field_service')=?
+    ORDER BY companies.id DESC
+    """, (industry_key,)).fetchall()
+    conn.close()
+
+    companies = []
+    for row in company_rows:
+        company = dict(row)
+        company["plan"] = normalize_plan(company["plan"])
+        company["plan_label"] = get_plan_label(company["plan"])
+        company["drift"] = get_business_preset_drift(
+            industry_key,
+            get_company_features(company["id"]),
+        )
+        companies.append(company)
+
+    return {
+        "summary": preset_usage["summary"],
+        "preset": preset,
+        "companies": companies,
+    }
+
+
 @app.post("/platform/companies")
 async def create_platform_company(request: Request):
 
@@ -8032,6 +8087,39 @@ async def platform_presets_export(request: Request):
             "Content-Disposition": (
                 "attachment; filename=platform_presets.csv"
             )
+        },
+    )
+
+
+@app.get("/platform/presets/{industry_key}", response_class=HTMLResponse)
+async def platform_preset_detail_page(request: Request, industry_key: str):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    profile = get_platform_preset_profile(industry_key)
+
+    if not profile:
+        return RedirectResponse(
+            "/platform/presets?error=preset_not_found",
+            status_code=302,
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_preset_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            **profile,
         },
     )
 
