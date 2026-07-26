@@ -7028,6 +7028,84 @@ def get_platform_company_profile(company_id):
     }
 
 
+def get_platform_module_usage():
+    conn = connect()
+    c = conn.cursor()
+    company_rows = c.execute("""
+    SELECT
+        companies.id,
+        companies.name,
+        companies.owner_username,
+        COALESCE(settings.plan, 'basic') AS plan,
+        COALESCE(settings.industry, 'field_service') AS industry
+    FROM companies
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=companies.id
+    ORDER BY companies.id DESC
+    """).fetchall()
+    conn.close()
+
+    industry_labels = dict(INDUSTRY_OPTIONS)
+    companies = []
+
+    for row in company_rows:
+        company = dict(row)
+        company["plan"] = normalize_plan(company["plan"])
+        company["plan_label"] = get_plan_label(company["plan"])
+        company["industry_label"] = industry_labels.get(
+            company["industry"],
+            "Сфера не указана",
+        )
+        company["features"] = get_company_features(company["id"])
+        companies.append(company)
+
+    module_rows = []
+    companies_count = len(companies)
+
+    for feature_key, title, description in FEATURE_DEFINITIONS:
+        enabled_companies = [
+            company
+            for company in companies
+            if company["features"].get(feature_key)
+        ]
+        enabled_count = len(enabled_companies)
+        coverage_percent = (
+            int(round((enabled_count / companies_count) * 100))
+            if companies_count
+            else 0
+        )
+
+        module_rows.append({
+            "key": feature_key,
+            "title": title,
+            "description": description,
+            "enabled_count": enabled_count,
+            "disabled_count": companies_count - enabled_count,
+            "coverage_percent": coverage_percent,
+            "companies": enabled_companies[:5],
+        })
+
+    enabled_links = sum(module["enabled_count"] for module in module_rows)
+    possible_links = companies_count * len(module_rows)
+
+    summary = {
+        "companies_count": companies_count,
+        "modules_count": len(module_rows),
+        "enabled_links": enabled_links,
+        "possible_links": possible_links,
+        "coverage_percent": (
+            int(round((enabled_links / possible_links) * 100))
+            if possible_links
+            else 0
+        ),
+    }
+
+    return {
+        "summary": summary,
+        "modules": module_rows,
+    }
+
+
 @app.post("/platform/companies")
 async def create_platform_company(request: Request):
 
@@ -7552,6 +7630,34 @@ async def platform_companies_page(
             "selected_limit": company_data["selected_limit"],
             "selected_feature": company_data["selected_feature"],
         }
+    )
+
+
+@app.get("/platform/modules", response_class=HTMLResponse)
+async def platform_modules_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    module_usage = get_platform_module_usage()
+
+    return templates.TemplateResponse(
+        request,
+        "platform_modules.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "summary": module_usage["summary"],
+            "modules": module_usage["modules"],
+        },
     )
 
 

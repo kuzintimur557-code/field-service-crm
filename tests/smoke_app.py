@@ -10360,6 +10360,47 @@ async def assert_platform_companies_page():
     conn.close()
 
 
+async def assert_platform_modules_page():
+    anonymous = await crm.platform_modules_page(
+        make_public_asgi_request("/platform/modules"),
+    )
+    assert anonymous.status_code == 302
+    assert anonymous.headers["location"] == "/login"
+
+    boss = await crm.platform_modules_page(
+        make_asgi_request("owner2", "/platform/modules"),
+    )
+    assert boss.status_code == 302
+    assert boss.headers["location"] == "/"
+
+    response = await crm.platform_modules_page(
+        make_asgi_request("super", "/platform/modules"),
+    )
+    html = response.body.decode("utf-8")
+    assert response.status_code == 200
+    assert "Модули платформы" in html
+    assert "Покрытие модулей" in html
+    assert "Автоматизация" in html
+    assert "ИИ-инсайты" in html
+    assert "/platform/companies/" in html
+    assert 'class="platform-mobile-nav"' in html
+    assert response.context["summary"]["modules_count"] == len(
+        crm.FEATURE_DEFINITIONS
+    )
+    assert response.context["summary"]["companies_count"] >= 1
+    assert response.context["summary"]["coverage_percent"] >= 0
+    assert any(
+        module["key"] == "automation"
+        for module in response.context["modules"]
+    )
+
+    platform_page = await crm.platform_dashboard(
+        make_asgi_request("super", "/platform"),
+    )
+    platform_html = platform_page.body.decode("utf-8")
+    assert "/platform/modules" in platform_html
+
+
 async def assert_platform_calendar_health():
     policy_environment_names = (
         "CALENDAR_INCIDENT_RESPONSE_MINUTES",
@@ -23418,6 +23459,7 @@ def main():
         asyncio.run(assert_dispatch_board())
         asyncio.run(assert_dispatch_planner())
         asyncio.run(assert_platform_companies_page())
+        asyncio.run(assert_platform_modules_page())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))
