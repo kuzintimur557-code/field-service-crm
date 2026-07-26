@@ -28705,6 +28705,7 @@ async def billing_page(request: Request):
         settings["plan"] if settings and "plan" in settings.keys() else "basic"
     )
     user_limit = get_plan_user_limit(plan)
+    user_limit_usage = get_company_user_limit_usage(company_id, settings)
     plan_names = {
         plan_key: definition["label"]
         for plan_key, definition in PLAN_DEFINITIONS.items()
@@ -28720,6 +28721,7 @@ async def billing_page(request: Request):
             "settings": settings,
             "plan": plan,
             "user_limit": user_limit,
+            "user_limit_usage": user_limit_usage,
             "plan_names": plan_names
         }
     )

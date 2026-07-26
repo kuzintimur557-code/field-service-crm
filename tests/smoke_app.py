@@ -5917,8 +5917,16 @@ async def assert_billing_page():
     assert "Тарифы" in html
     assert "Текущий тариф" in html
     assert "Доступные тарифы" in html
+    assert "Используется пользователей" in html
+    assert (
+        "Осталось мест" in html
+        or "Лимит заполнен" in html
+        or "Превышен лимит" in html
+    )
     assert "Включено" in html
     assert "Настройка 1С" in html
+    assert response.context["user_limit_usage"]["active_users_count"] >= 1
+    assert "status" in response.context["user_limit_usage"]
     basic_section = html.split('<div class="name">Базовый</div>', 1)[1].split(
         '<div class="name">Команда</div>',
         1,
