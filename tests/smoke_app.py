@@ -12988,8 +12988,11 @@ async def assert_platform_calendar_health():
         platform_html = platform_page.body.decode("utf-8")
         assert "/platform/calendar-health" in platform_html
         assert "/platform/readiness" in platform_html
+        assert "/platform/modules" in platform_html
+        assert "/platform/presets" in platform_html
         assert "Готовность релиза" in platform_html
         assert "Релизный штаб" in platform_html
+        assert "Модульность SaaS" in platform_html
         assert "Быстрые действия" in platform_html
         assert "🛠 Панель платформы" not in platform_html
         assert "🏢 Компании" not in platform_html
@@ -13019,6 +13022,12 @@ async def assert_platform_calendar_health():
         assert platform_page.context["release_dashboard"]["alerts"]
         assert platform_page.context["release_dashboard"]["next_checkpoint"]
         assert platform_page.context["release_dashboard"]["mode"]
+        assert platform_page.context["module_usage_summary"]["modules_count"] == len(
+            crm.FEATURE_DEFINITIONS
+        )
+        assert platform_page.context["preset_usage_summary"]["presets_count"] == len(
+            crm.INDUSTRY_OPTIONS
+        )
         assert "secret_key" in {
             item["key"]
             for item in platform_page.context["release_readiness"]["checks"]
