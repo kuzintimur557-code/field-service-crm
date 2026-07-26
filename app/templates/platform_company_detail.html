@@ -36,6 +36,9 @@ h2{margin:0 0 16px;font-size:22px}
 .feature.enabled{background:#f0fdf4;border-color:#bbf7d0}
 .feature-title{font-size:13px;font-weight:900}
 .feature-desc{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
+.drift-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:10px 0;border-bottom:1px solid #e5e7eb}
+.drift-row:last-child{border-bottom:0}
+.drift-title{font-size:13px;font-weight:900}
 .settings-form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
 .settings-form label{display:grid;gap:6px;color:#6b7280;font-size:13px;font-weight:900}
 .settings-form select{min-height:42px;padding:10px;border:1px solid #d1d5db;border-radius:11px;background:white;font-size:14px}
@@ -49,6 +52,7 @@ h2{margin:0 0 16px;font-size:22px}
     .settings-form{grid-template-columns:1fr}
     .settings-form button{width:100%}
     .row{grid-template-columns:1fr}
+    .drift-row{grid-template-columns:1fr}
     h1{font-size:28px}
 }
 </style>
@@ -98,6 +102,29 @@ h2{margin:0 0 16px;font-size:22px}
         </label>
         <button type="submit">Сохранить</button>
     </form>
+</div>
+
+<div class="card">
+    <h2>Соответствие пресету</h2>
+    <div class="meta">
+        Сфера: {{ industry_label }} · статус: {{ preset_drift["status_label"] }}
+    </div>
+    {% if preset_drift["items"] %}
+    {% for drift in preset_drift["items"] %}
+    <div class="drift-row">
+        <div>
+            <div class="drift-title">{{ drift["title"] }}</div>
+            <div class="meta">{{ drift["key"] }}</div>
+        </div>
+        <div class="meta">{{ drift["expected_label"] }}</div>
+        <div class="meta">{{ drift["current_label"] }}</div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div style="margin-top:12px">
+        <span class="badge ok">Настройки соответствуют пресету</span>
+    </div>
+    {% endif %}
 </div>
 
 <div class="stats">

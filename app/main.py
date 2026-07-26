@@ -7006,6 +7006,7 @@ def get_platform_company_profile(company_id):
         })
 
     enabled_features_count = sum(1 for feature in feature_rows if feature["enabled"])
+    preset_drift = get_business_preset_drift(industry, features)
 
     return {
         "company": company,
@@ -7015,6 +7016,7 @@ def get_platform_company_profile(company_id):
         "features": feature_rows,
         "enabled_features_count": enabled_features_count,
         "disabled_features_count": len(feature_rows) - enabled_features_count,
+        "preset_drift": preset_drift,
         "task_stats": {
             "total": int(task_stats["total"] or 0),
             "active": int(task_stats["active"] or 0),
@@ -7113,6 +7115,53 @@ def get_platform_module_usage():
     }
 
 
+def get_expected_business_preset_features(industry):
+    industry = str(industry or "field_service")
+    return set(
+        BUSINESS_PRESETS.get(industry, BUSINESS_PRESETS["other"])
+    ) | CORE_FEATURES
+
+
+def get_business_preset_drift(industry, features):
+    expected_features = get_expected_business_preset_features(industry)
+    drift_items = []
+
+    for feature_key, title, _ in FEATURE_DEFINITIONS:
+        expected_enabled = feature_key in expected_features
+        current_enabled = bool(features.get(feature_key))
+
+        if current_enabled == expected_enabled:
+            continue
+
+        drift_items.append({
+            "key": feature_key,
+            "title": title,
+            "expected_enabled": expected_enabled,
+            "current_enabled": current_enabled,
+            "expected_label": (
+                "Должен быть включён"
+                if expected_enabled
+                else "Должен быть выключен"
+            ),
+            "current_label": (
+                "Сейчас включён"
+                if current_enabled
+                else "Сейчас выключен"
+            ),
+        })
+
+    return {
+        "count": len(drift_items),
+        "items": drift_items,
+        "status_label": (
+            "Есть отклонения"
+            if drift_items
+            else "Соответствует пресету"
+        ),
+        "tone": "warning" if drift_items else "ok",
+    }
+
+
 def get_platform_preset_usage():
     conn = connect()
     c = conn.cursor()
@@ -7127,24 +7176,16 @@ def get_platform_preset_usage():
     """).fetchall()
     conn.close()
 
-    feature_keys = [feature_key for feature_key, _, _ in FEATURE_DEFINITIONS]
     company_counts = {}
     drift_counts = {}
 
     for row in company_rows:
         industry = str(row["industry"] or "field_service")
         company_counts[industry] = company_counts.get(industry, 0) + 1
-        expected_features = set(
-            BUSINESS_PRESETS.get(industry, BUSINESS_PRESETS["other"])
-        ) | CORE_FEATURES
         current_features = get_company_features(row["id"])
-        has_drift = any(
-            bool(current_features.get(feature_key))
-            != (feature_key in expected_features)
-            for feature_key in feature_keys
-        )
+        drift = get_business_preset_drift(industry, current_features)
 
-        if has_drift:
+        if drift["count"] > 0:
             drift_counts[industry] = drift_counts.get(industry, 0) + 1
 
     feature_titles = {
@@ -7154,10 +7195,7 @@ def get_platform_preset_usage():
     preset_rows = []
 
     for industry_key, industry_title in INDUSTRY_OPTIONS:
-        enabled_features = BUSINESS_PRESETS.get(
-            industry_key,
-            BUSINESS_PRESETS["other"],
-        ) | CORE_FEATURES
+        expected_features = get_expected_business_preset_features(industry_key)
         labels = INDUSTRY_LABEL_PRESETS.get(
             industry_key,
             INDUSTRY_LABEL_PRESETS["field_service"],
@@ -7168,7 +7206,7 @@ def get_platform_preset_usage():
                 "title": feature_titles.get(feature_key, feature_key),
             }
             for feature_key, _, _ in FEATURE_DEFINITIONS
-            if feature_key in enabled_features
+            if feature_key in expected_features
         ]
 
         preset_rows.append({
@@ -7581,6 +7619,7 @@ async def platform_company_export(request: Request, company_id: int):
     writer.writerow(["Пользователи всего", usage["users_count"]])
     writer.writerow(["Модулей включено", profile["enabled_features_count"]])
     writer.writerow(["Модулей выключено", profile["disabled_features_count"]])
+    writer.writerow(["Отклонений от пресета", profile["preset_drift"]["count"]])
     writer.writerow(["Заявки всего", profile["task_stats"]["total"]])
     writer.writerow(["Активные заявки", profile["task_stats"]["active"]])
     writer.writerow(["Архивные заявки", profile["task_stats"]["archived"]])
@@ -7617,6 +7656,17 @@ async def platform_company_export(request: Request, company_id: int):
             feature["key"],
             feature["title"],
             "Включено" if feature["enabled"] else "Выключено",
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Отклонения от пресета"])
+    writer.writerow(["Ключ", "Название", "Ожидается", "Сейчас"])
+    for drift in profile["preset_drift"]["items"]:
+        writer.writerow([
+            drift["key"],
+            drift["title"],
+            drift["expected_label"],
+            drift["current_label"],
         ])
     writer.writerow([])
 
