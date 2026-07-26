@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Отраслевые пресеты</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1120px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border-radius:22px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+h1{margin:0;font-size:34px}
+h2{margin:0 0 14px;font-size:22px}
+.meta{color:#6b7280;font-size:13px;font-weight:800;line-height:1.45}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.stat-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
+.stat-value{margin-top:5px;font-size:24px;font-weight:900}
+.preset{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px;padding:16px;border:1px solid #e5e7eb;border-radius:16px;background:#f9fafb;margin-bottom:10px}
+.preset-title{font-size:18px;font-weight:900}
+.preset-title a{color:#111827;text-decoration:none}
+.preset-title a:hover{color:#2563eb}
+.labels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}
+.label-chip{padding:8px;border-radius:9px;background:white;border:1px solid #e5e7eb;font-size:11px;font-weight:900}
+.features{display:flex;gap:6px;flex-wrap:wrap}
+.feature{display:inline-flex;padding:6px 8px;border-radius:8px;background:white;border:1px solid #d1d5db;color:#111827;text-decoration:none;font-size:11px;font-weight:900}
+@media(max-width:850px){
+    .container{padding:16px 14px 92px}
+    .stats,.preset{grid-template-columns:1fr}
+    .labels{grid-template-columns:1fr}
+    h1{font-size:28px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/platform" class="back">Назад к платформе</a>
+
+<div class="card">
+    <h1>Отраслевые пресеты</h1>
+    <div class="meta">
+        Настройки по умолчанию для разных типов бизнеса:
+        включённые модули и названия сущностей в интерфейсе.
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat">
+        <div class="stat-label">Пресетов</div>
+        <div class="stat-value">{{ summary["presets_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Активных сфер</div>
+        <div class="stat-value">{{ summary["active_presets_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Компаний</div>
+        <div class="stat-value">{{ summary["companies_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Модулей</div>
+        <div class="stat-value">{{ summary["modules_count"] }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Сферы бизнеса</h2>
+    {% for preset in presets %}
+    <div class="preset">
+        <div>
+            <div class="preset-title">
+                <a href="/platform/companies?industry={{ preset['key'] }}">{{ preset["title"] }}</a>
+            </div>
+            <div class="meta">
+                Компаний: {{ preset["companies_count"] }} ·
+                модулей в пресете: {{ preset["modules_count"] }}
+            </div>
+            <div class="labels">
+                <div class="label-chip">Заявка: {{ preset["labels"]["task_label"] }}</div>
+                <div class="label-chip">Исполнитель: {{ preset["labels"]["worker_label"] }}</div>
+                <div class="label-chip">Клиент: {{ preset["labels"]["client_label"] }}</div>
+                <div class="label-chip">Услуга: {{ preset["labels"]["service_label"] }}</div>
+            </div>
+        </div>
+        <div>
+            <div class="features">
+                {% for feature in preset["features"] %}
+                <a class="feature" href="/platform/modules/{{ feature['key'] }}">
+                    {{ feature["title"] }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+</div>
+{% include 'platform_mobile_nav.html' %}
+</body>
+</html>

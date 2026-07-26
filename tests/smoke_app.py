@@ -10467,6 +10467,47 @@ async def assert_platform_modules_page():
     assert "/platform/modules" in platform_html
 
 
+async def assert_platform_presets_page():
+    anonymous = await crm.platform_presets_page(
+        make_public_asgi_request("/platform/presets"),
+    )
+    assert anonymous.status_code == 302
+    assert anonymous.headers["location"] == "/login"
+
+    boss = await crm.platform_presets_page(
+        make_asgi_request("owner2", "/platform/presets"),
+    )
+    assert boss.status_code == 302
+    assert boss.headers["location"] == "/"
+
+    response = await crm.platform_presets_page(
+        make_asgi_request("super", "/platform/presets"),
+    )
+    html = response.body.decode("utf-8")
+    assert response.status_code == 200
+    assert "Отраслевые пресеты" in html
+    assert "Сферы бизнеса" in html
+    assert "Бьюти" in html
+    assert "Грузоперевозки" in html
+    assert "Заявка:" in html
+    assert "/platform/companies?industry=beauty" in html
+    assert "/platform/modules/calendar" in html
+    assert 'class="platform-mobile-nav"' in html
+    assert response.context["summary"]["presets_count"] == len(
+        crm.INDUSTRY_OPTIONS
+    )
+    assert response.context["summary"]["modules_count"] == len(
+        crm.FEATURE_DEFINITIONS
+    )
+    assert response.context["summary"]["companies_count"] >= 1
+
+    platform_page = await crm.platform_dashboard(
+        make_asgi_request("super", "/platform"),
+    )
+    platform_html = platform_page.body.decode("utf-8")
+    assert "/platform/presets" in platform_html
+
+
 async def assert_platform_calendar_health():
     policy_environment_names = (
         "CALENDAR_INCIDENT_RESPONSE_MINUTES",
@@ -23526,6 +23567,7 @@ def main():
         asyncio.run(assert_dispatch_planner())
         asyncio.run(assert_platform_companies_page())
         asyncio.run(assert_platform_modules_page())
+        asyncio.run(assert_platform_presets_page())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))

@@ -7113,6 +7113,72 @@ def get_platform_module_usage():
     }
 
 
+def get_platform_preset_usage():
+    conn = connect()
+    c = conn.cursor()
+    industry_rows = c.execute("""
+    SELECT
+        COALESCE(industry, 'field_service') AS industry,
+        COUNT(*) AS companies_count
+    FROM company_settings
+    GROUP BY COALESCE(industry, 'field_service')
+    """).fetchall()
+    conn.close()
+
+    company_counts = {
+        row["industry"]: int(row["companies_count"] or 0)
+        for row in industry_rows
+    }
+    feature_titles = {
+        feature_key: title
+        for feature_key, title, _ in FEATURE_DEFINITIONS
+    }
+    preset_rows = []
+
+    for industry_key, industry_title in INDUSTRY_OPTIONS:
+        enabled_features = BUSINESS_PRESETS.get(
+            industry_key,
+            BUSINESS_PRESETS["other"],
+        )
+        labels = INDUSTRY_LABEL_PRESETS.get(
+            industry_key,
+            INDUSTRY_LABEL_PRESETS["field_service"],
+        )
+        feature_items = [
+            {
+                "key": feature_key,
+                "title": feature_titles.get(feature_key, feature_key),
+            }
+            for feature_key, _, _ in FEATURE_DEFINITIONS
+            if feature_key in enabled_features
+        ]
+
+        preset_rows.append({
+            "key": industry_key,
+            "title": industry_title,
+            "companies_count": company_counts.get(industry_key, 0),
+            "modules_count": len(feature_items),
+            "features": feature_items,
+            "labels": labels,
+        })
+
+    summary = {
+        "presets_count": len(preset_rows),
+        "companies_count": sum(company_counts.values()),
+        "active_presets_count": sum(
+            1
+            for preset in preset_rows
+            if preset["companies_count"] > 0
+        ),
+        "modules_count": len(FEATURE_DEFINITIONS),
+    }
+
+    return {
+        "summary": summary,
+        "presets": preset_rows,
+    }
+
+
 @app.post("/platform/companies")
 async def create_platform_company(request: Request):
 
@@ -7756,6 +7822,34 @@ async def platform_module_detail_page(request: Request, feature_key: str):
             "role": role,
             "summary": module_usage["summary"],
             "module": module,
+        },
+    )
+
+
+@app.get("/platform/presets", response_class=HTMLResponse)
+async def platform_presets_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    preset_usage = get_platform_preset_usage()
+
+    return templates.TemplateResponse(
+        request,
+        "platform_presets.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "summary": preset_usage["summary"],
+            "presets": preset_usage["presets"],
         },
     )
 
