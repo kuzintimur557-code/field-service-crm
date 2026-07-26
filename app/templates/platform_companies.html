@@ -16,6 +16,8 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 h1{margin:0 0 12px;font-size:36px}
 .company{display:grid;grid-template-columns:.5fr 1.5fr 1fr 1fr 1fr 1fr;gap:14px;background:#f9fafb;padding:16px;border-radius:18px;margin-bottom:10px;align-items:center}
 .name{font-size:18px;font-weight:900}
+.name a{color:#111827;text-decoration:none}
+.name a:hover{color:#2563eb}
 .meta{font-size:14px;color:#6b7280;font-weight:800}
 .filters{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr auto auto;gap:10px;margin-bottom:18px;align-items:end}
 .filters label{display:grid;gap:6px;color:#6b7280;font-size:13px;font-weight:900}
@@ -176,7 +178,9 @@ h1{margin:0 0 12px;font-size:36px}
 <div class="company">
     <div class="name">#{{ company["id"] }}</div>
     <div>
-        <div class="name">{{ company["name"] }}</div>
+        <div class="name">
+            <a href="/platform/companies/{{ company['id'] }}">{{ company["name"] }}</a>
+        </div>
         <div class="meta">Создана: {{ company["created_at"] }}</div>
     </div>
     <div class="meta">Владелец: {{ company["owner_username"] }}</div>

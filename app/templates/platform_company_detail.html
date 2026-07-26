@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Карточка компании</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:1120px;margin:auto;padding:28px}
+.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border-radius:22px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
+.header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start}
+h1{margin:0;font-size:34px}
+h2{margin:0 0 16px;font-size:22px}
+.meta{color:#6b7280;font-size:14px;font-weight:800;line-height:1.45}
+.badge{display:inline-flex;padding:7px 10px;border-radius:10px;background:#e5e7eb;color:#374151;font-size:12px;font-weight:900}
+.badge.ok{background:#dcfce7;color:#166534}
+.badge.warning{background:#fef3c7;color:#92400e}
+.badge.danger{background:#fee2e2;color:#991b1b}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.stat-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
+.stat-value{margin-top:5px;font-size:22px;font-weight:900}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.row{display:grid;grid-template-columns:1.1fr 1fr .8fr;gap:10px;padding:11px 0;border-bottom:1px solid #e5e7eb;align-items:center}
+.row:last-child{border-bottom:0}
+.name{font-weight:900;overflow-wrap:anywhere}
+.features{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.feature{padding:11px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb}
+.feature.enabled{background:#f0fdf4;border-color:#bbf7d0}
+.feature-title{font-size:13px;font-weight:900}
+.feature-desc{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800;line-height:1.35}
+@media(max-width:850px){
+    .container{padding:16px 14px 92px}
+    .header,.grid,.stats{grid-template-columns:1fr}
+    .features{grid-template-columns:1fr}
+    .row{grid-template-columns:1fr}
+    h1{font-size:28px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/platform/companies" class="back">Назад к компаниям</a>
+
+<div class="card header">
+    <div>
+        <h1>{{ company["name"] }}</h1>
+        <div class="meta">
+            Карточка компании · владелец: {{ company["owner_username"] }} · создана: {{ company["created_at"] }}
+        </div>
+    </div>
+    <span class="badge {{ usage['tone'] }}">{{ usage["status"] }}</span>
+</div>
+
+<div class="stats">
+    <div class="stat">
+        <div class="stat-label">Тариф</div>
+        <div class="stat-value">{{ usage["plan_label"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Сфера</div>
+        <div class="stat-value">{{ industry_label }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Пользователи</div>
+        <div class="stat-value">{{ usage["active_users_count"] }} / {{ usage["user_limit_label"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Всего аккаунтов</div>
+        <div class="stat-value">{{ usage["users_count"] }}</div>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h2>Пользователи</h2>
+        {% if users %}
+        {% for user in users %}
+        <div class="row">
+            <div>
+                <div class="name">{{ user["full_name"] or user["username"] }}</div>
+                <div class="meta">{{ user["username"] }}</div>
+            </div>
+            <div class="meta">{{ role_label(user["role"]) }}</div>
+            <div>
+                {% if user["is_active"] is none or user["is_active"] %}
+                <span class="badge ok">Активен</span>
+                {% else %}
+                <span class="badge danger">Отключён</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="meta">Пользователей пока нет</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Последние заявки</h2>
+        {% if recent_tasks %}
+        {% for task in recent_tasks %}
+        <div class="row">
+            <div>
+                <div class="name">#{{ task["id"] }} · {{ task["client"] or "Без клиента" }}</div>
+                <div class="meta">{{ task["task_date"] or "Дата не указана" }}</div>
+            </div>
+            <div class="meta">{{ task["status"] or "Без статуса" }}</div>
+            <div>
+                {% if task["archived"] %}
+                <span class="badge warning">Архив</span>
+                {% else %}
+                <span class="badge ok">Активна</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="meta">Заявок пока нет</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h2>Модули</h2>
+    <div class="features">
+        {% for feature in features %}
+        <div class="feature {% if feature['enabled'] %}enabled{% endif %}">
+            <div class="feature-title">
+                {{ feature["title"] }} · {% if feature["enabled"] %}включено{% else %}выключено{% endif %}
+            </div>
+            <div class="feature-desc">{{ feature["description"] }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+</div>
+{% include 'platform_mobile_nav.html' %}
+</body>
+</html>

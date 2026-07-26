@@ -6907,6 +6907,84 @@ def get_platform_company_items(
     }
 
 
+def get_platform_company_profile(company_id):
+    company_id = int(company_id or 0)
+    conn = connect()
+    c = conn.cursor()
+
+    company = c.execute("""
+    SELECT id, name, owner_username, created_at
+    FROM companies
+    WHERE id=?
+    """, (company_id,)).fetchone()
+
+    if not company:
+        conn.close()
+        return None
+
+    company = dict(company)
+    conn.close()
+
+    settings = get_company_settings(company_id)
+    usage = get_company_user_limit_usage(company_id, settings)
+    features = get_company_features(company_id)
+    industry_labels = dict(INDUSTRY_OPTIONS)
+    industry = str(settings["industry"] or "field_service")
+
+    conn = connect()
+    c = conn.cursor()
+
+    users = c.execute("""
+    SELECT
+        id,
+        username,
+        full_name,
+        role,
+        is_active,
+        last_seen
+    FROM users
+    WHERE company_id=?
+      AND role!='superadmin'
+    ORDER BY
+        CASE role
+            WHEN 'boss' THEN 1
+            WHEN 'manager' THEN 2
+            ELSE 3
+        END,
+        COALESCE(is_active, 1) DESC,
+        username
+    """, (company_id,)).fetchall()
+
+    recent_tasks = c.execute("""
+    SELECT id, client, status, task_date, archived
+    FROM tasks
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 8
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    feature_rows = []
+    for feature_key, title, description in FEATURE_DEFINITIONS:
+        feature_rows.append({
+            "key": feature_key,
+            "title": title,
+            "description": description,
+            "enabled": bool(features.get(feature_key)),
+        })
+
+    return {
+        "company": company,
+        "settings": settings,
+        "usage": usage,
+        "industry_label": industry_labels.get(industry, "Сфера не указана"),
+        "features": feature_rows,
+        "users": [dict(user) for user in users],
+        "recent_tasks": [dict(task) for task in recent_tasks],
+    }
+
+
 @app.post("/platform/companies")
 async def create_platform_company(request: Request):
 
@@ -7199,6 +7277,39 @@ async def platform_companies_export(
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f"attachment; filename={filename}"
+        },
+    )
+
+
+@app.get("/platform/companies/{company_id}", response_class=HTMLResponse)
+async def platform_company_detail_page(request: Request, company_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    profile = get_platform_company_profile(company_id)
+
+    if not profile:
+        return RedirectResponse(
+            "/platform/companies?error=company_not_found",
+            status_code=302,
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_company_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            **profile,
         },
     )
 

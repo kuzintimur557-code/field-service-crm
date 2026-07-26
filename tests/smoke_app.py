@@ -9835,6 +9835,7 @@ async def assert_platform_companies_page():
     assert list_response.context["summary"]["active_users"] >= 1
     assert list_response.context["summary"]["active_tasks"] >= 0
     assert list_response.context["summary"]["limit_alerts"] >= 0
+    assert f'href="/platform/companies/{logistics_company_id}"' in list_html
     assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
     assert 'name="return_search"' in list_html
     assert 'name="return_limit"' in list_html
@@ -9950,6 +9951,53 @@ async def assert_platform_companies_page():
     assert "Осталось мест: 2" in export_csv
     assert ",1,1,0,0," in export_csv
     assert "Smoke Company 1" not in export_csv
+
+    anonymous_detail = await crm.platform_company_detail_page(
+        make_public_asgi_request(
+            f"/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    assert anonymous_detail.status_code == 302
+    assert anonymous_detail.headers["location"] == "/login"
+
+    boss_detail = await crm.platform_company_detail_page(
+        make_asgi_request(
+            "owner2",
+            f"/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    assert boss_detail.status_code == 302
+    assert boss_detail.headers["location"] == "/"
+
+    missing_detail = await crm.platform_company_detail_page(
+        make_asgi_request("super", "/platform/companies/999999"),
+        999999,
+    )
+    assert missing_detail.status_code == 302
+    assert missing_detail.headers["location"] == (
+        "/platform/companies?error=company_not_found"
+    )
+
+    detail_response = await crm.platform_company_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    detail_html = detail_response.body.decode("utf-8")
+    assert detail_response.status_code == 200
+    assert detail_response.context["company"]["id"] == logistics_company_id
+    assert detail_response.context["usage"]["active_users_count"] == 1
+    assert "Карточка компании" in detail_html
+    assert "Smoke Logistics Company" in detail_html
+    assert "Пользователи" in detail_html
+    assert "Модули" in detail_html
+    assert "Последние заявки" in detail_html
+    assert "smoke_logistics_owner" in detail_html
+    assert "Заявок пока нет" in detail_html
 
     logistics_create_page = await crm.create_task_page(
         make_asgi_request("smoke_logistics_owner", "/create-task"),
