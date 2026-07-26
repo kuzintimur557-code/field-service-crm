@@ -10383,6 +10383,7 @@ async def assert_platform_modules_page():
     assert "Автоматизация" in html
     assert "ИИ-инсайты" in html
     assert "/platform/companies/" in html
+    assert "/platform/modules/export" in html
     assert 'class="platform-mobile-nav"' in html
     assert response.context["summary"]["modules_count"] == len(
         crm.FEATURE_DEFINITIONS
@@ -10393,6 +10394,30 @@ async def assert_platform_modules_page():
         module["key"] == "automation"
         for module in response.context["modules"]
     )
+
+    anonymous_export = await crm.platform_modules_export(
+        make_public_asgi_request("/platform/modules/export"),
+    )
+    assert anonymous_export.status_code == 302
+    assert anonymous_export.headers["location"] == "/login"
+
+    boss_export = await crm.platform_modules_export(
+        make_asgi_request("owner2", "/platform/modules/export"),
+    )
+    assert boss_export.status_code == 302
+    assert boss_export.headers["location"] == "/"
+
+    export_response = await crm.platform_modules_export(
+        make_asgi_request("super", "/platform/modules/export"),
+    )
+    export_csv = export_response.body.decode("utf-8")
+    assert export_response.status_code == 200
+    assert export_response.headers["content-disposition"] == (
+        "attachment; filename=platform_modules.csv"
+    )
+    assert "Модуль,Ключ,Описание" in export_csv
+    assert "Автоматизация,automation" in export_csv
+    assert "ИИ-инсайты,ai_insights" in export_csv
 
     platform_page = await crm.platform_dashboard(
         make_asgi_request("super", "/platform"),

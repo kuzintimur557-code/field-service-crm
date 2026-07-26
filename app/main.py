@@ -7661,6 +7661,55 @@ async def platform_modules_page(request: Request):
     )
 
 
+@app.get("/platform/modules/export")
+async def platform_modules_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    module_usage = get_platform_module_usage()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Модуль",
+        "Ключ",
+        "Описание",
+        "Включено компаний",
+        "Выключено компаний",
+        "Покрытие",
+        "Примеры компаний",
+    ])
+
+    for module in module_usage["modules"]:
+        writer.writerow([
+            module["title"],
+            module["key"],
+            module["description"],
+            module["enabled_count"],
+            module["disabled_count"],
+            f"{module['coverage_percent']}%",
+            "; ".join(company["name"] for company in module["companies"]),
+        ])
+
+    return Response(
+        output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=platform_modules.csv"
+            )
+        },
+    )
+
+
 def format_file_size(size):
     size = int(size or 0)
     units = ["байт", "КБ", "МБ", "ГБ"]

@@ -11,7 +11,9 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .container{max-width:1120px;margin:auto;padding:28px}
-.back{display:inline-block;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.top-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.back{display:inline-block;color:#2563eb;text-decoration:none;font-weight:900}
+.export-link{display:inline-block;color:#059669;text-decoration:none;font-weight:900}
 .card{background:white;padding:26px;border-radius:22px;box-shadow:0 10px 25px rgba(0,0,0,.07);margin-bottom:18px}
 h1{margin:0;font-size:34px}
 h2{margin:0 0 14px;font-size:22px}
@@ -42,7 +44,10 @@ h2{margin:0 0 14px;font-size:22px}
 <body>
 <div class="container">
 
-<a href="/platform" class="back">Назад к платформе</a>
+<div class="top-actions">
+    <a href="/platform" class="back">Назад к платформе</a>
+    <a href="/platform/modules/export" class="export-link">Экспорт CSV</a>
+</div>
 
 <div class="card">
     <h1>Модули платформы</h1>
