@@ -9988,6 +9988,55 @@ async def assert_platform_companies_page():
         "/platform/companies?error=company_not_found"
     )
 
+    anonymous_company_export = await crm.platform_company_export(
+        make_public_asgi_request(
+            f"/platform/companies/{logistics_company_id}/export",
+        ),
+        logistics_company_id,
+    )
+    assert anonymous_company_export.status_code == 302
+    assert anonymous_company_export.headers["location"] == "/login"
+
+    boss_company_export = await crm.platform_company_export(
+        make_asgi_request(
+            "owner2",
+            f"/platform/companies/{logistics_company_id}/export",
+        ),
+        logistics_company_id,
+    )
+    assert boss_company_export.status_code == 302
+    assert boss_company_export.headers["location"] == "/"
+
+    missing_company_export = await crm.platform_company_export(
+        make_asgi_request("super", "/platform/companies/999999/export"),
+        999999,
+    )
+    assert missing_company_export.status_code == 302
+    assert missing_company_export.headers["location"] == (
+        "/platform/companies?error=company_not_found"
+    )
+
+    company_export_response = await crm.platform_company_export(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}/export",
+        ),
+        logistics_company_id,
+    )
+    company_export_csv = company_export_response.body.decode("utf-8")
+    assert company_export_response.status_code == 200
+    assert company_export_response.headers["content-disposition"] == (
+        f"attachment; filename=platform_company_{logistics_company_id}.csv"
+    )
+    assert "Карточка компании" in company_export_csv
+    assert "Smoke Logistics Company" in company_export_csv
+    assert "smoke_logistics_owner" in company_export_csv
+    assert "Грузоперевозки" in company_export_csv
+    assert "Базовый" in company_export_csv
+    assert "Пользователи" in company_export_csv
+    assert "Модули" in company_export_csv
+    assert "Последние заявки" in company_export_csv
+
     detail_response = await crm.platform_company_detail_page(
         make_asgi_request(
             "super",
@@ -10005,6 +10054,7 @@ async def assert_platform_companies_page():
     assert "Пользователи" in detail_html
     assert "Модули" in detail_html
     assert "Последние заявки" in detail_html
+    assert f"/platform/companies/{logistics_company_id}/export" in detail_html
     assert 'name="return_to" value="detail"' in detail_html
     assert "smoke_logistics_owner" in detail_html
     assert "Заявок пока нет" in detail_html

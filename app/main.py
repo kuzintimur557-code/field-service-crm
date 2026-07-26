@@ -7312,6 +7312,98 @@ async def platform_companies_export(
     )
 
 
+@app.get("/platform/companies/{company_id}/export")
+async def platform_company_export(request: Request, company_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    profile = get_platform_company_profile(company_id)
+
+    if not profile:
+        return RedirectResponse(
+            "/platform/companies?error=company_not_found",
+            status_code=302,
+        )
+
+    company = profile["company"]
+    settings = profile["settings"]
+    usage = profile["usage"]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Карточка компании"])
+    writer.writerow(["ID", company["id"]])
+    writer.writerow(["Компания", company["name"]])
+    writer.writerow(["Владелец", company["owner_username"]])
+    writer.writerow(["Сфера", profile["industry_label"]])
+    writer.writerow(["Тариф", usage["plan_label"]])
+    writer.writerow(["Лимит пользователей", usage["user_limit_label"]])
+    writer.writerow(["Статус лимита", usage["status"]])
+    writer.writerow(["Активные пользователи", usage["active_users_count"]])
+    writer.writerow(["Пользователи всего", usage["users_count"]])
+    writer.writerow(["Создана", company["created_at"]])
+    writer.writerow([])
+
+    writer.writerow(["Настройки"])
+    writer.writerow(["Заявка", settings["task_label"]])
+    writer.writerow(["Исполнитель", settings["worker_label"]])
+    writer.writerow(["Клиент", settings["client_label"]])
+    writer.writerow(["Услуга", settings["service_label"]])
+    writer.writerow([])
+
+    writer.writerow(["Пользователи"])
+    writer.writerow(["ID", "Имя", "Логин", "Роль", "Статус", "Последний вход"])
+    for user in profile["users"]:
+        writer.writerow([
+            user["id"],
+            user["full_name"] or user["username"],
+            user["username"],
+            role_label(user["role"]),
+            "Активен" if user["is_active"] is None or user["is_active"] else "Отключён",
+            user["last_seen"] or "",
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Модули"])
+    writer.writerow(["Ключ", "Название", "Статус"])
+    for feature in profile["features"]:
+        writer.writerow([
+            feature["key"],
+            feature["title"],
+            "Включено" if feature["enabled"] else "Выключено",
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Последние заявки"])
+    writer.writerow(["ID", "Клиент", "Статус", "Дата", "Архив"])
+    for task in profile["recent_tasks"]:
+        writer.writerow([
+            task["id"],
+            task["client"] or "",
+            task["status"] or "",
+            task["task_date"] or "",
+            "Да" if task["archived"] else "Нет",
+        ])
+
+    return Response(
+        output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=platform_company_{company_id}.csv"
+            )
+        },
+    )
+
+
 @app.get("/platform/companies/{company_id}", response_class=HTMLResponse)
 async def platform_company_detail_page(request: Request, company_id: int):
 
