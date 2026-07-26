@@ -6974,12 +6974,16 @@ def get_platform_company_profile(company_id):
             "enabled": bool(features.get(feature_key)),
         })
 
+    enabled_features_count = sum(1 for feature in feature_rows if feature["enabled"])
+
     return {
         "company": company,
         "settings": settings,
         "usage": usage,
         "industry_label": industry_labels.get(industry, "Сфера не указана"),
         "features": feature_rows,
+        "enabled_features_count": enabled_features_count,
+        "disabled_features_count": len(feature_rows) - enabled_features_count,
         "users": [dict(user) for user in users],
         "recent_tasks": [dict(task) for task in recent_tasks],
     }
@@ -7349,6 +7353,8 @@ async def platform_company_export(request: Request, company_id: int):
     writer.writerow(["Статус лимита", usage["status"]])
     writer.writerow(["Активные пользователи", usage["active_users_count"]])
     writer.writerow(["Пользователи всего", usage["users_count"]])
+    writer.writerow(["Модулей включено", profile["enabled_features_count"]])
+    writer.writerow(["Модулей выключено", profile["disabled_features_count"]])
     writer.writerow(["Создана", company["created_at"]])
     writer.writerow([])
 

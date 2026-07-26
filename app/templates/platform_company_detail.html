@@ -23,7 +23,7 @@ h2{margin:0 0 16px;font-size:22px}
 .badge.ok{background:#dcfce7;color:#166534}
 .badge.warning{background:#fef3c7;color:#92400e}
 .badge.danger{background:#fee2e2;color:#991b1b}
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .stat{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
 .stat-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
 .stat-value{margin-top:5px;font-size:22px;font-weight:900}
@@ -116,6 +116,10 @@ h2{margin:0 0 16px;font-size:22px}
     <div class="stat">
         <div class="stat-label">Всего аккаунтов</div>
         <div class="stat-value">{{ usage["users_count"] }}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-label">Модули</div>
+        <div class="stat-value">{{ enabled_features_count }} / {{ enabled_features_count + disabled_features_count }}</div>
     </div>
 </div>
 
