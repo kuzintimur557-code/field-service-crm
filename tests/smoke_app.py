@@ -9992,10 +9992,12 @@ async def assert_platform_companies_page():
     assert detail_response.context["company"]["id"] == logistics_company_id
     assert detail_response.context["usage"]["active_users_count"] == 1
     assert "Карточка компании" in detail_html
+    assert "Настройки компании" in detail_html
     assert "Smoke Logistics Company" in detail_html
     assert "Пользователи" in detail_html
     assert "Модули" in detail_html
     assert "Последние заявки" in detail_html
+    assert 'name="return_to" value="detail"' in detail_html
     assert "smoke_logistics_owner" in detail_html
     assert "Заявок пока нет" in detail_html
 
@@ -10168,6 +10170,44 @@ async def assert_platform_companies_page():
     assert updated_features["notifications"] == 1
     assert updated_features["catalog"] == 1
     assert updated_features["recurring"] == 0
+    conn.close()
+
+    detail_update_events = []
+    crm.run_automation_event = (
+        lambda *args, **kwargs: detail_update_events.append(args) or 1
+    )
+
+    try:
+        detail_update_response = await crm.update_platform_company_settings(
+            make_form_request(
+                "super",
+                f"/platform/companies/{logistics_company_id}/settings",
+                {
+                    "plan": "business",
+                    "industry": "repair",
+                    "return_to": "detail",
+                },
+            ),
+            logistics_company_id,
+        )
+    finally:
+        crm.run_automation_event = original_run_automation_event
+
+    assert detail_update_response.status_code == 302
+    assert detail_update_response.headers["location"] == (
+        f"/platform/companies/{logistics_company_id}?updated=1"
+    )
+    assert detail_update_events[-1][1] == "company_settings_updated"
+
+    conn = connect()
+    c = conn.cursor()
+    detail_updated_settings = c.execute("""
+    SELECT plan, industry
+    FROM company_settings
+    WHERE company_id=?
+    """, (logistics_company_id,)).fetchone()
+    assert detail_updated_settings["plan"] == "business"
+    assert detail_updated_settings["industry"] == "repair"
 
     c.execute(
         "DELETE FROM notifications WHERE company_id=?",

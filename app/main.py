@@ -7106,6 +7106,7 @@ async def update_platform_company_settings(request: Request, company_id: int):
     form = await request.form()
     plan = normalize_plan(form.get("plan") or "basic")
     industry = (form.get("industry") or "field_service").strip()
+    return_to = (form.get("return_to") or "").strip()
     allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
 
     if industry not in allowed_industries:
@@ -7131,12 +7132,15 @@ async def update_platform_company_settings(request: Request, company_id: int):
     if visible_return_plan != "all" and visible_return_plan != plan:
         visible_return_plan = plan
 
-    return_url = build_platform_companies_url(
-        return_search,
-        visible_return_industry,
-        visible_return_plan,
-        limit=return_limit,
-    )
+    if return_to == "detail":
+        return_url = f"/platform/companies/{company_id}"
+    else:
+        return_url = build_platform_companies_url(
+            return_search,
+            visible_return_industry,
+            visible_return_plan,
+            limit=return_limit,
+        )
 
     conn = connect()
     c = conn.cursor()
@@ -7336,6 +7340,8 @@ async def platform_company_detail_page(request: Request, company_id: int):
             "request": request,
             "username": username,
             "role": role,
+            "industry_options": INDUSTRY_OPTIONS,
+            "plan_options": get_plan_options(),
             **profile,
         },
     )
