@@ -11705,6 +11705,22 @@ async def assert_platform_modules_page():
     assert platform_generated_invoice["status"] == "draft"
     assert "super" in platform_generated_invoice["notes"]
     platform_generated_invoice_id = platform_generated_invoice["id"]
+    generated_invoice_activity = c.execute("""
+    SELECT *
+    FROM team_activity
+    WHERE company_id=?
+      AND action=?
+      AND details LIKE ?
+    ORDER BY id DESC
+    LIMIT 1
+    """, (
+        2,
+        "Счёт платформы создан",
+        "%BILL-2-202610%",
+    )).fetchone()
+    assert generated_invoice_activity is not None
+    assert generated_invoice_activity["actor_username"] == "super"
+    assert generated_invoice_activity["target_username"] == "owner2"
     conn.close()
 
     platform_billing_company_api = await crm.api_platform_billing(
@@ -12022,7 +12038,45 @@ async def assert_platform_modules_page():
     """, (platform_generated_invoice_id,)).fetchone()
     assert paid_invoice["status"] == "paid"
     assert paid_invoice["paid_at"]
+    billing_activity_rows = c.execute("""
+    SELECT action, details, actor_username, target_username
+    FROM team_activity
+    WHERE company_id=?
+      AND details LIKE ?
+    ORDER BY id DESC
+    """, (
+        2,
+        "%BILL-2-202610%",
+    )).fetchall()
+    billing_activity_actions = [row["action"] for row in billing_activity_rows]
+    assert "Счёт платформы создан" in billing_activity_actions
+    assert "Статус счёта платформы" in billing_activity_actions
+    assert any(
+        "Черновик → Выставлен" in row["details"]
+        for row in billing_activity_rows
+    )
+    assert any(
+        "Выставлен → Оплачен" in row["details"]
+        for row in billing_activity_rows
+    )
     conn.close()
+
+    billing_team_activity = await crm.team_activity_page(
+        make_asgi_request(
+            "owner2",
+            "/workers/activity",
+            "action=billing",
+        ),
+        action="billing",
+    )
+    billing_team_activity_html = billing_team_activity.body.decode("utf-8")
+    assert billing_team_activity.status_code == 200
+    assert billing_team_activity.context["action"] == "billing"
+    assert billing_team_activity.context["activity_counts"]["billing_count"] >= 3
+    assert "Биллинг" in billing_team_activity_html
+    assert "BILL-2-202610" in billing_team_activity_html
+    assert "Счёт платформы создан" in billing_team_activity_html
+    assert "Статус счёта платформы" in billing_team_activity_html
 
     platform_updated_page = await crm.platform_billing_page(
         make_asgi_request(
@@ -12211,6 +12265,10 @@ async def assert_platform_modules_page():
     c.execute(
         "DELETE FROM notifications WHERE link=?",
         (f"/billing/invoices/{cron_invoice_id}",),
+    )
+    c.execute(
+        "DELETE FROM team_activity WHERE details LIKE ?",
+        ("%BILL-2-202610%",),
     )
     conn.commit()
     conn.close()

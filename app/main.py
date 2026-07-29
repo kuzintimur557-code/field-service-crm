@@ -126,6 +126,7 @@ TEAM_ACTIVITY_FILTERS = {
     "password": ("Пароль обновлён",),
     "commission": ("Процент обновлён",),
     "limits": ("Лимит тарифа",),
+    "billing": ("Счёт платформы создан", "Статус счёта платформы"),
 }
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 COOKIE_SECURE = (
@@ -1613,6 +1614,63 @@ def build_platform_billing_monthly_summary(invoices, today=None, limit=6):
         row["overdue_amount_label"] = format_rub_amount(row["overdue_amount"])
 
     return rows[:limit] if limit else rows
+
+
+def record_platform_billing_activity(
+    company_id,
+    actor_username,
+    action,
+    details,
+    target_username="",
+):
+    company_id = int(company_id or 0)
+
+    if company_id <= 0:
+        return None
+
+    conn = connect()
+    c = conn.cursor()
+
+    if not target_username:
+        company = c.execute("""
+        SELECT owner_username
+        FROM companies
+        WHERE id=?
+        """, (company_id,)).fetchone()
+        target_username = (
+            company["owner_username"]
+            if company and company["owner_username"]
+            else f"Компания #{company_id}"
+        )
+
+    user = c.execute("""
+    SELECT id
+    FROM users
+    WHERE company_id=?
+      AND username=?
+    """, (company_id, target_username)).fetchone()
+    user_id = user["id"] if user else 0
+
+    c.execute("""
+    INSERT INTO team_activity (
+        company_id, user_id, target_username, actor_username,
+        action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        user_id,
+        target_username,
+        actor_username,
+        action,
+        details,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    activity_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    return activity_id
 
 
 def sync_platform_billing_overdue_invoices(company_id="all", today=None):
@@ -12581,6 +12639,19 @@ async def generate_platform_billing_invoice(request: Request):
     result = generate_company_billing_invoice(company_id, period, username)
     flag = "invoice_created" if result["created"] else "invoice_exists"
 
+    if result["created"]:
+        invoice = result["invoice"]
+        record_platform_billing_activity(
+            company_id,
+            username,
+            "Счёт платформы создан",
+            (
+                f"{invoice['invoice_number']} · "
+                f"{invoice['period']} · {invoice['amount_label']}"
+            ),
+            profile["company"]["owner_username"] or "",
+        )
+
     return RedirectResponse(
         f"/platform/billing?{flag}=1",
         status_code=302,
@@ -12806,11 +12877,7 @@ async def update_platform_billing_invoice_status(
 
     conn = connect()
     c = conn.cursor()
-    invoice = c.execute("""
-    SELECT id
-    FROM billing_invoices
-    WHERE id=?
-    """, (invoice_id,)).fetchone()
+    invoice = fetch_platform_billing_invoice(c, invoice_id)
 
     if not invoice:
         conn.close()
@@ -12827,6 +12894,18 @@ async def update_platform_billing_invoice_status(
     """, (status, paid_at, invoice_id))
     conn.commit()
     conn.close()
+
+    new_status_label = get_billing_invoice_status_meta(status)["label"]
+    record_platform_billing_activity(
+        invoice["company_id"],
+        username,
+        "Статус счёта платформы",
+        (
+            f"{invoice['invoice_number'] or ('#' + str(invoice_id))}: "
+            f"{invoice['status_label']} → {new_status_label}"
+        ),
+        invoice["owner_username"] or "",
+    )
 
     if return_to == "detail":
         return RedirectResponse(
@@ -34892,7 +34971,10 @@ async def team_activity_page(
         ) THEN 1 ELSE 0 END) AS access_count,
         SUM(CASE WHEN action='Пароль обновлён' THEN 1 ELSE 0 END) AS password_count,
         SUM(CASE WHEN action='Процент обновлён' THEN 1 ELSE 0 END) AS commission_count,
-        SUM(CASE WHEN action='Лимит тарифа' THEN 1 ELSE 0 END) AS limit_count
+        SUM(CASE WHEN action='Лимит тарифа' THEN 1 ELSE 0 END) AS limit_count,
+        SUM(CASE WHEN action IN (
+            'Счёт платформы создан', 'Статус счёта платформы'
+        ) THEN 1 ELSE 0 END) AS billing_count
     FROM team_activity
     WHERE company_id=?
     """, (company_id,)).fetchone()
