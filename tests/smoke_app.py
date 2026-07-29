@@ -5771,6 +5771,9 @@ async def assert_settings_page():
         "enterprise_1c"
     )
     assert crm.get_recommended_user_limit_plan("enterprise_1c", 100) is None
+    assert crm.plan_allows_active_users("basic", 3) is True
+    assert crm.plan_allows_active_users("basic", 4) is False
+    assert crm.plan_allows_active_users("enterprise_1c", 100) is True
     assert crm.get_plan_feature_flags("basic") == {
         "one_c_enabled": 0,
         "calls_enabled": 0,
@@ -5886,6 +5889,23 @@ async def assert_settings_page():
     assert team_settings["one_c_enabled"] == 0
     assert team_settings["ai_calls_enabled"] == 0
 
+    blocked_downgrade_form = dict(settings_form)
+    blocked_downgrade_form["plan"] = "basic"
+    blocked_downgrade_response = await crm.update_settings(
+        make_form_request("owner2", "/settings", blocked_downgrade_form)
+    )
+    assert blocked_downgrade_response.status_code == 302
+    assert blocked_downgrade_response.headers["location"] == (
+        "/settings?error=plan_user_limit"
+    )
+    assert crm.get_company_settings(2)["plan"] == "team"
+
+    blocked_settings_page = await crm.settings_page(
+        make_asgi_request("owner2", "/settings", "error=plan_user_limit")
+    )
+    blocked_settings_html = blocked_settings_page.body.decode("utf-8")
+    assert "Этот тариф не покрывает текущую команду" in blocked_settings_html
+
     conn = connect()
     c = conn.cursor()
     c.execute("""
@@ -5906,19 +5926,24 @@ async def assert_settings_page():
     assert migrated_team_settings["one_c_enabled"] == 0
     assert migrated_team_settings["ai_calls_enabled"] == 0
 
-    restore_events = []
-    crm.run_automation_event = (
-        lambda *args, **kwargs: restore_events.append(args)
-    )
-
-    try:
-        restore_response = await crm.update_settings(
-            make_form_request("owner2", "/settings", settings_form)
-        )
-    finally:
-        crm.run_automation_event = original_run_automation_event
-
-    assert restore_response.status_code == 302
+    restore_plan_features = crm.get_plan_feature_flags(settings_form["plan"])
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    UPDATE company_settings
+    SET plan=?,
+        calls_enabled=?,
+        one_c_enabled=?,
+        ai_calls_enabled=?
+    WHERE company_id=2
+    """, (
+        settings_form["plan"],
+        restore_plan_features["calls_enabled"],
+        restore_plan_features["one_c_enabled"],
+        restore_plan_features["ai_calls_enabled"],
+    ))
+    conn.commit()
+    conn.close()
 
 
 async def assert_billing_page():
@@ -9786,6 +9811,18 @@ async def assert_platform_companies_page():
     assert "Заполните все поля" in error_html
     assert "❌ Заполните все поля" not in error_html
 
+    plan_limit_error_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            "error=plan_user_limit",
+        ),
+    )
+    plan_limit_error_html = plan_limit_error_response.body.decode("utf-8")
+    assert "Выбранный тариф не покрывает текущую команду компании" in (
+        plan_limit_error_html
+    )
+
     conn = connect()
     c = conn.cursor()
     c.executemany("""
@@ -10478,6 +10515,45 @@ async def assert_platform_companies_page():
         "Платформа изменила тариф: Команда, сфера: Бьюти"
     )
     assert platform_notification["link"] == "/settings"
+    conn.close()
+
+    blocked_platform_update = await crm.update_platform_company_settings(
+        make_form_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}/settings",
+            {
+                "plan": "basic",
+                "industry": "beauty",
+                "return_to": "detail",
+            },
+        ),
+        logistics_company_id,
+    )
+    assert blocked_platform_update.status_code == 302
+    assert blocked_platform_update.headers["location"] == (
+        f"/platform/companies/{logistics_company_id}?error=plan_user_limit"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    blocked_platform_settings = c.execute("""
+    SELECT plan
+    FROM company_settings
+    WHERE company_id=?
+    """, (logistics_company_id,)).fetchone()
+    assert blocked_platform_settings["plan"] == "team"
+
+    blocked_platform_detail = await crm.platform_company_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}",
+            "error=plan_user_limit",
+        ),
+        logistics_company_id,
+    )
+    assert "Выбранный тариф не покрывает текущую команду компании" in (
+        blocked_platform_detail.body.decode("utf-8")
+    )
 
     updated_features = {
         row["feature_key"]: row["enabled"]

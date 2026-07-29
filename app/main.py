@@ -1339,6 +1339,15 @@ def get_plan_user_limit(plan):
     return PLAN_DEFINITIONS[normalize_plan(plan)]["user_limit"]
 
 
+def plan_allows_active_users(plan, active_users_count):
+    user_limit = get_plan_user_limit(plan)
+
+    if user_limit is None:
+        return True
+
+    return int(active_users_count or 0) <= int(user_limit)
+
+
 def get_plan_feature_flags(plan):
     definition = PLAN_DEFINITIONS[normalize_plan(plan)]
     return {
@@ -7614,6 +7623,30 @@ async def update_platform_company_settings(request: Request, company_id: int):
 
     conn.commit()
     conn.close()
+
+    current_settings = get_company_settings(company_id)
+    current_plan = normalize_plan(
+        current_settings["plan"]
+        if current_settings and "plan" in current_settings.keys()
+        else "basic"
+    )
+    user_limit_usage = get_company_user_limit_usage(
+        company_id,
+        current_settings,
+    )
+
+    if (
+        plan != current_plan
+        and not plan_allows_active_users(
+            plan,
+            user_limit_usage["active_users_count"],
+        )
+    ):
+        separator = "&" if "?" in return_url else "?"
+        return RedirectResponse(
+            f"{return_url}{separator}error=plan_user_limit",
+            status_code=302,
+        )
 
     apply_business_preset(company_id, industry)
     plan_features = get_plan_feature_flags(plan)
@@ -30404,6 +30437,29 @@ async def update_settings(request: Request):
 
     if missing_company_response:
         return missing_company_response
+
+    current_settings = get_company_settings(company_id)
+    current_plan = normalize_plan(
+        current_settings["plan"]
+        if current_settings and "plan" in current_settings.keys()
+        else "basic"
+    )
+    user_limit_usage = get_company_user_limit_usage(
+        company_id,
+        current_settings,
+    )
+
+    if (
+        plan != current_plan
+        and not plan_allows_active_users(
+            plan,
+            user_limit_usage["active_users_count"],
+        )
+    ):
+        return RedirectResponse(
+            "/settings?error=plan_user_limit",
+            status_code=302,
+        )
 
 
     if form.get("apply_business_preset") == "1":

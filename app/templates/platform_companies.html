@@ -114,6 +114,12 @@ h1{margin:0 0 12px;font-size:36px}
 </div>
 {% endif %}
 
+{% if request.query_params.get("error") == "plan_user_limit" %}
+<div style="padding:14px;border-radius:16px;background:#fee2e2;color:#991b1b;font-weight:900;margin-bottom:16px">
+Выбранный тариф не покрывает текущую команду компании
+</div>
+{% endif %}
+
 <form class="filters" method="get" action="/platform/companies">
     <label>
         Поиск
