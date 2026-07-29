@@ -10654,6 +10654,12 @@ async def assert_platform_modules_page():
     )
     platform_html = platform_page.body.decode("utf-8")
     assert "/platform/modules" in platform_html
+    assert "Тарифы и лимиты" in platform_html
+    assert "/platform/companies?limit=danger" in platform_html
+    assert "/platform/companies?limit=warning" in platform_html
+    assert "company_usage_summary" not in platform_html
+    assert platform_page.context["company_usage_summary"]["companies"] >= 1
+    assert "limit_danger" in platform_page.context["company_usage_summary"]
 
 
 async def assert_platform_presets_page():

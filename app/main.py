@@ -7002,6 +7002,21 @@ def get_platform_company_items(
             for company in companies
             if company["user_limit_tone"] in {"warning", "danger"}
         ),
+        "limit_warning": sum(
+            1
+            for company in companies
+            if company["user_limit_tone"] == "warning"
+        ),
+        "limit_danger": sum(
+            1
+            for company in companies
+            if company["user_limit_tone"] == "danger"
+        ),
+        "limit_ok": sum(
+            1
+            for company in companies
+            if company["user_limit_tone"] == "ok"
+        ),
     }
 
     return {
@@ -11480,6 +11495,12 @@ async def platform_dashboard(request: Request):
         release_readiness,
         calendar_health_summary=calendar_health["summary"],
     )
+    platform_company_usage = get_platform_company_items()
+    limit_alert_companies = [
+        company
+        for company in platform_company_usage["companies"]
+        if company["user_limit_tone"] in {"warning", "danger"}
+    ][:5]
     platform_module_usage = get_platform_module_usage()
     platform_preset_usage = get_platform_preset_usage()
 
@@ -11504,6 +11525,8 @@ async def platform_dashboard(request: Request):
             "calendar_recommendations": calendar_recommendations,
             "release_readiness": release_readiness,
             "release_dashboard": release_dashboard,
+            "company_usage_summary": platform_company_usage["summary"],
+            "limit_alert_companies": limit_alert_companies,
             "module_usage_summary": platform_module_usage["summary"],
             "preset_usage_summary": platform_preset_usage["summary"],
         }

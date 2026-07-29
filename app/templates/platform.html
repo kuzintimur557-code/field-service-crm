@@ -31,6 +31,12 @@ h1{margin:0;font-size:38px}
 .saas-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .saas-actions a{display:inline-flex;padding:10px 12px;border-radius:10px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
 .saas-actions a.secondary{border:1px solid #d1d5db;background:white;color:#374151}
+.limit-company-list{display:grid;gap:8px;margin-top:14px}
+.limit-company{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid #e5e7eb;border-radius:12px;background:white;color:#111827;text-decoration:none}
+.limit-company.warning{background:#fffbeb;border-color:#fde68a}
+.limit-company.danger{background:#fff7f7;border-color:#fecaca}
+.limit-company strong{display:block;font-size:12px}
+.limit-company span{display:block;margin-top:4px;color:#6b7280;font-size:10px;font-weight:800}
 .release-card{display:grid;grid-template-columns:190px minmax(0,1fr) auto;gap:18px;align-items:center}
 .release-score{display:flex;width:116px;height:116px;align-items:center;justify-content:center;border:9px solid #bbf7d0;border-radius:50%;color:#047857;font-size:31px;font-weight:900}
 .release-card.warning .release-score{border-color:#fde68a;color:#b45309}
@@ -197,6 +203,52 @@ h1{font-size:30px}
     <div class="stat">
         <div class="label">Клиентов всего</div>
         <div class="value">{{ clients_count }}</div>
+    </div>
+</div>
+
+<div class="card saas-card">
+    <div>
+        <h2 class="release-title">Тарифы и лимиты</h2>
+        <div class="release-meta">
+            Контроль компаний, которые заполнили или превысили лимит пользователей.
+        </div>
+        <div class="saas-grid">
+            <a class="saas-item" href="/platform/companies">
+                <div class="saas-label">Компаний</div>
+                <div class="saas-value">{{ company_usage_summary["companies"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/companies?limit=danger">
+                <div class="saas-label">Превышен лимит</div>
+                <div class="saas-value">{{ company_usage_summary["limit_danger"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/companies?limit=warning">
+                <div class="saas-label">Лимит заполнен</div>
+                <div class="saas-value">{{ company_usage_summary["limit_warning"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/companies?limit=ok">
+                <div class="saas-label">В норме</div>
+                <div class="saas-value">{{ company_usage_summary["limit_ok"] }}</div>
+            </a>
+        </div>
+        {% if limit_alert_companies %}
+        <div class="limit-company-list">
+            {% for company in limit_alert_companies %}
+            <a class="limit-company {{ company['user_limit_tone'] }}" href="/platform/companies/{{ company['id'] }}">
+                <div>
+                    <strong>{{ company["name"] }}</strong>
+                    <span>{{ company["plan_label"] }} · {{ company["active_users_count"] }} / {{ company["user_limit_label"] }} · {{ company["user_limit_status"] }}</span>
+                </div>
+                {% if company["recommended_plan"] %}
+                <span>Рекомендация: {{ company["recommended_plan"]["label"] }}</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    <div class="saas-actions">
+        <a href="/platform/companies?limit=danger">Превышенные</a>
+        <a class="secondary" href="/platform/companies?limit=warning">Заполненные</a>
     </div>
 </div>
 
