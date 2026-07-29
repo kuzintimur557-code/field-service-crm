@@ -125,6 +125,7 @@ TEAM_ACTIVITY_FILTERS = {
     "access": ("Пользователь отключён", "Пользователь включён"),
     "password": ("Пароль обновлён",),
     "commission": ("Процент обновлён",),
+    "limits": ("Лимит тарифа",),
 }
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 COOKIE_SECURE = (
@@ -32649,7 +32650,8 @@ async def team_activity_page(
             'Пользователь отключён', 'Пользователь включён'
         ) THEN 1 ELSE 0 END) AS access_count,
         SUM(CASE WHEN action='Пароль обновлён' THEN 1 ELSE 0 END) AS password_count,
-        SUM(CASE WHEN action='Процент обновлён' THEN 1 ELSE 0 END) AS commission_count
+        SUM(CASE WHEN action='Процент обновлён' THEN 1 ELSE 0 END) AS commission_count,
+        SUM(CASE WHEN action='Лимит тарифа' THEN 1 ELSE 0 END) AS limit_count
     FROM team_activity
     WHERE company_id=?
     """, (company_id,)).fetchone()

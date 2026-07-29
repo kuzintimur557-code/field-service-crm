@@ -17246,6 +17246,37 @@ async def assert_finance_margin(task):
     assert "Пользователь удалён" in membership_export_csv
     assert "Пароль обновлён" not in membership_export_csv
 
+    limit_activity_response = await crm.team_activity_page(
+        make_asgi_request(
+            "owner2",
+            "/workers/activity?action=limits",
+        ),
+        action="limits",
+    )
+    limit_activity_html = limit_activity_response.body.decode("utf-8")
+    assert limit_activity_response.status_code == 200
+    assert limit_activity_response.context["action"] == "limits"
+    assert limit_activity_response.context["events"]
+    assert all(
+        event["action"] == "Лимит тарифа"
+        for event in limit_activity_response.context["events"]
+    )
+    assert "Лимиты" in limit_activity_html
+    assert "Превышен лимит" in limit_activity_html
+
+    limit_export_response = await crm.team_activity_export(
+        make_request("owner2"),
+        action="limits",
+    )
+    limit_export_csv = limit_export_response.body.decode("utf-8")
+    assert limit_export_response.status_code == 200
+    assert (
+        limit_export_response.headers["content-disposition"]
+        == "attachment; filename=team_activity_limits.csv"
+    )
+    assert "Лимит тарифа" in limit_export_csv
+    assert "Превышен лимит" in limit_export_csv
+
     searched_activity_response = await crm.team_activity_page(
         make_asgi_request(
             "owner2",
