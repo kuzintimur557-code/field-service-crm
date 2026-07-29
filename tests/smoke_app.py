@@ -10149,6 +10149,47 @@ async def assert_platform_companies_page():
     assert "последний вход:" in detail_html
     assert "Заявок пока нет" in detail_html
 
+    conn = connect()
+    c = conn.cursor()
+    c.executemany("""
+    INSERT INTO users (
+        username, password, role, company_id, telegram_chat_id
+    )
+    VALUES (?, ?, 'worker', ?, '')
+    """, [
+        ("smoke_logistics_limit_1", crm.hash_password("limit123"), logistics_company_id),
+        ("smoke_logistics_limit_2", crm.hash_password("limit123"), logistics_company_id),
+        ("smoke_logistics_limit_3", crm.hash_password("limit123"), logistics_company_id),
+    ])
+    conn.commit()
+    conn.close()
+
+    limit_detail_response = await crm.platform_company_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    limit_detail_html = limit_detail_response.body.decode("utf-8")
+    assert limit_detail_response.context["usage"]["tone"] == "danger"
+    assert limit_detail_response.context["recommended_plan"]["plan"] == "team"
+    assert "Рекомендация по тарифу: Команда" in limit_detail_html
+
+    limit_list_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            "search=Smoke%20Logistics&limit=danger",
+        ),
+        search="Smoke Logistics",
+        limit="danger",
+    )
+    limit_list_html = limit_list_response.body.decode("utf-8")
+    assert limit_list_response.context["summary"]["companies"] >= 1
+    assert "Smoke Logistics Company" in limit_list_html
+    assert "Рекомендация: Команда" in limit_list_html
+
     anonymous_apply_preset = await crm.apply_platform_company_preset(
         make_public_asgi_request(
             f"/platform/companies/{logistics_company_id}/apply-preset",

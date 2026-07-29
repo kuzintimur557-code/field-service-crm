@@ -6965,6 +6965,13 @@ def get_platform_company_items(
         )
         company["user_limit_status"] = user_limit_status["label"]
         company["user_limit_tone"] = user_limit_status["tone"]
+        company["recommended_plan"] = None
+
+        if company["user_limit_tone"] in {"warning", "danger"}:
+            company["recommended_plan"] = get_recommended_user_limit_plan(
+                plan,
+                company["active_users_count"],
+            )
 
         companies.append(company)
 
@@ -7028,6 +7035,14 @@ def get_platform_company_profile(company_id):
 
     settings = get_company_settings(company_id)
     usage = get_company_user_limit_usage(company_id, settings)
+    recommended_plan = None
+
+    if usage["tone"] in {"warning", "danger"}:
+        recommended_plan = get_recommended_user_limit_plan(
+            usage["plan"],
+            usage["active_users_count"],
+        )
+
     features = get_company_features(company_id)
     industry_labels = dict(INDUSTRY_OPTIONS)
     industry = str(settings["industry"] or "field_service")
@@ -7094,6 +7109,7 @@ def get_platform_company_profile(company_id):
         "company": company,
         "settings": settings,
         "usage": usage,
+        "recommended_plan": recommended_plan,
         "industry_label": industry_labels.get(industry, "Сфера не указана"),
         "features": feature_rows,
         "enabled_features_count": enabled_features_count,

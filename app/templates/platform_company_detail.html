@@ -23,6 +23,8 @@ h2{margin:0 0 16px;font-size:22px}
 .badge.ok{background:#dcfce7;color:#166534}
 .badge.warning{background:#fef3c7;color:#92400e}
 .badge.danger{background:#fee2e2;color:#991b1b}
+.limit-recommendation{border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a}
+.limit-recommendation strong{display:block;margin-bottom:6px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .stat{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
 .stat-label{color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
@@ -81,6 +83,19 @@ h2{margin:0 0 16px;font-size:22px}
     </div>
     <span class="badge {{ usage['tone'] }}">{{ usage["status"] }}</span>
 </div>
+
+{% if recommended_plan %}
+<div class="card limit-recommendation">
+    <strong>Рекомендация по тарифу: {{ recommended_plan["label"] }}</strong>
+    Сейчас активно пользователей: {{ usage["active_users_count"] }}.
+    Лимит рекомендуемого тарифа: {{ recommended_plan["user_limit_label"] }}.
+    {% if recommended_plan["available_slots"] is not none %}
+    После перехода останется свободных мест: {{ recommended_plan["available_slots"] }}.
+    {% else %}
+    Свободные места не ограничены.
+    {% endif %}
+</div>
+{% endif %}
 
 <div class="card">
     <h2>Настройки компании</h2>
