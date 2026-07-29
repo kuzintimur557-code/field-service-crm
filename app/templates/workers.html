@@ -96,7 +96,13 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 
 {% if request.query_params.get("limit_warning") == "1" %}
 <div class="notice err">
+{% if request.query_params.get("created") == "1" %}
 Пользователь создан, но лимит тарифа заполнен или превышен.
+{% elif request.query_params.get("status_updated") == "1" %}
+Пользователь включён, но лимит тарифа заполнен или превышен.
+{% else %}
+Лимит тарифа заполнен или превышен.
+{% endif %}
 <a href="/billing">Открыть тарифы</a>
 </div>
 {% endif %}

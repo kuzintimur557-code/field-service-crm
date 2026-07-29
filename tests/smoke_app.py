@@ -17446,6 +17446,19 @@ async def assert_finance_margin(task):
     assert "лимит тарифа заполнен или превышен" in limit_warning_html
     assert 'href="/billing"' in limit_warning_html
 
+    limit_status_warning_page = await crm.workers_page(
+        make_asgi_request(
+            "owner2",
+            "/workers",
+            "status_updated=1&limit_warning=1",
+        ),
+    )
+    limit_status_warning_html = limit_status_warning_page.body.decode("utf-8")
+    assert "Пользователь включён, но лимит тарифа заполнен или превышен" in (
+        limit_status_warning_html
+    )
+    assert 'href="/billing"' in limit_status_warning_html
+
     manager_workers_response = await crm.workers_page(
         make_asgi_request("manager2", "/workers"),
     )
