@@ -6044,6 +6044,8 @@ async def assert_billing_page():
     assert "Звонки:" in html
     assert "1С:" in html
     assert "ИИ-звонки:" in html
+    assert "История тарифа" in html
+    assert "Тариф: Базовый → Команда" in html
     assert "Лимит команды требует внимания" in html
     assert "Рекомендация по тарифу" in html
     assert "Изменить тариф" in html
@@ -6059,6 +6061,7 @@ async def assert_billing_page():
     assert "Настройка 1С" in html
     assert response.context["user_limit_usage"]["active_users_count"] >= 1
     assert "status" in response.context["user_limit_usage"]
+    assert len(response.context["plan_history"]) >= 1
     assert response.context["plan_features"]["calls_enabled"] in (0, 1)
     assert response.context["plan_features"]["one_c_enabled"] in (0, 1)
     assert response.context["plan_features"]["ai_calls_enabled"] in (0, 1)
@@ -6098,9 +6101,11 @@ async def assert_billing_page():
     assert billing_export_csv.startswith("\ufeff")
     assert "Тарифы компании" in billing_export_csv
     assert "Текущий тариф" in billing_export_csv
+    assert "История тарифа" in billing_export_csv
     assert "Тариф,Лимит пользователей,Звонки,1С,ИИ-звонки,Текущий" in (
         billing_export_csv
     )
+    assert "Тариф: Базовый → Команда" in billing_export_csv
     assert "Команда" in billing_export_csv
     assert "Корпоративный + 1С" in billing_export_csv
 

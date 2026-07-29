@@ -1365,6 +1365,23 @@ def get_plan_feature_flags(plan):
     }
 
 
+def fetch_billing_plan_history(c, company_id, limit=6):
+    query = """
+    SELECT *
+    FROM company_settings_history
+    WHERE company_id=?
+      AND details LIKE '%Тариф:%'
+    ORDER BY id DESC
+    """
+    params = [company_id]
+
+    if limit:
+        query += "\nLIMIT ?"
+        params.append(limit)
+
+    return c.execute(query, params).fetchall()
+
+
 def get_user_limit_status(active_users_count, user_limit):
     active_users_count = int(active_users_count or 0)
 
@@ -29745,6 +29762,11 @@ async def billing_page(request: Request):
             user_limit_usage["active_users_count"],
         )
 
+    conn = connect()
+    c = conn.cursor()
+    plan_history = fetch_billing_plan_history(c, company_id)
+    conn.close()
+
     plan_names = {
         plan_key: definition["label"]
         for plan_key, definition in PLAN_DEFINITIONS.items()
@@ -29763,7 +29785,8 @@ async def billing_page(request: Request):
             "user_limit": user_limit,
             "user_limit_usage": user_limit_usage,
             "recommended_plan": recommended_plan,
-            "plan_names": plan_names
+            "plan_names": plan_names,
+            "plan_history": plan_history,
         }
     )
 
@@ -29791,6 +29814,11 @@ async def billing_export(request: Request):
         settings["plan"] if settings and "plan" in settings.keys() else "basic"
     )
     user_limit_usage = get_company_user_limit_usage(company_id, settings)
+
+    conn = connect()
+    c = conn.cursor()
+    plan_history = fetch_billing_plan_history(c, company_id, limit=None)
+    conn.close()
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -29822,6 +29850,19 @@ async def billing_export(request: Request):
             "Да" if definition["one_c_enabled"] else "Нет",
             "Да" if definition["ai_calls_enabled"] else "Нет",
             "Да" if plan_key == plan else "Нет",
+        ])
+
+    writer.writerow([])
+    writer.writerow(["История тарифа"])
+    writer.writerow(["Дата", "Действие", "Детали", "Было", "Стало", "Кто изменил"])
+    for event in plan_history:
+        writer.writerow([
+            event["created_at"] or "",
+            event["action"] or "",
+            event["details"] or "",
+            event["old_value"] or "",
+            event["new_value"] or "",
+            event["actor_username"] or "",
         ])
 
     return Response(

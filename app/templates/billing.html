@@ -40,6 +40,11 @@ h2{margin:0 0 16px;font-size:22px}
 .capability{display:inline-flex;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
 .capability.on{background:#dcfce7;color:#166534}
 .capability.off{background:#f3f4f6;color:#6b7280}
+.history-item{display:grid;grid-template-columns:150px minmax(0,1fr) 130px;gap:12px;padding:13px 0;border-bottom:1px solid #e5e7eb;align-items:start}
+.history-item:last-child{border-bottom:0}
+.history-title{font-weight:900;color:#111827}
+.history-details{margin-top:5px;color:#4b5563;font-size:13px;font-weight:800;line-height:1.4}
+.history-meta{color:#6b7280;font-size:12px;font-weight:900}
 .integration-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:14px 18px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
@@ -47,6 +52,7 @@ h2{margin:0 0 16px;font-size:22px}
     .grid{grid-template-columns:1fr}
     h1{font-size:28px}
     .feature{display:grid;grid-template-columns:auto minmax(0,1fr)}
+    .history-item{grid-template-columns:1fr}
     .integration-link{width:100%}
 }
 </style>
@@ -165,6 +171,24 @@ h2{margin:0 0 16px;font-size:22px}
 </div>
 
 </div>
+</div>
+
+<div class="card">
+<h2>История тарифа</h2>
+{% if plan_history %}
+    {% for event in plan_history %}
+    <div class="history-item">
+        <div class="history-meta">{{ event["created_at"] }}</div>
+        <div>
+            <div class="history-title">{{ event["old_value"] or "нет" }} → {{ event["new_value"] or "нет" }}</div>
+            <div class="history-details">{{ event["details"] or event["action"] }}</div>
+        </div>
+        <div class="history-meta">{{ event["actor_username"] or "Система" }}</div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="small">История тарифа пока пустая</div>
+{% endif %}
 </div>
 
 <div class="card">
