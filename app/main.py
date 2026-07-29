@@ -8455,6 +8455,41 @@ async def platform_company_export(request: Request, company_id: int):
     )
 
 
+@app.post("/platform/companies/{company_id}/billing/generate")
+async def generate_platform_company_billing_invoice(
+    request: Request,
+    company_id: int,
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    profile = get_platform_company_profile(company_id)
+
+    if not profile:
+        return RedirectResponse(
+            "/platform/companies?error=company_not_found",
+            status_code=302,
+        )
+
+    form = await request.form()
+    period = normalize_billing_period(form.get("period") or "")
+    result = generate_company_billing_invoice(company_id, period, username)
+    flag = "invoice_created" if result["created"] else "invoice_exists"
+
+    return RedirectResponse(
+        f"/platform/companies/{company_id}?{flag}=1",
+        status_code=302,
+    )
+
+
 @app.get("/platform/companies/{company_id}", response_class=HTMLResponse)
 async def platform_company_detail_page(request: Request, company_id: int):
 

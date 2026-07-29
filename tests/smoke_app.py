@@ -10520,6 +10520,10 @@ async def assert_platform_companies_page():
     assert "История настроек пока пустая" in detail_html
     assert "Счета платформы" in detail_html
     assert "Счета платформы пока не созданы" in detail_html
+    assert (
+        f"/platform/companies/{logistics_company_id}/billing/generate"
+        in detail_html
+    )
     assert "Smoke Logistics Company" in detail_html
     assert "Пользователи" in detail_html
     assert "Модули" in detail_html
@@ -10529,6 +10533,125 @@ async def assert_platform_companies_page():
     assert "smoke_logistics_owner" in detail_html
     assert "последний вход:" in detail_html
     assert "Заявок пока нет" in detail_html
+
+    anonymous_platform_invoice = (
+        await crm.generate_platform_company_billing_invoice(
+            make_public_asgi_request(
+                f"/platform/companies/{logistics_company_id}/billing/generate",
+            ),
+            logistics_company_id,
+        )
+    )
+    assert anonymous_platform_invoice.status_code == 302
+    assert anonymous_platform_invoice.headers["location"] == "/login"
+
+    boss_platform_invoice = await crm.generate_platform_company_billing_invoice(
+        make_form_request(
+            "owner2",
+            f"/platform/companies/{logistics_company_id}/billing/generate",
+            {"period": "2026-09"},
+        ),
+        logistics_company_id,
+    )
+    assert boss_platform_invoice.status_code == 302
+    assert boss_platform_invoice.headers["location"] == "/"
+
+    missing_platform_invoice = (
+        await crm.generate_platform_company_billing_invoice(
+            make_form_request(
+                "super",
+                "/platform/companies/999999/billing/generate",
+                {"period": "2026-09"},
+            ),
+            999999,
+        )
+    )
+    assert missing_platform_invoice.status_code == 302
+    assert missing_platform_invoice.headers["location"] == (
+        "/platform/companies?error=company_not_found"
+    )
+
+    platform_invoice_response = await crm.generate_platform_company_billing_invoice(
+        make_form_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}/billing/generate",
+            {"period": "2026-09"},
+        ),
+        logistics_company_id,
+    )
+    assert platform_invoice_response.status_code == 302
+    assert platform_invoice_response.headers["location"] == (
+        f"/platform/companies/{logistics_company_id}?invoice_created=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    platform_invoice = c.execute("""
+    SELECT *
+    FROM billing_invoices
+    WHERE company_id=?
+      AND invoice_number=?
+    """, (
+        logistics_company_id,
+        f"BILL-{logistics_company_id}-202609",
+    )).fetchone()
+    assert platform_invoice is not None
+    assert platform_invoice["period"] == "2026-09"
+    assert platform_invoice["status"] == "draft"
+    assert platform_invoice["currency"] == "RUB"
+    assert "super" in platform_invoice["notes"]
+    conn.close()
+
+    platform_invoice_detail = await crm.platform_company_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}",
+            "invoice_created=1",
+        ),
+        logistics_company_id,
+    )
+    platform_invoice_html = platform_invoice_detail.body.decode("utf-8")
+    assert platform_invoice_detail.status_code == 200
+    assert platform_invoice_detail.context["billing_invoice_summary"]["count"] == 1
+    assert "Счёт платформы сформирован" in platform_invoice_html
+    assert f"BILL-{logistics_company_id}-202609" in platform_invoice_html
+
+    duplicate_platform_invoice = (
+        await crm.generate_platform_company_billing_invoice(
+            make_form_request(
+                "super",
+                f"/platform/companies/{logistics_company_id}/billing/generate",
+                {"period": "2026-09"},
+            ),
+            logistics_company_id,
+        )
+    )
+    assert duplicate_platform_invoice.status_code == 302
+    assert duplicate_platform_invoice.headers["location"] == (
+        f"/platform/companies/{logistics_company_id}?invoice_exists=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    duplicate_count = c.execute("""
+    SELECT COUNT(*) AS total
+    FROM billing_invoices
+    WHERE company_id=?
+      AND period='2026-09'
+    """, (logistics_company_id,)).fetchone()
+    assert duplicate_count["total"] == 1
+    conn.close()
+
+    duplicate_invoice_detail = await crm.platform_company_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}",
+            "invoice_exists=1",
+        ),
+        logistics_company_id,
+    )
+    duplicate_invoice_html = duplicate_invoice_detail.body.decode("utf-8")
+    assert "Счёт за этот период уже существует" in duplicate_invoice_html
 
     conn = connect()
     c = conn.cursor()
@@ -10993,6 +11116,10 @@ async def assert_platform_companies_page():
     )
     c.execute(
         "DELETE FROM notifications WHERE company_id=?",
+        (logistics_company_id,),
+    )
+    c.execute(
+        "DELETE FROM billing_invoices WHERE company_id=?",
         (logistics_company_id,),
     )
     c.execute(
