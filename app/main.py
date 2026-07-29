@@ -1523,6 +1523,39 @@ def build_billing_invoices_export_url(status_filter):
     return "/billing/invoices/export?" + urlencode({"status": status_filter})
 
 
+def normalize_platform_billing_company_id(company_id="all"):
+    value = str(company_id or "all").strip().lower()
+
+    if value in ("", "all"):
+        return "all"
+
+    try:
+        parsed = int(value)
+    except ValueError:
+        return "all"
+
+    return str(parsed) if parsed > 0 else "all"
+
+
+def build_platform_billing_url(status_filter="all", company_id="all", export=False):
+    status_filter = normalize_billing_invoice_filter(status_filter)
+    company_id = normalize_platform_billing_company_id(company_id)
+    params = {}
+
+    if status_filter != "all":
+        params["status"] = status_filter
+
+    if company_id != "all":
+        params["company_id"] = company_id
+
+    base_url = "/platform/billing/export" if export else "/platform/billing"
+
+    if not params:
+        return base_url
+
+    return base_url + "?" + urlencode(params)
+
+
 def normalize_billing_period(period=""):
     value = str(period or "").strip()
 
@@ -1684,8 +1717,9 @@ def get_platform_billing_invoice_summary():
     return summary
 
 
-def fetch_platform_billing_invoices(c, status_filter="all"):
+def fetch_platform_billing_invoices(c, status_filter="all", company_id="all"):
     status_filter = normalize_billing_invoice_filter(status_filter)
+    company_id = normalize_platform_billing_company_id(company_id)
     query = """
     SELECT
         billing_invoices.*,
@@ -1701,6 +1735,10 @@ def fetch_platform_billing_invoices(c, status_filter="all"):
     if status_filter != "all":
         query += "\nAND billing_invoices.status=?"
         params.append(status_filter)
+
+    if company_id != "all":
+        query += "\nAND billing_invoices.company_id=?"
+        params.append(int(company_id))
 
     query += "\nORDER BY billing_invoices.id DESC"
 
@@ -12145,7 +12183,11 @@ async def platform_dashboard(request: Request):
 
 
 @app.get("/platform/billing", response_class=HTMLResponse)
-async def platform_billing_page(request: Request, status: str = "all"):
+async def platform_billing_page(
+    request: Request,
+    status: str = "all",
+    company_id: str = "all",
+):
 
     username = get_user(request)
 
@@ -12158,13 +12200,28 @@ async def platform_billing_page(request: Request, status: str = "all"):
         return RedirectResponse("/", status_code=302)
 
     status_filter = normalize_billing_invoice_filter(status)
+    selected_company_id = normalize_platform_billing_company_id(company_id)
 
     conn = connect()
     c = conn.cursor()
-    invoices = fetch_platform_billing_invoices(c, status_filter=status_filter)
+    invoices = fetch_platform_billing_invoices(
+        c,
+        status_filter=status_filter,
+        company_id=selected_company_id,
+    )
     company_options = get_platform_billing_company_options(c)
     conn.close()
     summary = build_billing_invoice_summary(invoices)
+    status_filter_options = [
+        {
+            **option,
+            "url": build_platform_billing_url(
+                option["key"],
+                selected_company_id,
+            ),
+        }
+        for option in get_billing_invoice_status_options()
+    ]
 
     return templates.TemplateResponse(
         request,
@@ -12177,12 +12234,13 @@ async def platform_billing_page(request: Request, status: str = "all"):
             "summary": summary,
             "status_filter": status_filter,
             "status_options": get_billing_invoice_status_options(),
+            "status_filter_options": status_filter_options,
             "company_options": company_options,
-            "export_url": (
-                "/platform/billing/export"
-                if status_filter == "all"
-                else "/platform/billing/export?"
-                + urlencode({"status": status_filter})
+            "selected_company_id": selected_company_id,
+            "export_url": build_platform_billing_url(
+                status_filter,
+                selected_company_id,
+                export=True,
             ),
         },
     )
@@ -12399,7 +12457,11 @@ async def platform_billing_invoice_detail_page(
 
 
 @app.get("/platform/billing/export")
-async def platform_billing_export(request: Request, status: str = "all"):
+async def platform_billing_export(
+    request: Request,
+    status: str = "all",
+    company_id: str = "all",
+):
 
     username = get_user(request)
 
@@ -12412,10 +12474,15 @@ async def platform_billing_export(request: Request, status: str = "all"):
         return RedirectResponse("/", status_code=302)
 
     status_filter = normalize_billing_invoice_filter(status)
+    selected_company_id = normalize_platform_billing_company_id(company_id)
 
     conn = connect()
     c = conn.cursor()
-    invoices = fetch_platform_billing_invoices(c, status_filter=status_filter)
+    invoices = fetch_platform_billing_invoices(
+        c,
+        status_filter=status_filter,
+        company_id=selected_company_id,
+    )
     conn.close()
 
     output = io.StringIO()
@@ -12451,9 +12518,17 @@ async def platform_billing_export(request: Request, status: str = "all"):
             invoice["created_at"] or "",
         ])
 
-    filename = "platform_billing.csv"
+    filename_parts = ["platform_billing"]
 
     if status_filter != "all":
+        filename_parts.append(status_filter)
+
+    if selected_company_id != "all":
+        filename_parts.append(f"company_{selected_company_id}")
+
+    filename = "_".join(filename_parts) + ".csv"
+
+    if status_filter != "all" and selected_company_id == "all":
         filename = f"platform_billing_{status_filter}.csv"
 
     return Response(

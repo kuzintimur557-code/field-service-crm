@@ -24,6 +24,7 @@ h2{margin:0 0 16px;font-size:22px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 .filter-link{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 12px;border-radius:999px;background:white;border:1px solid #d1d5db;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
 .filter-link.active{background:#111827;border-color:#111827;color:white}
+.company-filter{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:10px;align-items:end;margin-bottom:16px}
 .notice{padding:14px 16px;border-radius:14px;font-weight:900;margin-bottom:18px}
 .notice.ok{background:#dcfce7;color:#166534}
 .notice.err{background:#fee2e2;color:#991b1b}
@@ -49,6 +50,7 @@ h2{margin:0 0 16px;font-size:22px}
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
     .summary{grid-template-columns:1fr}
+    .company-filter{grid-template-columns:1fr}
     .generate-form{grid-template-columns:1fr}
     .primary-button{width:100%}
     .status-form{grid-template-columns:1fr}
@@ -147,10 +149,25 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="card">
     <h2>Фильтр</h2>
+    <form class="company-filter" method="get" action="/platform/billing">
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        <label class="field">
+            Компания
+            <select name="company_id">
+                <option value="all" {% if selected_company_id == "all" %}selected{% endif %}>Все компании</option>
+                {% for company in company_options %}
+                <option value="{{ company['id'] }}" {% if selected_company_id == company['id']|string %}selected{% endif %}>
+                    {{ company["name"] }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="primary-button" type="submit">Показать</button>
+    </form>
     <div class="filters">
-        {% for option in status_options %}
+        {% for option in status_filter_options %}
         <a
-            href="/platform/billing{% if option['key'] != 'all' %}?status={{ option['key'] }}{% endif %}"
+            href="{{ option['url'] }}"
             class="filter-link {% if status_filter == option['key'] %}active{% endif %}"
         >
             {{ option["label"] }}

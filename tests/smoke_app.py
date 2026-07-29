@@ -6040,6 +6040,11 @@ async def assert_billing_page():
     assert crm.build_billing_invoices_export_url("issued") == (
         "/billing/invoices/export?status=issued"
     )
+    assert crm.normalize_platform_billing_company_id("bad") == "all"
+    assert crm.normalize_platform_billing_company_id("2") == "2"
+    assert crm.build_platform_billing_url("paid", "2", export=True) == (
+        "/platform/billing/export?status=paid&company_id=2"
+    )
     assert crm.get_billing_invoice_status_meta("paid")["label"] == "Оплачен"
     assert crm.format_rub_amount(1200) == "1200 ₽"
     assert crm.format_rub_amount(1200.5) == "1200.50 ₽"
@@ -11280,12 +11285,14 @@ async def assert_platform_modules_page():
     platform_billing_html = platform_billing_page.body.decode("utf-8")
     assert platform_billing_page.status_code == 200
     assert platform_billing_page.context["status_filter"] == "all"
+    assert platform_billing_page.context["selected_company_id"] == "all"
     assert platform_billing_page.context["summary"]["count"] >= 0
     assert platform_billing_page.context["company_options"]
     assert "Счета платформы" in platform_billing_html
     assert "Сформировать счёт" in platform_billing_html
     assert "/platform/billing/generate" in platform_billing_html
     assert "Фильтр" in platform_billing_html
+    assert "Все компании" in platform_billing_html
     assert "/platform/billing/export" in platform_billing_html
     assert 'class="platform-mobile-nav"' in platform_billing_html
 
@@ -11638,6 +11645,26 @@ async def assert_platform_modules_page():
     platform_paid_html = platform_paid_page.body.decode("utf-8")
     assert "BILL-2-202610" in platform_paid_html
 
+    platform_company_filter_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing?status=paid&company_id=2",
+        ),
+        status="paid",
+        company_id="2",
+    )
+    platform_company_filter_html = (
+        platform_company_filter_page.body.decode("utf-8")
+    )
+    assert platform_company_filter_page.status_code == 200
+    assert platform_company_filter_page.context["status_filter"] == "paid"
+    assert platform_company_filter_page.context["selected_company_id"] == "2"
+    assert platform_company_filter_page.context["export_url"] == (
+        "/platform/billing/export?status=paid&company_id=2"
+    )
+    assert "BILL-2-202610" in platform_company_filter_html
+    assert "Smoke Company 2" in platform_company_filter_html
+
     platform_status_error_page = await crm.platform_billing_page(
         make_asgi_request(
             "super",
@@ -11737,6 +11764,23 @@ async def assert_platform_modules_page():
     assert platform_billing_export_issued.headers["content-disposition"] == (
         "attachment; filename=platform_billing_issued.csv"
     )
+
+    platform_billing_export_company = await crm.platform_billing_export(
+        make_asgi_request(
+            "super",
+            "/platform/billing/export?status=paid&company_id=2",
+        ),
+        status="paid",
+        company_id="2",
+    )
+    platform_billing_export_company_csv = (
+        platform_billing_export_company.body.decode("utf-8")
+    )
+    assert platform_billing_export_company.status_code == 200
+    assert platform_billing_export_company.headers["content-disposition"] == (
+        "attachment; filename=platform_billing_paid_company_2.csv"
+    )
+    assert "BILL-2-202610" in platform_billing_export_company_csv
 
     conn = connect()
     c = conn.cursor()
