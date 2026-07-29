@@ -1743,6 +1743,10 @@ def record_user_limit_warning(
     if limit_usage["tone"] not in ("warning", "danger"):
         return None
 
+    recommended_plan = get_recommended_user_limit_plan(
+        limit_usage["plan"],
+        limit_usage["active_users_count"],
+    )
     limit_details = (
         f"{limit_usage['status']}. "
         f"Тариф: {limit_usage['plan_label']}. "
@@ -1750,6 +1754,9 @@ def record_user_limit_warning(
         f"{limit_usage['active_users_count']} / "
         f"{limit_usage['user_limit_label']}."
     )
+
+    if recommended_plan:
+        limit_details += f" Рекомендуемый тариф: {recommended_plan['label']}."
 
     conn = connect()
     c = conn.cursor()
@@ -1781,6 +1788,7 @@ def record_user_limit_warning(
 
     return {
         "usage": limit_usage,
+        "recommended_plan": recommended_plan,
         "details": limit_details,
     }
 

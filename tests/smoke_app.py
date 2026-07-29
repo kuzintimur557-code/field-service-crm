@@ -16578,6 +16578,7 @@ async def assert_finance_margin(task):
     assert limit_activity is not None
     assert "Превышен лимит" in limit_activity["details"]
     assert "Тариф:" in limit_activity["details"]
+    assert "Рекомендуемый тариф:" in limit_activity["details"]
     assert limit_activity["actor_username"] == "owner2"
     limit_notification = c.execute("""
     SELECT title, message, link
@@ -16590,6 +16591,7 @@ async def assert_finance_margin(task):
     """).fetchone()
     assert limit_notification is not None
     assert "Превышен лимит" in limit_notification["message"]
+    assert "Рекомендуемый тариф:" in limit_notification["message"]
     assert limit_notification["link"] == "/billing"
     assert len(created_worker_events) == 2
     assert created_worker_events[0] == {
@@ -16835,6 +16837,7 @@ async def assert_finance_margin(task):
     assert history_activity[0]["actor_username"] == "owner2"
     assert history_activity[1]["details"] == "Доступ восстановлен"
     assert "Превышен лимит" in history_activity[2]["details"]
+    assert "Рекомендуемый тариф:" in history_activity[2]["details"]
     assert history_activity[2]["actor_username"] == "owner2"
     conn.close()
 
