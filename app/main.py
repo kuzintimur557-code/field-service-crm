@@ -7997,6 +7997,26 @@ async def platform_company_export(request: Request, company_id: int):
     writer.writerow(["Услуга", settings["service_label"]])
     writer.writerow([])
 
+    writer.writerow(["История настроек"])
+    writer.writerow([
+        "Дата",
+        "Действие",
+        "Детали",
+        "Было",
+        "Стало",
+        "Кто изменил",
+    ])
+    for event in profile["settings_history"]:
+        writer.writerow([
+            event["created_at"] or "",
+            event["action"] or "",
+            event["details"] or "",
+            event["old_value"] or "",
+            event["new_value"] or "",
+            event["actor_username"] or "",
+        ])
+    writer.writerow([])
+
     writer.writerow(["Пользователи"])
     writer.writerow(["ID", "Имя", "Логин", "Роль", "Статус", "Последний вход"])
     for user in profile["users"]:

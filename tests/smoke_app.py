@@ -10199,6 +10199,7 @@ async def assert_platform_companies_page():
     assert "Модулей включено" in company_export_csv
     assert "Модулей выключено" in company_export_csv
     assert "Отклонений от пресета" in company_export_csv
+    assert "История настроек" in company_export_csv
     assert "Заявки всего" in company_export_csv
     assert "Активные заявки" in company_export_csv
     assert "Модули" in company_export_csv
@@ -10575,6 +10576,19 @@ async def assert_platform_companies_page():
     assert platform_settings_history["new_value"] == "Команда"
     assert platform_settings_history["actor_username"] == "super"
     conn.close()
+
+    history_company_export = await crm.platform_company_export(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}/export",
+        ),
+        logistics_company_id,
+    )
+    history_company_export_csv = history_company_export.body.decode("utf-8")
+    assert "История настроек" in history_company_export_csv
+    assert "Платформа обновила настройки" in history_company_export_csv
+    assert "Тариф: Базовый → Команда" in history_company_export_csv
+    assert "super" in history_company_export_csv
 
     blocked_platform_update = await crm.update_platform_company_settings(
         make_form_request(
