@@ -244,6 +244,23 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS billing_invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        invoice_number TEXT,
+        period TEXT,
+        plan TEXT,
+        amount REAL DEFAULT 0,
+        currency TEXT DEFAULT 'RUB',
+        status TEXT DEFAULT 'draft',
+        due_date TEXT,
+        paid_at TEXT,
+        notes TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS worker_unavailability (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1083,6 +1100,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_company_settings_history_company_created
     ON company_settings_history(company_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_billing_invoices_company_status
+    ON billing_invoices(company_id, status, due_date)
     """)
 
     c.execute("""

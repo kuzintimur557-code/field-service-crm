@@ -1327,6 +1327,30 @@ PLAN_DEFINITIONS = {
 }
 
 
+BILLING_INVOICE_STATUSES = {
+    "draft": {
+        "label": "Черновик",
+        "tone": "muted",
+    },
+    "issued": {
+        "label": "Выставлен",
+        "tone": "warning",
+    },
+    "paid": {
+        "label": "Оплачен",
+        "tone": "ok",
+    },
+    "overdue": {
+        "label": "Просрочен",
+        "tone": "danger",
+    },
+    "canceled": {
+        "label": "Отменён",
+        "tone": "muted",
+    },
+}
+
+
 def normalize_plan(plan):
     normalized_plan = str(plan or "basic").strip()
     return normalized_plan if normalized_plan in PLAN_DEFINITIONS else "basic"
@@ -1380,6 +1404,90 @@ def fetch_billing_plan_history(c, company_id, limit=6):
         params.append(limit)
 
     return c.execute(query, params).fetchall()
+
+
+def normalize_billing_invoice_status(status):
+    normalized_status = str(status or "draft").strip().lower()
+    return (
+        normalized_status
+        if normalized_status in BILLING_INVOICE_STATUSES
+        else "draft"
+    )
+
+
+def get_billing_invoice_status_meta(status):
+    return BILLING_INVOICE_STATUSES[normalize_billing_invoice_status(status)]
+
+
+def format_rub_amount(amount):
+    value = round(float(amount or 0), 2)
+
+    if value.is_integer():
+        return f"{int(value)} ₽"
+
+    return f"{value:.2f} ₽"
+
+
+def build_billing_invoice_rows(rows):
+    invoice_rows = []
+
+    for row in rows:
+        invoice = dict(row)
+        status_meta = get_billing_invoice_status_meta(invoice.get("status"))
+        invoice["status_code"] = normalize_billing_invoice_status(
+            invoice.get("status")
+        )
+        invoice["status_label"] = status_meta["label"]
+        invoice["status_tone"] = status_meta["tone"]
+        invoice["plan_label"] = get_plan_label(invoice.get("plan"))
+        invoice["amount_label"] = format_rub_amount(invoice.get("amount"))
+        invoice_rows.append(invoice)
+
+    return invoice_rows
+
+
+def build_billing_invoice_summary(invoices):
+    total_amount = sum(float(invoice.get("amount") or 0) for invoice in invoices)
+    unpaid_amount = sum(
+        float(invoice.get("amount") or 0)
+        for invoice in invoices
+        if invoice.get("status_code") in ("draft", "issued", "overdue")
+    )
+    paid_amount = sum(
+        float(invoice.get("amount") or 0)
+        for invoice in invoices
+        if invoice.get("status_code") == "paid"
+    )
+
+    return {
+        "count": len(invoices),
+        "total_amount": round(total_amount, 2),
+        "paid_amount": round(paid_amount, 2),
+        "unpaid_amount": round(unpaid_amount, 2),
+        "total_amount_label": format_rub_amount(total_amount),
+        "paid_amount_label": format_rub_amount(paid_amount),
+        "unpaid_amount_label": format_rub_amount(unpaid_amount),
+        "overdue_count": sum(
+            1 for invoice in invoices if invoice.get("status_code") == "overdue"
+        ),
+    }
+
+
+def fetch_billing_invoices(c, company_id, limit=None):
+    query = """
+    SELECT *
+    FROM billing_invoices
+    WHERE company_id=?
+    ORDER BY id DESC
+    """
+    params = [company_id]
+
+    if limit:
+        query += "\nLIMIT ?"
+        params.append(limit)
+
+    rows = c.execute(query, params).fetchall()
+    return build_billing_invoice_rows(rows)
 
 
 def get_user_limit_status(active_users_count, user_limit):
@@ -29870,6 +29978,104 @@ async def billing_export(request: Request):
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": "attachment; filename=billing_plans.csv"
+        },
+    )
+
+
+@app.get("/billing/invoices", response_class=HTMLResponse)
+async def billing_invoices_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
+    conn = connect()
+    c = conn.cursor()
+    invoices = fetch_billing_invoices(c, company_id)
+    conn.close()
+    summary = build_billing_invoice_summary(invoices)
+
+    return templates.TemplateResponse(
+        request,
+        "billing_invoices.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "invoices": invoices,
+            "summary": summary,
+        },
+    )
+
+
+@app.get("/billing/invoices/export")
+async def billing_invoices_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
+    conn = connect()
+    c = conn.cursor()
+    invoices = fetch_billing_invoices(c, company_id)
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Номер",
+        "Период",
+        "Тариф",
+        "Сумма",
+        "Валюта",
+        "Статус",
+        "Оплатить до",
+        "Оплачен",
+        "Примечание",
+        "Создан",
+    ])
+
+    for invoice in invoices:
+        writer.writerow([
+            invoice["invoice_number"] or "",
+            invoice["period"] or "",
+            invoice["plan_label"],
+            invoice["amount"] or 0,
+            invoice["currency"] or "RUB",
+            invoice["status_label"],
+            invoice["due_date"] or "",
+            invoice["paid_at"] or "",
+            invoice["notes"] or "",
+            invoice["created_at"] or "",
+        ])
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=billing_invoices.csv"
         },
     )
 

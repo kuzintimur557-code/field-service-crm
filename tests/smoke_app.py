@@ -6034,6 +6034,39 @@ async def assert_settings_page():
 
 
 async def assert_billing_page():
+    assert crm.normalize_billing_invoice_status("bad") == "draft"
+    assert crm.get_billing_invoice_status_meta("paid")["label"] == "Оплачен"
+    assert crm.format_rub_amount(1200) == "1200 ₽"
+    assert crm.format_rub_amount(1200.5) == "1200.50 ₽"
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-BILL-1",),
+    )
+    c.execute("""
+    INSERT INTO billing_invoices (
+        company_id, invoice_number, period, plan, amount, currency,
+        status, due_date, paid_at, notes, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "SMOKE-BILL-1",
+        "2026-07",
+        "team",
+        1200,
+        "RUB",
+        "issued",
+        "2026-07-31",
+        "",
+        "smoke invoice",
+        "2026-07-01 10:00",
+    ))
+    conn.commit()
+    conn.close()
+
     response = await crm.billing_page(make_asgi_request("owner2", "/billing"))
     assert response.status_code == 200
     html = response.body.decode("utf-8")
@@ -6051,7 +6084,9 @@ async def assert_billing_page():
     assert "Изменить тариф" in html
     assert "/settings#company-plan" in html
     assert "/billing/export" in html
+    assert "/billing/invoices" in html
     assert "Скачать CSV" in html
+    assert "Счета платформы" in html
     assert (
         "Осталось мест" in html
         or "Лимит заполнен" in html
@@ -6108,6 +6143,41 @@ async def assert_billing_page():
     assert "Тариф: Базовый → Команда" in billing_export_csv
     assert "Команда" in billing_export_csv
     assert "Корпоративный + 1С" in billing_export_csv
+
+    invoices_page = await crm.billing_invoices_page(
+        make_asgi_request("owner2", "/billing/invoices")
+    )
+    invoices_html = invoices_page.body.decode("utf-8")
+    assert invoices_page.status_code == 200
+    assert invoices_page.context["summary"]["count"] >= 1
+    assert invoices_page.context["summary"]["unpaid_amount"] >= 1200
+    assert "Счета платформы" in invoices_html
+    assert "SMOKE-BILL-1" in invoices_html
+    assert "Выставлен" in invoices_html
+    assert "1200 ₽" in invoices_html
+    assert "/billing/invoices/export" in invoices_html
+
+    invoices_export = await crm.billing_invoices_export(
+        make_asgi_request("owner2", "/billing/invoices/export")
+    )
+    invoices_export_csv = invoices_export.body.decode("utf-8")
+    assert invoices_export.status_code == 200
+    assert invoices_export.headers["content-disposition"] == (
+        "attachment; filename=billing_invoices.csv"
+    )
+    assert invoices_export_csv.startswith("\ufeff")
+    assert "Номер,Период,Тариф,Сумма,Валюта,Статус" in invoices_export_csv
+    assert "SMOKE-BILL-1" in invoices_export_csv
+    assert "Выставлен" in invoices_export_csv
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-BILL-1",),
+    )
+    conn.commit()
+    conn.close()
 
     settings_response = await crm.settings_page(
         make_asgi_request("owner2", "/settings")
@@ -13968,6 +14038,20 @@ async def assert_platform_calendar_health():
         )
         assert no_company_billing_export.status_code == 302
         assert no_company_billing_export.headers["location"] == "/platform"
+
+        no_company_billing_invoices = await crm.billing_invoices_page(
+            make_asgi_request("companyless_super", "/billing/invoices"),
+        )
+        assert no_company_billing_invoices.status_code == 302
+        assert no_company_billing_invoices.headers["location"] == "/platform"
+
+        no_company_billing_invoices_export = await crm.billing_invoices_export(
+            make_asgi_request("companyless_super", "/billing/invoices/export"),
+        )
+        assert no_company_billing_invoices_export.status_code == 302
+        assert no_company_billing_invoices_export.headers["location"] == (
+            "/platform"
+        )
 
         no_company_1c = await crm.integration_1c_page(
             make_asgi_request("companyless_super", "/integrations/1c"),
