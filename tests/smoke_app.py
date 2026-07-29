@@ -10436,6 +10436,18 @@ async def assert_platform_companies_page():
         "Платформа повторно применила пресет: Грузоперевозки"
     )
     assert preset_notification["link"] == "/settings"
+    preset_history = c.execute("""
+    SELECT action, details, old_value, new_value, actor_username
+    FROM company_settings_history
+    WHERE company_id=?
+      AND action='Платформа применила пресет'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (logistics_company_id,)).fetchone()
+    assert preset_history is not None
+    assert "Пресет: Грузоперевозки" in preset_history["details"]
+    assert preset_history["new_value"] == "Грузоперевозки"
+    assert preset_history["actor_username"] == "super"
     conn.close()
 
     logistics_create_page = await crm.create_task_page(

@@ -7819,6 +7819,18 @@ async def apply_platform_company_preset(request: Request, company_id: int):
 
     apply_business_preset(company_id, industry)
 
+    record_company_settings_history(
+        company_id,
+        username,
+        "Платформа применила пресет",
+        (
+            f"Пресет: {industry_label}; "
+            "модули и подписи компании приведены к настройкам сферы"
+        ),
+        "",
+        industry_label,
+    )
+
     owner_username = str(company["owner_username"] or "").strip()
 
     if owner_username:
