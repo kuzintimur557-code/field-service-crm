@@ -208,7 +208,7 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
                     <div class="endpoint-title">{{ endpoint.title }}</div>
                     <span class="pill {{ endpoint.status }}">{{ endpoint.status_label }}</span>
                 </div>
-                {% if role == "superadmin" or endpoint.url in ["/health", "/ready", "/system"] %}
+                {% if endpoint.method == "GET" and (role == "superadmin" or endpoint.url in ["/health", "/ready", "/system"]) %}
                 <a class="endpoint-url" href="{{ endpoint.url }}" target="_blank">{{ endpoint.method }} {{ endpoint.url }}</a>
                 {% else %}
                 <div class="endpoint-url">{{ endpoint.method }} {{ endpoint.url }}</div>

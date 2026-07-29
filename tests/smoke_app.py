@@ -14913,6 +14913,8 @@ async def assert_platform_calendar_health():
         assert "Сервис" in system_html
         assert "GET /health" in system_html
         assert "GET /ready" in system_html
+        assert "POST /automation/cron/platform-billing-reminders" in system_html
+        assert "Напоминания по счетам" in system_html
         assert "Журнал системы" in system_html
         assert "/system/export" in system_html
         assert "/system/events/export" in system_html
@@ -14937,6 +14939,7 @@ async def assert_platform_calendar_health():
             "/ready",
             "/system",
             "/platform/readiness",
+            "/automation/cron/platform-billing-reminders",
             "/backup",
         }.issubset({
             item["url"]
@@ -15000,6 +15003,9 @@ async def assert_platform_calendar_health():
         assert "Контроль деплоя" in system_export_csv
         assert "/health" in system_export_csv
         assert "/ready" in system_export_csv
+        assert "/automation/cron/platform-billing-reminders" in (
+            system_export_csv
+        )
         assert "Резервные копии" in system_export_csv
         assert "Ошибки за 24 часа" in system_export_csv
         assert "HTTP событий" in system_export_csv
@@ -15028,6 +15034,11 @@ async def assert_platform_calendar_health():
         assert system_api["public_readiness_status"]["ok"] is True
         assert any(
             item["url"] == "/ready"
+            for item in system_api["deployment_endpoints"]
+        )
+        assert any(
+            item["url"] == "/automation/cron/platform-billing-reminders"
+            and item["method"] == "POST"
             for item in system_api["deployment_endpoints"]
         )
         assert system_api["system_event_summary"]["hours"] == (

@@ -36491,6 +36491,20 @@ def build_system_diagnostics(role=""):
             "method": "GET",
         },
         {
+            "title": "Напоминания по счетам",
+            "url": "/automation/cron/platform-billing-reminders",
+            "access_label": "cron secret",
+            "status": "ok" if cron_secret_configured else "warning",
+            "status_label": (
+                "готово" if cron_secret_configured else "нужен секрет"
+            ),
+            "summary": (
+                "Плановый запуск уведомлений владельцам компаний "
+                "по выставленным и просроченным счетам платформы."
+            ),
+            "method": "POST",
+        },
+        {
             "title": "Резервные копии",
             "url": "/backup",
             "access_label": "superadmin",
