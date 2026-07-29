@@ -5915,7 +5915,20 @@ async def assert_settings_page():
     assert history_page.status_code == 200
     assert "История настроек" in history_html
     assert "Тариф: Базовый → Команда" in history_html
+    assert "/settings/history/export" in history_html
     assert 'class="mobile-nav"' in history_html
+
+    history_export = await crm.settings_history_export(
+        make_request("owner2")
+    )
+    history_export_csv = history_export.body.decode("utf-8")
+    assert history_export.status_code == 200
+    assert history_export.headers["content-disposition"] == (
+        "attachment; filename=company_settings_history.csv"
+    )
+    assert history_export_csv.startswith("\ufeff")
+    assert "Дата,Действие,Детали,Было,Стало,Кто изменил" in history_export_csv
+    assert "Тариф: Базовый → Команда" in history_export_csv
 
     blocked_downgrade_form = dict(settings_form)
     blocked_downgrade_form["plan"] = "basic"

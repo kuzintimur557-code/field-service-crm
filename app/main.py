@@ -30508,6 +30508,69 @@ async def settings_history_page(request: Request):
     )
 
 
+@app.get("/settings/history/export")
+async def settings_history_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(
+        username,
+        role,
+    )
+
+    if missing_company_response:
+        return missing_company_response
+
+    conn = connect()
+    c = conn.cursor()
+    history = c.execute("""
+    SELECT *
+    FROM company_settings_history
+    WHERE company_id=?
+    ORDER BY id DESC
+    """, (company_id,)).fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Дата",
+        "Действие",
+        "Детали",
+        "Было",
+        "Стало",
+        "Кто изменил",
+    ])
+
+    for event in history:
+        writer.writerow([
+            event["created_at"] or "",
+            event["action"] or "",
+            event["details"] or "",
+            event["old_value"] or "",
+            event["new_value"] or "",
+            event["actor_username"] or "",
+        ])
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=company_settings_history.csv"
+            )
+        },
+    )
+
+
 @app.post("/settings")
 async def update_settings(request: Request):
 

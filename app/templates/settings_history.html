@@ -12,6 +12,8 @@
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .container{max-width:900px;margin:auto;padding:28px}
 .back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.actions .back{margin-bottom:0}
 .card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
 h1{margin:0 0 8px;font-size:34px}
 .meta{color:#6b7280;font-size:14px;font-weight:800;line-height:1.45}
@@ -31,7 +33,10 @@ h1{margin:0 0 8px;font-size:34px}
 <body>
 <div class="container">
 
-<a href="/settings" class="back">← Назад к настройкам</a>
+<div class="actions">
+    <a href="/settings" class="back">← Назад к настройкам</a>
+    <a href="/settings/history/export" class="back">Скачать CSV</a>
+</div>
 
 <div class="card">
     <h1>История настроек</h1>
