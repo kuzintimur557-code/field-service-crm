@@ -11268,6 +11268,8 @@ async def assert_platform_modules_page():
     assert "Счета и подписки" in platform_html
     assert "/platform/billing" in platform_html
     assert "/platform/billing/export" in platform_html
+    assert "Просрочено по сроку" in platform_html
+    assert "Оплата в 7 дней" in platform_html
     assert "/platform/companies?limit=danger" in platform_html
     assert "/platform/companies?limit=warning" in platform_html
     assert "company_usage_summary" not in platform_html
@@ -11278,6 +11280,7 @@ async def assert_platform_modules_page():
     assert "unpaid_amount_label" in platform_page.context[
         "platform_billing_summary"
     ]
+    assert "risk_summary" in platform_page.context["platform_billing_summary"]
 
     anonymous_billing_page = await crm.platform_billing_page(
         make_public_asgi_request("/platform/billing"),

@@ -1751,6 +1751,7 @@ def get_platform_billing_invoice_summary():
 
     invoices = build_billing_invoice_rows(rows)
     summary = build_billing_invoice_summary(invoices)
+    summary["risk_summary"] = build_platform_billing_risk_summary(invoices)
     summary["companies_with_invoices"] = int(companies_with_invoices or 0)
     summary["issued_count"] = sum(
         1 for invoice in invoices if invoice.get("status_code") == "issued"

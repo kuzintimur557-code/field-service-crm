@@ -260,7 +260,7 @@ h1{font-size:30px}
         </div>
         <div class="saas-grid">
             <a class="saas-item" href="/platform/billing">
-                <div class="saas-label">Счетов</div>
+                <div class="saas-label">Счётов</div>
                 <div class="saas-value">{{ platform_billing_summary["count"] }}</div>
             </a>
             <a class="saas-item" href="/platform/billing">
@@ -274,6 +274,14 @@ h1{font-size:30px}
             <a class="saas-item" href="/platform/billing">
                 <div class="saas-label">К оплате</div>
                 <div class="saas-value">{{ platform_billing_summary["unpaid_amount_label"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/billing">
+                <div class="saas-label">Просрочено по сроку</div>
+                <div class="saas-value">{{ platform_billing_summary["risk_summary"]["overdue_by_date_count"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/billing">
+                <div class="saas-label">Оплата в 7 дней</div>
+                <div class="saas-value">{{ platform_billing_summary["risk_summary"]["due_soon_count"] }}</div>
             </a>
         </div>
     </div>
