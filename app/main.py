@@ -1553,6 +1553,28 @@ def get_platform_billing_invoice_summary():
     return summary
 
 
+def fetch_platform_billing_invoices(c):
+    rows = c.execute("""
+    SELECT
+        billing_invoices.*,
+        companies.name AS company_name,
+        companies.owner_username AS owner_username
+    FROM billing_invoices
+    LEFT JOIN companies
+      ON companies.id=billing_invoices.company_id
+    ORDER BY billing_invoices.id DESC
+    """).fetchall()
+    invoices = []
+
+    for row in rows:
+        invoice = build_billing_invoice_rows([row])[0]
+        invoice["company_name"] = row["company_name"] or ""
+        invoice["owner_username"] = row["owner_username"] or ""
+        invoices.append(invoice)
+
+    return invoices
+
+
 def get_user_limit_status(active_users_count, user_limit):
     active_users_count = int(active_users_count or 0)
 
@@ -11893,6 +11915,66 @@ async def platform_dashboard(request: Request):
             "module_usage_summary": platform_module_usage["summary"],
             "preset_usage_summary": platform_preset_usage["summary"],
         }
+    )
+
+
+@app.get("/platform/billing/export")
+async def platform_billing_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+    invoices = fetch_platform_billing_invoices(c)
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID компании",
+        "Компания",
+        "Владелец",
+        "Номер",
+        "Период",
+        "Тариф",
+        "Сумма",
+        "Валюта",
+        "Статус",
+        "Оплатить до",
+        "Оплачен",
+        "Создан",
+    ])
+
+    for invoice in invoices:
+        writer.writerow([
+            invoice["company_id"] or "",
+            invoice["company_name"],
+            invoice["owner_username"],
+            invoice["invoice_number"] or "",
+            invoice["period"] or "",
+            invoice["plan_label"],
+            invoice["amount"] or 0,
+            invoice["currency"] or "RUB",
+            invoice["status_label"],
+            invoice["due_date"] or "",
+            invoice["paid_at"] or "",
+            invoice["created_at"] or "",
+        ])
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=platform_billing.csv"
+        },
     )
 
 

@@ -11055,6 +11055,7 @@ async def assert_platform_modules_page():
     assert "/platform/modules" in platform_html
     assert "Тарифы и лимиты" in platform_html
     assert "Счета и подписки" in platform_html
+    assert "/platform/billing/export" in platform_html
     assert "/platform/companies?limit=danger" in platform_html
     assert "/platform/companies?limit=warning" in platform_html
     assert "company_usage_summary" not in platform_html
@@ -11065,6 +11066,31 @@ async def assert_platform_modules_page():
     assert "unpaid_amount_label" in platform_page.context[
         "platform_billing_summary"
     ]
+
+    anonymous_billing_export = await crm.platform_billing_export(
+        make_public_asgi_request("/platform/billing/export"),
+    )
+    assert anonymous_billing_export.status_code == 302
+    assert anonymous_billing_export.headers["location"] == "/login"
+
+    boss_billing_export = await crm.platform_billing_export(
+        make_asgi_request("owner2", "/platform/billing/export"),
+    )
+    assert boss_billing_export.status_code == 302
+    assert boss_billing_export.headers["location"] == "/"
+
+    platform_billing_export = await crm.platform_billing_export(
+        make_asgi_request("super", "/platform/billing/export"),
+    )
+    platform_billing_export_csv = platform_billing_export.body.decode("utf-8")
+    assert platform_billing_export.status_code == 200
+    assert platform_billing_export.headers["content-disposition"] == (
+        "attachment; filename=platform_billing.csv"
+    )
+    assert platform_billing_export_csv.startswith("\ufeff")
+    assert "ID компании,Компания,Владелец,Номер,Период,Тариф" in (
+        platform_billing_export_csv
+    )
 
 
 async def assert_platform_presets_page():
@@ -13635,6 +13661,7 @@ async def assert_platform_calendar_health():
         assert "Релизный штаб" in platform_html
         assert "Модульность SaaS" in platform_html
         assert "Счета и подписки" in platform_html
+        assert "/platform/billing/export" in platform_html
         assert "Быстрые действия" in platform_html
         assert "🛠 Панель платформы" not in platform_html
         assert "🏢 Компании" not in platform_html
