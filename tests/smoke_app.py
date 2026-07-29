@@ -11334,6 +11334,8 @@ async def assert_platform_modules_page():
     assert "/platform/billing/generate" in platform_billing_html
     assert "/platform/billing/reminders/send" in platform_billing_html
     assert "Отправить напоминания владельцам" in platform_billing_html
+    assert "/platform/billing/overdue/sync" in platform_billing_html
+    assert "Синхронизировать просрочки" in platform_billing_html
     assert "Фильтр" in platform_billing_html
     assert "Все компании" in platform_billing_html
     assert "/platform/billing/export" in platform_billing_html
@@ -11346,6 +11348,29 @@ async def assert_platform_modules_page():
         "DELETE FROM billing_invoices WHERE invoice_number=?",
         ("SMOKE-PLATFORM-REMINDER",),
     )
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-PLATFORM-SYNC",),
+    )
+    c.execute("""
+    INSERT INTO billing_invoices (
+        company_id, invoice_number, period, plan, amount, currency,
+        status, due_date, paid_at, notes, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "SMOKE-PLATFORM-SYNC",
+        "2026-07",
+        "team",
+        1990,
+        "RUB",
+        "issued",
+        yesterday,
+        "",
+        "smoke overdue sync",
+        "2026-07-01 09:30",
+    ))
     c.execute("""
     INSERT INTO billing_invoices (
         company_id, invoice_number, period, plan, amount, currency,
@@ -11368,6 +11393,74 @@ async def assert_platform_modules_page():
     reminder_invoice_id = c.lastrowid
     conn.commit()
     conn.close()
+
+    anonymous_overdue_sync = await crm.sync_platform_billing_overdue(
+        make_public_asgi_request("/platform/billing/overdue/sync"),
+    )
+    assert anonymous_overdue_sync.status_code == 302
+    assert anonymous_overdue_sync.headers["location"] == "/login"
+
+    boss_overdue_sync = await crm.sync_platform_billing_overdue(
+        make_form_request(
+            "owner2",
+            "/platform/billing/overdue/sync",
+            {"company_id": "2", "status": "issued"},
+        ),
+    )
+    assert boss_overdue_sync.status_code == 302
+    assert boss_overdue_sync.headers["location"] == "/"
+
+    platform_overdue_sync = await crm.sync_platform_billing_overdue(
+        make_form_request(
+            "super",
+            "/platform/billing/overdue/sync",
+            {"company_id": "2", "status": "issued"},
+        ),
+    )
+    assert platform_overdue_sync.status_code == 302
+    overdue_sync_location = platform_overdue_sync.headers["location"]
+    assert overdue_sync_location.startswith(
+        "/platform/billing?status=issued&company_id=2"
+        "&overdue_synced=1&updated="
+    )
+    overdue_sync_updated = int(overdue_sync_location.rsplit("=", 1)[-1])
+    assert overdue_sync_updated >= 2
+
+    conn = connect()
+    c = conn.cursor()
+    synced_invoice = c.execute("""
+    SELECT status
+    FROM billing_invoices
+    WHERE invoice_number=?
+    """, ("SMOKE-PLATFORM-SYNC",)).fetchone()
+    synced_reminder_invoice = c.execute("""
+    SELECT status
+    FROM billing_invoices
+    WHERE id=?
+    """, (reminder_invoice_id,)).fetchone()
+    assert synced_invoice is not None
+    assert synced_invoice["status"] == "overdue"
+    assert synced_reminder_invoice is not None
+    assert synced_reminder_invoice["status"] == "overdue"
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-PLATFORM-SYNC",),
+    )
+    conn.commit()
+    conn.close()
+
+    overdue_sync_notice_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing",
+            f"overdue_synced=1&updated={overdue_sync_updated}",
+        ),
+    )
+    assert (
+        f"Обновлено просроченных счетов: {overdue_sync_updated}"
+    ) in (
+        overdue_sync_notice_page.body.decode("utf-8")
+    )
 
     anonymous_billing_reminders = await crm.send_platform_billing_reminders(
         make_public_asgi_request("/platform/billing/reminders/send"),
@@ -12021,6 +12114,10 @@ async def assert_platform_modules_page():
     c.execute(
         "DELETE FROM billing_invoices WHERE invoice_number=?",
         ("SMOKE-PLATFORM-REMINDER",),
+    )
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-PLATFORM-SYNC",),
     )
     c.execute(
         "DELETE FROM billing_invoices WHERE invoice_number=?",

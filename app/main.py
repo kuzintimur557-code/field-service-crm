@@ -1561,6 +1561,37 @@ def build_platform_billing_risk_summary(invoices, today=None):
     }
 
 
+def sync_platform_billing_overdue_invoices(company_id="all", today=None):
+    today = today or datetime.now().date()
+    selected_company_id = normalize_platform_billing_company_id(company_id)
+    today_value = today.strftime("%Y-%m-%d")
+    query = """
+    UPDATE billing_invoices
+    SET status='overdue'
+    WHERE status='issued'
+      AND COALESCE(due_date, '')!=''
+      AND due_date<?
+    """
+    params = [today_value]
+
+    if selected_company_id != "all":
+        query += "\nAND company_id=?"
+        params.append(int(selected_company_id))
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute(query, params)
+    updated_count = c.rowcount if c.rowcount is not None else 0
+    conn.commit()
+    conn.close()
+
+    return {
+        "updated": max(int(updated_count or 0), 0),
+        "company_id": selected_company_id,
+        "today": today_value,
+    }
+
+
 def get_platform_billing_reminder_payload(invoice, today=None):
     today = today or datetime.now().date()
     status = normalize_billing_invoice_status(invoice.get("status_code"))
@@ -1603,6 +1634,10 @@ def create_platform_billing_reminders(company_id="all", today=None):
     today = today or datetime.now().date()
     selected_company_id = normalize_platform_billing_company_id(company_id)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    sync_result = sync_platform_billing_overdue_invoices(
+        selected_company_id,
+        today=today,
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -1669,6 +1704,7 @@ def create_platform_billing_reminders(company_id="all", today=None):
         "created": created_count,
         "skipped": skipped_count,
         "checked": checked_count,
+        "synced_overdue": sync_result["updated"],
         "company_id": selected_company_id,
     }
 
@@ -12523,6 +12559,39 @@ async def send_platform_billing_reminders(request: Request):
         (
             f"{redirect_url}{separator}billing_reminders=1"
             f"&created={result['created']}"
+        ),
+        status_code=302,
+    )
+
+
+@app.post("/platform/billing/overdue/sync")
+async def sync_platform_billing_overdue(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    selected_company_id = normalize_platform_billing_company_id(
+        form.get("company_id") or "all"
+    )
+    status_filter = normalize_billing_invoice_filter(
+        form.get("status") or "all"
+    )
+    result = sync_platform_billing_overdue_invoices(selected_company_id)
+    redirect_url = build_platform_billing_url(status_filter, selected_company_id)
+    separator = "&" if "?" in redirect_url else "?"
+
+    return RedirectResponse(
+        (
+            f"{redirect_url}{separator}overdue_synced=1"
+            f"&updated={result['updated']}"
         ),
         status_code=302,
     )

@@ -23,8 +23,9 @@ h2{margin:0 0 16px;font-size:22px}
 .summary-value{margin-top:8px;font-size:24px;font-weight:900}
 .risk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .risk-item{padding:2px 0}
-.reminder-form{margin-top:16px}
-.reminder-form button{min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;font-weight:900;cursor:pointer}
+.billing-action-forms{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.billing-action-form button{min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;font-weight:900;cursor:pointer}
+.billing-action-form .secondary-action{background:#e5e7eb;color:#111827}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 .filter-link{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 12px;border-radius:999px;background:white;border:1px solid #d1d5db;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
 .filter-link.active{background:#111827;border-color:#111827;color:white}
@@ -56,7 +57,8 @@ h2{margin:0 0 16px;font-size:22px}
     .summary,.risk-grid{grid-template-columns:1fr}
     .company-filter{grid-template-columns:1fr}
     .generate-form{grid-template-columns:1fr}
-    .reminder-form button{width:100%}
+    .billing-action-forms{display:grid}
+    .billing-action-form button{width:100%}
     .primary-button{width:100%}
     .status-form{grid-template-columns:1fr}
     .status-form button{width:100%}
@@ -94,6 +96,10 @@ h2{margin:0 0 16px;font-size:22px}
 
 {% if request.query_params.get("billing_reminders") == "1" %}
 <div class="notice ok">Создано уведомлений по счетам: {{ request.query_params.get("created") or "0" }}</div>
+{% endif %}
+
+{% if request.query_params.get("overdue_synced") == "1" %}
+<div class="notice ok">Обновлено просроченных счетов: {{ request.query_params.get("updated") or "0" }}</div>
 {% endif %}
 
 {% if request.query_params.get("error") == "company_required" %}
@@ -153,11 +159,18 @@ h2{margin:0 0 16px;font-size:22px}
             <div class="summary-value">{{ risk_summary["issued_count"] }}</div>
         </div>
     </div>
-    <form class="reminder-form" method="post" action="/platform/billing/reminders/send">
-        <input type="hidden" name="company_id" value="{{ selected_company_id }}">
-        <input type="hidden" name="status" value="{{ status_filter }}">
-        <button type="submit">Отправить напоминания владельцам</button>
-    </form>
+    <div class="billing-action-forms">
+        <form class="billing-action-form" method="post" action="/platform/billing/reminders/send">
+            <input type="hidden" name="company_id" value="{{ selected_company_id }}">
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <button type="submit">Отправить напоминания владельцам</button>
+        </form>
+        <form class="billing-action-form" method="post" action="/platform/billing/overdue/sync">
+            <input type="hidden" name="company_id" value="{{ selected_company_id }}">
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <button class="secondary-action" type="submit">Синхронизировать просрочки</button>
+        </form>
+    </div>
 </div>
 
 <div class="card">
