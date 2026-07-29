@@ -7153,6 +7153,14 @@ def get_platform_company_profile(company_id):
     LIMIT 8
     """, (company_id,)).fetchall()
 
+    settings_history = c.execute("""
+    SELECT *
+    FROM company_settings_history
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 5
+    """, (company_id,)).fetchall()
+
     task_stats = c.execute("""
     SELECT
         COUNT(*) AS total,
@@ -7199,6 +7207,9 @@ def get_platform_company_profile(company_id):
         },
         "users": [dict(user) for user in users],
         "recent_tasks": [dict(task) for task in recent_tasks],
+        "settings_history": [
+            dict(event) for event in settings_history
+        ],
     }
 
 

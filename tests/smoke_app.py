@@ -10224,6 +10224,8 @@ async def assert_platform_companies_page():
     assert "Настройки компании" in detail_html
     assert "Соответствие пресету" in detail_html
     assert "Настройки соответствуют пресету" in detail_html
+    assert "История настроек" in detail_html
+    assert "История настроек пока пустая" in detail_html
     assert "Smoke Logistics Company" in detail_html
     assert "Пользователи" in detail_html
     assert "Модули" in detail_html
@@ -10611,6 +10613,9 @@ async def assert_platform_companies_page():
     assert "Выбранный тариф не покрывает текущую команду компании" in (
         blocked_platform_detail.body.decode("utf-8")
     )
+    blocked_platform_detail_html = blocked_platform_detail.body.decode("utf-8")
+    assert "Платформа обновила настройки" in blocked_platform_detail_html
+    assert "Тариф: Базовый → Команда" in blocked_platform_detail_html
 
     updated_features = {
         row["feature_key"]: row["enabled"]
