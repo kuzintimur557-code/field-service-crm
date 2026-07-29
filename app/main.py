@@ -10310,6 +10310,27 @@ def get_platform_release_readiness(
             "Операции",
         ),
         make_release_readiness_check(
+            "platform_billing_reminder_cron",
+            "Cron напоминаний по счетам",
+            "ok" if cron_secret_configured else "warning",
+            (
+                "Endpoint напоминаний по счетам готов к плановому запуску."
+                if cron_secret_configured
+                else (
+                    "Напоминания по счетам есть, но cron secret "
+                    "ещё не настроен."
+                )
+            ),
+            (
+                "Подключите Railway cron на "
+                "/automation/cron/platform-billing-reminders."
+            ),
+            "/system",
+            4,
+            "operations",
+            "Операции",
+        ),
+        make_release_readiness_check(
             "uploads",
             "Хранилище файлов",
             "ok" if UPLOAD_DIR.exists() else "critical",
@@ -10947,6 +10968,13 @@ def get_platform_release_runbook(
     score = int(readiness["score"] or 0)
     critical_count = int(readiness["critical_count"] or 0)
     warning_count = int(readiness["warning_count"] or 0)
+    checks_by_key = {
+        item["key"]: item for item in readiness["checks"]
+    }
+    billing_cron_check = checks_by_key.get(
+        "platform_billing_reminder_cron",
+        {},
+    )
 
     if blocked:
         status = "critical"
@@ -10999,6 +11027,23 @@ def get_platform_release_runbook(
                     ),
                     "/platform/readiness",
                     "ok" if has_signoff else "warning",
+                ),
+                make_release_runbook_step(
+                    "Подключить cron счетов",
+                    (
+                        "Cron напоминаний по счетам готов."
+                        if billing_cron_check.get("status") == "ok"
+                        else (
+                            "Добавьте Railway schedule для "
+                            "POST /automation/cron/platform-billing-reminders."
+                        )
+                    ),
+                    "/system",
+                    (
+                        "ok"
+                        if billing_cron_check.get("status") == "ok"
+                        else "warning"
+                    ),
                 ),
             ],
         },

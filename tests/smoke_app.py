@@ -15650,6 +15650,8 @@ async def assert_platform_calendar_health():
         assert "Секрет приложения" in readiness_html
         assert "Telegram уведомления" in readiness_html
         assert "Фоновые запуски" in readiness_html
+        assert "Cron напоминаний по счетам" in readiness_html
+        assert "Подключить cron счетов" in readiness_html
         assert "Операционный контроль" in readiness_html
         assert "/platform/readiness/export" in readiness_html
         assert "/platform/calendar-health" in readiness_html
@@ -15858,6 +15860,8 @@ async def assert_platform_calendar_health():
         assert "Категории" in readiness_csv
         assert "Следующие действия" in readiness_csv
         assert "Все проверки" in readiness_csv
+        assert "Cron напоминаний по счетам" in readiness_csv
+        assert "Подключить cron счетов" in readiness_csv
         assert "История снимков" in readiness_csv
         assert "Секрет приложения" in readiness_csv
         assert backup_admin_username in readiness_csv
@@ -15929,6 +15933,10 @@ async def assert_platform_calendar_health():
         assert readiness_api["control_center"]["metrics"]
         assert readiness_api["post_launch_review"]["metrics"]
         assert readiness_api["export_url"] == "/platform/readiness/export"
+        assert any(
+            check["key"] == "platform_billing_reminder_cron"
+            for check in readiness_api["checks"]
+        )
         anonymous_review_api = (
             await crm.api_platform_readiness_post_launch_review(
                 make_public_asgi_request(
@@ -15988,6 +15996,11 @@ async def assert_platform_calendar_health():
         assert runbook_api["sections"]
         assert runbook_api["rollback_triggers"]
         assert runbook_api["steps_count"] >= 1
+        assert any(
+            step["title"] == "Подключить cron счетов"
+            for section in runbook_api["sections"]
+            for step in section["steps"]
+        )
         anonymous_timeline_api = await crm.api_platform_readiness_timeline(
             make_public_asgi_request("/api/platform/readiness/timeline"),
         )
