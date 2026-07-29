@@ -12483,6 +12483,37 @@ async def send_platform_billing_reminders(request: Request):
     )
 
 
+@app.post("/automation/cron/platform-billing-reminders")
+async def run_platform_billing_reminders_cron(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "AUTOMATION_CRON_SECRET is not configured",
+            },
+            status_code=503,
+        )
+
+    token = (
+        request.headers.get("x-automation-secret")
+        or request.query_params.get("token")
+        or ""
+    ).strip()
+
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    return JSONResponse({
+        "ok": True,
+        "summary": create_platform_billing_reminders("all"),
+    })
+
+
 @app.post("/platform/billing/invoices/{invoice_id}/status")
 async def update_platform_billing_invoice_status(
     request: Request,

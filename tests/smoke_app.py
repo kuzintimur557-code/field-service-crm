@@ -612,6 +612,7 @@ async def assert_automation_page():
     assert "AUTOMATION_CRON_SECRET" in html
     assert "заголовком x-automation-secret" in html
     assert "POST /automation/cron/ai-digest" in html
+    assert "POST /automation/cron/platform-billing-reminders" in html
     assert 'href="/automation/diagnostics"' in html
     assert "Одобрить безопасные" in html
     assert "approveSafeA3Actions" in html
@@ -11441,6 +11442,90 @@ async def assert_platform_modules_page():
         reminders_notice_page.body.decode("utf-8")
     )
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-PLATFORM-CRON",),
+    )
+    c.execute("""
+    INSERT INTO billing_invoices (
+        company_id, invoice_number, period, plan, amount, currency,
+        status, due_date, paid_at, notes, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "SMOKE-PLATFORM-CRON",
+        "2026-07",
+        "team",
+        3990,
+        "RUB",
+        "issued",
+        yesterday,
+        "",
+        "smoke cron reminder",
+        "2026-07-01 10:30",
+    ))
+    cron_invoice_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    old_cron_secret = os.environ.get("AUTOMATION_CRON_SECRET")
+    os.environ.pop("AUTOMATION_CRON_SECRET", None)
+
+    try:
+        no_secret_cron = await crm.run_platform_billing_reminders_cron(
+            make_public_asgi_request(
+                "/automation/cron/platform-billing-reminders",
+            ),
+        )
+        assert no_secret_cron.status_code == 503
+
+        os.environ["AUTOMATION_CRON_SECRET"] = "billing-cron-secret"
+        forbidden_cron = await crm.run_platform_billing_reminders_cron(
+            make_public_asgi_request(
+                "/automation/cron/platform-billing-reminders",
+            ),
+        )
+        assert forbidden_cron.status_code == 403
+
+        billing_cron = await crm.run_platform_billing_reminders_cron(
+            make_public_asgi_request(
+                "/automation/cron/platform-billing-reminders",
+                headers=[(b"x-automation-secret", b"billing-cron-secret")],
+            ),
+        )
+        assert billing_cron.status_code == 200
+        billing_cron_payload = json.loads(billing_cron.body.decode("utf-8"))
+        assert billing_cron_payload["ok"] is True
+        assert billing_cron_payload["summary"]["created"] == 1
+    finally:
+        if old_cron_secret is None:
+            os.environ.pop("AUTOMATION_CRON_SECRET", None)
+        else:
+            os.environ["AUTOMATION_CRON_SECRET"] = old_cron_secret
+
+    conn = connect()
+    c = conn.cursor()
+    cron_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
+      AND title=?
+      AND link=?
+      AND is_read=0
+    """, (
+        2,
+        "owner2",
+        "Просрочен счёт платформы",
+        f"/billing/invoices/{cron_invoice_id}",
+    )).fetchone()
+    assert cron_notification is not None
+    assert "SMOKE-PLATFORM-CRON" in cron_notification["message"]
+    conn.close()
+
     anonymous_platform_generate = await crm.generate_platform_billing_invoice(
         make_public_asgi_request("/platform/billing/generate"),
     )
@@ -11938,8 +12023,16 @@ async def assert_platform_modules_page():
         ("SMOKE-PLATFORM-REMINDER",),
     )
     c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-PLATFORM-CRON",),
+    )
+    c.execute(
         "DELETE FROM notifications WHERE link=?",
         (f"/billing/invoices/{reminder_invoice_id}",),
+    )
+    c.execute(
+        "DELETE FROM notifications WHERE link=?",
+        (f"/billing/invoices/{cron_invoice_id}",),
     )
     conn.commit()
     conn.close()
