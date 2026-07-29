@@ -5803,6 +5803,11 @@ async def assert_settings_page():
     assert "Сохранить настройки" in html
     assert "Реквизиты, банк, получатель..." in html
     assert "Команда — звонки без 1С" in html
+    assert "Лимит пользователей:" in html
+    assert "Рекомендуемый тариф:" in html
+    assert "Открыть страницу тарифов" in html
+    assert response.context["user_limit_usage"]["active_users_count"] >= 1
+    assert response.context["recommended_plan"] is not None
     assert "status-on" in html
     assert "status-off" in html
     assert 'class="mobile-nav"' in html

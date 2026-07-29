@@ -34,6 +34,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .module-title{font-weight:900;color:#111827}
 .module-desc{font-size:13px;color:#6b7280;font-weight:800;line-height:1.35;margin-top:4px}
 .plan-status{margin-top:14px;padding:14px;border-radius:16px;background:#f9fafb;color:#374151;font-weight:800;line-height:1.5}
+.plan-status.warning{background:#fffbeb;color:#92400e}
+.plan-status.danger{background:#fee2e2;color:#991b1b}
+.plan-status a{display:inline-flex;margin-top:8px;color:#2563eb;font-weight:900}
 .status-on{color:#166534;font-weight:900}
 .status-off{color:#991b1b;font-weight:900}
 @media(max-width:700px){
@@ -177,6 +180,15 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     1С: {% if settings["one_c_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}<br>
     Звонки: {% if settings["calls_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}<br>
     ИИ-анализ звонков: {% if settings["ai_calls_enabled"] %}<span class="status-on">включено</span>{% else %}<span class="status-off">выключено</span>{% endif %}
+</div>
+
+<div class="plan-status {{ user_limit_usage['tone'] }}">
+    Лимит пользователей: {{ user_limit_usage["active_users_count"] }} / {{ user_limit_usage["user_limit_label"] }}.
+    {{ user_limit_usage["status"] }}.
+    {% if recommended_plan %}
+    <br>Рекомендуемый тариф: {{ recommended_plan["label"] }}.
+    {% endif %}
+    <br><a href="/billing">Открыть страницу тарифов</a>
 </div>
 
 <button type="submit">Сохранить настройки</button>
