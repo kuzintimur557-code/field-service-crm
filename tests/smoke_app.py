@@ -5803,6 +5803,8 @@ async def assert_settings_page():
     assert "Диагностика системы" in html
     assert "Тарифы" in html
     assert "Поля компании" in html
+    assert "История настроек" in html
+    assert "/settings/history" in html
     assert "Сохранить настройки" in html
     assert "Реквизиты, банк, получатель..." in html
     assert "Команда — звонки без 1С" in html
@@ -5888,6 +5890,32 @@ async def assert_settings_page():
     assert team_settings["calls_enabled"] == 1
     assert team_settings["one_c_enabled"] == 0
     assert team_settings["ai_calls_enabled"] == 0
+
+    conn = connect()
+    c = conn.cursor()
+    settings_history = c.execute("""
+    SELECT action, details, old_value, new_value, actor_username
+    FROM company_settings_history
+    WHERE company_id=2
+    ORDER BY id DESC
+    LIMIT 1
+    """).fetchone()
+    conn.close()
+    assert settings_history is not None
+    assert settings_history["action"] == "Настройки компании обновлены"
+    assert "Тариф: Базовый → Команда" in settings_history["details"]
+    assert settings_history["old_value"] == "Базовый"
+    assert settings_history["new_value"] == "Команда"
+    assert settings_history["actor_username"] == "owner2"
+
+    history_page = await crm.settings_history_page(
+        make_asgi_request("owner2", "/settings/history")
+    )
+    history_html = history_page.body.decode("utf-8")
+    assert history_page.status_code == 200
+    assert "История настроек" in history_html
+    assert "Тариф: Базовый → Команда" in history_html
+    assert 'class="mobile-nav"' in history_html
 
     blocked_downgrade_form = dict(settings_form)
     blocked_downgrade_form["plan"] = "basic"
@@ -10515,6 +10543,22 @@ async def assert_platform_companies_page():
         "Платформа изменила тариф: Команда, сфера: Бьюти"
     )
     assert platform_notification["link"] == "/settings"
+    platform_settings_history = c.execute("""
+    SELECT action, details, old_value, new_value, actor_username
+    FROM company_settings_history
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 1
+    """, (logistics_company_id,)).fetchone()
+    assert platform_settings_history is not None
+    assert platform_settings_history["action"] == "Платформа обновила настройки"
+    assert "Тариф: Базовый → Команда" in platform_settings_history["details"]
+    assert "Сфера: Грузоперевозки → Бьюти" in (
+        platform_settings_history["details"]
+    )
+    assert platform_settings_history["old_value"] == "Базовый"
+    assert platform_settings_history["new_value"] == "Команда"
+    assert platform_settings_history["actor_username"] == "super"
     conn.close()
 
     blocked_platform_update = await crm.update_platform_company_settings(
@@ -10606,6 +10650,10 @@ async def assert_platform_companies_page():
     assert detail_updated_settings["plan"] == "business"
     assert detail_updated_settings["industry"] == "repair"
 
+    c.execute(
+        "DELETE FROM company_settings_history WHERE company_id=?",
+        (logistics_company_id,),
+    )
     c.execute(
         "DELETE FROM notifications WHERE company_id=?",
         (logistics_company_id,),

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>История настроек</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.container{max-width:900px;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 8px;font-size:34px}
+.meta{color:#6b7280;font-size:14px;font-weight:800;line-height:1.45}
+.event{padding:15px 0;border-bottom:1px solid #e5e7eb}
+.event:last-child{border-bottom:0}
+.event-title{font-size:16px;font-weight:900}
+.event-details{margin-top:6px;color:#374151;font-size:14px;font-weight:800;line-height:1.45}
+.pill{display:inline-flex;margin-top:8px;padding:6px 8px;border-radius:9px;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:900}
+@media(max-width:700px){
+    .container{padding:16px 14px 92px}
+    .card{padding:20px;border-radius:18px}
+    h1{font-size:28px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a href="/settings" class="back">← Назад к настройкам</a>
+
+<div class="card">
+    <h1>История настроек</h1>
+    <div class="meta">Изменения тарифа и сферы компании</div>
+</div>
+
+<div class="card">
+{% if history %}
+    {% for event in history %}
+    <div class="event">
+        <div class="event-title">{{ event["action"] }}</div>
+        <div class="meta">
+            Выполнил: {{ event["actor_username"] or "Система" }} · {{ event["created_at"] }}
+        </div>
+        {% if event["details"] %}
+        <div class="event-details">{{ event["details"] }}</div>
+        {% endif %}
+        {% if event["old_value"] or event["new_value"] %}
+        <div class="pill">{{ event["old_value"] or "нет" }} → {{ event["new_value"] or "нет" }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="meta">История настроек пока пустая</div>
+{% endif %}
+</div>
+
+</div>
+{% include 'mobile_nav.html' %}
+</body>
+</html>

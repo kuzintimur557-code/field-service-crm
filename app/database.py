@@ -231,6 +231,19 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS company_settings_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        actor_username TEXT,
+        action TEXT,
+        details TEXT,
+        old_value TEXT,
+        new_value TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS worker_unavailability (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1065,6 +1078,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_team_activity_company_user_created
     ON team_activity(company_id, user_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_company_settings_history_company_created
+    ON company_settings_history(company_id, created_at)
     """)
 
     c.execute("""

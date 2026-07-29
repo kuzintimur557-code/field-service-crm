@@ -530,6 +530,14 @@ INDUSTRY_OPTIONS = [
     ("custom", "Своя сфера")
 ]
 
+
+def get_industry_label(industry):
+    return dict(INDUSTRY_OPTIONS).get(
+        str(industry or "field_service"),
+        "Сфера не указана",
+    )
+
+
 BUSINESS_PRESETS = {
     "field_service": {
         "calendar", "clients", "catalog", "recurring", "finance", "payroll",
@@ -1800,6 +1808,40 @@ def record_user_limit_warning(
         "recommended_plan": recommended_plan,
         "details": limit_details,
     }
+
+
+def record_company_settings_history(
+    company_id,
+    actor_username,
+    action,
+    details="",
+    old_value="",
+    new_value="",
+):
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO company_settings_history (
+        company_id,
+        actor_username,
+        action,
+        details,
+        old_value,
+        new_value,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        actor_username,
+        action,
+        details,
+        old_value,
+        new_value,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+    conn.close()
 
 
 def create_call_follow_up_notification(
@@ -7630,6 +7672,9 @@ async def update_platform_company_settings(request: Request, company_id: int):
         if current_settings and "plan" in current_settings.keys()
         else "basic"
     )
+    current_industry = str(
+        current_settings["industry"] or "field_service"
+    )
     user_limit_usage = get_company_user_limit_usage(
         company_id,
         current_settings,
@@ -7646,6 +7691,21 @@ async def update_platform_company_settings(request: Request, company_id: int):
         return RedirectResponse(
             f"{return_url}{separator}error=plan_user_limit",
             status_code=302,
+        )
+
+    settings_history_changes = []
+
+    if plan != current_plan:
+        settings_history_changes.append(
+            f"Тариф: {get_plan_label(current_plan)} → {get_plan_label(plan)}"
+        )
+
+    if industry != current_industry:
+        settings_history_changes.append(
+            (
+                f"Сфера: {get_industry_label(current_industry)} → "
+                f"{get_industry_label(industry)}"
+            )
         )
 
     apply_business_preset(company_id, industry)
@@ -7672,7 +7732,17 @@ async def update_platform_company_settings(request: Request, company_id: int):
     conn.commit()
     conn.close()
 
-    industry_label = dict(INDUSTRY_OPTIONS).get(industry, "Сфера не указана")
+    if settings_history_changes:
+        record_company_settings_history(
+            company_id,
+            username,
+            "Платформа обновила настройки",
+            "; ".join(settings_history_changes),
+            get_plan_label(current_plan),
+            get_plan_label(plan),
+        )
+
+    industry_label = get_industry_label(industry)
     owner_username = str(company["owner_username"] or "").strip()
 
     if owner_username:
@@ -30394,6 +30464,50 @@ async def settings_page(request: Request):
     )
 
 
+@app.get("/settings/history", response_class=HTMLResponse)
+async def settings_history_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(
+        username,
+        role,
+    )
+
+    if missing_company_response:
+        return missing_company_response
+
+    conn = connect()
+    c = conn.cursor()
+    history = c.execute("""
+    SELECT *
+    FROM company_settings_history
+    WHERE company_id=?
+    ORDER BY id DESC
+    LIMIT 200
+    """, (company_id,)).fetchall()
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "settings_history.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "history": history,
+        },
+    )
+
+
 @app.post("/settings")
 async def update_settings(request: Request):
 
@@ -30444,6 +30558,9 @@ async def update_settings(request: Request):
         if current_settings and "plan" in current_settings.keys()
         else "basic"
     )
+    current_industry = str(
+        current_settings["industry"] or "field_service"
+    )
     user_limit_usage = get_company_user_limit_usage(
         company_id,
         current_settings,
@@ -30459,6 +30576,21 @@ async def update_settings(request: Request):
         return RedirectResponse(
             "/settings?error=plan_user_limit",
             status_code=302,
+        )
+
+    settings_history_changes = []
+
+    if plan != current_plan:
+        settings_history_changes.append(
+            f"Тариф: {get_plan_label(current_plan)} → {get_plan_label(plan)}"
+        )
+
+    if industry != current_industry:
+        settings_history_changes.append(
+            (
+                f"Сфера: {get_industry_label(current_industry)} → "
+                f"{get_industry_label(industry)}"
+            )
         )
 
 
@@ -30509,6 +30641,16 @@ async def update_settings(request: Request):
     conn.commit()
 
     conn.close()
+
+    if settings_history_changes:
+        record_company_settings_history(
+            company_id,
+            username,
+            "Настройки компании обновлены",
+            "; ".join(settings_history_changes),
+            get_plan_label(current_plan),
+            get_plan_label(plan),
+        )
 
     try:
         send_message(
