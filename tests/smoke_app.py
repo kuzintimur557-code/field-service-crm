@@ -6069,6 +6069,31 @@ async def assert_billing_page():
         "smoke invoice",
         "2026-07-01 10:00",
     ))
+    invoice_id = c.lastrowid
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-BILL-OTHER",),
+    )
+    c.execute("""
+    INSERT INTO billing_invoices (
+        company_id, invoice_number, period, plan, amount, currency,
+        status, due_date, paid_at, notes, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        1,
+        "SMOKE-BILL-OTHER",
+        "2026-07",
+        "business",
+        5000,
+        "RUB",
+        "issued",
+        "2026-07-31",
+        "",
+        "foreign invoice",
+        "2026-07-01 10:00",
+    ))
+    foreign_invoice_id = c.lastrowid
     conn.commit()
     conn.close()
 
@@ -6161,8 +6186,29 @@ async def assert_billing_page():
     assert "Выставлен" in invoices_html
     assert "1200 ₽" in invoices_html
     assert "/billing/invoices/export" in invoices_html
+    assert f"/billing/invoices/{invoice_id}" in invoices_html
     assert "Черновик" in invoices_html
     assert "Оплачен" in invoices_html
+
+    invoice_detail = await crm.billing_invoice_detail_page(
+        make_asgi_request("owner2", f"/billing/invoices/{invoice_id}"),
+        invoice_id,
+    )
+    invoice_detail_html = invoice_detail.body.decode("utf-8")
+    assert invoice_detail.status_code == 200
+    assert invoice_detail.context["invoice"]["id"] == invoice_id
+    assert "Счёт SMOKE-BILL-1" in invoice_detail_html
+    assert "Детали счёта" in invoice_detail_html
+    assert "smoke invoice" in invoice_detail_html
+
+    foreign_invoice_detail = await crm.billing_invoice_detail_page(
+        make_asgi_request("owner2", f"/billing/invoices/{foreign_invoice_id}"),
+        foreign_invoice_id,
+    )
+    assert foreign_invoice_detail.status_code == 302
+    assert foreign_invoice_detail.headers["location"] == (
+        "/billing/invoices?error=invoice_not_found"
+    )
 
     issued_invoices_page = await crm.billing_invoices_page(
         make_asgi_request("owner2", "/billing/invoices?status=issued"),
@@ -6203,8 +6249,8 @@ async def assert_billing_page():
     conn = connect()
     c = conn.cursor()
     c.execute(
-        "DELETE FROM billing_invoices WHERE invoice_number=?",
-        ("SMOKE-BILL-1",),
+        "DELETE FROM billing_invoices WHERE invoice_number IN (?, ?)",
+        ("SMOKE-BILL-1", "SMOKE-BILL-OTHER"),
     )
     conn.commit()
     conn.close()
@@ -14080,6 +14126,15 @@ async def assert_platform_calendar_health():
         )
         assert no_company_billing_invoices_export.status_code == 302
         assert no_company_billing_invoices_export.headers["location"] == (
+            "/platform"
+        )
+
+        no_company_billing_invoice_detail = await crm.billing_invoice_detail_page(
+            make_asgi_request("companyless_super", "/billing/invoices/1"),
+            1,
+        )
+        assert no_company_billing_invoice_detail.status_code == 302
+        assert no_company_billing_invoice_detail.headers["location"] == (
             "/platform"
         )
 

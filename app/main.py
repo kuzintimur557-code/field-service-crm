@@ -1512,6 +1512,20 @@ def fetch_billing_invoices(c, company_id, limit=None, status_filter="all"):
     return build_billing_invoice_rows(rows)
 
 
+def fetch_billing_invoice(c, company_id, invoice_id):
+    row = c.execute("""
+    SELECT *
+    FROM billing_invoices
+    WHERE company_id=?
+      AND id=?
+    """, (company_id, invoice_id)).fetchone()
+
+    if not row:
+        return None
+
+    return build_billing_invoice_rows([row])[0]
+
+
 def get_user_limit_status(active_users_count, user_limit):
     active_users_count = int(active_users_count or 0)
 
@@ -30123,6 +30137,47 @@ async def billing_invoices_export(request: Request, status: str = "all"):
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f"attachment; filename={filename}"
+        },
+    )
+
+
+@app.get("/billing/invoices/{invoice_id}", response_class=HTMLResponse)
+async def billing_invoice_detail_page(request: Request, invoice_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
+    conn = connect()
+    c = conn.cursor()
+    invoice = fetch_billing_invoice(c, company_id, invoice_id)
+    conn.close()
+
+    if not invoice:
+        return RedirectResponse(
+            "/billing/invoices?error=invoice_not_found",
+            status_code=302,
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "billing_invoice_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "invoice": invoice,
         },
     )
 

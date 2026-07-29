@@ -28,6 +28,7 @@ h2{margin:0 0 16px;font-size:22px}
 .row{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr 1fr;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
 .row.head{background:white;color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
 .value{font-weight:900;color:#111827}
+.value a{color:#2563eb;text-decoration:none}
 .meta{color:#6b7280;font-size:13px;font-weight:800;line-height:1.4}
 .status{display:inline-flex;justify-content:center;min-height:30px;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
 .status.ok{background:#dcfce7;color:#166534}
@@ -101,7 +102,11 @@ h2{margin:0 0 16px;font-size:22px}
         {% for invoice in invoices %}
         <div class="row">
             <div>
-                <div class="value">{{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</div>
+                <div class="value">
+                    <a href="/billing/invoices/{{ invoice['id'] }}">
+                        {{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}
+                    </a>
+                </div>
                 <div class="meta">Создан: {{ invoice["created_at"] or "не указано" }}</div>
             </div>
             <div class="value">{{ invoice["period"] or "не указан" }}</div>
