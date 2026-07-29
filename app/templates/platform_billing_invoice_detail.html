@@ -50,6 +50,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="actions">
     <a href="/platform/billing" class="back">← Назад к счетам платформы</a>
     <a href="/platform/companies/{{ invoice['company_id'] }}" class="back">Карточка компании</a>
+    <a href="/platform/billing/invoices/{{ invoice['id'] }}/export" class="back">Экспорт CSV</a>
 </div>
 
 {% if request.query_params.get("invoice_updated") == "1" %}

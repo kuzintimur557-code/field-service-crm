@@ -11425,7 +11425,60 @@ async def assert_platform_modules_page():
     assert "Счёт BILL-2-202610" in platform_invoice_detail_html
     assert "Управление статусом" in platform_invoice_detail_html
     assert "Карточка компании" in platform_invoice_detail_html
+    assert (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}/export"
+        in platform_invoice_detail_html
+    )
     assert 'name="return_to" value="detail"' in platform_invoice_detail_html
+
+    anonymous_platform_invoice_export = await crm.platform_billing_invoice_export(
+        make_public_asgi_request(
+            f"/platform/billing/invoices/{platform_generated_invoice_id}/export",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert anonymous_platform_invoice_export.status_code == 302
+    assert anonymous_platform_invoice_export.headers["location"] == "/login"
+
+    boss_platform_invoice_export = await crm.platform_billing_invoice_export(
+        make_asgi_request(
+            "owner2",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}/export",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert boss_platform_invoice_export.status_code == 302
+    assert boss_platform_invoice_export.headers["location"] == "/"
+
+    missing_platform_invoice_export = await crm.platform_billing_invoice_export(
+        make_asgi_request(
+            "super",
+            "/platform/billing/invoices/999999/export",
+        ),
+        999999,
+    )
+    assert missing_platform_invoice_export.status_code == 302
+    assert missing_platform_invoice_export.headers["location"] == (
+        "/platform/billing?error=invoice_not_found"
+    )
+
+    platform_invoice_export = await crm.platform_billing_invoice_export(
+        make_asgi_request(
+            "super",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}/export",
+        ),
+        platform_generated_invoice_id,
+    )
+    platform_invoice_export_csv = platform_invoice_export.body.decode("utf-8")
+    assert platform_invoice_export.status_code == 200
+    assert platform_invoice_export.headers["content-disposition"] == (
+        f"attachment; filename=platform_invoice_{platform_generated_invoice_id}.csv"
+    )
+    assert platform_invoice_export_csv.startswith("\ufeff")
+    assert "Счёт платформы" in platform_invoice_export_csv
+    assert "BILL-2-202610" in platform_invoice_export_csv
+    assert "Smoke Company 2" in platform_invoice_export_csv
+    assert "Примечание" in platform_invoice_export_csv
 
     invalid_detail_status_update = (
         await crm.update_platform_billing_invoice_status(

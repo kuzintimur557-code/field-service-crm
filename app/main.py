@@ -12302,6 +12302,62 @@ async def update_platform_billing_invoice_status(
     )
 
 
+@app.get("/platform/billing/invoices/{invoice_id}/export")
+async def platform_billing_invoice_export(
+    request: Request,
+    invoice_id: int,
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+    invoice = fetch_platform_billing_invoice(c, invoice_id)
+    conn.close()
+
+    if not invoice:
+        return RedirectResponse(
+            "/platform/billing?error=invoice_not_found",
+            status_code=302,
+        )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Счёт платформы"])
+    writer.writerow(["ID счёта", invoice["id"]])
+    writer.writerow(["Номер", invoice["invoice_number"] or ""])
+    writer.writerow(["Компания", invoice["company_name"]])
+    writer.writerow(["ID компании", invoice["company_id"]])
+    writer.writerow(["Владелец", invoice["owner_username"]])
+    writer.writerow(["Период", invoice["period"] or ""])
+    writer.writerow(["Тариф", invoice["plan_label"]])
+    writer.writerow(["Сумма", invoice["amount"] or 0])
+    writer.writerow(["Валюта", invoice["currency"] or "RUB"])
+    writer.writerow(["Статус", invoice["status_label"]])
+    writer.writerow(["Оплатить до", invoice["due_date"] or ""])
+    writer.writerow(["Оплачен", invoice["paid_at"] or ""])
+    writer.writerow(["Создан", invoice["created_at"] or ""])
+    writer.writerow(["Примечание", invoice["notes"] or ""])
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=platform_invoice_{invoice_id}.csv"
+            )
+        },
+    )
+
+
 @app.get("/platform/billing/invoices/{invoice_id}", response_class=HTMLResponse)
 async def platform_billing_invoice_detail_page(
     request: Request,
