@@ -12964,9 +12964,34 @@ async def platform_billing_export(
         company_id=selected_company_id,
     )
     conn.close()
+    monthly_summary = build_platform_billing_monthly_summary(invoices)
 
     output = io.StringIO()
     writer = csv.writer(output)
+    writer.writerow(["Динамика по месяцам"])
+    writer.writerow([
+        "Период",
+        "Счётов",
+        "Начислено",
+        "Оплачено",
+        "К оплате",
+        "Просрочено счетов",
+        "Просрочено сумма",
+    ])
+
+    for month in monthly_summary:
+        writer.writerow([
+            month["period"],
+            month["count"],
+            month["total_amount"],
+            month["paid_amount"],
+            month["unpaid_amount"],
+            month["overdue_count"],
+            month["overdue_amount"],
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Счета"])
     writer.writerow([
         "ID компании",
         "Компания",

@@ -12152,6 +12152,10 @@ async def assert_platform_modules_page():
         "attachment; filename=platform_billing.csv"
     )
     assert platform_billing_export_csv.startswith("\ufeff")
+    assert "Динамика по месяцам" in platform_billing_export_csv
+    assert "Период,Счётов,Начислено,Оплачено,К оплате" in (
+        platform_billing_export_csv
+    )
     assert "ID компании,Компания,Владелец,Номер,Период,Тариф" in (
         platform_billing_export_csv
     )
