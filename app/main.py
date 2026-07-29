@@ -32738,6 +32738,15 @@ async def workers_export(
 
     company_id = get_user_company_id(username)
     settings = get_company_settings(company_id)
+    user_limit_usage = get_company_user_limit_usage(company_id, settings)
+    recommended_plan = None
+
+    if user_limit_usage["tone"] in ("warning", "danger"):
+        recommended_plan = get_recommended_user_limit_plan(
+            user_limit_usage["plan"],
+            user_limit_usage["active_users_count"],
+        )
+
     worker_data = get_workers_for_company(
         company_id,
         status=status,
@@ -32785,6 +32794,21 @@ async def workers_export(
             worker["commission_percent"] or 0,
             worker["last_seen"] or "",
         ])
+
+    writer.writerow([])
+    writer.writerow(["Тариф", user_limit_usage["plan_label"]])
+    writer.writerow([
+        "Лимит пользователей",
+        (
+            f"{user_limit_usage['active_users_count']} / "
+            f"{user_limit_usage['user_limit_label']}"
+        ),
+    ])
+    writer.writerow(["Статус лимита", user_limit_usage["status"]])
+    writer.writerow([
+        "Рекомендуемый тариф",
+        recommended_plan["label"] if recommended_plan else "",
+    ])
 
     filename_parts = [
         status,

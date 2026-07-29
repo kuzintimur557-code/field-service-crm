@@ -17695,6 +17695,9 @@ async def assert_finance_margin(task):
     assert workers_export_csv.startswith("\ufeff")
     assert "Логин,ФИО,Роль,Статус" in workers_export_csv
     assert "inactive_candidate2" in workers_export_csv
+    assert "Лимит пользователей" in workers_export_csv
+    assert "Статус лимита" in workers_export_csv
+    assert "Рекомендуемый тариф" in workers_export_csv
 
     workload_response = await crm.workload_page(
         make_asgi_request("owner2", "/workload")
