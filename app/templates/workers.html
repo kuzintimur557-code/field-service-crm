@@ -94,6 +94,12 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 <div class="notice ok">Пользователь создан</div>
 {% endif %}
 
+{% if request.query_params.get("limit_warning") == "1" %}
+<div class="notice err">
+Пользователь создан, но лимит тарифа заполнен или превышен. Проверьте тариф в разделе оплаты.
+</div>
+{% endif %}
+
 {% if request.query_params.get("error") == "weak_password" %}
 <div class="notice err">Пароль должен быть минимум 6 символов</div>
 {% elif request.query_params.get("error") == "empty_credentials" %}

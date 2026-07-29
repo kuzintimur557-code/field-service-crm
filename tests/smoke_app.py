@@ -16453,7 +16453,9 @@ async def assert_finance_margin(task):
         crm.run_automation_event = original_run_automation_event
 
     assert created_worker_response.status_code == 302
-    assert created_worker_response.headers["location"] == "/workers?created=1"
+    assert created_worker_response.headers["location"] == (
+        "/workers?created=1&limit_warning=1"
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -16470,21 +16472,55 @@ async def assert_finance_margin(task):
     created_worker_activity = c.execute("""
     SELECT action, details, actor_username
     FROM team_activity
-    WHERE company_id=2 AND user_id=?
+    WHERE company_id=2 AND user_id=? AND action='Пользователь создан'
     ORDER BY id DESC
     LIMIT 1
     """, (created_worker["id"],)).fetchone()
     assert created_worker_activity["action"] == "Пользователь создан"
     assert created_worker_activity["details"] == "Роль: Менеджер"
     assert created_worker_activity["actor_username"] == "owner2"
-    assert created_worker_events == [{
+    limit_activity = c.execute("""
+    SELECT action, details, actor_username
+    FROM team_activity
+    WHERE company_id=2 AND user_id=? AND action='Лимит тарифа'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (created_worker["id"],)).fetchone()
+    assert limit_activity is not None
+    assert "Превышен лимит" in limit_activity["details"]
+    assert "Тариф:" in limit_activity["details"]
+    assert limit_activity["actor_username"] == "owner2"
+    limit_notification = c.execute("""
+    SELECT title, message, link
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title='Лимит тарифа команды'
+    ORDER BY id DESC
+    LIMIT 1
+    """).fetchone()
+    assert limit_notification is not None
+    assert "Превышен лимит" in limit_notification["message"]
+    assert limit_notification["link"] == "/billing"
+    assert len(created_worker_events) == 2
+    assert created_worker_events[0] == {
         "company_id": 2,
         "trigger_key": "worker_created",
         "entity_type": "worker",
         "entity_id": created_worker["id"],
         "message": "Сотрудник создан: audit_manager2",
         "link": f"/workers/{created_worker['id']}",
-    }]
+    }
+    assert created_worker_events[1]["company_id"] == 2
+    assert created_worker_events[1]["trigger_key"] == (
+        "company_user_limit_warning"
+    )
+    assert created_worker_events[1]["entity_type"] == "worker"
+    assert created_worker_events[1]["entity_id"] == created_worker["id"]
+    assert created_worker_events[1]["message"].startswith(
+        "Создан пользователь audit_manager2, но превышен лимит"
+    )
+    assert created_worker_events[1]["link"] == "/billing"
     c.execute("DELETE FROM users WHERE id=?", (created_worker["id"],))
     conn.commit()
     outsider = c.execute("""
@@ -17349,6 +17385,17 @@ async def assert_finance_margin(task):
     assert "История управления командой" in (
         active_workers_response.body.decode("utf-8")
     )
+
+    limit_warning_page = await crm.workers_page(
+        make_asgi_request(
+            "owner2",
+            "/workers",
+            "created=1&limit_warning=1",
+        ),
+    )
+    limit_warning_html = limit_warning_page.body.decode("utf-8")
+    assert "Пользователь создан" in limit_warning_html
+    assert "лимит тарифа заполнен или превышен" in limit_warning_html
 
     manager_workers_response = await crm.workers_page(
         make_asgi_request("manager2", "/workers"),

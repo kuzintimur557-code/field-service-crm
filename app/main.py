@@ -33457,6 +33457,46 @@ async def create_worker(request: Request):
     conn.commit()
     conn.close()
 
+    limit_usage = get_company_user_limit_usage(company_id)
+    limit_warning = limit_usage["tone"] in ("warning", "danger")
+
+    if limit_warning:
+        limit_details = (
+            f"{limit_usage['status']}. "
+            f"Тариф: {limit_usage['plan_label']}. "
+            "Активных пользователей: "
+            f"{limit_usage['active_users_count']} / "
+            f"{limit_usage['user_limit_label']}."
+        )
+
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        INSERT INTO team_activity (
+            company_id, user_id, target_username, actor_username,
+            action, details, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            created_user_id,
+            worker_username,
+            username,
+            "Лимит тарифа",
+            limit_details,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+        conn.commit()
+        conn.close()
+
+        create_notification(
+            company_id,
+            username,
+            "Лимит тарифа команды",
+            limit_details,
+            "/billing",
+        )
+
     run_automation_event(
         company_id,
         "worker_created",
@@ -33465,6 +33505,23 @@ async def create_worker(request: Request):
         f"Сотрудник создан: {worker_username}",
         f"/workers/{created_user_id}",
     )
+
+    if limit_warning:
+        run_automation_event(
+            company_id,
+            "company_user_limit_warning",
+            "worker",
+            created_user_id,
+            (
+                f"Создан пользователь {worker_username}, "
+                f"но {limit_usage['status'].lower()}"
+            ),
+            "/billing",
+        )
+        return RedirectResponse(
+            "/workers?created=1&limit_warning=1",
+            status_code=302,
+        )
 
     return RedirectResponse("/workers?created=1", status_code=302)
 
