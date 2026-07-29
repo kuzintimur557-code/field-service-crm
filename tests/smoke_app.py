@@ -11794,6 +11794,43 @@ async def assert_platform_modules_page():
     )
     assert 'name="return_to" value="detail"' in platform_invoice_detail_html
 
+    anonymous_platform_invoice_api = await crm.api_platform_billing_invoice(
+        make_public_asgi_request(
+            f"/api/platform/billing/invoices/{platform_generated_invoice_id}",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert anonymous_platform_invoice_api.status_code == 401
+    boss_platform_invoice_api = await crm.api_platform_billing_invoice(
+        make_asgi_request(
+            "owner2",
+            f"/api/platform/billing/invoices/{platform_generated_invoice_id}",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert boss_platform_invoice_api.status_code == 403
+    missing_platform_invoice_api = await crm.api_platform_billing_invoice(
+        make_asgi_request(
+            "super",
+            "/api/platform/billing/invoices/999999",
+        ),
+        999999,
+    )
+    assert missing_platform_invoice_api.status_code == 404
+    platform_invoice_api = await crm.api_platform_billing_invoice(
+        make_asgi_request(
+            "super",
+            f"/api/platform/billing/invoices/{platform_generated_invoice_id}",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert platform_invoice_api["ok"] is True
+    assert platform_invoice_api["invoice"]["invoice_number"] == "BILL-2-202610"
+    assert platform_invoice_api["export_url"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}/export"
+    )
+    assert platform_invoice_api["company_url"] == "/platform/companies/2"
+
     anonymous_platform_invoice_export = await crm.platform_billing_invoice_export(
         make_public_asgi_request(
             f"/platform/billing/invoices/{platform_generated_invoice_id}/export",

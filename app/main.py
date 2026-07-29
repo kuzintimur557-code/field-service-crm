@@ -12678,6 +12678,40 @@ async def api_platform_billing(
     }
 
 
+@app.get("/api/platform/billing/invoices/{invoice_id}")
+async def api_platform_billing_invoice(
+    request: Request,
+    invoice_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    conn = connect()
+    c = conn.cursor()
+    invoice = fetch_platform_billing_invoice(c, invoice_id)
+    conn.close()
+
+    if not invoice:
+        return JSONResponse(
+            {"error": "invoice_not_found"},
+            status_code=404,
+        )
+
+    return {
+        "ok": True,
+        "invoice": invoice,
+        "export_url": f"/platform/billing/invoices/{invoice_id}/export",
+        "company_url": f"/platform/companies/{invoice['company_id']}",
+    }
+
+
 @app.post("/platform/billing/invoices/{invoice_id}/status")
 async def update_platform_billing_invoice_status(
     request: Request,
