@@ -29734,6 +29734,7 @@ async def billing_page(request: Request):
     plan = normalize_plan(
         settings["plan"] if settings and "plan" in settings.keys() else "basic"
     )
+    plan_features = get_plan_feature_flags(plan)
     user_limit = get_plan_user_limit(plan)
     user_limit_usage = get_company_user_limit_usage(company_id, settings)
     recommended_plan = None
@@ -29758,6 +29759,7 @@ async def billing_page(request: Request):
             "role": role,
             "settings": settings,
             "plan": plan,
+            "plan_features": plan_features,
             "user_limit": user_limit,
             "user_limit_usage": user_limit_usage,
             "recommended_plan": recommended_plan,

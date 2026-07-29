@@ -6041,6 +6041,9 @@ async def assert_billing_page():
     assert "Текущий тариф" in html
     assert "Доступные тарифы" in html
     assert "Используется пользователей" in html
+    assert "Звонки:" in html
+    assert "1С:" in html
+    assert "ИИ-звонки:" in html
     assert "Лимит команды требует внимания" in html
     assert "Рекомендация по тарифу" in html
     assert "Изменить тариф" in html
@@ -6056,6 +6059,9 @@ async def assert_billing_page():
     assert "Настройка 1С" in html
     assert response.context["user_limit_usage"]["active_users_count"] >= 1
     assert "status" in response.context["user_limit_usage"]
+    assert response.context["plan_features"]["calls_enabled"] in (0, 1)
+    assert response.context["plan_features"]["one_c_enabled"] in (0, 1)
+    assert response.context["plan_features"]["ai_calls_enabled"] in (0, 1)
     basic_section = html.split('<div class="name">Базовый</div>', 1)[1].split(
         '<div class="name">Команда</div>',
         1,

@@ -36,6 +36,10 @@ h2{margin:0 0 16px;font-size:22px}
 .recommendation{margin-top:14px;padding:15px;border:1px solid #bfdbfe;border-radius:14px;background:#eff6ff;color:#1e3a8a;font-weight:900;line-height:1.45}
 .recommendation strong{display:block;margin-bottom:6px;font-size:16px}
 .recommendation a{display:inline-flex;align-items:center;justify-content:center;min-height:40px;margin-top:10px;padding:10px 13px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-size:13px;font-weight:900}
+.capabilities{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.capability{display:inline-flex;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
+.capability.on{background:#dcfce7;color:#166534}
+.capability.off{background:#f3f4f6;color:#6b7280}
 .integration-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:14px 18px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
@@ -72,6 +76,17 @@ h2{margin:0 0 16px;font-size:22px}
 Используется пользователей: {{ user_limit_usage["active_users_count"] }} / {{ user_limit_usage["user_limit_label"] }}
 <br>
 <span class="limit-status {{ user_limit_usage['tone'] }}">{{ user_limit_usage["status"] }}</span>
+<div class="capabilities">
+    <span class="capability {% if plan_features['calls_enabled'] %}on{% else %}off{% endif %}">
+        Звонки: {% if plan_features["calls_enabled"] %}включены{% else %}выключены{% endif %}
+    </span>
+    <span class="capability {% if plan_features['one_c_enabled'] %}on{% else %}off{% endif %}">
+        1С: {% if plan_features["one_c_enabled"] %}включена{% else %}выключена{% endif %}
+    </span>
+    <span class="capability {% if plan_features['ai_calls_enabled'] %}on{% else %}off{% endif %}">
+        ИИ-звонки: {% if plan_features["ai_calls_enabled"] %}включены{% else %}выключены{% endif %}
+    </span>
+</div>
 {% if user_limit_usage["tone"] in ["warning", "danger"] %}
 <div class="limit-alert {{ user_limit_usage['tone'] }}">
 Лимит команды требует внимания. Если нужно добавить сотрудников без риска,
