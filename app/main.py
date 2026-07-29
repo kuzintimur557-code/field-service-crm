@@ -1288,6 +1288,7 @@ PLAN_DEFINITIONS = {
         "label": "Базовый",
         "settings_label": "Базовый — без 1С",
         "user_limit": 3,
+        "monthly_price": 0,
         "one_c_enabled": 0,
         "calls_enabled": 0,
         "ai_calls_enabled": 0,
@@ -1296,6 +1297,7 @@ PLAN_DEFINITIONS = {
         "label": "Команда",
         "settings_label": "Команда — звонки без 1С",
         "user_limit": 10,
+        "monthly_price": 2990,
         "one_c_enabled": 0,
         "calls_enabled": 1,
         "ai_calls_enabled": 0,
@@ -1304,6 +1306,7 @@ PLAN_DEFINITIONS = {
         "label": "Бизнес",
         "settings_label": "Бизнес — звонки без 1С",
         "user_limit": 30,
+        "monthly_price": 7990,
         "one_c_enabled": 0,
         "calls_enabled": 1,
         "ai_calls_enabled": 0,
@@ -1312,6 +1315,7 @@ PLAN_DEFINITIONS = {
         "label": "Бизнес + 1С",
         "settings_label": "Бизнес + 1С",
         "user_limit": 30,
+        "monthly_price": 11990,
         "one_c_enabled": 1,
         "calls_enabled": 1,
         "ai_calls_enabled": 0,
@@ -1320,6 +1324,7 @@ PLAN_DEFINITIONS = {
         "label": "Корпоративный + 1С",
         "settings_label": "Корпоративный + 1С + ИИ-звонки",
         "user_limit": None,
+        "monthly_price": 0,
         "one_c_enabled": 1,
         "calls_enabled": 1,
         "ai_calls_enabled": 1,
@@ -1369,6 +1374,19 @@ def get_plan_options():
 
 def get_plan_user_limit(plan):
     return PLAN_DEFINITIONS[normalize_plan(plan)]["user_limit"]
+
+
+def get_plan_monthly_price(plan):
+    return float(PLAN_DEFINITIONS[normalize_plan(plan)]["monthly_price"] or 0)
+
+
+def get_plan_price_label(plan):
+    price = get_plan_monthly_price(plan)
+
+    if normalize_plan(plan) == "enterprise_1c" and price <= 0:
+        return "по договорённости"
+
+    return f"{format_rub_amount(price)} / месяц"
 
 
 def plan_allows_active_users(plan, active_users_count):
@@ -30120,6 +30138,10 @@ async def billing_page(request: Request):
         plan_key: definition["label"]
         for plan_key, definition in PLAN_DEFINITIONS.items()
     }
+    plan_prices = {
+        plan_key: get_plan_price_label(plan_key)
+        for plan_key in PLAN_DEFINITIONS
+    }
 
     return templates.TemplateResponse(
         request,
@@ -30135,6 +30157,7 @@ async def billing_page(request: Request):
             "user_limit_usage": user_limit_usage,
             "recommended_plan": recommended_plan,
             "plan_names": plan_names,
+            "plan_prices": plan_prices,
             "plan_history": plan_history,
         }
     )
@@ -30180,6 +30203,7 @@ async def billing_export(request: Request):
     writer.writerow([
         "Тариф",
         "Лимит пользователей",
+        "Стоимость",
         "Звонки",
         "1С",
         "ИИ-звонки",
@@ -30195,6 +30219,7 @@ async def billing_export(request: Request):
         writer.writerow([
             definition["label"],
             user_limit_label,
+            get_plan_price_label(plan_key),
             "Да" if definition["calls_enabled"] else "Нет",
             "Да" if definition["one_c_enabled"] else "Нет",
             "Да" if definition["ai_calls_enabled"] else "Нет",

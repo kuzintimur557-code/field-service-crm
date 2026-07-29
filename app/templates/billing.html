@@ -22,6 +22,7 @@ h2{margin:0 0 16px;font-size:22px}
 .plan.active{border-color:#2563eb;background:#eff6ff}
 .name{font-size:20px;font-weight:900;margin-bottom:8px}
 .price{font-size:24px;font-weight:900;margin-bottom:12px}
+.plan-cost{margin-top:-6px;margin-bottom:12px;color:#2563eb;font-size:14px;font-weight:900}
 .feature{display:flex;align-items:flex-start;gap:8px;font-size:14px;color:#374151;font-weight:800;margin:8px 0;line-height:1.35}
 .feature-state{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:80px;padding:4px 7px;border-radius:999px;font-size:11px;font-weight:900}
 .feature-state.yes{background:#dcfce7;color:#166534}
@@ -125,6 +126,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="plan {% if plan == 'basic' %}active{% endif %}">
     <div class="name">Базовый</div>
     <div class="price">до 3 пользователей</div>
+    <div class="plan-cost">{{ plan_prices["basic"] }}</div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>{{ task_label }}</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Фото</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>PDF-акты</span></div>
@@ -135,6 +137,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="plan {% if plan == 'team' %}active{% endif %}">
     <div class="name">Команда</div>
     <div class="price">до 10 пользователей</div>
+    <div class="plan-cost">{{ plan_prices["team"] }}</div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Всё из базового тарифа</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>{{ client_label }}</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Финансы</span></div>
@@ -145,6 +148,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="plan {% if plan == 'business' %}active{% endif %}">
     <div class="name">Бизнес</div>
     <div class="price">до 30 пользователей</div>
+    <div class="plan-cost">{{ plan_prices["business"] }}</div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Всё из тарифа Команда</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Каталог</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Звонки</span></div>
@@ -155,6 +159,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="plan {% if plan == 'business_1c' %}active{% endif %}">
     <div class="name">Бизнес + 1С</div>
     <div class="price">до 30 пользователей</div>
+    <div class="plan-cost">{{ plan_prices["business_1c"] }}</div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Всё из тарифа Бизнес</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>1С</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Обмен: {{ client_label|lower }}</span></div>
@@ -164,6 +169,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="plan {% if plan == 'enterprise_1c' %}active{% endif %}">
     <div class="name">Корпоративный + 1С</div>
     <div class="price">без лимита</div>
+    <div class="plan-cost">{{ plan_prices["enterprise_1c"] }}</div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Всё</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>1С</span></div>
     <div class="feature"><span class="feature-state yes">Включено</span><span>Звонки</span></div>

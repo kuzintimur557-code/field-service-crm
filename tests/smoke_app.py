@@ -6043,6 +6043,9 @@ async def assert_billing_page():
     assert crm.get_billing_invoice_status_meta("paid")["label"] == "Оплачен"
     assert crm.format_rub_amount(1200) == "1200 ₽"
     assert crm.format_rub_amount(1200.5) == "1200.50 ₽"
+    assert crm.get_plan_monthly_price("team") == 2990
+    assert crm.get_plan_price_label("team") == "2990 ₽ / месяц"
+    assert crm.get_plan_price_label("enterprise_1c") == "по договорённости"
 
     conn = connect()
     c = conn.cursor()
@@ -6107,6 +6110,8 @@ async def assert_billing_page():
     assert "Звонки:" in html
     assert "1С:" in html
     assert "ИИ-звонки:" in html
+    assert "2990 ₽ / месяц" in html
+    assert "по договорённости" in html
     assert "История тарифа" in html
     assert "Тариф: Базовый → Команда" in html
     assert "Лимит команды требует внимания" in html
@@ -6167,9 +6172,10 @@ async def assert_billing_page():
     assert "Тарифы компании" in billing_export_csv
     assert "Текущий тариф" in billing_export_csv
     assert "История тарифа" in billing_export_csv
-    assert "Тариф,Лимит пользователей,Звонки,1С,ИИ-звонки,Текущий" in (
+    assert "Тариф,Лимит пользователей,Стоимость,Звонки,1С,ИИ-звонки,Текущий" in (
         billing_export_csv
     )
+    assert "2990 ₽ / месяц" in billing_export_csv
     assert "Тариф: Базовый → Команда" in billing_export_csv
     assert "Команда" in billing_export_csv
     assert "Корпоративный + 1С" in billing_export_csv
