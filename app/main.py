@@ -1704,6 +1704,59 @@ def create_notification(
     conn.close()
 
 
+def record_user_limit_warning(
+    company_id,
+    actor_username,
+    target_user_id,
+    target_username,
+):
+    limit_usage = get_company_user_limit_usage(company_id)
+
+    if limit_usage["tone"] not in ("warning", "danger"):
+        return None
+
+    limit_details = (
+        f"{limit_usage['status']}. "
+        f"Тариф: {limit_usage['plan_label']}. "
+        "Активных пользователей: "
+        f"{limit_usage['active_users_count']} / "
+        f"{limit_usage['user_limit_label']}."
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO team_activity (
+        company_id, user_id, target_username, actor_username,
+        action, details, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        company_id,
+        target_user_id,
+        target_username,
+        actor_username,
+        "Лимит тарифа",
+        limit_details,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
+    conn.commit()
+    conn.close()
+
+    create_notification(
+        company_id,
+        actor_username,
+        "Лимит тарифа команды",
+        limit_details,
+        "/billing",
+    )
+
+    return {
+        "usage": limit_usage,
+        "details": limit_details,
+    }
+
+
 def create_call_follow_up_notification(
     company_id,
     username,
@@ -33459,45 +33512,12 @@ async def create_worker(request: Request):
     conn.commit()
     conn.close()
 
-    limit_usage = get_company_user_limit_usage(company_id)
-    limit_warning = limit_usage["tone"] in ("warning", "danger")
-
-    if limit_warning:
-        limit_details = (
-            f"{limit_usage['status']}. "
-            f"Тариф: {limit_usage['plan_label']}. "
-            "Активных пользователей: "
-            f"{limit_usage['active_users_count']} / "
-            f"{limit_usage['user_limit_label']}."
-        )
-
-        conn = connect()
-        c = conn.cursor()
-        c.execute("""
-        INSERT INTO team_activity (
-            company_id, user_id, target_username, actor_username,
-            action, details, created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            company_id,
-            created_user_id,
-            worker_username,
-            username,
-            "Лимит тарифа",
-            limit_details,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-        ))
-        conn.commit()
-        conn.close()
-
-        create_notification(
-            company_id,
-            username,
-            "Лимит тарифа команды",
-            limit_details,
-            "/billing",
-        )
+    limit_warning = record_user_limit_warning(
+        company_id,
+        username,
+        created_user_id,
+        worker_username,
+    )
 
     run_automation_event(
         company_id,
@@ -33516,7 +33536,7 @@ async def create_worker(request: Request):
             created_user_id,
             (
                 f"Создан пользователь {worker_username}, "
-                f"но {limit_usage['status'].lower()}"
+                f"но {limit_warning['usage']['status'].lower()}"
             ),
             "/billing",
         )
@@ -33942,6 +33962,31 @@ async def toggle_team_user_active(request: Request, user_id: int):
         ),
         f"/workers/{user_id}",
     )
+
+    if new_active:
+        limit_warning = record_user_limit_warning(
+            company_id,
+            username,
+            user_id,
+            user["username"],
+        )
+
+        if limit_warning:
+            run_automation_event(
+                company_id,
+                "company_user_limit_warning",
+                "worker",
+                user_id,
+                (
+                    f"Включён пользователь {user['username']}, "
+                    f"но {limit_warning['usage']['status'].lower()}"
+                ),
+                "/billing",
+            )
+            return RedirectResponse(
+                "/workers?status_updated=1&limit_warning=1",
+                status_code=302,
+            )
 
     return RedirectResponse("/workers?status_updated=1", status_code=302)
 

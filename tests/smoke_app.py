@@ -16699,7 +16699,9 @@ async def assert_finance_margin(task):
         crm.run_automation_event = original_run_automation_event
 
     assert history_reenable_response.status_code == 302
-    assert history_reenable_response.headers["location"] == "/workers?status_updated=1"
+    assert history_reenable_response.headers["location"] == (
+        "/workers?status_updated=1&limit_warning=1"
+    )
 
     conn = connect()
     c = conn.cursor()
@@ -16711,14 +16713,25 @@ async def assert_finance_margin(task):
     assert reenabled_history_candidate["is_active"] == 1
     assert reenabled_history_candidate["disabled_at"] is None
     assert reenabled_history_candidate["disabled_reason"] is None
-    assert worker_enable_events == [{
+    assert len(worker_enable_events) == 2
+    assert worker_enable_events[0] == {
         "company_id": 2,
         "trigger_key": "worker_status_changed",
         "entity_type": "worker",
         "entity_id": history_candidate["id"],
         "message": "Сотрудник history_candidate2 включён",
         "link": f"/workers/{history_candidate['id']}",
-    }]
+    }
+    assert worker_enable_events[1]["company_id"] == 2
+    assert worker_enable_events[1]["trigger_key"] == (
+        "company_user_limit_warning"
+    )
+    assert worker_enable_events[1]["entity_type"] == "worker"
+    assert worker_enable_events[1]["entity_id"] == history_candidate["id"]
+    assert worker_enable_events[1]["message"].startswith(
+        "Включён пользователь history_candidate2, но превышен лимит"
+    )
+    assert worker_enable_events[1]["link"] == "/billing"
     history_activity = c.execute("""
     SELECT action, details, actor_username
     FROM team_activity
@@ -16728,10 +16741,13 @@ async def assert_finance_margin(task):
     assert [event["action"] for event in history_activity] == [
         "Пользователь отключён",
         "Пользователь включён",
+        "Лимит тарифа",
     ]
     assert history_activity[0]["details"] == "Сотрудник уволен"
     assert history_activity[0]["actor_username"] == "owner2"
     assert history_activity[1]["details"] == "Доступ восстановлен"
+    assert "Превышен лимит" in history_activity[2]["details"]
+    assert history_activity[2]["actor_username"] == "owner2"
     conn.close()
 
     original_run_automation_event = crm.run_automation_event
