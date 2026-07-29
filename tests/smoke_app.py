@@ -13958,6 +13958,12 @@ async def assert_platform_calendar_health():
         assert no_company_billing.status_code == 302
         assert no_company_billing.headers["location"] == "/platform"
 
+        no_company_billing_export = await crm.billing_export(
+            make_asgi_request("companyless_super", "/billing/export"),
+        )
+        assert no_company_billing_export.status_code == 302
+        assert no_company_billing_export.headers["location"] == "/platform"
+
         no_company_1c = await crm.integration_1c_page(
             make_asgi_request("companyless_super", "/integrations/1c"),
         )
