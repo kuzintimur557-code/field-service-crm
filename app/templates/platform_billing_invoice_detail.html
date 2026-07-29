@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Счёт платформы</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:940px;width:100%;margin:auto;padding:28px}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 10px;font-size:34px;line-height:1.12}
+h2{margin:0 0 16px;font-size:22px}
+.small{color:#6b7280;font-weight:800;line-height:1.45}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.label{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
+.value{margin-top:6px;font-size:18px;font-weight:900;color:#111827;overflow-wrap:anywhere}
+.value a{color:#2563eb;text-decoration:none}
+.status{display:inline-flex;margin-top:8px;justify-content:center;min-height:30px;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
+.status.ok{background:#dcfce7;color:#166534}
+.status.warning{background:#fef3c7;color:#92400e}
+.status.danger{background:#fee2e2;color:#991b1b}
+.status.muted{background:#f3f4f6;color:#6b7280}
+.notice{padding:14px 16px;border-radius:14px;font-weight:900;margin-bottom:18px}
+.notice.ok{background:#dcfce7;color:#166534}
+.notice.err{background:#fee2e2;color:#991b1b}
+.status-form{display:grid;grid-template-columns:minmax(170px,240px) auto;gap:10px;align-items:end}
+.status-form label{display:grid;gap:6px;color:#6b7280;font-size:13px;font-weight:900}
+.status-form select{min-height:42px;padding:10px;border:1px solid #d1d5db;border-radius:12px;background:white;color:#111827;font-size:14px;font-weight:800}
+.status-form button{min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;font-weight:900;cursor:pointer}
+@media(max-width:700px){
+    .container{padding:16px 14px 92px}
+    .card{padding:20px;border-radius:18px}
+    .grid,.status-form{grid-template-columns:1fr}
+    .status-form button{width:100%}
+    h1{font-size:28px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="actions">
+    <a href="/platform/billing" class="back">← Назад к счетам платформы</a>
+    <a href="/platform/companies/{{ invoice['company_id'] }}" class="back">Карточка компании</a>
+</div>
+
+{% if request.query_params.get("invoice_updated") == "1" %}
+<div class="notice ok">Статус счёта обновлён</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "status_invalid" %}
+<div class="notice err">Некорректный статус счёта</div>
+{% endif %}
+
+<div class="card">
+    <h1>Счёт {{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</h1>
+    <div class="small">
+        Компания:
+        <a href="/platform/companies/{{ invoice['company_id'] }}">
+            {{ invoice["company_name"] or ("Компания #" ~ invoice["company_id"]) }}
+        </a>
+        · владелец: {{ invoice["owner_username"] or "не указан" }}
+    </div>
+    <span class="status {{ invoice['status_tone'] }}">{{ invoice["status_label"] }}</span>
+</div>
+
+<div class="card">
+    <h2>Управление статусом</h2>
+    <form class="status-form" method="post" action="/platform/billing/invoices/{{ invoice['id'] }}/status">
+        <input type="hidden" name="return_to" value="detail">
+        <label>
+            Статус счёта
+            <select name="status">
+                {% for option in status_options %}
+                {% if option["key"] != "all" %}
+                <option value="{{ option['key'] }}" {% if invoice["status_code"] == option["key"] %}selected{% endif %}>{{ option["label"] }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit">Сохранить статус</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Детали счёта</h2>
+    <div class="grid">
+        <div class="field">
+            <div class="label">Компания</div>
+            <div class="value">
+                <a href="/platform/companies/{{ invoice['company_id'] }}">
+                    {{ invoice["company_name"] or ("Компания #" ~ invoice["company_id"]) }}
+                </a>
+            </div>
+        </div>
+        <div class="field">
+            <div class="label">Владелец</div>
+            <div class="value">{{ invoice["owner_username"] or "не указан" }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Период</div>
+            <div class="value">{{ invoice["period"] or "не указан" }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Тариф</div>
+            <div class="value">{{ invoice["plan_label"] }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Сумма</div>
+            <div class="value">{{ invoice["amount_label"] }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Валюта</div>
+            <div class="value">{{ invoice["currency"] or "RUB" }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Оплатить до</div>
+            <div class="value">{{ invoice["due_date"] or "не указано" }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Оплачен</div>
+            <div class="value">{{ invoice["paid_at"] or "не оплачен" }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Создан</div>
+            <div class="value">{{ invoice["created_at"] or "не указано" }}</div>
+        </div>
+        <div class="field">
+            <div class="label">ID счёта</div>
+            <div class="value">#{{ invoice["id"] }}</div>
+        </div>
+    </div>
+</div>
+
+{% if invoice["notes"] %}
+<div class="card">
+    <h2>Примечание</h2>
+    <div class="small">{{ invoice["notes"] }}</div>
+</div>
+{% endif %}
+
+</div>
+{% include 'platform_mobile_nav.html' %}
+</body>
+</html>

@@ -1716,6 +1716,27 @@ def fetch_platform_billing_invoices(c, status_filter="all"):
     return invoices
 
 
+def fetch_platform_billing_invoice(c, invoice_id):
+    row = c.execute("""
+    SELECT
+        billing_invoices.*,
+        companies.name AS company_name,
+        companies.owner_username AS owner_username
+    FROM billing_invoices
+    LEFT JOIN companies
+      ON companies.id=billing_invoices.company_id
+    WHERE billing_invoices.id=?
+    """, (invoice_id,)).fetchone()
+
+    if not row:
+        return None
+
+    invoice = build_billing_invoice_rows([row])[0]
+    invoice["company_name"] = row["company_name"] or ""
+    invoice["owner_username"] = row["owner_username"] or ""
+    return invoice
+
+
 def get_platform_billing_company_options(c):
     rows = c.execute("""
     SELECT
@@ -12229,8 +12250,15 @@ async def update_platform_billing_invoice_status(
 
     form = await request.form()
     status = str(form.get("status") or "").strip().lower()
+    return_to = str(form.get("return_to") or "").strip().lower()
 
     if status not in BILLING_INVOICE_STATUSES:
+        if return_to == "detail":
+            return RedirectResponse(
+                f"/platform/billing/invoices/{invoice_id}?error=status_invalid",
+                status_code=302,
+            )
+
         return RedirectResponse(
             "/platform/billing?error=status_invalid",
             status_code=302,
@@ -12262,9 +12290,55 @@ async def update_platform_billing_invoice_status(
     conn.commit()
     conn.close()
 
+    if return_to == "detail":
+        return RedirectResponse(
+            f"/platform/billing/invoices/{invoice_id}?invoice_updated=1",
+            status_code=302,
+        )
+
     return RedirectResponse(
         "/platform/billing?invoice_updated=1",
         status_code=302,
+    )
+
+
+@app.get("/platform/billing/invoices/{invoice_id}", response_class=HTMLResponse)
+async def platform_billing_invoice_detail_page(
+    request: Request,
+    invoice_id: int,
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+    invoice = fetch_platform_billing_invoice(c, invoice_id)
+    conn.close()
+
+    if not invoice:
+        return RedirectResponse(
+            "/platform/billing?error=invoice_not_found",
+            status_code=302,
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_billing_invoice_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "invoice": invoice,
+            "status_options": get_billing_invoice_status_options(),
+        },
     )
 
 

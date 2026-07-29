@@ -11370,6 +11370,129 @@ async def assert_platform_modules_page():
         f"/platform/billing/invoices/{platform_generated_invoice_id}/status"
         in platform_created_html
     )
+    assert (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}"
+        in platform_created_html
+    )
+
+    anonymous_platform_invoice_detail = (
+        await crm.platform_billing_invoice_detail_page(
+            make_public_asgi_request(
+                f"/platform/billing/invoices/{platform_generated_invoice_id}",
+            ),
+            platform_generated_invoice_id,
+        )
+    )
+    assert anonymous_platform_invoice_detail.status_code == 302
+    assert anonymous_platform_invoice_detail.headers["location"] == "/login"
+
+    boss_platform_invoice_detail = await crm.platform_billing_invoice_detail_page(
+        make_asgi_request(
+            "owner2",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert boss_platform_invoice_detail.status_code == 302
+    assert boss_platform_invoice_detail.headers["location"] == "/"
+
+    missing_platform_invoice_detail = (
+        await crm.platform_billing_invoice_detail_page(
+            make_asgi_request(
+                "super",
+                "/platform/billing/invoices/999999",
+            ),
+            999999,
+        )
+    )
+    assert missing_platform_invoice_detail.status_code == 302
+    assert missing_platform_invoice_detail.headers["location"] == (
+        "/platform/billing?error=invoice_not_found"
+    )
+
+    platform_invoice_detail_page = await crm.platform_billing_invoice_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}",
+        ),
+        platform_generated_invoice_id,
+    )
+    platform_invoice_detail_html = platform_invoice_detail_page.body.decode("utf-8")
+    assert platform_invoice_detail_page.status_code == 200
+    assert platform_invoice_detail_page.context["invoice"]["id"] == (
+        platform_generated_invoice_id
+    )
+    assert "Счёт BILL-2-202610" in platform_invoice_detail_html
+    assert "Управление статусом" in platform_invoice_detail_html
+    assert "Карточка компании" in platform_invoice_detail_html
+    assert 'name="return_to" value="detail"' in platform_invoice_detail_html
+
+    invalid_detail_status_update = (
+        await crm.update_platform_billing_invoice_status(
+            make_form_request(
+                "super",
+                f"/platform/billing/invoices/{platform_generated_invoice_id}/status",
+                {"status": "bad", "return_to": "detail"},
+            ),
+            platform_generated_invoice_id,
+        )
+    )
+    assert invalid_detail_status_update.status_code == 302
+    assert invalid_detail_status_update.headers["location"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}"
+        "?error=status_invalid"
+    )
+
+    detail_status_error_page = await crm.platform_billing_invoice_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}",
+            "error=status_invalid",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert "Некорректный статус счёта" in (
+        detail_status_error_page.body.decode("utf-8")
+    )
+
+    issued_detail_status_update = (
+        await crm.update_platform_billing_invoice_status(
+            make_form_request(
+                "super",
+                f"/platform/billing/invoices/{platform_generated_invoice_id}/status",
+                {"status": "issued", "return_to": "detail"},
+            ),
+            platform_generated_invoice_id,
+        )
+    )
+    assert issued_detail_status_update.status_code == 302
+    assert issued_detail_status_update.headers["location"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}"
+        "?invoice_updated=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    issued_invoice = c.execute("""
+    SELECT status, paid_at
+    FROM billing_invoices
+    WHERE id=?
+    """, (platform_generated_invoice_id,)).fetchone()
+    assert issued_invoice["status"] == "issued"
+    assert issued_invoice["paid_at"] == ""
+    conn.close()
+
+    detail_updated_notice_page = await crm.platform_billing_invoice_detail_page(
+        make_asgi_request(
+            "super",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}",
+            "invoice_updated=1",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert "Статус счёта обновлён" in (
+        detail_updated_notice_page.body.decode("utf-8")
+    )
 
     anonymous_status_update = await crm.update_platform_billing_invoice_status(
         make_public_asgi_request(

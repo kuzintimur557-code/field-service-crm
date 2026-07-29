@@ -179,7 +179,11 @@ h2{margin:0 0 16px;font-size:22px}
                 <div class="meta">{{ invoice["owner_username"] or "Владелец не указан" }}</div>
             </div>
             <div>
-                <div class="value">{{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</div>
+                <div class="value">
+                    <a href="/platform/billing/invoices/{{ invoice['id'] }}">
+                        {{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}
+                    </a>
+                </div>
                 <div class="meta">{{ invoice["created_at"] or "Дата не указана" }}</div>
             </div>
             <div class="value">{{ invoice["period"] or "не указан" }}</div>
