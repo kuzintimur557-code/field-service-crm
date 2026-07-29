@@ -186,6 +186,10 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 {% if user_limit_usage["tone"] in ["warning", "danger"] %}
 <div class="notice err">
 Лимит тарифа: {{ user_limit_usage["status"] }}. Текущий тариф: {{ user_limit_usage["plan_label"] }}.
+{% if recommended_plan %}
+Рекомендуемый тариф: {{ recommended_plan["label"] }}.
+{% endif %}
+<a href="/billing">Открыть тарифы</a>
 </div>
 {% endif %}
 

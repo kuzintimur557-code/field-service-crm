@@ -17499,6 +17499,8 @@ async def assert_finance_margin(task):
     assert "Показано:" in workers_html
     assert "Лимит тарифа" in workers_html
     assert "Текущий тариф" in workers_html
+    assert "Рекомендуемый тариф:" in workers_html
+    assert 'href="/billing"' in workers_html
     assert "Экспорт CSV" in workers_html
     assert 'href="/workers/export?status=inactive' in workers_html
     assert ".contact-link" in workers_html
@@ -17511,6 +17513,7 @@ async def assert_finance_margin(task):
     assert workers_response.context["team_counts"]["inactive_count"] >= 1
     assert workers_response.context["user_limit_usage"]["active_users_count"] >= 1
     assert "status" in workers_response.context["user_limit_usage"]
+    assert workers_response.context["recommended_plan"] is not None
     assert "Создать пользователя" in workers_html
 
     active_workers_response = await crm.workers_page(

@@ -32604,6 +32604,14 @@ async def workers_page(
     company_id = get_user_company_id(username)
     settings = get_company_settings(company_id)
     user_limit_usage = get_company_user_limit_usage(company_id, settings)
+    recommended_plan = None
+
+    if user_limit_usage["tone"] in ("warning", "danger"):
+        recommended_plan = get_recommended_user_limit_plan(
+            user_limit_usage["plan"],
+            user_limit_usage["active_users_count"],
+        )
+
     worker_data = get_workers_for_company(
         company_id,
         status=status,
@@ -32635,6 +32643,7 @@ async def workers_page(
             "search": worker_data["search"],
             "team_counts": team_counts,
             "user_limit_usage": user_limit_usage,
+            "recommended_plan": recommended_plan,
             "settings": settings
         }
     )
