@@ -5765,6 +5765,12 @@ async def assert_settings_page():
     assert crm.get_plan_label("team") == "Команда"
     assert ("team", "Команда — звонки без 1С") in crm.get_plan_options()
     assert crm.get_plan_user_limit("enterprise_1c") is None
+    assert crm.get_recommended_user_limit_plan("basic", 3)["plan"] == "team"
+    assert crm.get_recommended_user_limit_plan("team", 10)["plan"] == "business"
+    assert crm.get_recommended_user_limit_plan("business_1c", 30)["plan"] == (
+        "enterprise_1c"
+    )
+    assert crm.get_recommended_user_limit_plan("enterprise_1c", 100) is None
     assert crm.get_plan_feature_flags("basic") == {
         "one_c_enabled": 0,
         "calls_enabled": 0,
@@ -5919,6 +5925,9 @@ async def assert_billing_page():
     assert "Доступные тарифы" in html
     assert "Используется пользователей" in html
     assert "Лимит команды требует внимания" in html
+    assert "Рекомендация по тарифу" in html
+    assert "Изменить тариф" in html
+    assert "/settings#company-plan" in html
     assert (
         "Осталось мест" in html
         or "Лимит заполнен" in html
@@ -5952,6 +5961,12 @@ async def assert_billing_page():
     assert "✅" not in html
     assert "❌" not in html
     assert "🔗 Настройка 1С" not in html
+
+    settings_response = await crm.settings_page(
+        make_asgi_request("owner2", "/settings")
+    )
+    settings_html = settings_response.body.decode("utf-8")
+    assert 'id="company-plan"' in settings_html
 
 
 async def assert_calls_page():

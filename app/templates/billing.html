@@ -31,6 +31,9 @@ h2{margin:0 0 16px;font-size:22px}
 .limit-status.danger{background:#fee2e2;color:#991b1b}
 .limit-alert{margin-top:14px;padding:13px;border-radius:14px;background:#fffbeb;color:#92400e;font-weight:900;line-height:1.45}
 .limit-alert.danger{background:#fee2e2;color:#991b1b}
+.recommendation{margin-top:14px;padding:15px;border:1px solid #bfdbfe;border-radius:14px;background:#eff6ff;color:#1e3a8a;font-weight:900;line-height:1.45}
+.recommendation strong{display:block;margin-bottom:6px;font-size:16px}
+.recommendation a{display:inline-flex;align-items:center;justify-content:center;min-height:40px;margin-top:10px;padding:10px 13px;border-radius:12px;background:#2563eb;color:white;text-decoration:none;font-size:13px;font-weight:900}
 .integration-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:14px 18px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
@@ -69,6 +72,20 @@ h2{margin:0 0 16px;font-size:22px}
 Лимит команды требует внимания. Если нужно добавить сотрудников без риска,
 переведите компанию на тариф с большим лимитом.
 </div>
+{% if recommended_plan %}
+<div class="recommendation">
+<strong>Рекомендация по тарифу: {{ recommended_plan["label"] }}</strong>
+Подойдёт для текущей команды: {{ user_limit_usage["active_users_count"] }} пользователей,
+лимит тарифа — {{ recommended_plan["user_limit_label"] }}.
+{% if recommended_plan["available_slots"] is not none %}
+После перехода останется свободных мест: {{ recommended_plan["available_slots"] }}.
+{% else %}
+Свободные места не ограничены.
+{% endif %}
+<br>
+<a href="/settings#company-plan">Изменить тариф</a>
+</div>
+{% endif %}
 {% endif %}
 </div>
 </div>

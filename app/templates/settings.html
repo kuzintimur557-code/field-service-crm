@@ -166,7 +166,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         {% endfor %}
     </div>
 
-	<label>Тариф</label>
+	<label id="company-plan">Тариф</label>
 <select name="plan">
     {% for plan_key, plan_label in plan_options %}
     <option value="{{ plan_key }}" {% if settings["plan"] == plan_key %}selected{% endif %}>{{ plan_label }}</option>

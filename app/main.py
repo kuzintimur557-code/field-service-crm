@@ -1421,6 +1421,34 @@ def get_company_user_limit_usage(company_id, settings=None):
     }
 
 
+def get_recommended_user_limit_plan(plan, active_users_count):
+    current_plan = normalize_plan(plan)
+    active_users_count = int(active_users_count or 0)
+    plan_keys = list(PLAN_DEFINITIONS.keys())
+    start_index = plan_keys.index(current_plan) + 1
+
+    for plan_key in plan_keys[start_index:]:
+        definition = PLAN_DEFINITIONS[plan_key]
+        user_limit = definition["user_limit"]
+
+        if user_limit is None or active_users_count < int(user_limit):
+            return {
+                "plan": plan_key,
+                "label": definition["label"],
+                "settings_label": definition["settings_label"],
+                "user_limit": user_limit,
+                "user_limit_label": (
+                    str(user_limit) if user_limit else "без лимита"
+                ),
+                "available_slots": (
+                    None if user_limit is None
+                    else max(int(user_limit) - active_users_count, 0)
+                ),
+            }
+
+    return None
+
+
 def require_company_id_value(company_id):
     if not company_id:
         raise ValueError("company_id is required")
@@ -29501,6 +29529,14 @@ async def billing_page(request: Request):
     )
     user_limit = get_plan_user_limit(plan)
     user_limit_usage = get_company_user_limit_usage(company_id, settings)
+    recommended_plan = None
+
+    if user_limit_usage["tone"] in ("warning", "danger"):
+        recommended_plan = get_recommended_user_limit_plan(
+            plan,
+            user_limit_usage["active_users_count"],
+        )
+
     plan_names = {
         plan_key: definition["label"]
         for plan_key, definition in PLAN_DEFINITIONS.items()
@@ -29517,6 +29553,7 @@ async def billing_page(request: Request):
             "plan": plan,
             "user_limit": user_limit,
             "user_limit_usage": user_limit_usage,
+            "recommended_plan": recommended_plan,
             "plan_names": plan_names
         }
     )
