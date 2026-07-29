@@ -30581,6 +30581,23 @@ def fetch_company_settings_history(c, company_id, filters, limit=None):
     return c.execute(query, params).fetchall()
 
 
+def build_settings_history_summary(history):
+    actors = {
+        str(event["actor_username"] or "").strip()
+        for event in history
+        if str(event["actor_username"] or "").strip()
+    }
+
+    latest_event = history[0] if history else None
+
+    return {
+        "events_count": len(history),
+        "actors_count": len(actors),
+        "latest_at": latest_event["created_at"] if latest_event else "",
+        "latest_action": latest_event["action"] if latest_event else "",
+    }
+
+
 @app.get("/settings/history", response_class=HTMLResponse)
 async def settings_history_page(
     request: Request,
@@ -30621,6 +30638,7 @@ async def settings_history_page(
     """, (company_id,)).fetchall()
     history = fetch_company_settings_history(c, company_id, filters, limit=200)
     conn.close()
+    summary = build_settings_history_summary(history)
 
     return templates.TemplateResponse(
         request,
@@ -30633,6 +30651,7 @@ async def settings_history_page(
             "filters": filters,
             "action_options": [row["action"] for row in action_options],
             "export_url": build_settings_history_export_url(filters),
+            "summary": summary,
         },
     )
 

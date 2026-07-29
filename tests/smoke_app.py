@@ -5781,6 +5781,12 @@ async def assert_settings_page():
         "date_from": "",
         "date_to": "2026-01-01",
     }
+    assert crm.build_settings_history_summary([]) == {
+        "events_count": 0,
+        "actors_count": 0,
+        "latest_at": "",
+        "latest_action": "",
+    }
     assert crm.plan_allows_active_users("basic", 3) is True
     assert crm.plan_allows_active_users("basic", 4) is False
     assert crm.plan_allows_active_users("enterprise_1c", 100) is True
@@ -5923,7 +5929,12 @@ async def assert_settings_page():
     )
     history_html = history_page.body.decode("utf-8")
     assert history_page.status_code == 200
+    assert history_page.context["summary"]["events_count"] >= 1
+    assert history_page.context["summary"]["actors_count"] >= 1
     assert "История настроек" in history_html
+    assert "Событий" in history_html
+    assert "Кто менял" in history_html
+    assert "Последнее изменение" in history_html
     assert "Тариф: Базовый → Команда" in history_html
     assert "/settings/history/export" in history_html
     assert "Все действия" in history_html

@@ -17,6 +17,11 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
 h1{margin:0 0 8px;font-size:34px}
 .meta{color:#6b7280;font-size:14px;font-weight:800;line-height:1.45}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.summary-card{background:white;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 8px 22px rgba(0,0,0,.06)}
+.summary-label{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
+.summary-value{margin-top:8px;font-size:24px;font-weight:900}
+.summary-small{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800}
 .filters{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:12px;align-items:end}
 .field{display:flex;flex-direction:column;gap:6px}
 label{font-size:12px;color:#6b7280;font-weight:900;text-transform:uppercase}
@@ -31,6 +36,7 @@ button,.button{display:inline-flex;align-items:center;justify-content:center;min
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
+    .summary-grid{grid-template-columns:1fr}
     .filters{grid-template-columns:1fr}
     h1{font-size:28px}
 }
@@ -48,6 +54,24 @@ button,.button{display:inline-flex;align-items:center;justify-content:center;min
 <div class="card">
     <h1>История настроек</h1>
     <div class="meta">Изменения тарифа и сферы компании</div>
+</div>
+
+<div class="summary-grid">
+    <div class="summary-card">
+        <div class="summary-label">Событий</div>
+        <div class="summary-value">{{ summary["events_count"] }}</div>
+        <div class="summary-small">по текущему фильтру</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Кто менял</div>
+        <div class="summary-value">{{ summary["actors_count"] }}</div>
+        <div class="summary-small">уникальных пользователей</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Последнее изменение</div>
+        <div class="summary-value">{{ summary["latest_at"] or "Нет" }}</div>
+        <div class="summary-small">{{ summary["latest_action"] or "Изменений пока нет" }}</div>
+    </div>
 </div>
 
 <form method="get" action="/settings/history" class="card filters">
