@@ -11317,6 +11317,24 @@ async def assert_platform_modules_page():
     assert boss_billing_page.status_code == 302
     assert boss_billing_page.headers["location"] == "/"
 
+    anonymous_platform_billing_api = await crm.api_platform_billing(
+        make_public_asgi_request("/api/platform/billing"),
+    )
+    assert anonymous_platform_billing_api.status_code == 401
+    boss_platform_billing_api = await crm.api_platform_billing(
+        make_asgi_request("owner2", "/api/platform/billing"),
+    )
+    assert boss_platform_billing_api.status_code == 403
+    platform_billing_api = await crm.api_platform_billing(
+        make_asgi_request("super", "/api/platform/billing"),
+    )
+    assert platform_billing_api["ok"] is True
+    assert platform_billing_api["filters"]["status"] == "all"
+    assert platform_billing_api["filters"]["company_id"] == "all"
+    assert "risk_summary" in platform_billing_api
+    assert platform_billing_api["company_options"]
+    assert platform_billing_api["export_url"] == "/platform/billing/export"
+
     platform_billing_page = await crm.platform_billing_page(
         make_asgi_request("super", "/platform/billing"),
     )
@@ -11685,6 +11703,21 @@ async def assert_platform_modules_page():
     assert "super" in platform_generated_invoice["notes"]
     platform_generated_invoice_id = platform_generated_invoice["id"]
     conn.close()
+
+    platform_billing_company_api = await crm.api_platform_billing(
+        make_asgi_request("super", "/api/platform/billing"),
+        status="draft",
+        company_id="2",
+    )
+    assert platform_billing_company_api["filters"]["status"] == "draft"
+    assert platform_billing_company_api["filters"]["company_id"] == "2"
+    assert platform_billing_company_api["export_url"] == (
+        "/platform/billing/export?status=draft&company_id=2"
+    )
+    assert any(
+        invoice["invoice_number"] == "BILL-2-202610"
+        for invoice in platform_billing_company_api["invoices"]
+    )
 
     platform_created_page = await crm.platform_billing_page(
         make_asgi_request(

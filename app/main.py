@@ -12628,6 +12628,56 @@ async def run_platform_billing_reminders_cron(request: Request):
     })
 
 
+@app.get("/api/platform/billing")
+async def api_platform_billing(
+    request: Request,
+    status: str = "all",
+    company_id: str = "all",
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    status_filter = normalize_billing_invoice_filter(status)
+    selected_company_id = normalize_platform_billing_company_id(company_id)
+
+    conn = connect()
+    c = conn.cursor()
+    invoices = fetch_platform_billing_invoices(
+        c,
+        status_filter=status_filter,
+        company_id=selected_company_id,
+    )
+    company_options = get_platform_billing_company_options(c)
+    conn.close()
+
+    summary = build_billing_invoice_summary(invoices)
+    risk_summary = build_platform_billing_risk_summary(invoices)
+
+    return {
+        "ok": True,
+        "filters": {
+            "status": status_filter,
+            "company_id": selected_company_id,
+        },
+        "summary": summary,
+        "risk_summary": risk_summary,
+        "company_options": company_options,
+        "export_url": build_platform_billing_url(
+            status_filter,
+            selected_company_id,
+            export=True,
+        ),
+        "invoices": invoices,
+    }
+
+
 @app.post("/platform/billing/invoices/{invoice_id}/status")
 async def update_platform_billing_invoice_status(
     request: Request,
