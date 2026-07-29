@@ -12,6 +12,8 @@
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
 .container{max-width:1100px;width:100%;margin:auto;padding:28px}
 .back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.actions .back{margin-bottom:0}
 .card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
 h1{margin:0 0 12px;font-size:34px}
 h2{margin:0 0 16px;font-size:22px}
@@ -51,7 +53,10 @@ h2{margin:0 0 16px;font-size:22px}
 {% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 <div class="container">
 
-<a href="/settings" class="back">← Назад к настройкам</a>
+<div class="actions">
+    <a href="/settings" class="back">← Назад к настройкам</a>
+    <a href="/billing/export" class="back">Скачать CSV</a>
+</div>
 
 <div class="card">
 <h1>Тарифы</h1>

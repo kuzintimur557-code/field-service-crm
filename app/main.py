@@ -29766,6 +29766,71 @@ async def billing_page(request: Request):
     )
 
 
+@app.get("/billing/export")
+async def billing_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
+    settings = get_company_settings(company_id)
+    plan = normalize_plan(
+        settings["plan"] if settings and "plan" in settings.keys() else "basic"
+    )
+    user_limit_usage = get_company_user_limit_usage(company_id, settings)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Тарифы компании"])
+    writer.writerow(["Текущий тариф", get_plan_label(plan)])
+    writer.writerow(["Активные пользователи", user_limit_usage["active_users_count"]])
+    writer.writerow(["Лимит пользователей", user_limit_usage["user_limit_label"]])
+    writer.writerow(["Статус лимита", user_limit_usage["status"]])
+    writer.writerow([])
+    writer.writerow([
+        "Тариф",
+        "Лимит пользователей",
+        "Звонки",
+        "1С",
+        "ИИ-звонки",
+        "Текущий",
+    ])
+
+    for plan_key, definition in PLAN_DEFINITIONS.items():
+        user_limit_label = (
+            str(definition["user_limit"])
+            if definition["user_limit"] is not None
+            else "Без лимита"
+        )
+        writer.writerow([
+            definition["label"],
+            user_limit_label,
+            "Да" if definition["calls_enabled"] else "Нет",
+            "Да" if definition["one_c_enabled"] else "Нет",
+            "Да" if definition["ai_calls_enabled"] else "Нет",
+            "Да" if plan_key == plan else "Нет",
+        ])
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=billing_plans.csv"
+        },
+    )
+
+
 
 @app.get("/ai/insights", response_class=HTMLResponse)
 async def ai_insights_page(request: Request):

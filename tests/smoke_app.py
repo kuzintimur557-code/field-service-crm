@@ -6045,6 +6045,8 @@ async def assert_billing_page():
     assert "Рекомендация по тарифу" in html
     assert "Изменить тариф" in html
     assert "/settings#company-plan" in html
+    assert "/billing/export" in html
+    assert "Скачать CSV" in html
     assert (
         "Осталось мест" in html
         or "Лимит заполнен" in html
@@ -6078,6 +6080,23 @@ async def assert_billing_page():
     assert "✅" not in html
     assert "❌" not in html
     assert "🔗 Настройка 1С" not in html
+
+    billing_export = await crm.billing_export(
+        make_asgi_request("owner2", "/billing/export")
+    )
+    billing_export_csv = billing_export.body.decode("utf-8")
+    assert billing_export.status_code == 200
+    assert billing_export.headers["content-disposition"] == (
+        "attachment; filename=billing_plans.csv"
+    )
+    assert billing_export_csv.startswith("\ufeff")
+    assert "Тарифы компании" in billing_export_csv
+    assert "Текущий тариф" in billing_export_csv
+    assert "Тариф,Лимит пользователей,Звонки,1С,ИИ-звонки,Текущий" in (
+        billing_export_csv
+    )
+    assert "Команда" in billing_export_csv
+    assert "Корпоративный + 1С" in billing_export_csv
 
     settings_response = await crm.settings_page(
         make_asgi_request("owner2", "/settings")
