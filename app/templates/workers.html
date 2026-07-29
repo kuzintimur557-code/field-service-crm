@@ -96,7 +96,8 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 
 {% if request.query_params.get("limit_warning") == "1" %}
 <div class="notice err">
-Пользователь создан, но лимит тарифа заполнен или превышен. Проверьте тариф в разделе оплаты.
+Пользователь создан, но лимит тарифа заполнен или превышен.
+<a href="/billing">Открыть тарифы</a>
 </div>
 {% endif %}
 

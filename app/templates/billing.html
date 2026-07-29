@@ -29,6 +29,8 @@ h2{margin:0 0 16px;font-size:22px}
 .limit-status{display:inline-flex;margin-top:8px;padding:7px 10px;border-radius:10px;background:#dcfce7;color:#166534;font-size:12px;font-weight:900}
 .limit-status.warning{background:#fef3c7;color:#92400e}
 .limit-status.danger{background:#fee2e2;color:#991b1b}
+.limit-alert{margin-top:14px;padding:13px;border-radius:14px;background:#fffbeb;color:#92400e;font-weight:900;line-height:1.45}
+.limit-alert.danger{background:#fee2e2;color:#991b1b}
 .integration-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:14px 18px;border-radius:14px;background:#111827;color:white;text-decoration:none;font-weight:900}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
@@ -62,6 +64,12 @@ h2{margin:0 0 16px;font-size:22px}
 Используется пользователей: {{ user_limit_usage["active_users_count"] }} / {{ user_limit_usage["user_limit_label"] }}
 <br>
 <span class="limit-status {{ user_limit_usage['tone'] }}">{{ user_limit_usage["status"] }}</span>
+{% if user_limit_usage["tone"] in ["warning", "danger"] %}
+<div class="limit-alert {{ user_limit_usage['tone'] }}">
+Лимит команды требует внимания. Если нужно добавить сотрудников без риска,
+переведите компанию на тариф с большим лимитом.
+</div>
+{% endif %}
 </div>
 </div>
 

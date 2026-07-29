@@ -5918,6 +5918,7 @@ async def assert_billing_page():
     assert "Текущий тариф" in html
     assert "Доступные тарифы" in html
     assert "Используется пользователей" in html
+    assert "Лимит команды требует внимания" in html
     assert (
         "Осталось мест" in html
         or "Лимит заполнен" in html
@@ -17427,6 +17428,7 @@ async def assert_finance_margin(task):
     limit_warning_html = limit_warning_page.body.decode("utf-8")
     assert "Пользователь создан" in limit_warning_html
     assert "лимит тарифа заполнен или превышен" in limit_warning_html
+    assert 'href="/billing"' in limit_warning_html
 
     manager_workers_response = await crm.workers_page(
         make_asgi_request("manager2", "/workers"),
