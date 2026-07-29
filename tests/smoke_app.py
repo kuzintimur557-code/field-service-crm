@@ -10005,7 +10005,8 @@ async def assert_platform_companies_page():
     )
     assert (
         "ID,Компания,Владелец,Сфера,Тариф,Лимит пользователей,"
-        "Статус лимита,Активные пользователи,Пользователи всего,"
+        "Статус лимита,Рекомендуемый тариф,Активные пользователи,"
+        "Пользователи всего,"
         "Активные заявки,Архивные заявки,Создана"
     ) in export_csv
     assert "Smoke Logistics Company" in export_csv
@@ -10111,6 +10112,7 @@ async def assert_platform_companies_page():
     assert "Грузоперевозки" in company_export_csv
     assert "Базовый" in company_export_csv
     assert "Пользователи" in company_export_csv
+    assert "Рекомендуемый тариф" in company_export_csv
     assert "Модулей включено" in company_export_csv
     assert "Модулей выключено" in company_export_csv
     assert "Отклонений от пресета" in company_export_csv
@@ -10176,6 +10178,16 @@ async def assert_platform_companies_page():
     assert limit_detail_response.context["recommended_plan"]["plan"] == "team"
     assert "Рекомендация по тарифу: Команда" in limit_detail_html
 
+    limit_company_export = await crm.platform_company_export(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}/export",
+        ),
+        logistics_company_id,
+    )
+    limit_company_export_csv = limit_company_export.body.decode("utf-8")
+    assert "Рекомендуемый тариф,Команда" in limit_company_export_csv
+
     limit_list_response = await crm.platform_companies_page(
         make_asgi_request(
             "super",
@@ -10189,6 +10201,20 @@ async def assert_platform_companies_page():
     assert limit_list_response.context["summary"]["companies"] >= 1
     assert "Smoke Logistics Company" in limit_list_html
     assert "Рекомендация: Команда" in limit_list_html
+
+    limit_export_response = await crm.platform_companies_export(
+        make_asgi_request(
+            "super",
+            "/platform/companies/export",
+            "search=Smoke%20Logistics&limit=danger",
+        ),
+        search="Smoke Logistics",
+        limit="danger",
+    )
+    limit_export_csv = limit_export_response.body.decode("utf-8")
+    assert "Рекомендуемый тариф" in limit_export_csv
+    assert "Smoke Logistics Company" in limit_export_csv
+    assert "Команда" in limit_export_csv
 
     anonymous_apply_preset = await crm.apply_platform_company_preset(
         make_public_asgi_request(

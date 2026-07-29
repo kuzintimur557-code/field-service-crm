@@ -7746,6 +7746,7 @@ async def platform_companies_export(
         "Тариф",
         "Лимит пользователей",
         "Статус лимита",
+        "Рекомендуемый тариф",
         "Активные пользователи",
         "Пользователи всего",
         "Активные заявки",
@@ -7762,6 +7763,11 @@ async def platform_companies_export(
             company["plan_label"],
             company["user_limit_label"],
             company["user_limit_status"],
+            (
+                company["recommended_plan"]["label"]
+                if company["recommended_plan"]
+                else ""
+            ),
             company["active_users_count"],
             company["users_count"],
             company["active_tasks_count"],
@@ -7825,6 +7831,14 @@ async def platform_company_export(request: Request, company_id: int):
     writer.writerow(["Тариф", usage["plan_label"]])
     writer.writerow(["Лимит пользователей", usage["user_limit_label"]])
     writer.writerow(["Статус лимита", usage["status"]])
+    writer.writerow([
+        "Рекомендуемый тариф",
+        (
+            profile["recommended_plan"]["label"]
+            if profile["recommended_plan"]
+            else ""
+        ),
+    ])
     writer.writerow(["Активные пользователи", usage["active_users_count"]])
     writer.writerow(["Пользователи всего", usage["users_count"]])
     writer.writerow(["Модулей включено", profile["enabled_features_count"]])
