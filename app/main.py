@@ -7322,6 +7322,10 @@ def get_platform_company_profile(company_id):
     LIMIT 5
     """, (company_id,)).fetchall()
 
+    billing_invoices = fetch_billing_invoices(c, company_id)
+    recent_billing_invoices = billing_invoices[:5]
+    billing_invoice_summary = build_billing_invoice_summary(billing_invoices)
+
     task_stats = c.execute("""
     SELECT
         COUNT(*) AS total,
@@ -7371,6 +7375,8 @@ def get_platform_company_profile(company_id):
         "settings_history": [
             dict(event) for event in settings_history
         ],
+        "billing_invoices": recent_billing_invoices,
+        "billing_invoice_summary": billing_invoice_summary,
     }
 
 
@@ -8187,6 +8193,19 @@ async def platform_company_export(request: Request, company_id: int):
             event["old_value"] or "",
             event["new_value"] or "",
             event["actor_username"] or "",
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Счета платформы"])
+    writer.writerow(["Номер", "Период", "Тариф", "Сумма", "Статус", "Оплатить до"])
+    for invoice in profile["billing_invoices"]:
+        writer.writerow([
+            invoice["invoice_number"] or f"#{invoice['id']}",
+            invoice["period"] or "",
+            invoice["plan_label"],
+            invoice["amount"] or 0,
+            invoice["status_label"],
+            invoice["due_date"] or "",
         ])
     writer.writerow([])
 

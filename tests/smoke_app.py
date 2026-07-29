@@ -10422,6 +10422,7 @@ async def assert_platform_companies_page():
     assert "Модулей выключено" in company_export_csv
     assert "Отклонений от пресета" in company_export_csv
     assert "История настроек" in company_export_csv
+    assert "Счета платформы" in company_export_csv
     assert "Заявки всего" in company_export_csv
     assert "Активные заявки" in company_export_csv
     assert "Модули" in company_export_csv
@@ -10441,6 +10442,7 @@ async def assert_platform_companies_page():
     assert detail_response.context["enabled_features_count"] >= 1
     assert detail_response.context["disabled_features_count"] >= 0
     assert detail_response.context["preset_drift"]["count"] == 0
+    assert detail_response.context["billing_invoice_summary"]["count"] == 0
     assert detail_response.context["task_stats"]["total"] == 0
     assert detail_response.context["task_stats"]["active"] == 0
     assert "Карточка компании" in detail_html
@@ -10449,6 +10451,8 @@ async def assert_platform_companies_page():
     assert "Настройки соответствуют пресету" in detail_html
     assert "История настроек" in detail_html
     assert "История настроек пока пустая" in detail_html
+    assert "Счета платформы" in detail_html
+    assert "Счета платформы пока не созданы" in detail_html
     assert "Smoke Logistics Company" in detail_html
     assert "Пользователи" in detail_html
     assert "Модули" in detail_html

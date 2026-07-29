@@ -205,6 +205,29 @@ h2{margin:0 0 16px;font-size:22px}
     </div>
 </div>
 
+<div class="card">
+    <h2>Счета платформы</h2>
+    <div class="meta">
+        Всего: {{ billing_invoice_summary["count"] }} ·
+        начислено: {{ billing_invoice_summary["total_amount_label"] }} ·
+        к оплате: {{ billing_invoice_summary["unpaid_amount_label"] }}
+    </div>
+    {% if billing_invoices %}
+    {% for invoice in billing_invoices %}
+    <div class="row">
+        <div>
+            <div class="name">{{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</div>
+            <div class="meta">{{ invoice["period"] or "Период не указан" }} · {{ invoice["plan_label"] }}</div>
+        </div>
+        <div class="meta">{{ invoice["amount_label"] }}</div>
+        <div><span class="badge {{ invoice['status_tone'] }}">{{ invoice["status_label"] }}</span></div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="meta" style="margin-top:12px">Счета платформы пока не созданы</div>
+    {% endif %}
+</div>
+
 <div class="grid">
     <div class="card">
         <h2>Пользователи</h2>
