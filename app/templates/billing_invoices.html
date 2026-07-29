@@ -21,6 +21,9 @@ h2{margin:0 0 16px;font-size:22px}
 .summary-card{background:white;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 8px 22px rgba(0,0,0,.06)}
 .summary-label{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
 .summary-value{margin-top:8px;font-size:24px;font-weight:900}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.filter-link{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 12px;border-radius:999px;background:white;border:1px solid #d1d5db;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filter-link.active{background:#111827;border-color:#111827;color:white}
 .table{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr 1fr;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
 .row.head{background:white;color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
@@ -47,7 +50,7 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="actions">
     <a href="/billing" class="back">← Назад к тарифам</a>
-    <a href="/billing/invoices/export" class="back">Скачать CSV</a>
+    <a href="{{ export_url }}" class="back">Скачать CSV</a>
 </div>
 
 <div class="card">
@@ -76,6 +79,16 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="card">
     <h2>Список счетов</h2>
+    <div class="filters">
+        {% for option in status_options %}
+        <a
+            href="/billing/invoices{% if option['key'] != 'all' %}?status={{ option['key'] }}{% endif %}"
+            class="filter-link {% if status_filter == option['key'] %}active{% endif %}"
+        >
+            {{ option["label"] }}
+        </a>
+        {% endfor %}
+    </div>
     {% if invoices %}
     <div class="table">
         <div class="row head">

@@ -1415,6 +1415,15 @@ def normalize_billing_invoice_status(status):
     )
 
 
+def normalize_billing_invoice_filter(status):
+    normalized_status = str(status or "all").strip().lower()
+    return (
+        normalized_status
+        if normalized_status == "all" or normalized_status in BILLING_INVOICE_STATUSES
+        else "all"
+    )
+
+
 def get_billing_invoice_status_meta(status):
     return BILLING_INVOICE_STATUSES[normalize_billing_invoice_status(status)]
 
@@ -1473,14 +1482,27 @@ def build_billing_invoice_summary(invoices):
     }
 
 
-def fetch_billing_invoices(c, company_id, limit=None):
+def build_billing_invoices_export_url(status_filter):
+    if status_filter == "all":
+        return "/billing/invoices/export"
+
+    return "/billing/invoices/export?" + urlencode({"status": status_filter})
+
+
+def fetch_billing_invoices(c, company_id, limit=None, status_filter="all"):
+    status_filter = normalize_billing_invoice_filter(status_filter)
     query = """
     SELECT *
     FROM billing_invoices
     WHERE company_id=?
-    ORDER BY id DESC
     """
     params = [company_id]
+
+    if status_filter != "all":
+        query += "\nAND status=?"
+        params.append(status_filter)
+
+    query += "\nORDER BY id DESC"
 
     if limit:
         query += "\nLIMIT ?"
@@ -29983,7 +30005,7 @@ async def billing_export(request: Request):
 
 
 @app.get("/billing/invoices", response_class=HTMLResponse)
-async def billing_invoices_page(request: Request):
+async def billing_invoices_page(request: Request, status: str = "all"):
 
     username = get_user(request)
 
@@ -30000,11 +30022,26 @@ async def billing_invoices_page(request: Request):
     if missing_company_response:
         return missing_company_response
 
+    status_filter = normalize_billing_invoice_filter(status)
+
     conn = connect()
     c = conn.cursor()
-    invoices = fetch_billing_invoices(c, company_id)
+    invoices = fetch_billing_invoices(c, company_id, status_filter=status_filter)
     conn.close()
     summary = build_billing_invoice_summary(invoices)
+    status_options = [
+        {
+            "key": "all",
+            "label": "Все",
+        },
+        *[
+            {
+                "key": status_key,
+                "label": status_meta["label"],
+            }
+            for status_key, status_meta in BILLING_INVOICE_STATUSES.items()
+        ],
+    ]
 
     return templates.TemplateResponse(
         request,
@@ -30015,12 +30052,15 @@ async def billing_invoices_page(request: Request):
             "role": role,
             "invoices": invoices,
             "summary": summary,
+            "status_filter": status_filter,
+            "status_options": status_options,
+            "export_url": build_billing_invoices_export_url(status_filter),
         },
     )
 
 
 @app.get("/billing/invoices/export")
-async def billing_invoices_export(request: Request):
+async def billing_invoices_export(request: Request, status: str = "all"):
 
     username = get_user(request)
 
@@ -30037,9 +30077,11 @@ async def billing_invoices_export(request: Request):
     if missing_company_response:
         return missing_company_response
 
+    status_filter = normalize_billing_invoice_filter(status)
+
     conn = connect()
     c = conn.cursor()
-    invoices = fetch_billing_invoices(c, company_id)
+    invoices = fetch_billing_invoices(c, company_id, status_filter=status_filter)
     conn.close()
 
     output = io.StringIO()
@@ -30071,11 +30113,16 @@ async def billing_invoices_export(request: Request):
             invoice["created_at"] or "",
         ])
 
+    filename = "billing_invoices.csv"
+
+    if status_filter != "all":
+        filename = f"billing_invoices_{status_filter}.csv"
+
     return Response(
         content="\ufeff" + output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": "attachment; filename=billing_invoices.csv"
+            "Content-Disposition": f"attachment; filename={filename}"
         },
     )
 

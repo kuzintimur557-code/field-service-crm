@@ -6035,6 +6035,11 @@ async def assert_settings_page():
 
 async def assert_billing_page():
     assert crm.normalize_billing_invoice_status("bad") == "draft"
+    assert crm.normalize_billing_invoice_filter("bad") == "all"
+    assert crm.normalize_billing_invoice_filter("issued") == "issued"
+    assert crm.build_billing_invoices_export_url("issued") == (
+        "/billing/invoices/export?status=issued"
+    )
     assert crm.get_billing_invoice_status_meta("paid")["label"] == "Оплачен"
     assert crm.format_rub_amount(1200) == "1200 ₽"
     assert crm.format_rub_amount(1200.5) == "1200.50 ₽"
@@ -6156,6 +6161,20 @@ async def assert_billing_page():
     assert "Выставлен" in invoices_html
     assert "1200 ₽" in invoices_html
     assert "/billing/invoices/export" in invoices_html
+    assert "Черновик" in invoices_html
+    assert "Оплачен" in invoices_html
+
+    issued_invoices_page = await crm.billing_invoices_page(
+        make_asgi_request("owner2", "/billing/invoices?status=issued"),
+        status="issued",
+    )
+    issued_invoices_html = issued_invoices_page.body.decode("utf-8")
+    assert issued_invoices_page.status_code == 200
+    assert issued_invoices_page.context["status_filter"] == "issued"
+    assert issued_invoices_page.context["export_url"] == (
+        "/billing/invoices/export?status=issued"
+    )
+    assert "SMOKE-BILL-1" in issued_invoices_html
 
     invoices_export = await crm.billing_invoices_export(
         make_asgi_request("owner2", "/billing/invoices/export")
@@ -6169,6 +6188,17 @@ async def assert_billing_page():
     assert "Номер,Период,Тариф,Сумма,Валюта,Статус" in invoices_export_csv
     assert "SMOKE-BILL-1" in invoices_export_csv
     assert "Выставлен" in invoices_export_csv
+
+    issued_invoices_export = await crm.billing_invoices_export(
+        make_asgi_request("owner2", "/billing/invoices/export?status=issued"),
+        status="issued",
+    )
+    issued_invoices_export_csv = issued_invoices_export.body.decode("utf-8")
+    assert issued_invoices_export.status_code == 200
+    assert issued_invoices_export.headers["content-disposition"] == (
+        "attachment; filename=billing_invoices_issued.csv"
+    )
+    assert "SMOKE-BILL-1" in issued_invoices_export_csv
 
     conn = connect()
     c = conn.cursor()
