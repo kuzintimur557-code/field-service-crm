@@ -11054,11 +11054,17 @@ async def assert_platform_modules_page():
     platform_html = platform_page.body.decode("utf-8")
     assert "/platform/modules" in platform_html
     assert "Тарифы и лимиты" in platform_html
+    assert "Счета и подписки" in platform_html
     assert "/platform/companies?limit=danger" in platform_html
     assert "/platform/companies?limit=warning" in platform_html
     assert "company_usage_summary" not in platform_html
     assert platform_page.context["company_usage_summary"]["companies"] >= 1
     assert "limit_danger" in platform_page.context["company_usage_summary"]
+    assert "platform_billing_summary" not in platform_html
+    assert platform_page.context["platform_billing_summary"]["count"] >= 0
+    assert "unpaid_amount_label" in platform_page.context[
+        "platform_billing_summary"
+    ]
 
 
 async def assert_platform_presets_page():
@@ -13628,6 +13634,7 @@ async def assert_platform_calendar_health():
         assert "Готовность релиза" in platform_html
         assert "Релизный штаб" in platform_html
         assert "Модульность SaaS" in platform_html
+        assert "Счета и подписки" in platform_html
         assert "Быстрые действия" in platform_html
         assert "🛠 Панель платформы" not in platform_html
         assert "🏢 Компании" not in platform_html
@@ -13664,6 +13671,7 @@ async def assert_platform_calendar_health():
             crm.INDUSTRY_OPTIONS
         )
         assert platform_page.context["preset_usage_summary"]["drift_count"] >= 0
+        assert platform_page.context["platform_billing_summary"]["count"] >= 0
         assert "secret_key" in {
             item["key"]
             for item in platform_page.context["release_readiness"]["checks"]

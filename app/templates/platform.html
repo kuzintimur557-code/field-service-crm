@@ -254,6 +254,37 @@ h1{font-size:30px}
 
 <div class="card saas-card">
     <div>
+        <h2 class="release-title">Счета и подписки</h2>
+        <div class="release-meta">
+            Контроль будущих начислений платформы, оплат и просроченных счетов.
+        </div>
+        <div class="saas-grid">
+            <a class="saas-item" href="/platform/companies">
+                <div class="saas-label">Счетов</div>
+                <div class="saas-value">{{ platform_billing_summary["count"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/companies">
+                <div class="saas-label">Компаний со счетами</div>
+                <div class="saas-value">{{ platform_billing_summary["companies_with_invoices"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/companies">
+                <div class="saas-label">Начислено</div>
+                <div class="saas-value">{{ platform_billing_summary["total_amount_label"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/companies">
+                <div class="saas-label">К оплате</div>
+                <div class="saas-value">{{ platform_billing_summary["unpaid_amount_label"] }}</div>
+            </a>
+        </div>
+    </div>
+    <div class="saas-actions">
+        <a href="/platform/companies">Компании</a>
+        <a class="secondary" href="/platform/companies?limit=danger">Риски тарифов</a>
+    </div>
+</div>
+
+<div class="card saas-card">
+    <div>
         <h2 class="release-title">Модульность SaaS</h2>
         <div class="release-meta">
             Контроль отраслевых пресетов и включённых модулей по компаниям.

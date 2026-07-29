@@ -1526,6 +1526,33 @@ def fetch_billing_invoice(c, company_id, invoice_id):
     return build_billing_invoice_rows([row])[0]
 
 
+def get_platform_billing_invoice_summary():
+    conn = connect()
+    c = conn.cursor()
+    rows = c.execute("""
+    SELECT *
+    FROM billing_invoices
+    ORDER BY id DESC
+    """).fetchall()
+    companies_with_invoices = c.execute("""
+    SELECT COUNT(DISTINCT company_id)
+    FROM billing_invoices
+    """).fetchone()[0]
+    conn.close()
+
+    invoices = build_billing_invoice_rows(rows)
+    summary = build_billing_invoice_summary(invoices)
+    summary["companies_with_invoices"] = int(companies_with_invoices or 0)
+    summary["issued_count"] = sum(
+        1 for invoice in invoices if invoice.get("status_code") == "issued"
+    )
+    summary["paid_count"] = sum(
+        1 for invoice in invoices if invoice.get("status_code") == "paid"
+    )
+
+    return summary
+
+
 def get_user_limit_status(active_users_count, user_limit):
     active_users_count = int(active_users_count or 0)
 
@@ -11835,6 +11862,7 @@ async def platform_dashboard(request: Request):
         for company in platform_company_usage["companies"]
         if company["user_limit_tone"] in {"warning", "danger"}
     ][:5]
+    platform_billing_summary = get_platform_billing_invoice_summary()
     platform_module_usage = get_platform_module_usage()
     platform_preset_usage = get_platform_preset_usage()
 
@@ -11861,6 +11889,7 @@ async def platform_dashboard(request: Request):
             "release_dashboard": release_dashboard,
             "company_usage_summary": platform_company_usage["summary"],
             "limit_alert_companies": limit_alert_companies,
+            "platform_billing_summary": platform_billing_summary,
             "module_usage_summary": platform_module_usage["summary"],
             "preset_usage_summary": platform_preset_usage["summary"],
         }
