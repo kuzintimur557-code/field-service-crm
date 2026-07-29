@@ -1561,6 +1561,118 @@ def build_platform_billing_risk_summary(invoices, today=None):
     }
 
 
+def get_platform_billing_reminder_payload(invoice, today=None):
+    today = today or datetime.now().date()
+    status = normalize_billing_invoice_status(invoice.get("status_code"))
+    due_date = parse_billing_due_date(invoice.get("due_date"))
+
+    if status not in {"issued", "overdue"} or not due_date:
+        return None
+
+    invoice_number = invoice.get("invoice_number") or f"#{invoice.get('id')}"
+    period = invoice.get("period") or "период не указан"
+    amount_label = invoice.get("amount_label") or format_rub_amount(
+        invoice.get("amount")
+    )
+    link = f"/billing/invoices/{invoice['id']}"
+
+    if status == "overdue" or due_date < today:
+        return {
+            "title": "Просрочен счёт платформы",
+            "message": (
+                f"Счёт {invoice_number} за {period} просрочен. "
+                f"Сумма: {amount_label}. Оплатить до: {invoice['due_date']}."
+            ),
+            "link": link,
+        }
+
+    if today <= due_date <= today + timedelta(days=7):
+        return {
+            "title": "Скоро оплата счёта платформы",
+            "message": (
+                f"Счёт {invoice_number} за {period} скоро к оплате. "
+                f"Сумма: {amount_label}. Оплатить до: {invoice['due_date']}."
+            ),
+            "link": link,
+        }
+
+    return None
+
+
+def create_platform_billing_reminders(company_id="all", today=None):
+    today = today or datetime.now().date()
+    selected_company_id = normalize_platform_billing_company_id(company_id)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    conn = connect()
+    c = conn.cursor()
+    invoices = fetch_platform_billing_invoices(
+        c,
+        status_filter="all",
+        company_id=selected_company_id,
+    )
+    created_count = 0
+    skipped_count = 0
+    checked_count = 0
+
+    for invoice in invoices:
+        owner_username = str(invoice.get("owner_username") or "").strip()
+        payload = get_platform_billing_reminder_payload(invoice, today=today)
+
+        if not owner_username or not payload:
+            continue
+
+        checked_count += 1
+        existing_notification = c.execute("""
+        SELECT id
+        FROM notifications
+        WHERE company_id=?
+          AND username=?
+          AND title=?
+          AND link=?
+          AND is_read=0
+        """, (
+            invoice["company_id"],
+            owner_username,
+            payload["title"],
+            payload["link"],
+        )).fetchone()
+
+        if existing_notification:
+            skipped_count += 1
+            continue
+
+        c.execute("""
+        INSERT INTO notifications (
+            company_id,
+            username,
+            title,
+            message,
+            link,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            invoice["company_id"],
+            owner_username,
+            payload["title"],
+            payload["message"],
+            payload["link"],
+            now,
+        ))
+        created_count += 1
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "created": created_count,
+        "skipped": skipped_count,
+        "checked": checked_count,
+        "company_id": selected_company_id,
+    }
+
+
 def build_billing_invoices_export_url(status_filter):
     if status_filter == "all":
         return "/billing/invoices/export"
@@ -12334,6 +12446,39 @@ async def generate_platform_billing_invoice(request: Request):
 
     return RedirectResponse(
         f"/platform/billing?{flag}=1",
+        status_code=302,
+    )
+
+
+@app.post("/platform/billing/reminders/send")
+async def send_platform_billing_reminders(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    selected_company_id = normalize_platform_billing_company_id(
+        form.get("company_id") or "all"
+    )
+    status_filter = normalize_billing_invoice_filter(
+        form.get("status") or "all"
+    )
+    result = create_platform_billing_reminders(selected_company_id)
+    redirect_url = build_platform_billing_url(status_filter, selected_company_id)
+    separator = "&" if "?" in redirect_url else "?"
+
+    return RedirectResponse(
+        (
+            f"{redirect_url}{separator}billing_reminders=1"
+            f"&created={result['created']}"
+        ),
         status_code=302,
     )
 

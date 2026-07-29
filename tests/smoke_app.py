@@ -6057,6 +6057,28 @@ async def assert_billing_page():
     assert billing_risk["due_soon_count"] == 1
     assert billing_risk["draft_count"] == 1
     assert billing_risk["issued_count"] == 1
+    overdue_payload = crm.get_platform_billing_reminder_payload(
+        {
+            "id": 7,
+            "invoice_number": "BILL-SMOKE",
+            "period": "2026-07",
+            "amount": 100,
+            "amount_label": "100 ₽",
+            "status_code": "issued",
+            "due_date": "2026-07-28",
+        },
+        today=datetime(2026, 7, 29).date(),
+    )
+    assert overdue_payload["title"] == "Просрочен счёт платформы"
+    assert overdue_payload["link"] == "/billing/invoices/7"
+    assert crm.get_platform_billing_reminder_payload(
+        {
+            "id": 8,
+            "status_code": "draft",
+            "due_date": "2026-07-28",
+        },
+        today=datetime(2026, 7, 29).date(),
+    ) is None
     assert crm.get_billing_invoice_status_meta("paid")["label"] == "Оплачен"
     assert crm.format_rub_amount(1200) == "1200 ₽"
     assert crm.format_rub_amount(1200.5) == "1200.50 ₽"
@@ -11309,10 +11331,115 @@ async def assert_platform_modules_page():
     assert "Просрочено по сроку" in platform_billing_html
     assert "Сформировать счёт" in platform_billing_html
     assert "/platform/billing/generate" in platform_billing_html
+    assert "/platform/billing/reminders/send" in platform_billing_html
+    assert "Отправить напоминания владельцам" in platform_billing_html
     assert "Фильтр" in platform_billing_html
     assert "Все компании" in platform_billing_html
     assert "/platform/billing/export" in platform_billing_html
     assert 'class="platform-mobile-nav"' in platform_billing_html
+
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    conn = connect()
+    c = conn.cursor()
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-PLATFORM-REMINDER",),
+    )
+    c.execute("""
+    INSERT INTO billing_invoices (
+        company_id, invoice_number, period, plan, amount, currency,
+        status, due_date, paid_at, notes, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "SMOKE-PLATFORM-REMINDER",
+        "2026-07",
+        "team",
+        2990,
+        "RUB",
+        "issued",
+        yesterday,
+        "",
+        "smoke reminder",
+        "2026-07-01 10:00",
+    ))
+    reminder_invoice_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    anonymous_billing_reminders = await crm.send_platform_billing_reminders(
+        make_public_asgi_request("/platform/billing/reminders/send"),
+    )
+    assert anonymous_billing_reminders.status_code == 302
+    assert anonymous_billing_reminders.headers["location"] == "/login"
+
+    boss_billing_reminders = await crm.send_platform_billing_reminders(
+        make_form_request(
+            "owner2",
+            "/platform/billing/reminders/send",
+            {"company_id": "2", "status": "issued"},
+        ),
+    )
+    assert boss_billing_reminders.status_code == 302
+    assert boss_billing_reminders.headers["location"] == "/"
+
+    platform_billing_reminders = await crm.send_platform_billing_reminders(
+        make_form_request(
+            "super",
+            "/platform/billing/reminders/send",
+            {"company_id": "2", "status": "issued"},
+        ),
+    )
+    assert platform_billing_reminders.status_code == 302
+    assert platform_billing_reminders.headers["location"] == (
+        "/platform/billing?status=issued&company_id=2"
+        "&billing_reminders=1&created=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    billing_reminder_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
+      AND title=?
+      AND link=?
+      AND is_read=0
+    """, (
+        2,
+        "owner2",
+        "Просрочен счёт платформы",
+        f"/billing/invoices/{reminder_invoice_id}",
+    )).fetchone()
+    assert billing_reminder_notification is not None
+    assert "SMOKE-PLATFORM-REMINDER" in billing_reminder_notification["message"]
+    conn.close()
+
+    duplicate_billing_reminders = await crm.send_platform_billing_reminders(
+        make_form_request(
+            "super",
+            "/platform/billing/reminders/send",
+            {"company_id": "2", "status": "issued"},
+        ),
+    )
+    assert duplicate_billing_reminders.status_code == 302
+    assert duplicate_billing_reminders.headers["location"] == (
+        "/platform/billing?status=issued&company_id=2"
+        "&billing_reminders=1&created=0"
+    )
+
+    reminders_notice_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing",
+            "billing_reminders=1&created=1",
+        ),
+    )
+    assert "Создано уведомлений по счетам: 1" in (
+        reminders_notice_page.body.decode("utf-8")
+    )
 
     anonymous_platform_generate = await crm.generate_platform_billing_invoice(
         make_public_asgi_request("/platform/billing/generate"),
@@ -11805,6 +11932,14 @@ async def assert_platform_modules_page():
     c.execute(
         "DELETE FROM billing_invoices WHERE invoice_number=?",
         ("BILL-2-202610",),
+    )
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("SMOKE-PLATFORM-REMINDER",),
+    )
+    c.execute(
+        "DELETE FROM notifications WHERE link=?",
+        (f"/billing/invoices/{reminder_invoice_id}",),
     )
     conn.commit()
     conn.close()
