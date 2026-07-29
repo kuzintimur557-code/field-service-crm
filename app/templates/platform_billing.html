@@ -32,7 +32,7 @@ h2{margin:0 0 16px;font-size:22px}
 .field select,.field input{min-height:42px;padding:10px;border:1px solid #d1d5db;border-radius:12px;background:white;color:#111827;font-size:14px;font-weight:800}
 .primary-button{min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .table{display:grid;gap:10px}
-.row{display:grid;grid-template-columns:1.2fr 1fr .9fr .9fr .9fr;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.row{display:grid;grid-template-columns:1.2fr 1fr .75fr .75fr .75fr .9fr;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
 .row.head{background:white;color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
 .value{font-weight:900;color:#111827}
 .value a{color:#2563eb;text-decoration:none}
@@ -42,12 +42,17 @@ h2{margin:0 0 16px;font-size:22px}
 .status.warning{background:#fef3c7;color:#92400e}
 .status.danger{background:#fee2e2;color:#991b1b}
 .status.muted{background:#f3f4f6;color:#6b7280}
+.status-form{display:grid;grid-template-columns:1fr auto;gap:8px}
+.status-form select{min-height:36px;min-width:0;padding:8px;border:1px solid #d1d5db;border-radius:10px;background:white;color:#111827;font-size:13px;font-weight:800}
+.status-form button{min-height:36px;padding:8px 10px;border:0;border-radius:10px;background:#111827;color:white;font-size:12px;font-weight:900;cursor:pointer}
 @media(max-width:860px){
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
     .summary{grid-template-columns:1fr}
     .generate-form{grid-template-columns:1fr}
     .primary-button{width:100%}
+    .status-form{grid-template-columns:1fr}
+    .status-form button{width:100%}
     .row,.row.head{grid-template-columns:1fr}
     .row.head{display:none}
     h1{font-size:28px}
@@ -76,12 +81,24 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="notice ok">Счёт за этот период уже существует</div>
 {% endif %}
 
+{% if request.query_params.get("invoice_updated") == "1" %}
+<div class="notice ok">Статус счёта обновлён</div>
+{% endif %}
+
 {% if request.query_params.get("error") == "company_required" %}
 <div class="notice err">Выберите компанию для формирования счёта</div>
 {% endif %}
 
 {% if request.query_params.get("error") == "company_not_found" %}
 <div class="notice err">Компания не найдена</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "invoice_not_found" %}
+<div class="notice err">Счёт не найден</div>
+{% endif %}
+
+{% if request.query_params.get("error") == "status_invalid" %}
+<div class="notice err">Некорректный статус счёта</div>
 {% endif %}
 
 <div class="summary">
@@ -149,6 +166,7 @@ h2{margin:0 0 16px;font-size:22px}
             <div>Период</div>
             <div>Сумма</div>
             <div>Статус</div>
+            <div>Действие</div>
         </div>
         {% for invoice in invoices %}
         <div class="row">
@@ -167,6 +185,16 @@ h2{margin:0 0 16px;font-size:22px}
             <div class="value">{{ invoice["period"] or "не указан" }}</div>
             <div class="value">{{ invoice["amount_label"] }}</div>
             <div><span class="status {{ invoice['status_tone'] }}">{{ invoice["status_label"] }}</span></div>
+            <form class="status-form" method="post" action="/platform/billing/invoices/{{ invoice['id'] }}/status">
+                <select name="status" aria-label="Статус счёта">
+                    {% for option in status_options %}
+                    {% if option["key"] != "all" %}
+                    <option value="{{ option['key'] }}" {% if invoice["status_code"] == option["key"] %}selected{% endif %}>{{ option["label"] }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <button type="submit">Сохранить</button>
+            </form>
         </div>
         {% endfor %}
     </div>

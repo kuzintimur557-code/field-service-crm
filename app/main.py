@@ -12211,6 +12211,63 @@ async def generate_platform_billing_invoice(request: Request):
     )
 
 
+@app.post("/platform/billing/invoices/{invoice_id}/status")
+async def update_platform_billing_invoice_status(
+    request: Request,
+    invoice_id: int,
+):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    status = str(form.get("status") or "").strip().lower()
+
+    if status not in BILLING_INVOICE_STATUSES:
+        return RedirectResponse(
+            "/platform/billing?error=status_invalid",
+            status_code=302,
+        )
+
+    paid_at = datetime.now().strftime("%Y-%m-%d %H:%M") if status == "paid" else ""
+
+    conn = connect()
+    c = conn.cursor()
+    invoice = c.execute("""
+    SELECT id
+    FROM billing_invoices
+    WHERE id=?
+    """, (invoice_id,)).fetchone()
+
+    if not invoice:
+        conn.close()
+        return RedirectResponse(
+            "/platform/billing?error=invoice_not_found",
+            status_code=302,
+        )
+
+    c.execute("""
+    UPDATE billing_invoices
+    SET status=?,
+        paid_at=?
+    WHERE id=?
+    """, (status, paid_at, invoice_id))
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(
+        "/platform/billing?invoice_updated=1",
+        status_code=302,
+    )
+
+
 @app.get("/platform/billing/export")
 async def platform_billing_export(request: Request, status: str = "all"):
 

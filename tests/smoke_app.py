@@ -11353,6 +11353,7 @@ async def assert_platform_modules_page():
     assert platform_generated_invoice["period"] == "2026-10"
     assert platform_generated_invoice["status"] == "draft"
     assert "super" in platform_generated_invoice["notes"]
+    platform_generated_invoice_id = platform_generated_invoice["id"]
     conn.close()
 
     platform_created_page = await crm.platform_billing_page(
@@ -11365,6 +11366,112 @@ async def assert_platform_modules_page():
     platform_created_html = platform_created_page.body.decode("utf-8")
     assert "Счёт платформы сформирован" in platform_created_html
     assert "BILL-2-202610" in platform_created_html
+    assert (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}/status"
+        in platform_created_html
+    )
+
+    anonymous_status_update = await crm.update_platform_billing_invoice_status(
+        make_public_asgi_request(
+            f"/platform/billing/invoices/{platform_generated_invoice_id}/status",
+        ),
+        platform_generated_invoice_id,
+    )
+    assert anonymous_status_update.status_code == 302
+    assert anonymous_status_update.headers["location"] == "/login"
+
+    boss_status_update = await crm.update_platform_billing_invoice_status(
+        make_form_request(
+            "owner2",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}/status",
+            {"status": "paid"},
+        ),
+        platform_generated_invoice_id,
+    )
+    assert boss_status_update.status_code == 302
+    assert boss_status_update.headers["location"] == "/"
+
+    invalid_status_update = await crm.update_platform_billing_invoice_status(
+        make_form_request(
+            "super",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}/status",
+            {"status": "bad"},
+        ),
+        platform_generated_invoice_id,
+    )
+    assert invalid_status_update.status_code == 302
+    assert invalid_status_update.headers["location"] == (
+        "/platform/billing?error=status_invalid"
+    )
+
+    missing_status_update = await crm.update_platform_billing_invoice_status(
+        make_form_request(
+            "super",
+            "/platform/billing/invoices/999999/status",
+            {"status": "paid"},
+        ),
+        999999,
+    )
+    assert missing_status_update.status_code == 302
+    assert missing_status_update.headers["location"] == (
+        "/platform/billing?error=invoice_not_found"
+    )
+
+    paid_status_update = await crm.update_platform_billing_invoice_status(
+        make_form_request(
+            "super",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}/status",
+            {"status": "paid"},
+        ),
+        platform_generated_invoice_id,
+    )
+    assert paid_status_update.status_code == 302
+    assert paid_status_update.headers["location"] == (
+        "/platform/billing?invoice_updated=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    paid_invoice = c.execute("""
+    SELECT status, paid_at
+    FROM billing_invoices
+    WHERE id=?
+    """, (platform_generated_invoice_id,)).fetchone()
+    assert paid_invoice["status"] == "paid"
+    assert paid_invoice["paid_at"]
+    conn.close()
+
+    platform_updated_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing",
+            "invoice_updated=1",
+        ),
+    )
+    platform_updated_html = platform_updated_page.body.decode("utf-8")
+    assert "Статус счёта обновлён" in platform_updated_html
+    assert "Оплачен" in platform_updated_html
+
+    platform_paid_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing?status=paid",
+        ),
+        status="paid",
+    )
+    platform_paid_html = platform_paid_page.body.decode("utf-8")
+    assert "BILL-2-202610" in platform_paid_html
+
+    platform_status_error_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing",
+            "error=status_invalid",
+        ),
+    )
+    assert "Некорректный статус счёта" in (
+        platform_status_error_page.body.decode("utf-8")
+    )
 
     duplicate_platform_generate = await crm.generate_platform_billing_invoice(
         make_form_request(
