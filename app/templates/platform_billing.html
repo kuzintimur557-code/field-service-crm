@@ -21,6 +21,8 @@ h2{margin:0 0 16px;font-size:22px}
 .summary-card{background:white;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 8px 22px rgba(0,0,0,.06)}
 .summary-label{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
 .summary-value{margin-top:8px;font-size:24px;font-weight:900}
+.risk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.risk-item{padding:2px 0}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 .filter-link{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 12px;border-radius:999px;background:white;border:1px solid #d1d5db;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
 .filter-link.active{background:#111827;border-color:#111827;color:white}
@@ -49,7 +51,7 @@ h2{margin:0 0 16px;font-size:22px}
 @media(max-width:860px){
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
-    .summary{grid-template-columns:1fr}
+    .summary,.risk-grid{grid-template-columns:1fr}
     .company-filter{grid-template-columns:1fr}
     .generate-form{grid-template-columns:1fr}
     .primary-button{width:100%}
@@ -119,6 +121,30 @@ h2{margin:0 0 16px;font-size:22px}
     <div class="summary-card">
         <div class="summary-label">К оплате</div>
         <div class="summary-value">{{ summary["unpaid_amount_label"] }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Контроль оплат</h2>
+    <div class="risk-grid">
+        <div class="risk-item">
+            <div class="summary-label">Просрочено по сроку</div>
+            <div class="summary-value">{{ risk_summary["overdue_by_date_count"] }}</div>
+            <div class="small">{{ risk_summary["overdue_by_date_amount_label"] }}</div>
+        </div>
+        <div class="risk-item">
+            <div class="summary-label">Оплата в 7 дней</div>
+            <div class="summary-value">{{ risk_summary["due_soon_count"] }}</div>
+            <div class="small">{{ risk_summary["due_soon_amount_label"] }}</div>
+        </div>
+        <div class="risk-item">
+            <div class="summary-label">Черновики</div>
+            <div class="summary-value">{{ risk_summary["draft_count"] }}</div>
+        </div>
+        <div class="risk-item">
+            <div class="summary-label">Выставлено</div>
+            <div class="summary-value">{{ risk_summary["issued_count"] }}</div>
+        </div>
     </div>
 </div>
 

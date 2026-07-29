@@ -6045,6 +6045,18 @@ async def assert_billing_page():
     assert crm.build_platform_billing_url("paid", "2", export=True) == (
         "/platform/billing/export?status=paid&company_id=2"
     )
+    billing_risk = crm.build_platform_billing_risk_summary(
+        [
+            {"status_code": "issued", "due_date": "2026-07-28", "amount": 100},
+            {"status_code": "draft", "due_date": "2026-08-01", "amount": 50},
+            {"status_code": "paid", "due_date": "2026-07-20", "amount": 500},
+        ],
+        today=datetime(2026, 7, 29).date(),
+    )
+    assert billing_risk["overdue_by_date_count"] == 1
+    assert billing_risk["due_soon_count"] == 1
+    assert billing_risk["draft_count"] == 1
+    assert billing_risk["issued_count"] == 1
     assert crm.get_billing_invoice_status_meta("paid")["label"] == "Оплачен"
     assert crm.format_rub_amount(1200) == "1200 ₽"
     assert crm.format_rub_amount(1200.5) == "1200.50 ₽"
@@ -11287,8 +11299,11 @@ async def assert_platform_modules_page():
     assert platform_billing_page.context["status_filter"] == "all"
     assert platform_billing_page.context["selected_company_id"] == "all"
     assert platform_billing_page.context["summary"]["count"] >= 0
+    assert "risk_summary" in platform_billing_page.context
     assert platform_billing_page.context["company_options"]
     assert "Счета платформы" in platform_billing_html
+    assert "Контроль оплат" in platform_billing_html
+    assert "Просрочено по сроку" in platform_billing_html
     assert "Сформировать счёт" in platform_billing_html
     assert "/platform/billing/generate" in platform_billing_html
     assert "Фильтр" in platform_billing_html

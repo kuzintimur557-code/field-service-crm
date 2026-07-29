@@ -1516,6 +1516,51 @@ def build_billing_invoice_summary(invoices):
     }
 
 
+def parse_billing_due_date(value):
+    try:
+        return datetime.strptime(str(value or ""), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def build_platform_billing_risk_summary(invoices, today=None):
+    today = today or datetime.now().date()
+    due_soon_end = today + timedelta(days=7)
+    unpaid_statuses = {"draft", "issued", "overdue"}
+    overdue_by_date = []
+    due_soon = []
+
+    for invoice in invoices:
+        status = normalize_billing_invoice_status(invoice.get("status_code"))
+        due_date = parse_billing_due_date(invoice.get("due_date"))
+
+        if not due_date or status not in unpaid_statuses:
+            continue
+
+        if due_date < today:
+            overdue_by_date.append(invoice)
+        elif today <= due_date <= due_soon_end:
+            due_soon.append(invoice)
+
+    overdue_amount = sum(float(invoice.get("amount") or 0) for invoice in overdue_by_date)
+    due_soon_amount = sum(float(invoice.get("amount") or 0) for invoice in due_soon)
+
+    return {
+        "overdue_by_date_count": len(overdue_by_date),
+        "overdue_by_date_amount": overdue_amount,
+        "overdue_by_date_amount_label": format_rub_amount(overdue_amount),
+        "due_soon_count": len(due_soon),
+        "due_soon_amount": due_soon_amount,
+        "due_soon_amount_label": format_rub_amount(due_soon_amount),
+        "draft_count": sum(
+            1 for invoice in invoices if invoice.get("status_code") == "draft"
+        ),
+        "issued_count": sum(
+            1 for invoice in invoices if invoice.get("status_code") == "issued"
+        ),
+    }
+
+
 def build_billing_invoices_export_url(status_filter):
     if status_filter == "all":
         return "/billing/invoices/export"
@@ -12212,6 +12257,7 @@ async def platform_billing_page(
     company_options = get_platform_billing_company_options(c)
     conn.close()
     summary = build_billing_invoice_summary(invoices)
+    risk_summary = build_platform_billing_risk_summary(invoices)
     status_filter_options = [
         {
             **option,
@@ -12232,6 +12278,7 @@ async def platform_billing_page(
             "role": role,
             "invoices": invoices,
             "summary": summary,
+            "risk_summary": risk_summary,
             "status_filter": status_filter,
             "status_options": get_billing_invoice_status_options(),
             "status_filter_options": status_filter_options,
