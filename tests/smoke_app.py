@@ -6046,12 +6046,16 @@ async def assert_billing_page():
     assert crm.get_plan_monthly_price("team") == 2990
     assert crm.get_plan_price_label("team") == "2990 ₽ / месяц"
     assert crm.get_plan_price_label("enterprise_1c") == "по договорённости"
+    assert crm.normalize_billing_period("bad") == datetime.now().strftime("%Y-%m")
+    assert crm.normalize_billing_period("2026-08") == "2026-08"
+    assert crm.get_billing_period_due_date("2026-02") == "2026-02-28"
+    assert crm.build_billing_invoice_number(2, "2026-08") == "BILL-2-202608"
 
     conn = connect()
     c = conn.cursor()
     c.execute(
-        "DELETE FROM billing_invoices WHERE invoice_number=?",
-        ("SMOKE-BILL-1",),
+        "DELETE FROM billing_invoices WHERE invoice_number IN (?, ?)",
+        ("SMOKE-BILL-1", "BILL-2-202608"),
     )
     c.execute("""
     INSERT INTO billing_invoices (
@@ -6193,8 +6197,65 @@ async def assert_billing_page():
     assert "1200 ₽" in invoices_html
     assert "/billing/invoices/export" in invoices_html
     assert f"/billing/invoices/{invoice_id}" in invoices_html
+    assert "Сформировать счёт" in invoices_html
     assert "Черновик" in invoices_html
     assert "Оплачен" in invoices_html
+
+    generated_invoice_response = await crm.generate_billing_invoice(
+        make_form_request(
+            "owner2",
+            "/billing/invoices/generate",
+            {"period": "2026-08"},
+        )
+    )
+    assert generated_invoice_response.status_code == 302
+    assert "created=1" in generated_invoice_response.headers["location"]
+
+    conn = connect()
+    c = conn.cursor()
+    generated_invoice = c.execute("""
+    SELECT *
+    FROM billing_invoices
+    WHERE company_id=?
+      AND invoice_number=?
+    """, (2, "BILL-2-202608")).fetchone()
+    assert generated_invoice is not None
+    current_settings = c.execute("""
+    SELECT plan
+    FROM company_settings
+    WHERE company_id=?
+    """, (2,)).fetchone()
+    current_plan = crm.normalize_plan(current_settings["plan"])
+    assert generated_invoice["period"] == "2026-08"
+    assert generated_invoice["plan"] == current_plan
+    assert generated_invoice["amount"] == crm.get_plan_monthly_price(current_plan)
+    assert generated_invoice["status"] == "draft"
+    assert generated_invoice["due_date"] == "2026-08-31"
+    assert "owner2" in generated_invoice["notes"]
+    generated_invoice_id = generated_invoice["id"]
+    conn.close()
+
+    duplicate_invoice_response = await crm.generate_billing_invoice(
+        make_form_request(
+            "owner2",
+            "/billing/invoices/generate",
+            {"period": "2026-08"},
+        )
+    )
+    conn = connect()
+    c = conn.cursor()
+    duplicate_count = c.execute("""
+    SELECT COUNT(*)
+    FROM billing_invoices
+    WHERE company_id=?
+      AND period=?
+    """, (2, "2026-08")).fetchone()[0]
+    conn.close()
+    assert duplicate_invoice_response.status_code == 302
+    assert duplicate_invoice_response.headers["location"] == (
+        f"/billing/invoices/{generated_invoice_id}?exists=1"
+    )
+    assert duplicate_count == 1
 
     invoice_detail = await crm.billing_invoice_detail_page(
         make_asgi_request("owner2", f"/billing/invoices/{invoice_id}"),
@@ -6255,8 +6316,8 @@ async def assert_billing_page():
     conn = connect()
     c = conn.cursor()
     c.execute(
-        "DELETE FROM billing_invoices WHERE invoice_number IN (?, ?)",
-        ("SMOKE-BILL-1", "SMOKE-BILL-OTHER"),
+        "DELETE FROM billing_invoices WHERE invoice_number IN (?, ?, ?)",
+        ("SMOKE-BILL-1", "SMOKE-BILL-OTHER", "BILL-2-202608"),
     )
     conn.commit()
     conn.close()

@@ -1523,6 +1523,28 @@ def build_billing_invoices_export_url(status_filter):
     return "/billing/invoices/export?" + urlencode({"status": status_filter})
 
 
+def normalize_billing_period(period=""):
+    value = str(period or "").strip()
+
+    try:
+        parsed = datetime.strptime(value + "-01", "%Y-%m-%d")
+        return parsed.strftime("%Y-%m")
+    except ValueError:
+        return datetime.now().strftime("%Y-%m")
+
+
+def get_billing_period_due_date(period):
+    normalized_period = normalize_billing_period(period)
+    year, month = [int(part) for part in normalized_period.split("-")]
+    last_day = calendar.monthrange(year, month)[1]
+    return f"{normalized_period}-{last_day:02d}"
+
+
+def build_billing_invoice_number(company_id, period):
+    normalized_period = normalize_billing_period(period).replace("-", "")
+    return f"BILL-{int(company_id)}-{normalized_period}"
+
+
 def fetch_billing_invoices(c, company_id, limit=None, status_filter="all"):
     status_filter = normalize_billing_invoice_filter(status_filter)
     query = """
@@ -1544,6 +1566,81 @@ def fetch_billing_invoices(c, company_id, limit=None, status_filter="all"):
 
     rows = c.execute(query, params).fetchall()
     return build_billing_invoice_rows(rows)
+
+
+def generate_company_billing_invoice(company_id, period="", actor_username=""):
+    company_id = int(company_id or 0)
+    normalized_period = normalize_billing_period(period)
+    invoice_number = build_billing_invoice_number(company_id, normalized_period)
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    conn = connect()
+    c = conn.cursor()
+    existing = c.execute("""
+    SELECT *
+    FROM billing_invoices
+    WHERE company_id=?
+      AND period=?
+    ORDER BY id DESC
+    LIMIT 1
+    """, (company_id, normalized_period)).fetchone()
+
+    if existing:
+        invoice = build_billing_invoice_rows([existing])[0]
+        conn.close()
+        return {
+            "created": False,
+            "invoice": invoice,
+        }
+
+    settings = c.execute("""
+    SELECT plan
+    FROM company_settings
+    WHERE company_id=?
+    """, (company_id,)).fetchone()
+    plan = normalize_plan(settings["plan"] if settings else "basic")
+    amount = get_plan_monthly_price(plan)
+    due_date = get_billing_period_due_date(normalized_period)
+    notes = f"Сформировано автоматически: {actor_username or 'система'}"
+
+    c.execute("""
+    INSERT INTO billing_invoices (
+        company_id,
+        invoice_number,
+        period,
+        plan,
+        amount,
+        currency,
+        status,
+        due_date,
+        paid_at,
+        notes,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, 'RUB', 'draft', ?, '', ?, ?)
+    """, (
+        company_id,
+        invoice_number,
+        normalized_period,
+        plan,
+        amount,
+        due_date,
+        notes,
+        created_at,
+    ))
+    invoice_id = c.lastrowid
+    conn.commit()
+    invoice = c.execute("""
+    SELECT *
+    FROM billing_invoices
+    WHERE id=?
+    """, (invoice_id,)).fetchone()
+    conn.close()
+
+    return {
+        "created": True,
+        "invoice": build_billing_invoice_rows([invoice])[0],
+    }
 
 
 def fetch_billing_invoice(c, company_id, invoice_id):
@@ -30286,6 +30383,36 @@ async def billing_invoices_page(request: Request, status: str = "all"):
             "status_options": get_billing_invoice_status_options(),
             "export_url": build_billing_invoices_export_url(status_filter),
         },
+    )
+
+
+@app.post("/billing/invoices/generate")
+async def generate_billing_invoice(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
+    form = await request.form()
+    period = normalize_billing_period(form.get("period") or "")
+    result = generate_company_billing_invoice(company_id, period, username)
+    invoice = result["invoice"]
+    flag = "created" if result["created"] else "exists"
+
+    return RedirectResponse(
+        f"/billing/invoices/{invoice['id']}?{flag}=1",
+        status_code=302,
     )
 
 
