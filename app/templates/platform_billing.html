@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Счета платформы</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:1180px;width:100%;margin:auto;padding:28px}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 10px;font-size:34px;line-height:1.12}
+h2{margin:0 0 16px;font-size:22px}
+.small{color:#6b7280;font-weight:800;line-height:1.45}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.summary-card{background:white;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 8px 22px rgba(0,0,0,.06)}
+.summary-label{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
+.summary-value{margin-top:8px;font-size:24px;font-weight:900}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.filter-link{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 12px;border-radius:999px;background:white;border:1px solid #d1d5db;color:#374151;text-decoration:none;font-size:13px;font-weight:900}
+.filter-link.active{background:#111827;border-color:#111827;color:white}
+.table{display:grid;gap:10px}
+.row{display:grid;grid-template-columns:1.2fr 1fr .9fr .9fr .9fr;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.row.head{background:white;color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
+.value{font-weight:900;color:#111827}
+.value a{color:#2563eb;text-decoration:none}
+.meta{color:#6b7280;font-size:13px;font-weight:800;line-height:1.4}
+.status{display:inline-flex;justify-content:center;min-height:30px;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
+.status.ok{background:#dcfce7;color:#166534}
+.status.warning{background:#fef3c7;color:#92400e}
+.status.danger{background:#fee2e2;color:#991b1b}
+.status.muted{background:#f3f4f6;color:#6b7280}
+@media(max-width:860px){
+    .container{padding:16px 14px 92px}
+    .card{padding:20px;border-radius:18px}
+    .summary{grid-template-columns:1fr}
+    .row,.row.head{grid-template-columns:1fr}
+    .row.head{display:none}
+    h1{font-size:28px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="actions">
+    <a href="/platform" class="back">← Назад к платформе</a>
+    <a href="{{ export_url }}" class="back">Скачать CSV</a>
+</div>
+
+<div class="card">
+    <h1>Счета платформы</h1>
+    <div class="small">Единый список начислений по компаниям и будущим подпискам.</div>
+</div>
+
+<div class="summary">
+    <div class="summary-card">
+        <div class="summary-label">Счетов</div>
+        <div class="summary-value">{{ summary["count"] }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Начислено</div>
+        <div class="summary-value">{{ summary["total_amount_label"] }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Оплачено</div>
+        <div class="summary-value">{{ summary["paid_amount_label"] }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">К оплате</div>
+        <div class="summary-value">{{ summary["unpaid_amount_label"] }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Фильтр</h2>
+    <div class="filters">
+        {% for option in status_options %}
+        <a
+            href="/platform/billing{% if option['key'] != 'all' %}?status={{ option['key'] }}{% endif %}"
+            class="filter-link {% if status_filter == option['key'] %}active{% endif %}"
+        >
+            {{ option["label"] }}
+        </a>
+        {% endfor %}
+    </div>
+
+    {% if invoices %}
+    <div class="table">
+        <div class="row head">
+            <div>Компания</div>
+            <div>Счёт</div>
+            <div>Период</div>
+            <div>Сумма</div>
+            <div>Статус</div>
+        </div>
+        {% for invoice in invoices %}
+        <div class="row">
+            <div>
+                <div class="value">
+                    <a href="/platform/companies/{{ invoice['company_id'] }}">
+                        {{ invoice["company_name"] or ("Компания #" ~ invoice["company_id"]) }}
+                    </a>
+                </div>
+                <div class="meta">{{ invoice["owner_username"] or "Владелец не указан" }}</div>
+            </div>
+            <div>
+                <div class="value">{{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</div>
+                <div class="meta">{{ invoice["created_at"] or "Дата не указана" }}</div>
+            </div>
+            <div class="value">{{ invoice["period"] or "не указан" }}</div>
+            <div class="value">{{ invoice["amount_label"] }}</div>
+            <div><span class="status {{ invoice['status_tone'] }}">{{ invoice["status_label"] }}</span></div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="small">По выбранному фильтру счетов нет.</div>
+    {% endif %}
+</div>
+
+</div>
+{% include 'platform_mobile_nav.html' %}
+</body>
+</html>

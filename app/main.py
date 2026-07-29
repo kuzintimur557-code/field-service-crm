@@ -1428,6 +1428,22 @@ def get_billing_invoice_status_meta(status):
     return BILLING_INVOICE_STATUSES[normalize_billing_invoice_status(status)]
 
 
+def get_billing_invoice_status_options():
+    return [
+        {
+            "key": "all",
+            "label": "Все",
+        },
+        *[
+            {
+                "key": status_key,
+                "label": status_meta["label"],
+            }
+            for status_key, status_meta in BILLING_INVOICE_STATUSES.items()
+        ],
+    ]
+
+
 def format_rub_amount(amount):
     value = round(float(amount or 0), 2)
 
@@ -1553,8 +1569,9 @@ def get_platform_billing_invoice_summary():
     return summary
 
 
-def fetch_platform_billing_invoices(c):
-    rows = c.execute("""
+def fetch_platform_billing_invoices(c, status_filter="all"):
+    status_filter = normalize_billing_invoice_filter(status_filter)
+    query = """
     SELECT
         billing_invoices.*,
         companies.name AS company_name,
@@ -1562,8 +1579,17 @@ def fetch_platform_billing_invoices(c):
     FROM billing_invoices
     LEFT JOIN companies
       ON companies.id=billing_invoices.company_id
-    ORDER BY billing_invoices.id DESC
-    """).fetchall()
+    WHERE 1=1
+    """
+    params = []
+
+    if status_filter != "all":
+        query += "\nAND billing_invoices.status=?"
+        params.append(status_filter)
+
+    query += "\nORDER BY billing_invoices.id DESC"
+
+    rows = c.execute(query, params).fetchall()
     invoices = []
 
     for row in rows:
@@ -11918,8 +11944,8 @@ async def platform_dashboard(request: Request):
     )
 
 
-@app.get("/platform/billing/export")
-async def platform_billing_export(request: Request):
+@app.get("/platform/billing", response_class=HTMLResponse)
+async def platform_billing_page(request: Request, status: str = "all"):
 
     username = get_user(request)
 
@@ -11931,9 +11957,53 @@ async def platform_billing_export(request: Request):
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
+    status_filter = normalize_billing_invoice_filter(status)
+
     conn = connect()
     c = conn.cursor()
-    invoices = fetch_platform_billing_invoices(c)
+    invoices = fetch_platform_billing_invoices(c, status_filter=status_filter)
+    conn.close()
+    summary = build_billing_invoice_summary(invoices)
+
+    return templates.TemplateResponse(
+        request,
+        "platform_billing.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "invoices": invoices,
+            "summary": summary,
+            "status_filter": status_filter,
+            "status_options": get_billing_invoice_status_options(),
+            "export_url": (
+                "/platform/billing/export"
+                if status_filter == "all"
+                else "/platform/billing/export?"
+                + urlencode({"status": status_filter})
+            ),
+        },
+    )
+
+
+@app.get("/platform/billing/export")
+async def platform_billing_export(request: Request, status: str = "all"):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    status_filter = normalize_billing_invoice_filter(status)
+
+    conn = connect()
+    c = conn.cursor()
+    invoices = fetch_platform_billing_invoices(c, status_filter=status_filter)
     conn.close()
 
     output = io.StringIO()
@@ -11969,11 +12039,16 @@ async def platform_billing_export(request: Request):
             invoice["created_at"] or "",
         ])
 
+    filename = "platform_billing.csv"
+
+    if status_filter != "all":
+        filename = f"platform_billing_{status_filter}.csv"
+
     return Response(
         content="\ufeff" + output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": "attachment; filename=platform_billing.csv"
+            "Content-Disposition": f"attachment; filename={filename}"
         },
     )
 
@@ -30173,20 +30248,6 @@ async def billing_invoices_page(request: Request, status: str = "all"):
     invoices = fetch_billing_invoices(c, company_id, status_filter=status_filter)
     conn.close()
     summary = build_billing_invoice_summary(invoices)
-    status_options = [
-        {
-            "key": "all",
-            "label": "Все",
-        },
-        *[
-            {
-                "key": status_key,
-                "label": status_meta["label"],
-            }
-            for status_key, status_meta in BILLING_INVOICE_STATUSES.items()
-        ],
-    ]
-
     return templates.TemplateResponse(
         request,
         "billing_invoices.html",
@@ -30197,7 +30258,7 @@ async def billing_invoices_page(request: Request, status: str = "all"):
             "invoices": invoices,
             "summary": summary,
             "status_filter": status_filter,
-            "status_options": status_options,
+            "status_options": get_billing_invoice_status_options(),
             "export_url": build_billing_invoices_export_url(status_filter),
         },
     )

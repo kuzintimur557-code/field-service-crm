@@ -11055,6 +11055,7 @@ async def assert_platform_modules_page():
     assert "/platform/modules" in platform_html
     assert "Тарифы и лимиты" in platform_html
     assert "Счета и подписки" in platform_html
+    assert "/platform/billing" in platform_html
     assert "/platform/billing/export" in platform_html
     assert "/platform/companies?limit=danger" in platform_html
     assert "/platform/companies?limit=warning" in platform_html
@@ -11066,6 +11067,40 @@ async def assert_platform_modules_page():
     assert "unpaid_amount_label" in platform_page.context[
         "platform_billing_summary"
     ]
+
+    anonymous_billing_page = await crm.platform_billing_page(
+        make_public_asgi_request("/platform/billing"),
+    )
+    assert anonymous_billing_page.status_code == 302
+    assert anonymous_billing_page.headers["location"] == "/login"
+
+    boss_billing_page = await crm.platform_billing_page(
+        make_asgi_request("owner2", "/platform/billing"),
+    )
+    assert boss_billing_page.status_code == 302
+    assert boss_billing_page.headers["location"] == "/"
+
+    platform_billing_page = await crm.platform_billing_page(
+        make_asgi_request("super", "/platform/billing"),
+    )
+    platform_billing_html = platform_billing_page.body.decode("utf-8")
+    assert platform_billing_page.status_code == 200
+    assert platform_billing_page.context["status_filter"] == "all"
+    assert platform_billing_page.context["summary"]["count"] >= 0
+    assert "Счета платформы" in platform_billing_html
+    assert "Фильтр" in platform_billing_html
+    assert "/platform/billing/export" in platform_billing_html
+    assert 'class="platform-mobile-nav"' in platform_billing_html
+
+    filtered_platform_billing_page = await crm.platform_billing_page(
+        make_asgi_request("super", "/platform/billing?status=issued"),
+        status="issued",
+    )
+    assert filtered_platform_billing_page.status_code == 200
+    assert filtered_platform_billing_page.context["status_filter"] == "issued"
+    assert filtered_platform_billing_page.context["export_url"] == (
+        "/platform/billing/export?status=issued"
+    )
 
     anonymous_billing_export = await crm.platform_billing_export(
         make_public_asgi_request("/platform/billing/export"),
@@ -11090,6 +11125,15 @@ async def assert_platform_modules_page():
     assert platform_billing_export_csv.startswith("\ufeff")
     assert "ID компании,Компания,Владелец,Номер,Период,Тариф" in (
         platform_billing_export_csv
+    )
+
+    platform_billing_export_issued = await crm.platform_billing_export(
+        make_asgi_request("super", "/platform/billing/export?status=issued"),
+        status="issued",
+    )
+    assert platform_billing_export_issued.status_code == 200
+    assert platform_billing_export_issued.headers["content-disposition"] == (
+        "attachment; filename=platform_billing_issued.csv"
     )
 
 
@@ -13661,6 +13705,7 @@ async def assert_platform_calendar_health():
         assert "Релизный штаб" in platform_html
         assert "Модульность SaaS" in platform_html
         assert "Счета и подписки" in platform_html
+        assert "/platform/billing" in platform_html
         assert "/platform/billing/export" in platform_html
         assert "Быстрые действия" in platform_html
         assert "🛠 Панель платформы" not in platform_html
