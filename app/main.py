@@ -1561,6 +1561,60 @@ def build_platform_billing_risk_summary(invoices, today=None):
     }
 
 
+def build_platform_billing_monthly_summary(invoices, today=None, limit=6):
+    today = today or datetime.now().date()
+    buckets = {}
+
+    for invoice in invoices:
+        period = str(invoice.get("period") or "Без периода").strip()
+        status = normalize_billing_invoice_status(invoice.get("status_code"))
+        amount = float(invoice.get("amount") or 0)
+        due_date = parse_billing_due_date(invoice.get("due_date"))
+        bucket = buckets.setdefault(
+            period,
+            {
+                "period": period,
+                "count": 0,
+                "total_amount": 0,
+                "paid_amount": 0,
+                "unpaid_amount": 0,
+                "overdue_count": 0,
+                "overdue_amount": 0,
+            },
+        )
+        bucket["count"] += 1
+        bucket["total_amount"] += amount
+
+        if status == "paid":
+            bucket["paid_amount"] += amount
+        elif status in {"draft", "issued", "overdue"}:
+            bucket["unpaid_amount"] += amount
+
+        if status == "overdue" or (
+            status in {"draft", "issued"} and due_date and due_date < today
+        ):
+            bucket["overdue_count"] += 1
+            bucket["overdue_amount"] += amount
+
+    rows = sorted(
+        buckets.values(),
+        key=lambda item: item["period"],
+        reverse=True,
+    )
+
+    for row in rows:
+        row["total_amount"] = round(row["total_amount"], 2)
+        row["paid_amount"] = round(row["paid_amount"], 2)
+        row["unpaid_amount"] = round(row["unpaid_amount"], 2)
+        row["overdue_amount"] = round(row["overdue_amount"], 2)
+        row["total_amount_label"] = format_rub_amount(row["total_amount"])
+        row["paid_amount_label"] = format_rub_amount(row["paid_amount"])
+        row["unpaid_amount_label"] = format_rub_amount(row["unpaid_amount"])
+        row["overdue_amount_label"] = format_rub_amount(row["overdue_amount"])
+
+    return rows[:limit] if limit else rows
+
+
 def sync_platform_billing_overdue_invoices(company_id="all", today=None):
     today = today or datetime.now().date()
     selected_company_id = normalize_platform_billing_company_id(company_id)
@@ -12452,6 +12506,7 @@ async def platform_billing_page(
     conn.close()
     summary = build_billing_invoice_summary(invoices)
     risk_summary = build_platform_billing_risk_summary(invoices)
+    monthly_summary = build_platform_billing_monthly_summary(invoices)
     status_filter_options = [
         {
             **option,
@@ -12473,6 +12528,7 @@ async def platform_billing_page(
             "invoices": invoices,
             "summary": summary,
             "risk_summary": risk_summary,
+            "monthly_summary": monthly_summary,
             "status_filter": status_filter,
             "status_options": get_billing_invoice_status_options(),
             "status_filter_options": status_filter_options,
@@ -12659,6 +12715,7 @@ async def api_platform_billing(
 
     summary = build_billing_invoice_summary(invoices)
     risk_summary = build_platform_billing_risk_summary(invoices)
+    monthly_summary = build_platform_billing_monthly_summary(invoices)
 
     return {
         "ok": True,
@@ -12668,6 +12725,7 @@ async def api_platform_billing(
         },
         "summary": summary,
         "risk_summary": risk_summary,
+        "monthly_summary": monthly_summary,
         "company_options": company_options,
         "export_url": build_platform_billing_url(
             status_filter,

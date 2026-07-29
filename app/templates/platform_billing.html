@@ -23,6 +23,10 @@ h2{margin:0 0 16px;font-size:22px}
 .summary-value{margin-top:8px;font-size:24px;font-weight:900}
 .risk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .risk-item{padding:2px 0}
+.monthly-table{display:grid;gap:8px}
+.monthly-row{display:grid;grid-template-columns:1fr repeat(5,.85fr);gap:10px;align-items:center;padding:11px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb}
+.monthly-row.head{background:white;color:#6b7280;font-size:11px;font-weight:900;text-transform:uppercase}
+.monthly-cell{font-size:13px;font-weight:900}
 .billing-action-forms{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .billing-action-form button{min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;font-weight:900;cursor:pointer}
 .billing-action-form .secondary-action{background:#e5e7eb;color:#111827}
@@ -59,6 +63,8 @@ h2{margin:0 0 16px;font-size:22px}
     .generate-form{grid-template-columns:1fr}
     .billing-action-forms{display:grid}
     .billing-action-form button{width:100%}
+    .monthly-row,.monthly-row.head{grid-template-columns:1fr}
+    .monthly-row.head{display:none}
     .primary-button{width:100%}
     .status-form{grid-template-columns:1fr}
     .status-form button{width:100%}
@@ -171,6 +177,34 @@ h2{margin:0 0 16px;font-size:22px}
             <button class="secondary-action" type="submit">Синхронизировать просрочки</button>
         </form>
     </div>
+</div>
+
+<div class="card">
+    <h2>Динамика по месяцам</h2>
+    {% if monthly_summary %}
+    <div class="monthly-table">
+        <div class="monthly-row head">
+            <div>Период</div>
+            <div>Счётов</div>
+            <div>Начислено</div>
+            <div>Оплачено</div>
+            <div>К оплате</div>
+            <div>Просрочено</div>
+        </div>
+        {% for month in monthly_summary %}
+        <div class="monthly-row">
+            <div class="monthly-cell">{{ month["period"] }}</div>
+            <div class="monthly-cell">{{ month["count"] }}</div>
+            <div class="monthly-cell">{{ month["total_amount_label"] }}</div>
+            <div class="monthly-cell">{{ month["paid_amount_label"] }}</div>
+            <div class="monthly-cell">{{ month["unpaid_amount_label"] }}</div>
+            <div class="monthly-cell">{{ month["overdue_count"] }} · {{ month["overdue_amount_label"] }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="small">Данных по месяцам пока нет.</div>
+    {% endif %}
 </div>
 
 <div class="card">

@@ -11332,6 +11332,7 @@ async def assert_platform_modules_page():
     assert platform_billing_api["filters"]["status"] == "all"
     assert platform_billing_api["filters"]["company_id"] == "all"
     assert "risk_summary" in platform_billing_api
+    assert "monthly_summary" in platform_billing_api
     assert platform_billing_api["company_options"]
     assert platform_billing_api["export_url"] == "/platform/billing/export"
 
@@ -11344,9 +11345,11 @@ async def assert_platform_modules_page():
     assert platform_billing_page.context["selected_company_id"] == "all"
     assert platform_billing_page.context["summary"]["count"] >= 0
     assert "risk_summary" in platform_billing_page.context
+    assert "monthly_summary" in platform_billing_page.context
     assert platform_billing_page.context["company_options"]
     assert "Счета платформы" in platform_billing_html
     assert "Контроль оплат" in platform_billing_html
+    assert "Динамика по месяцам" in platform_billing_html
     assert "Просрочено по сроку" in platform_billing_html
     assert "Сформировать счёт" in platform_billing_html
     assert "/platform/billing/generate" in platform_billing_html
@@ -11713,6 +11716,10 @@ async def assert_platform_modules_page():
     assert platform_billing_company_api["filters"]["company_id"] == "2"
     assert platform_billing_company_api["export_url"] == (
         "/platform/billing/export?status=draft&company_id=2"
+    )
+    assert any(
+        month["period"] == "2026-10"
+        for month in platform_billing_company_api["monthly_summary"]
     )
     assert any(
         invoice["invoice_number"] == "BILL-2-202610"
