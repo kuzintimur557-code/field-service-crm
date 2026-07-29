@@ -5771,6 +5771,16 @@ async def assert_settings_page():
         "enterprise_1c"
     )
     assert crm.get_recommended_user_limit_plan("enterprise_1c", 100) is None
+    assert crm.normalize_settings_history_date("bad-date") == ""
+    assert crm.normalize_settings_history_filters(
+        "",
+        "bad-date",
+        "2026-01-01",
+    ) == {
+        "action": "all",
+        "date_from": "",
+        "date_to": "2026-01-01",
+    }
     assert crm.plan_allows_active_users("basic", 3) is True
     assert crm.plan_allows_active_users("basic", 4) is False
     assert crm.plan_allows_active_users("enterprise_1c", 100) is True
@@ -5916,7 +5926,24 @@ async def assert_settings_page():
     assert "История настроек" in history_html
     assert "Тариф: Базовый → Команда" in history_html
     assert "/settings/history/export" in history_html
+    assert "Все действия" in history_html
+    assert "С даты" in history_html
+    assert "По дату" in history_html
+    assert "Показать" in history_html
+    assert "Сбросить" in history_html
     assert 'class="mobile-nav"' in history_html
+
+    filtered_history_page = await crm.settings_history_page(
+        make_asgi_request("owner2", "/settings/history"),
+        action="Настройки компании обновлены",
+    )
+    filtered_history_html = filtered_history_page.body.decode("utf-8")
+    assert filtered_history_page.status_code == 200
+    assert filtered_history_page.context["filters"]["action"] == (
+        "Настройки компании обновлены"
+    )
+    assert "action=" in filtered_history_page.context["export_url"]
+    assert "Тариф: Базовый → Команда" in filtered_history_html
 
     history_export = await crm.settings_history_export(
         make_request("owner2")
@@ -5929,6 +5956,14 @@ async def assert_settings_page():
     assert history_export_csv.startswith("\ufeff")
     assert "Дата,Действие,Детали,Было,Стало,Кто изменил" in history_export_csv
     assert "Тариф: Базовый → Команда" in history_export_csv
+
+    filtered_history_export = await crm.settings_history_export(
+        make_request("owner2"),
+        action="Настройки компании обновлены",
+    )
+    filtered_history_export_csv = filtered_history_export.body.decode("utf-8")
+    assert filtered_history_export.status_code == 200
+    assert "Тариф: Базовый → Команда" in filtered_history_export_csv
 
     blocked_downgrade_form = dict(settings_form)
     blocked_downgrade_form["plan"] = "basic"

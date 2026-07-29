@@ -17,6 +17,12 @@ body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .card{background:white;padding:26px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:18px}
 h1{margin:0 0 8px;font-size:34px}
 .meta{color:#6b7280;font-size:14px;font-weight:800;line-height:1.45}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:12px;align-items:end}
+.field{display:flex;flex-direction:column;gap:6px}
+label{font-size:12px;color:#6b7280;font-weight:900;text-transform:uppercase}
+select,input{width:100%;min-height:44px;border:1px solid #d1d5db;border-radius:12px;padding:10px 12px;font-size:15px;font-weight:800;background:white}
+button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:0;border-radius:12px;padding:10px 14px;background:#111827;color:white;text-decoration:none;font-size:14px;font-weight:900;cursor:pointer;white-space:nowrap}
+.button.light{background:#eef2ff;color:#3730a3}
 .event{padding:15px 0;border-bottom:1px solid #e5e7eb}
 .event:last-child{border-bottom:0}
 .event-title{font-size:16px;font-weight:900}
@@ -25,6 +31,7 @@ h1{margin:0 0 8px;font-size:34px}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
+    .filters{grid-template-columns:1fr}
     h1{font-size:28px}
 }
 </style>
@@ -35,13 +42,35 @@ h1{margin:0 0 8px;font-size:34px}
 
 <div class="actions">
     <a href="/settings" class="back">← Назад к настройкам</a>
-    <a href="/settings/history/export" class="back">Скачать CSV</a>
+    <a href="{{ export_url }}" class="back">Скачать CSV</a>
 </div>
 
 <div class="card">
     <h1>История настроек</h1>
     <div class="meta">Изменения тарифа и сферы компании</div>
 </div>
+
+<form method="get" action="/settings/history" class="card filters">
+    <div class="field">
+        <label for="action">Действие</label>
+        <select id="action" name="action">
+            <option value="all" {% if filters["action"] == "all" %}selected{% endif %}>Все действия</option>
+            {% for option in action_options %}
+            <option value="{{ option }}" {% if filters["action"] == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="field">
+        <label for="date_from">С даты</label>
+        <input id="date_from" type="date" name="date_from" value="{{ filters['date_from'] }}">
+    </div>
+    <div class="field">
+        <label for="date_to">По дату</label>
+        <input id="date_to" type="date" name="date_to" value="{{ filters['date_to'] }}">
+    </div>
+    <button type="submit">Показать</button>
+    <a href="/settings/history" class="button light">Сбросить</a>
+</form>
 
 <div class="card">
 {% if history %}

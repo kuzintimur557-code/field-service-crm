@@ -30495,8 +30495,87 @@ async def settings_page(request: Request):
     )
 
 
+def normalize_settings_history_date(value):
+    value = str(value or "").strip()
+
+    if not value:
+        return ""
+
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+        return value
+    except ValueError:
+        return ""
+
+
+def normalize_settings_history_filters(action="all", date_from="", date_to=""):
+    selected_action = str(action or "all").strip()
+
+    if not selected_action:
+        selected_action = "all"
+
+    return {
+        "action": selected_action,
+        "date_from": normalize_settings_history_date(date_from),
+        "date_to": normalize_settings_history_date(date_to),
+    }
+
+
+def build_settings_history_export_url(filters):
+    params = {}
+
+    if filters["action"] != "all":
+        params["action"] = filters["action"]
+
+    if filters["date_from"]:
+        params["date_from"] = filters["date_from"]
+
+    if filters["date_to"]:
+        params["date_to"] = filters["date_to"]
+
+    if not params:
+        return "/settings/history/export"
+
+    return "/settings/history/export?" + urlencode(params)
+
+
+def fetch_company_settings_history(c, company_id, filters, limit=None):
+    where = ["company_id=?"]
+    params = [company_id]
+
+    if filters["action"] != "all":
+        where.append("action=?")
+        params.append(filters["action"])
+
+    if filters["date_from"]:
+        where.append("date(created_at) >= date(?)")
+        params.append(filters["date_from"])
+
+    if filters["date_to"]:
+        where.append("date(created_at) <= date(?)")
+        params.append(filters["date_to"])
+
+    query = f"""
+    SELECT *
+    FROM company_settings_history
+    WHERE {' AND '.join(where)}
+    ORDER BY id DESC
+    """
+
+    if limit:
+        query += "\nLIMIT ?"
+        params.append(limit)
+
+    return c.execute(query, params).fetchall()
+
+
 @app.get("/settings/history", response_class=HTMLResponse)
-async def settings_history_page(request: Request):
+async def settings_history_page(
+    request: Request,
+    action: str = "all",
+    date_from: str = "",
+    date_to: str = "",
+):
 
     username = get_user(request)
 
@@ -30516,15 +30595,19 @@ async def settings_history_page(request: Request):
     if missing_company_response:
         return missing_company_response
 
+    filters = normalize_settings_history_filters(action, date_from, date_to)
+
     conn = connect()
     c = conn.cursor()
-    history = c.execute("""
-    SELECT *
+    action_options = c.execute("""
+    SELECT DISTINCT action
     FROM company_settings_history
     WHERE company_id=?
-    ORDER BY id DESC
-    LIMIT 200
+      AND action IS NOT NULL
+      AND action != ''
+    ORDER BY action
     """, (company_id,)).fetchall()
+    history = fetch_company_settings_history(c, company_id, filters, limit=200)
     conn.close()
 
     return templates.TemplateResponse(
@@ -30535,12 +30618,20 @@ async def settings_history_page(request: Request):
             "username": username,
             "role": role,
             "history": history,
+            "filters": filters,
+            "action_options": [row["action"] for row in action_options],
+            "export_url": build_settings_history_export_url(filters),
         },
     )
 
 
 @app.get("/settings/history/export")
-async def settings_history_export(request: Request):
+async def settings_history_export(
+    request: Request,
+    action: str = "all",
+    date_from: str = "",
+    date_to: str = "",
+):
 
     username = get_user(request)
 
@@ -30560,14 +30651,11 @@ async def settings_history_export(request: Request):
     if missing_company_response:
         return missing_company_response
 
+    filters = normalize_settings_history_filters(action, date_from, date_to)
+
     conn = connect()
     c = conn.cursor()
-    history = c.execute("""
-    SELECT *
-    FROM company_settings_history
-    WHERE company_id=?
-    ORDER BY id DESC
-    """, (company_id,)).fetchall()
+    history = fetch_company_settings_history(c, company_id, filters)
     conn.close()
 
     output = io.StringIO()
