@@ -11281,10 +11281,135 @@ async def assert_platform_modules_page():
     assert platform_billing_page.status_code == 200
     assert platform_billing_page.context["status_filter"] == "all"
     assert platform_billing_page.context["summary"]["count"] >= 0
+    assert platform_billing_page.context["company_options"]
     assert "Счета платформы" in platform_billing_html
+    assert "Сформировать счёт" in platform_billing_html
+    assert "/platform/billing/generate" in platform_billing_html
     assert "Фильтр" in platform_billing_html
     assert "/platform/billing/export" in platform_billing_html
     assert 'class="platform-mobile-nav"' in platform_billing_html
+
+    anonymous_platform_generate = await crm.generate_platform_billing_invoice(
+        make_public_asgi_request("/platform/billing/generate"),
+    )
+    assert anonymous_platform_generate.status_code == 302
+    assert anonymous_platform_generate.headers["location"] == "/login"
+
+    boss_platform_generate = await crm.generate_platform_billing_invoice(
+        make_form_request(
+            "owner2",
+            "/platform/billing/generate",
+            {"company_id": "2", "period": "2026-10"},
+        ),
+    )
+    assert boss_platform_generate.status_code == 302
+    assert boss_platform_generate.headers["location"] == "/"
+
+    missing_company_generate = await crm.generate_platform_billing_invoice(
+        make_form_request(
+            "super",
+            "/platform/billing/generate",
+            {"company_id": "999999", "period": "2026-10"},
+        ),
+    )
+    assert missing_company_generate.status_code == 302
+    assert missing_company_generate.headers["location"] == (
+        "/platform/billing?error=company_not_found"
+    )
+
+    invalid_company_generate = await crm.generate_platform_billing_invoice(
+        make_form_request(
+            "super",
+            "/platform/billing/generate",
+            {"company_id": "", "period": "2026-10"},
+        ),
+    )
+    assert invalid_company_generate.status_code == 302
+    assert invalid_company_generate.headers["location"] == (
+        "/platform/billing?error=company_required"
+    )
+
+    platform_generate = await crm.generate_platform_billing_invoice(
+        make_form_request(
+            "super",
+            "/platform/billing/generate",
+            {"company_id": "2", "period": "2026-10"},
+        ),
+    )
+    assert platform_generate.status_code == 302
+    assert platform_generate.headers["location"] == (
+        "/platform/billing?invoice_created=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    platform_generated_invoice = c.execute("""
+    SELECT *
+    FROM billing_invoices
+    WHERE company_id=?
+      AND invoice_number=?
+    """, (2, "BILL-2-202610")).fetchone()
+    assert platform_generated_invoice is not None
+    assert platform_generated_invoice["period"] == "2026-10"
+    assert platform_generated_invoice["status"] == "draft"
+    assert "super" in platform_generated_invoice["notes"]
+    conn.close()
+
+    platform_created_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing",
+            "invoice_created=1",
+        ),
+    )
+    platform_created_html = platform_created_page.body.decode("utf-8")
+    assert "Счёт платформы сформирован" in platform_created_html
+    assert "BILL-2-202610" in platform_created_html
+
+    duplicate_platform_generate = await crm.generate_platform_billing_invoice(
+        make_form_request(
+            "super",
+            "/platform/billing/generate",
+            {"company_id": "2", "period": "2026-10"},
+        ),
+    )
+    assert duplicate_platform_generate.status_code == 302
+    assert duplicate_platform_generate.headers["location"] == (
+        "/platform/billing?invoice_exists=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    platform_duplicate_count = c.execute("""
+    SELECT COUNT(*) AS total
+    FROM billing_invoices
+    WHERE company_id=?
+      AND period=?
+    """, (2, "2026-10")).fetchone()
+    assert platform_duplicate_count["total"] == 1
+    conn.close()
+
+    platform_exists_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing",
+            "invoice_exists=1",
+        ),
+    )
+    assert "Счёт за этот период уже существует" in (
+        platform_exists_page.body.decode("utf-8")
+    )
+
+    platform_required_page = await crm.platform_billing_page(
+        make_asgi_request(
+            "super",
+            "/platform/billing",
+            "error=company_required",
+        ),
+    )
+    assert "Выберите компанию для формирования счёта" in (
+        platform_required_page.body.decode("utf-8")
+    )
 
     filtered_platform_billing_page = await crm.platform_billing_page(
         make_asgi_request("super", "/platform/billing?status=issued"),
@@ -11329,6 +11454,15 @@ async def assert_platform_modules_page():
     assert platform_billing_export_issued.headers["content-disposition"] == (
         "attachment; filename=platform_billing_issued.csv"
     )
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute(
+        "DELETE FROM billing_invoices WHERE invoice_number=?",
+        ("BILL-2-202610",),
+    )
+    conn.commit()
+    conn.close()
 
 
 async def assert_platform_presets_page():

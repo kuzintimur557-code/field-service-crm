@@ -1716,6 +1716,35 @@ def fetch_platform_billing_invoices(c, status_filter="all"):
     return invoices
 
 
+def get_platform_billing_company_options(c):
+    rows = c.execute("""
+    SELECT
+        companies.id,
+        companies.name,
+        companies.owner_username,
+        COALESCE(settings.plan, 'basic') AS plan
+    FROM companies
+    LEFT JOIN company_settings AS settings
+      ON settings.company_id=companies.id
+    ORDER BY lower(companies.name), companies.id
+    """).fetchall()
+
+    options = []
+
+    for row in rows:
+        plan = normalize_plan(row["plan"])
+        options.append({
+            "id": row["id"],
+            "name": row["name"] or f"Компания #{row['id']}",
+            "owner_username": row["owner_username"] or "",
+            "plan": plan,
+            "plan_label": get_plan_label(plan),
+            "price_label": get_plan_price_label(plan),
+        })
+
+    return options
+
+
 def get_user_limit_status(active_users_count, user_limit):
     active_users_count = int(active_users_count or 0)
 
@@ -12112,6 +12141,7 @@ async def platform_billing_page(request: Request, status: str = "all"):
     conn = connect()
     c = conn.cursor()
     invoices = fetch_platform_billing_invoices(c, status_filter=status_filter)
+    company_options = get_platform_billing_company_options(c)
     conn.close()
     summary = build_billing_invoice_summary(invoices)
 
@@ -12126,6 +12156,7 @@ async def platform_billing_page(request: Request, status: str = "all"):
             "summary": summary,
             "status_filter": status_filter,
             "status_options": get_billing_invoice_status_options(),
+            "company_options": company_options,
             "export_url": (
                 "/platform/billing/export"
                 if status_filter == "all"
@@ -12133,6 +12164,50 @@ async def platform_billing_page(request: Request, status: str = "all"):
                 + urlencode({"status": status_filter})
             ),
         },
+    )
+
+
+@app.post("/platform/billing/generate")
+async def generate_platform_billing_invoice(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+
+    try:
+        company_id = int(form.get("company_id") or 0)
+    except (TypeError, ValueError):
+        company_id = 0
+
+    if company_id <= 0:
+        return RedirectResponse(
+            "/platform/billing?error=company_required",
+            status_code=302,
+        )
+
+    profile = get_platform_company_profile(company_id)
+
+    if not profile:
+        return RedirectResponse(
+            "/platform/billing?error=company_not_found",
+            status_code=302,
+        )
+
+    period = normalize_billing_period(form.get("period") or "")
+    result = generate_company_billing_invoice(company_id, period, username)
+    flag = "invoice_created" if result["created"] else "invoice_exists"
+
+    return RedirectResponse(
+        f"/platform/billing?{flag}=1",
+        status_code=302,
     )
 
 
