@@ -31463,6 +31463,48 @@ async def billing_invoices_page(request: Request, status: str = "all"):
     )
 
 
+@app.get("/api/billing/invoices")
+async def api_billing_invoices(request: Request, status: str = "all"):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    company_id = get_user_company_id(username)
+
+    if not company_id:
+        return JSONResponse({"error": "company_required"}, status_code=400)
+
+    status_filter = normalize_billing_invoice_filter(status)
+
+    conn = connect()
+    c = conn.cursor()
+    invoices = fetch_billing_invoices(
+        c,
+        company_id,
+        status_filter=status_filter,
+    )
+    conn.close()
+    summary = build_billing_invoice_summary(invoices)
+
+    return {
+        "ok": True,
+        "filters": {
+            "status": status_filter,
+            "company_id": company_id,
+        },
+        "summary": summary,
+        "export_url": build_billing_invoices_export_url(status_filter),
+        "invoices": invoices,
+    }
+
+
 @app.post("/billing/invoices/generate")
 async def generate_billing_invoice(request: Request):
 

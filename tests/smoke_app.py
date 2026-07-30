@@ -6241,6 +6241,27 @@ async def assert_billing_page():
     assert "Черновик" in invoices_html
     assert "Оплачен" in invoices_html
 
+    anonymous_invoices_api = await crm.api_billing_invoices(
+        make_public_asgi_request("/api/billing/invoices"),
+    )
+    assert anonymous_invoices_api.status_code == 401
+    worker_invoices_api = await crm.api_billing_invoices(
+        make_asgi_request("worker2", "/api/billing/invoices"),
+    )
+    assert worker_invoices_api.status_code == 403
+    owner_invoices_api = await crm.api_billing_invoices(
+        make_asgi_request("owner2", "/api/billing/invoices"),
+    )
+    assert owner_invoices_api["ok"] is True
+    assert owner_invoices_api["filters"]["status"] == "all"
+    assert owner_invoices_api["filters"]["company_id"] == 2
+    assert owner_invoices_api["summary"]["count"] >= 1
+    assert owner_invoices_api["export_url"] == "/billing/invoices/export"
+    assert any(
+        invoice["invoice_number"] == "SMOKE-BILL-1"
+        for invoice in owner_invoices_api["invoices"]
+    )
+
     generated_invoice_response = await crm.generate_billing_invoice(
         make_form_request(
             "owner2",
@@ -6348,6 +6369,19 @@ async def assert_billing_page():
         "/billing/invoices/export?status=issued"
     )
     assert "SMOKE-BILL-1" in issued_invoices_html
+
+    issued_invoices_api = await crm.api_billing_invoices(
+        make_asgi_request("owner2", "/api/billing/invoices?status=issued"),
+        status="issued",
+    )
+    assert issued_invoices_api["filters"]["status"] == "issued"
+    assert issued_invoices_api["export_url"] == (
+        "/billing/invoices/export?status=issued"
+    )
+    assert any(
+        invoice["invoice_number"] == "SMOKE-BILL-1"
+        for invoice in issued_invoices_api["invoices"]
+    )
 
     invoices_export = await crm.billing_invoices_export(
         make_asgi_request("owner2", "/billing/invoices/export")
