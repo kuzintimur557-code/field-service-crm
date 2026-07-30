@@ -18,6 +18,7 @@ h1{margin:0 0 10px;font-size:34px;line-height:1.12}
 h2{margin:0 0 16px;font-size:22px}
 .small{color:#6b7280;font-weight:800;line-height:1.45}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .field{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
 .label{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
 .value{margin-top:6px;font-size:18px;font-weight:900;color:#111827}
@@ -26,10 +27,13 @@ h2{margin:0 0 16px;font-size:22px}
 .status.warning{background:#fef3c7;color:#92400e}
 .status.danger{background:#fee2e2;color:#991b1b}
 .status.muted{background:#f3f4f6;color:#6b7280}
+.activity-list{display:grid;gap:10px}
+.activity-item{padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.activity-title{font-weight:900}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
-    .grid{grid-template-columns:1fr}
+    .grid,.summary-grid{grid-template-columns:1fr}
     h1{font-size:28px}
 }
 </style>
@@ -47,6 +51,27 @@ h2{margin:0 0 16px;font-size:22px}
     <h1>Счёт {{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</h1>
     <div class="small">Период: {{ invoice["period"] or "не указан" }}</div>
     <span class="status {{ invoice['status_tone'] }}">{{ invoice["status_label"] }}</span>
+</div>
+
+<div class="card">
+    <h2>Контроль истории</h2>
+    <div class="summary-grid">
+        <div class="field">
+            <div class="label">Событий</div>
+            <div class="value">{{ activity_summary["total"] }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Смен статуса</div>
+            <div class="value">{{ activity_summary["status_changes"] }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Последнее действие</div>
+            <div class="value">{{ activity_summary["latest_action"] }}</div>
+            {% if activity_summary["latest_at"] %}
+            <div class="small">{{ activity_summary["latest_at"] }} · {{ activity_summary["latest_actor"] }}</div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <div class="card">
@@ -85,6 +110,23 @@ h2{margin:0 0 16px;font-size:22px}
     <div class="small">{{ invoice["notes"] }}</div>
 </div>
 {% endif %}
+
+<div class="card">
+    <h2>История счёта</h2>
+    {% if invoice_activity %}
+    <div class="activity-list">
+        {% for event in invoice_activity %}
+        <div class="activity-item">
+            <div class="activity-title">{{ event["action"] }}</div>
+            <div class="small">{{ event["details"] }}</div>
+            <div class="small">Выполнил: {{ event["actor_username"] }} · {{ event["created_at"] }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="small">Событий по этому счёту пока нет.</div>
+    {% endif %}
+</div>
 
 </div>
 {% include 'mobile_nav.html' %}

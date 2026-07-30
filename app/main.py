@@ -31582,6 +31582,11 @@ async def billing_invoice_detail_page(request: Request, invoice_id: int):
     conn = connect()
     c = conn.cursor()
     invoice = fetch_billing_invoice(c, company_id, invoice_id)
+    invoice_activity = (
+        fetch_platform_billing_invoice_activity(c, invoice)
+        if invoice
+        else []
+    )
     conn.close()
 
     if not invoice:
@@ -31598,6 +31603,12 @@ async def billing_invoice_detail_page(request: Request, invoice_id: int):
             "username": username,
             "role": role,
             "invoice": invoice,
+            "invoice_activity": invoice_activity,
+            "activity_summary": (
+                build_platform_billing_invoice_activity_summary(
+                    invoice_activity,
+                )
+            ),
         },
     )
 

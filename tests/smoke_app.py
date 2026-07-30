@@ -12150,6 +12150,21 @@ async def assert_platform_modules_page():
     assert duplicate_billing_activity_count == billing_activity_count
     conn.close()
 
+    owner_invoice_history_page = await crm.billing_invoice_detail_page(
+        make_asgi_request(
+            "owner2",
+            f"/billing/invoices/{platform_generated_invoice_id}",
+        ),
+        platform_generated_invoice_id,
+    )
+    owner_invoice_history_html = owner_invoice_history_page.body.decode("utf-8")
+    assert owner_invoice_history_page.status_code == 200
+    assert "Контроль истории" in owner_invoice_history_html
+    assert "История счёта" in owner_invoice_history_html
+    assert "BILL-2-202610" in owner_invoice_history_html
+    assert "Выставлен → Оплачен" in owner_invoice_history_html
+    assert owner_invoice_history_page.context["activity_summary"]["total"] >= 3
+
     billing_team_activity = await crm.team_activity_page(
         make_asgi_request(
             "owner2",
