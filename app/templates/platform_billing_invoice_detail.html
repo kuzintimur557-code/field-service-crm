@@ -18,6 +18,7 @@ h1{margin:0 0 10px;font-size:34px;line-height:1.12}
 h2{margin:0 0 16px;font-size:22px}
 .small{color:#6b7280;font-weight:800;line-height:1.45}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .field{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
 .label{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
 .value{margin-top:6px;font-size:18px;font-weight:900;color:#111827;overflow-wrap:anywhere}
@@ -40,7 +41,7 @@ h2{margin:0 0 16px;font-size:22px}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
-    .grid,.status-form{grid-template-columns:1fr}
+    .grid,.summary-grid,.status-form{grid-template-columns:1fr}
     .status-form button{width:100%}
     h1{font-size:28px}
 }
@@ -92,6 +93,27 @@ h2{margin:0 0 16px;font-size:22px}
         </label>
         <button type="submit">Сохранить статус</button>
     </form>
+</div>
+
+<div class="card">
+    <h2>Контроль истории</h2>
+    <div class="summary-grid">
+        <div class="field">
+            <div class="label">Событий</div>
+            <div class="value">{{ activity_summary["total"] }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Смен статуса</div>
+            <div class="value">{{ activity_summary["status_changes"] }}</div>
+        </div>
+        <div class="field">
+            <div class="label">Последнее действие</div>
+            <div class="value">{{ activity_summary["latest_action"] }}</div>
+            {% if activity_summary["latest_at"] %}
+            <div class="small">{{ activity_summary["latest_at"] }} · {{ activity_summary["latest_actor"] }}</div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <div class="card">

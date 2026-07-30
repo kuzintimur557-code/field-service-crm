@@ -11811,6 +11811,8 @@ async def assert_platform_modules_page():
     assert "Счёт BILL-2-202610" in platform_invoice_detail_html
     assert "Управление статусом" in platform_invoice_detail_html
     assert "Карточка компании" in platform_invoice_detail_html
+    assert "Контроль истории" in platform_invoice_detail_html
+    assert "Смен статуса" in platform_invoice_detail_html
     assert "История счёта" in platform_invoice_detail_html
     assert "Счёт платформы создан" in platform_invoice_detail_html
     assert (
@@ -11852,6 +11854,8 @@ async def assert_platform_modules_page():
     assert platform_invoice_api["ok"] is True
     assert platform_invoice_api["invoice"]["invoice_number"] == "BILL-2-202610"
     assert platform_invoice_api["activity"]
+    assert platform_invoice_api["activity_summary"]["total"] >= 1
+    assert platform_invoice_api["activity_summary"]["created_events"] >= 1
     assert platform_invoice_api["export_url"] == (
         f"/platform/billing/invoices/{platform_generated_invoice_id}/export"
     )
@@ -11972,6 +11976,7 @@ async def assert_platform_modules_page():
     detail_updated_notice_html = detail_updated_notice_page.body.decode("utf-8")
     assert "Статус счёта обновлён" in detail_updated_notice_html
     assert "Черновик → Выставлен" in detail_updated_notice_html
+    assert "Контроль истории" in detail_updated_notice_html
 
     anonymous_status_update = await crm.update_platform_billing_invoice_status(
         make_public_asgi_request(

@@ -1696,6 +1696,28 @@ def fetch_platform_billing_invoice_activity(c, invoice, limit=10):
     return [dict(row) for row in rows]
 
 
+def build_platform_billing_invoice_activity_summary(activity):
+    activity = list(activity or [])
+    status_changes = sum(
+        1 for event in activity
+        if event.get("action") == "Статус счёта платформы"
+    )
+    created_events = sum(
+        1 for event in activity
+        if event.get("action") == "Счёт платформы создан"
+    )
+    latest = activity[0] if activity else {}
+
+    return {
+        "total": len(activity),
+        "status_changes": status_changes,
+        "created_events": created_events,
+        "latest_action": latest.get("action") or "Событий пока нет",
+        "latest_at": latest.get("created_at") or "",
+        "latest_actor": latest.get("actor_username") or "",
+    }
+
+
 def sync_platform_billing_overdue_invoices(company_id="all", today=None):
     today = today or datetime.now().date()
     selected_company_id = normalize_platform_billing_company_id(company_id)
@@ -12865,6 +12887,9 @@ async def api_platform_billing_invoice(
         "ok": True,
         "invoice": invoice,
         "activity": invoice_activity,
+        "activity_summary": (
+            build_platform_billing_invoice_activity_summary(invoice_activity)
+        ),
         "export_url": f"/platform/billing/invoices/{invoice_id}/export",
         "company_url": f"/platform/companies/{invoice['company_id']}",
     }
@@ -13050,6 +13075,11 @@ async def platform_billing_invoice_detail_page(
             "role": role,
             "invoice": invoice,
             "invoice_activity": invoice_activity,
+            "activity_summary": (
+                build_platform_billing_invoice_activity_summary(
+                    invoice_activity,
+                )
+            ),
             "status_options": get_billing_invoice_status_options(),
         },
     )
