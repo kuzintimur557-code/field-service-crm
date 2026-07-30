@@ -12085,6 +12085,69 @@ async def assert_platform_modules_page():
         "Выставлен → Оплачен" in row["details"]
         for row in billing_activity_rows
     )
+    paid_notification_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
+      AND title=?
+      AND link=?
+    """, (
+        2,
+        "owner2",
+        "Счёт платформы оплачен",
+        f"/billing/invoices/{platform_generated_invoice_id}",
+    )).fetchone()[0]
+    billing_activity_count = c.execute("""
+    SELECT COUNT(*)
+    FROM team_activity
+    WHERE company_id=?
+      AND details LIKE ?
+    """, (
+        2,
+        "%BILL-2-202610%",
+    )).fetchone()[0]
+    conn.close()
+
+    duplicate_paid_status_update = await crm.update_platform_billing_invoice_status(
+        make_form_request(
+            "super",
+            f"/platform/billing/invoices/{platform_generated_invoice_id}/status",
+            {"status": "paid"},
+        ),
+        platform_generated_invoice_id,
+    )
+    assert duplicate_paid_status_update.status_code == 302
+    assert duplicate_paid_status_update.headers["location"] == (
+        "/platform/billing?invoice_updated=1"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    duplicate_paid_notification_count = c.execute("""
+    SELECT COUNT(*)
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
+      AND title=?
+      AND link=?
+    """, (
+        2,
+        "owner2",
+        "Счёт платформы оплачен",
+        f"/billing/invoices/{platform_generated_invoice_id}",
+    )).fetchone()[0]
+    duplicate_billing_activity_count = c.execute("""
+    SELECT COUNT(*)
+    FROM team_activity
+    WHERE company_id=?
+      AND details LIKE ?
+    """, (
+        2,
+        "%BILL-2-202610%",
+    )).fetchone()[0]
+    assert duplicate_paid_notification_count == paid_notification_count
+    assert duplicate_billing_activity_count == billing_activity_count
     conn.close()
 
     billing_team_activity = await crm.team_activity_page(

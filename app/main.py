@@ -12976,6 +12976,20 @@ async def update_platform_billing_invoice_status(
             status_code=302,
         )
 
+    if invoice["status_code"] == status:
+        conn.close()
+
+        if return_to == "detail":
+            return RedirectResponse(
+                f"/platform/billing/invoices/{invoice_id}?invoice_updated=1",
+                status_code=302,
+            )
+
+        return RedirectResponse(
+            "/platform/billing?invoice_updated=1",
+            status_code=302,
+        )
+
     c.execute("""
     UPDATE billing_invoices
     SET status=?,
