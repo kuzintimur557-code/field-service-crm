@@ -31677,6 +31677,51 @@ async def billing_invoice_detail_export(request: Request, invoice_id: int):
     )
 
 
+@app.get("/api/billing/invoices/{invoice_id}")
+async def api_billing_invoice_detail(request: Request, invoice_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    company_id = get_user_company_id(username)
+
+    if not company_id:
+        return JSONResponse({"error": "company_required"}, status_code=400)
+
+    conn = connect()
+    c = conn.cursor()
+    invoice = fetch_billing_invoice(c, company_id, invoice_id)
+    invoice_activity = (
+        fetch_platform_billing_invoice_activity(c, invoice)
+        if invoice
+        else []
+    )
+    conn.close()
+
+    if not invoice:
+        return JSONResponse(
+            {"error": "invoice_not_found"},
+            status_code=404,
+        )
+
+    return {
+        "ok": True,
+        "invoice": invoice,
+        "activity": invoice_activity,
+        "activity_summary": (
+            build_platform_billing_invoice_activity_summary(invoice_activity)
+        ),
+        "export_url": f"/billing/invoices/{invoice_id}/export",
+    }
+
+
 @app.get("/billing/invoices/{invoice_id}", response_class=HTMLResponse)
 async def billing_invoice_detail_page(request: Request, invoice_id: int):
 

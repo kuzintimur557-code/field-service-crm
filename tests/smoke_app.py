@@ -6330,6 +6330,27 @@ async def assert_billing_page():
     assert "smoke invoice" in invoice_detail_html
     assert f"/billing/invoices/{invoice_id}/export" in invoice_detail_html
 
+    anonymous_invoice_api = await crm.api_billing_invoice_detail(
+        make_public_asgi_request(f"/api/billing/invoices/{invoice_id}"),
+        invoice_id,
+    )
+    assert anonymous_invoice_api.status_code == 401
+    worker_invoice_api = await crm.api_billing_invoice_detail(
+        make_asgi_request("worker2", f"/api/billing/invoices/{invoice_id}"),
+        invoice_id,
+    )
+    assert worker_invoice_api.status_code == 403
+    owner_invoice_api = await crm.api_billing_invoice_detail(
+        make_asgi_request("owner2", f"/api/billing/invoices/{invoice_id}"),
+        invoice_id,
+    )
+    assert owner_invoice_api["ok"] is True
+    assert owner_invoice_api["invoice"]["invoice_number"] == "SMOKE-BILL-1"
+    assert owner_invoice_api["activity_summary"]["total"] == 0
+    assert owner_invoice_api["export_url"] == (
+        f"/billing/invoices/{invoice_id}/export"
+    )
+
     anonymous_invoice_detail_export = await crm.billing_invoice_detail_export(
         make_public_asgi_request(f"/billing/invoices/{invoice_id}/export"),
         invoice_id,
@@ -6345,6 +6366,15 @@ async def assert_billing_page():
     assert foreign_invoice_detail.headers["location"] == (
         "/billing/invoices?error=invoice_not_found"
     )
+
+    foreign_invoice_api = await crm.api_billing_invoice_detail(
+        make_asgi_request(
+            "owner2",
+            f"/api/billing/invoices/{foreign_invoice_id}",
+        ),
+        foreign_invoice_id,
+    )
+    assert foreign_invoice_api.status_code == 404
 
     foreign_invoice_detail_export = await crm.billing_invoice_detail_export(
         make_asgi_request(
