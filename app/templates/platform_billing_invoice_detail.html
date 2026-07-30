@@ -34,6 +34,9 @@ h2{margin:0 0 16px;font-size:22px}
 .status-form label{display:grid;gap:6px;color:#6b7280;font-size:13px;font-weight:900}
 .status-form select{min-height:42px;padding:10px;border:1px solid #d1d5db;border-radius:12px;background:white;color:#111827;font-size:14px;font-weight:800}
 .status-form button{min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;font-weight:900;cursor:pointer}
+.activity-list{display:grid;gap:10px}
+.activity-item{padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.activity-title{font-weight:900}
 @media(max-width:700px){
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
@@ -147,6 +150,23 @@ h2{margin:0 0 16px;font-size:22px}
     <div class="small">{{ invoice["notes"] }}</div>
 </div>
 {% endif %}
+
+<div class="card">
+    <h2>История счёта</h2>
+    {% if invoice_activity %}
+    <div class="activity-list">
+        {% for event in invoice_activity %}
+        <div class="activity-item">
+            <div class="activity-title">{{ event["action"] }}</div>
+            <div class="small">{{ event["details"] }}</div>
+            <div class="small">Выполнил: {{ event["actor_username"] }} · {{ event["created_at"] }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="small">Событий по этому счёту пока нет.</div>
+    {% endif %}
+</div>
 
 </div>
 {% include 'platform_mobile_nav.html' %}

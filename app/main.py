@@ -1673,6 +1673,29 @@ def record_platform_billing_activity(
     return activity_id
 
 
+def fetch_platform_billing_invoice_activity(c, invoice, limit=10):
+    invoice_number = str(invoice.get("invoice_number") or "").strip()
+
+    if not invoice_number:
+        return []
+
+    rows = c.execute("""
+    SELECT *
+    FROM team_activity
+    WHERE company_id=?
+      AND action IN ('Счёт платформы создан', 'Статус счёта платформы')
+      AND details LIKE ?
+    ORDER BY id DESC
+    LIMIT ?
+    """, (
+        invoice["company_id"],
+        f"%{invoice_number}%",
+        limit,
+    )).fetchall()
+
+    return [dict(row) for row in rows]
+
+
 def sync_platform_billing_overdue_invoices(company_id="all", today=None):
     today = today or datetime.now().date()
     selected_company_id = normalize_platform_billing_company_id(company_id)
@@ -12825,6 +12848,11 @@ async def api_platform_billing_invoice(
     conn = connect()
     c = conn.cursor()
     invoice = fetch_platform_billing_invoice(c, invoice_id)
+    invoice_activity = (
+        fetch_platform_billing_invoice_activity(c, invoice)
+        if invoice
+        else []
+    )
     conn.close()
 
     if not invoice:
@@ -12836,6 +12864,7 @@ async def api_platform_billing_invoice(
     return {
         "ok": True,
         "invoice": invoice,
+        "activity": invoice_activity,
         "export_url": f"/platform/billing/invoices/{invoice_id}/export",
         "company_url": f"/platform/companies/{invoice['company_id']}",
     }
@@ -12938,6 +12967,11 @@ async def platform_billing_invoice_export(
     conn = connect()
     c = conn.cursor()
     invoice = fetch_platform_billing_invoice(c, invoice_id)
+    invoice_activity = (
+        fetch_platform_billing_invoice_activity(c, invoice)
+        if invoice
+        else []
+    )
     conn.close()
 
     if not invoice:
@@ -12994,6 +13028,11 @@ async def platform_billing_invoice_detail_page(
     conn = connect()
     c = conn.cursor()
     invoice = fetch_platform_billing_invoice(c, invoice_id)
+    invoice_activity = (
+        fetch_platform_billing_invoice_activity(c, invoice)
+        if invoice
+        else []
+    )
     conn.close()
 
     if not invoice:
@@ -13010,6 +13049,7 @@ async def platform_billing_invoice_detail_page(
             "username": username,
             "role": role,
             "invoice": invoice,
+            "invoice_activity": invoice_activity,
             "status_options": get_billing_invoice_status_options(),
         },
     )
