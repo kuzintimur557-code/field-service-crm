@@ -6231,7 +6231,9 @@ async def assert_billing_page():
     assert invoices_page.status_code == 200
     assert invoices_page.context["summary"]["count"] >= 1
     assert invoices_page.context["summary"]["unpaid_amount"] >= 1200
+    assert invoices_page.context["monthly_summary"]
     assert "Счета платформы" in invoices_html
+    assert "Динамика по месяцам" in invoices_html
     assert "SMOKE-BILL-1" in invoices_html
     assert "Выставлен" in invoices_html
     assert "1200 ₽" in invoices_html
@@ -6256,6 +6258,7 @@ async def assert_billing_page():
     assert owner_invoices_api["filters"]["status"] == "all"
     assert owner_invoices_api["filters"]["company_id"] == 2
     assert owner_invoices_api["summary"]["count"] >= 1
+    assert owner_invoices_api["monthly_summary"]
     assert owner_invoices_api["export_url"] == "/billing/invoices/export"
     assert any(
         invoice["invoice_number"] == "SMOKE-BILL-1"
@@ -6408,6 +6411,7 @@ async def assert_billing_page():
     assert issued_invoices_api["export_url"] == (
         "/billing/invoices/export?status=issued"
     )
+    assert issued_invoices_api["monthly_summary"]
     assert any(
         invoice["invoice_number"] == "SMOKE-BILL-1"
         for invoice in issued_invoices_api["invoices"]

@@ -31447,6 +31447,7 @@ async def billing_invoices_page(request: Request, status: str = "all"):
     invoices = fetch_billing_invoices(c, company_id, status_filter=status_filter)
     conn.close()
     summary = build_billing_invoice_summary(invoices)
+    monthly_summary = build_platform_billing_monthly_summary(invoices)
     return templates.TemplateResponse(
         request,
         "billing_invoices.html",
@@ -31456,6 +31457,7 @@ async def billing_invoices_page(request: Request, status: str = "all"):
             "role": role,
             "invoices": invoices,
             "summary": summary,
+            "monthly_summary": monthly_summary,
             "status_filter": status_filter,
             "status_options": get_billing_invoice_status_options(),
             "export_url": build_billing_invoices_export_url(status_filter),
@@ -31492,6 +31494,7 @@ async def api_billing_invoices(request: Request, status: str = "all"):
     )
     conn.close()
     summary = build_billing_invoice_summary(invoices)
+    monthly_summary = build_platform_billing_monthly_summary(invoices)
 
     return {
         "ok": True,
@@ -31500,6 +31503,7 @@ async def api_billing_invoices(request: Request, status: str = "all"):
             "company_id": company_id,
         },
         "summary": summary,
+        "monthly_summary": monthly_summary,
         "export_url": build_billing_invoices_export_url(status_filter),
         "invoices": invoices,
     }

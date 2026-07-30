@@ -31,6 +31,9 @@ h2{margin:0 0 16px;font-size:22px}
 .table{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr 1fr;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
 .row.head{background:white;color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
+.monthly-table{display:grid;gap:10px}
+.monthly-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.monthly-row.head{background:white;color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase}
 .value{font-weight:900;color:#111827}
 .value a{color:#2563eb;text-decoration:none}
 .meta{color:#6b7280;font-size:13px;font-weight:800;line-height:1.4}
@@ -47,6 +50,8 @@ h2{margin:0 0 16px;font-size:22px}
     .generate-form button{width:100%}
     .row,.row.head{grid-template-columns:1fr}
     .row.head{display:none}
+    .monthly-row,.monthly-row.head{grid-template-columns:1fr}
+    .monthly-row.head{display:none}
     h1{font-size:28px}
 }
 </style>
@@ -82,6 +87,37 @@ h2{margin:0 0 16px;font-size:22px}
         <div class="summary-label">К оплате</div>
         <div class="summary-value">{{ summary["unpaid_amount_label"] }}</div>
     </div>
+</div>
+
+<div class="card">
+    <h2>Динамика по месяцам</h2>
+    {% if monthly_summary %}
+    <div class="monthly-table">
+        <div class="monthly-row head">
+            <div>Месяц</div>
+            <div>Счетов</div>
+            <div>Начислено</div>
+            <div>Оплачено</div>
+            <div>К оплате</div>
+        </div>
+        {% for month in monthly_summary %}
+        <div class="monthly-row">
+            <div class="value">{{ month["period"] }}</div>
+            <div class="value">{{ month["count"] }}</div>
+            <div class="value">{{ month["total_amount_label"] }}</div>
+            <div class="value">{{ month["paid_amount_label"] }}</div>
+            <div>
+                <div class="value">{{ month["unpaid_amount_label"] }}</div>
+                {% if month["overdue_count"] %}
+                <div class="meta">Просрочено: {{ month["overdue_count"] }} на {{ month["overdue_amount_label"] }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="small">Пока нет данных для помесячной аналитики.</div>
+    {% endif %}
 </div>
 
 <div class="card">
