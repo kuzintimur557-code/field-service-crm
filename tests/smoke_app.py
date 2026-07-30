@@ -12046,6 +12046,24 @@ async def assert_platform_modules_page():
     """, (platform_generated_invoice_id,)).fetchone()
     assert paid_invoice["status"] == "paid"
     assert paid_invoice["paid_at"]
+    paid_notification = c.execute("""
+    SELECT *
+    FROM notifications
+    WHERE company_id=?
+      AND username=?
+      AND title=?
+      AND link=?
+    ORDER BY id DESC
+    LIMIT 1
+    """, (
+        2,
+        "owner2",
+        "Счёт платформы оплачен",
+        f"/billing/invoices/{platform_generated_invoice_id}",
+    )).fetchone()
+    assert paid_notification is not None
+    assert "BILL-2-202610" in paid_notification["message"]
+    assert "Выставлен → Оплачен" in paid_notification["message"]
     billing_activity_rows = c.execute("""
     SELECT action, details, actor_username, target_username
     FROM team_activity
@@ -12273,6 +12291,10 @@ async def assert_platform_modules_page():
     c.execute(
         "DELETE FROM notifications WHERE link=?",
         (f"/billing/invoices/{cron_invoice_id}",),
+    )
+    c.execute(
+        "DELETE FROM notifications WHERE link=?",
+        (f"/billing/invoices/{platform_generated_invoice_id}",),
     )
     c.execute(
         "DELETE FROM team_activity WHERE details LIKE ?",

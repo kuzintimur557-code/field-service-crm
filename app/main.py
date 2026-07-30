@@ -1718,6 +1718,42 @@ def build_platform_billing_invoice_activity_summary(activity):
     }
 
 
+def notify_platform_billing_status_change(invoice, new_status):
+    owner_username = str(invoice.get("owner_username") or "").strip()
+
+    if not owner_username:
+        return None
+
+    new_status_label = get_billing_invoice_status_meta(new_status)["label"]
+    invoice_number = invoice.get("invoice_number") or f"#{invoice.get('id')}"
+    title = (
+        "Счёт платформы оплачен"
+        if new_status == "paid"
+        else "Статус счёта платформы обновлён"
+    )
+    message = (
+        f"Счёт {invoice_number}: "
+        f"{invoice.get('status_label') or 'статус не указан'} "
+        f"→ {new_status_label}. "
+        f"Сумма: {invoice.get('amount_label') or format_rub_amount(invoice.get('amount'))}."
+    )
+    link = f"/billing/invoices/{invoice['id']}"
+
+    create_notification(
+        invoice["company_id"],
+        owner_username,
+        title,
+        message,
+        link,
+    )
+
+    return {
+        "title": title,
+        "message": message,
+        "link": link,
+    }
+
+
 def sync_platform_billing_overdue_invoices(company_id="all", today=None):
     today = today or datetime.now().date()
     selected_company_id = normalize_platform_billing_company_id(company_id)
@@ -12960,6 +12996,7 @@ async def update_platform_billing_invoice_status(
         ),
         invoice["owner_username"] or "",
     )
+    notify_platform_billing_status_change(invoice, status)
 
     if return_to == "detail":
         return RedirectResponse(
