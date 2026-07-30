@@ -31561,6 +31561,80 @@ async def billing_invoices_export(request: Request, status: str = "all"):
     )
 
 
+@app.get("/billing/invoices/{invoice_id}/export")
+async def billing_invoice_detail_export(request: Request, invoice_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(
+        username,
+        role,
+    )
+
+    if missing_company_response:
+        return missing_company_response
+
+    conn = connect()
+    c = conn.cursor()
+    invoice = fetch_billing_invoice(c, company_id, invoice_id)
+    invoice_activity = (
+        fetch_platform_billing_invoice_activity(c, invoice)
+        if invoice
+        else []
+    )
+    conn.close()
+
+    if not invoice:
+        return RedirectResponse(
+            "/billing/invoices?error=invoice_not_found",
+            status_code=302,
+        )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Счёт платформы"])
+    writer.writerow(["ID счёта", invoice["id"]])
+    writer.writerow(["Номер", invoice["invoice_number"] or ""])
+    writer.writerow(["Период", invoice["period"] or ""])
+    writer.writerow(["Тариф", invoice["plan_label"]])
+    writer.writerow(["Сумма", invoice["amount"] or 0])
+    writer.writerow(["Валюта", invoice["currency"] or "RUB"])
+    writer.writerow(["Статус", invoice["status_label"]])
+    writer.writerow(["Оплатить до", invoice["due_date"] or ""])
+    writer.writerow(["Оплачен", invoice["paid_at"] or ""])
+    writer.writerow(["Создан", invoice["created_at"] or ""])
+    writer.writerow(["Примечание", invoice["notes"] or ""])
+    writer.writerow([])
+    writer.writerow(["История счёта"])
+    writer.writerow(["Действие", "Подробности", "Выполнил", "Дата"])
+
+    for event in invoice_activity:
+        writer.writerow([
+            event["action"] or "",
+            event["details"] or "",
+            event["actor_username"] or "",
+            event["created_at"] or "",
+        ])
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=billing_invoice_{invoice_id}.csv"
+            )
+        },
+    )
+
+
 @app.get("/billing/invoices/{invoice_id}", response_class=HTMLResponse)
 async def billing_invoice_detail_page(request: Request, invoice_id: int):
 

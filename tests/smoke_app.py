@@ -6307,6 +6307,14 @@ async def assert_billing_page():
     assert "Счёт SMOKE-BILL-1" in invoice_detail_html
     assert "Детали счёта" in invoice_detail_html
     assert "smoke invoice" in invoice_detail_html
+    assert f"/billing/invoices/{invoice_id}/export" in invoice_detail_html
+
+    anonymous_invoice_detail_export = await crm.billing_invoice_detail_export(
+        make_public_asgi_request(f"/billing/invoices/{invoice_id}/export"),
+        invoice_id,
+    )
+    assert anonymous_invoice_detail_export.status_code == 302
+    assert anonymous_invoice_detail_export.headers["location"] == "/login"
 
     foreign_invoice_detail = await crm.billing_invoice_detail_page(
         make_asgi_request("owner2", f"/billing/invoices/{foreign_invoice_id}"),
@@ -6314,6 +6322,18 @@ async def assert_billing_page():
     )
     assert foreign_invoice_detail.status_code == 302
     assert foreign_invoice_detail.headers["location"] == (
+        "/billing/invoices?error=invoice_not_found"
+    )
+
+    foreign_invoice_detail_export = await crm.billing_invoice_detail_export(
+        make_asgi_request(
+            "owner2",
+            f"/billing/invoices/{foreign_invoice_id}/export",
+        ),
+        foreign_invoice_id,
+    )
+    assert foreign_invoice_detail_export.status_code == 302
+    assert foreign_invoice_detail_export.headers["location"] == (
         "/billing/invoices?error=invoice_not_found"
     )
 
@@ -6341,6 +6361,20 @@ async def assert_billing_page():
     assert "Номер,Период,Тариф,Сумма,Валюта,Статус" in invoices_export_csv
     assert "SMOKE-BILL-1" in invoices_export_csv
     assert "Выставлен" in invoices_export_csv
+
+    invoice_detail_export = await crm.billing_invoice_detail_export(
+        make_asgi_request("owner2", f"/billing/invoices/{invoice_id}/export"),
+        invoice_id,
+    )
+    invoice_detail_export_csv = invoice_detail_export.body.decode("utf-8")
+    assert invoice_detail_export.status_code == 200
+    assert invoice_detail_export.headers["content-disposition"] == (
+        f"attachment; filename=billing_invoice_{invoice_id}.csv"
+    )
+    assert invoice_detail_export_csv.startswith("\ufeff")
+    assert "Счёт платформы" in invoice_detail_export_csv
+    assert "SMOKE-BILL-1" in invoice_detail_export_csv
+    assert "История счёта" in invoice_detail_export_csv
 
     issued_invoices_export = await crm.billing_invoices_export(
         make_asgi_request("owner2", "/billing/invoices/export?status=issued"),
