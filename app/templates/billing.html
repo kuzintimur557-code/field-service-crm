@@ -51,6 +51,14 @@ h2{margin:0 0 16px;font-size:22px}
 .invoice-alert{margin-top:14px;padding:14px;border-radius:14px;background:#eff6ff;color:#1e3a8a;font-weight:900;line-height:1.45}
 .invoice-alert.warning{background:#fffbeb;color:#92400e}
 .invoice-alert.danger{background:#fee2e2;color:#991b1b}
+.invoice-list{display:grid;gap:10px;margin-top:16px}
+.invoice-row{display:grid;grid-template-columns:minmax(0,1.2fr) 1fr 1fr auto;gap:12px;align-items:center;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb;color:#111827;text-decoration:none}
+.invoice-title{font-weight:900;color:#2563eb}
+.invoice-status{display:inline-flex;justify-content:center;min-height:28px;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
+.invoice-status.ok{background:#dcfce7;color:#166534}
+.invoice-status.warning{background:#fef3c7;color:#92400e}
+.invoice-status.danger{background:#fee2e2;color:#991b1b}
+.invoice-status.muted{background:#f3f4f6;color:#6b7280}
 .history-item{display:grid;grid-template-columns:150px minmax(0,1fr) 130px;gap:12px;padding:13px 0;border-bottom:1px solid #e5e7eb;align-items:start}
 .history-item:last-child{border-bottom:0}
 .history-title{font-weight:900;color:#111827}
@@ -62,6 +70,7 @@ h2{margin:0 0 16px;font-size:22px}
     .card{padding:20px;border-radius:18px}
     .grid{grid-template-columns:1fr}
     .invoice-grid{grid-template-columns:1fr}
+    .invoice-row{grid-template-columns:1fr}
     h1{font-size:28px}
     .feature{display:grid;grid-template-columns:auto minmax(0,1fr)}
     .history-item{grid-template-columns:1fr}
@@ -164,6 +173,21 @@ h2{margin:0 0 16px;font-size:22px}
 {% else %}
 <div class="invoice-alert">
 Критичных счетов нет. Тарифный контур работает штатно.
+</div>
+{% endif %}
+{% if recent_billing_invoices %}
+<div class="invoice-list">
+    {% for invoice in recent_billing_invoices %}
+    <a class="invoice-row" href="/billing/invoices/{{ invoice['id'] }}">
+        <div>
+            <div class="invoice-title">{{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</div>
+            <div class="invoice-note">Период: {{ invoice["period"] or "не указан" }}</div>
+        </div>
+        <div class="invoice-note">Тариф: {{ invoice["plan_label"] }}</div>
+        <div class="invoice-value">{{ invoice["amount_label"] }}</div>
+        <span class="invoice-status {{ invoice['status_tone'] }}">{{ invoice["status_label"] }}</span>
+    </a>
+    {% endfor %}
 </div>
 {% endif %}
 </div>

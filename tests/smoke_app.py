@@ -6153,6 +6153,7 @@ async def assert_billing_page():
     assert "Состояние счетов" in html
     assert "Просрочено по дате" in html
     assert "К оплате всего" in html
+    assert "SMOKE-BILL-1" in html
     assert "Используется пользователей" in html
     assert "Звонки:" in html
     assert "1С:" in html
@@ -6181,6 +6182,11 @@ async def assert_billing_page():
     assert len(response.context["plan_history"]) >= 1
     assert response.context["billing_invoice_summary"]["count"] >= 1
     assert response.context["billing_risk_summary"]["overdue_by_date_count"] >= 1
+    assert response.context["recent_billing_invoices"]
+    assert any(
+        invoice["invoice_number"] == "SMOKE-BILL-1"
+        for invoice in response.context["recent_billing_invoices"]
+    )
     assert response.context["plan_features"]["calls_enabled"] in (0, 1)
     assert response.context["plan_features"]["one_c_enabled"] in (0, 1)
     assert response.context["plan_features"]["ai_calls_enabled"] in (0, 1)
@@ -6229,6 +6235,11 @@ async def assert_billing_page():
     assert "calls_enabled" in owner_billing_api["plan"]["features"]
     assert owner_billing_api["invoice_summary"]["count"] >= 1
     assert owner_billing_api["invoice_risk_summary"]["overdue_by_date_count"] >= 1
+    assert owner_billing_api["recent_invoices"]
+    assert any(
+        invoice["invoice_number"] == "SMOKE-BILL-1"
+        for invoice in owner_billing_api["recent_invoices"]
+    )
     assert owner_billing_api["links"]["invoices"] == "/billing/invoices"
     assert owner_billing_api["links"]["invoices_api"] == "/api/billing/invoices"
 

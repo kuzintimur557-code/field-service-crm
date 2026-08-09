@@ -31310,6 +31310,7 @@ async def billing_page(request: Request):
     conn.close()
     billing_invoice_summary = build_billing_invoice_summary(billing_invoices)
     billing_risk_summary = build_platform_billing_risk_summary(billing_invoices)
+    recent_billing_invoices = billing_invoices[:3]
 
     plan_names = {
         plan_key: definition["label"]
@@ -31338,6 +31339,7 @@ async def billing_page(request: Request):
             "plan_history": plan_history,
             "billing_invoice_summary": billing_invoice_summary,
             "billing_risk_summary": billing_risk_summary,
+            "recent_billing_invoices": recent_billing_invoices,
         }
     )
 
@@ -31394,6 +31396,7 @@ async def api_billing(request: Request):
         "recommended_plan": recommended_plan,
         "invoice_summary": build_billing_invoice_summary(invoices),
         "invoice_risk_summary": build_platform_billing_risk_summary(invoices),
+        "recent_invoices": invoices[:3],
         "links": {
             "page": "/billing",
             "export": "/billing/export",
