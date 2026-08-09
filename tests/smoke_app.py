@@ -6058,6 +6058,23 @@ async def assert_billing_page():
     assert billing_risk["due_soon_count"] == 1
     assert billing_risk["draft_count"] == 1
     assert billing_risk["issued_count"] == 1
+    next_payment = crm.build_billing_next_payment_summary(
+        [
+            {
+                "id": 7,
+                "invoice_number": "BILL-SMOKE",
+                "status_code": "issued",
+                "due_date": "2026-07-28",
+                "amount_label": "100 ₽",
+            }
+        ],
+        today=datetime(2026, 7, 29).date(),
+    )
+    assert next_payment["has_invoice"] is True
+    assert next_payment["overdue"] is True
+    assert next_payment["tone"] == "danger"
+    assert next_payment["label"] == "Просрочен на 1 дн."
+    assert next_payment["link"] == "/billing/invoices/7"
     overdue_payload = crm.get_platform_billing_reminder_payload(
         {
             "id": 7,
@@ -6153,6 +6170,8 @@ async def assert_billing_page():
     assert "Состояние счетов" in html
     assert "Просрочено по дате" in html
     assert "К оплате всего" in html
+    assert "Ближайший платёж" in html
+    assert "Открыть счёт" in html
     assert "SMOKE-BILL-1" in html
     assert "Используется пользователей" in html
     assert "Звонки:" in html
@@ -6182,6 +6201,7 @@ async def assert_billing_page():
     assert len(response.context["plan_history"]) >= 1
     assert response.context["billing_invoice_summary"]["count"] >= 1
     assert response.context["billing_risk_summary"]["overdue_by_date_count"] >= 1
+    assert response.context["next_payment_summary"]["has_invoice"] is True
     assert response.context["recent_billing_invoices"]
     assert any(
         invoice["invoice_number"] == "SMOKE-BILL-1"
@@ -6235,6 +6255,10 @@ async def assert_billing_page():
     assert "calls_enabled" in owner_billing_api["plan"]["features"]
     assert owner_billing_api["invoice_summary"]["count"] >= 1
     assert owner_billing_api["invoice_risk_summary"]["overdue_by_date_count"] >= 1
+    assert owner_billing_api["next_payment"]["has_invoice"] is True
+    assert owner_billing_api["next_payment"]["link"].startswith(
+        "/billing/invoices/"
+    )
     assert owner_billing_api["recent_invoices"]
     assert any(
         invoice["invoice_number"] == "SMOKE-BILL-1"
@@ -6257,6 +6281,7 @@ async def assert_billing_page():
     assert "Состояние счетов" in billing_export_csv
     assert "Просрочено по дате" in billing_export_csv
     assert "Сумма просрочки" in billing_export_csv
+    assert "Ближайший платёж" in billing_export_csv
     assert "История тарифа" in billing_export_csv
     assert "Тариф,Лимит пользователей,Стоимость,Звонки,1С,ИИ-звонки,Текущий" in (
         billing_export_csv

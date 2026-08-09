@@ -59,6 +59,10 @@ h2{margin:0 0 16px;font-size:22px}
 .invoice-status.warning{background:#fef3c7;color:#92400e}
 .invoice-status.danger{background:#fee2e2;color:#991b1b}
 .invoice-status.muted{background:#f3f4f6;color:#6b7280}
+.next-payment{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;margin-bottom:14px;padding:16px;border:1px solid #bfdbfe;border-radius:16px;background:#eff6ff}
+.next-payment.warning{background:#fffbeb;border-color:#fde68a}
+.next-payment.danger{background:#fee2e2;border-color:#fecaca}
+.next-payment-action{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:10px 13px;border-radius:12px;background:#111827;color:white;text-decoration:none;font-size:13px;font-weight:900}
 .history-item{display:grid;grid-template-columns:150px minmax(0,1fr) 130px;gap:12px;padding:13px 0;border-bottom:1px solid #e5e7eb;align-items:start}
 .history-item:last-child{border-bottom:0}
 .history-title{font-weight:900;color:#111827}
@@ -71,6 +75,8 @@ h2{margin:0 0 16px;font-size:22px}
     .grid{grid-template-columns:1fr}
     .invoice-grid{grid-template-columns:1fr}
     .invoice-row{grid-template-columns:1fr}
+    .next-payment{grid-template-columns:1fr}
+    .next-payment-action{width:100%}
     h1{font-size:28px}
     .feature{display:grid;grid-template-columns:auto minmax(0,1fr)}
     .history-item{grid-template-columns:1fr}
@@ -140,6 +146,21 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="card">
 <h2>Состояние счетов</h2>
+{% if next_payment_summary["has_invoice"] %}
+{% set next_invoice = next_payment_summary["invoice"] %}
+<div class="next-payment {{ next_payment_summary['tone'] }}">
+    <div>
+        <div class="invoice-label">Ближайший платёж</div>
+        <div class="invoice-value">{{ next_invoice["amount_label"] }}</div>
+        <div class="invoice-note">
+            {{ next_invoice["invoice_number"] or ("#" ~ next_invoice["id"]) }} ·
+            {{ next_payment_summary["label"] }} ·
+            срок: {{ next_invoice["due_date"] or "не указан" }}
+        </div>
+    </div>
+    <a class="next-payment-action" href="{{ next_payment_summary['link'] }}">Открыть счёт</a>
+</div>
+{% endif %}
 <div class="invoice-grid">
     <a class="invoice-metric danger" href="/billing/invoices">
         <div class="invoice-label">Просрочено по дате</div>

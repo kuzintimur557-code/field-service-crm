@@ -1524,6 +1524,67 @@ def parse_billing_due_date(value):
         return None
 
 
+def build_billing_next_payment_summary(invoices, today=None):
+    today = today or datetime.now().date()
+    unpaid_statuses = {"draft", "issued", "overdue"}
+    candidates = []
+
+    for invoice in invoices:
+        status = normalize_billing_invoice_status(invoice.get("status_code"))
+
+        if status not in unpaid_statuses:
+            continue
+
+        due_date = parse_billing_due_date(invoice.get("due_date"))
+        sort_date = due_date or datetime.max.date()
+        candidates.append((sort_date, int(invoice.get("id") or 0), invoice))
+
+    if not candidates:
+        return {
+            "has_invoice": False,
+            "invoice": None,
+            "label": "Нет платежей",
+            "tone": "ok",
+            "days_left": None,
+            "overdue": False,
+            "link": "/billing/invoices",
+        }
+
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    _, _, invoice = candidates[0]
+    due_date = parse_billing_due_date(invoice.get("due_date"))
+    days_left = None
+    overdue = False
+    tone = "warning"
+
+    if due_date:
+        days_left = (due_date - today).days
+
+        if days_left < 0:
+            overdue = True
+            label = f"Просрочен на {abs(days_left)} дн."
+            tone = "danger"
+        elif days_left == 0:
+            label = "Оплатить сегодня"
+        elif days_left <= 7:
+            label = f"Оплатить через {days_left} дн."
+        else:
+            label = f"Оплатить до {invoice['due_date']}"
+            tone = "ok"
+    else:
+        label = "Дата оплаты не указана"
+
+    return {
+        "has_invoice": True,
+        "invoice": invoice,
+        "label": label,
+        "tone": tone,
+        "days_left": days_left,
+        "overdue": overdue,
+        "link": f"/billing/invoices/{invoice['id']}",
+    }
+
+
 def build_platform_billing_risk_summary(invoices, today=None):
     today = today or datetime.now().date()
     due_soon_end = today + timedelta(days=7)
@@ -31310,6 +31371,7 @@ async def billing_page(request: Request):
     conn.close()
     billing_invoice_summary = build_billing_invoice_summary(billing_invoices)
     billing_risk_summary = build_platform_billing_risk_summary(billing_invoices)
+    next_payment_summary = build_billing_next_payment_summary(billing_invoices)
     recent_billing_invoices = billing_invoices[:3]
 
     plan_names = {
@@ -31339,6 +31401,7 @@ async def billing_page(request: Request):
             "plan_history": plan_history,
             "billing_invoice_summary": billing_invoice_summary,
             "billing_risk_summary": billing_risk_summary,
+            "next_payment_summary": next_payment_summary,
             "recent_billing_invoices": recent_billing_invoices,
         }
     )
@@ -31396,6 +31459,7 @@ async def api_billing(request: Request):
         "recommended_plan": recommended_plan,
         "invoice_summary": build_billing_invoice_summary(invoices),
         "invoice_risk_summary": build_platform_billing_risk_summary(invoices),
+        "next_payment": build_billing_next_payment_summary(invoices),
         "recent_invoices": invoices[:3],
         "links": {
             "page": "/billing",
@@ -31437,6 +31501,7 @@ async def billing_export(request: Request):
     conn.close()
     billing_invoice_summary = build_billing_invoice_summary(billing_invoices)
     billing_risk_summary = build_platform_billing_risk_summary(billing_invoices)
+    next_payment_summary = build_billing_next_payment_summary(billing_invoices)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -31497,6 +31562,14 @@ async def billing_export(request: Request):
     ])
     writer.writerow(["Черновики", billing_risk_summary["draft_count"]])
     writer.writerow(["Выставленные", billing_risk_summary["issued_count"]])
+    if next_payment_summary["has_invoice"]:
+        next_invoice = next_payment_summary["invoice"]
+        writer.writerow([])
+        writer.writerow(["Ближайший платёж"])
+        writer.writerow(["Счёт", next_invoice["invoice_number"] or next_invoice["id"]])
+        writer.writerow(["Срок", next_invoice["due_date"] or "Не указан"])
+        writer.writerow(["Сумма", next_invoice["amount_label"]])
+        writer.writerow(["Статус", next_payment_summary["label"]])
 
     writer.writerow([])
     writer.writerow(["История тарифа"])
