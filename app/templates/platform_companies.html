@@ -35,6 +35,9 @@ h1{margin:0 0 12px;font-size:36px}
 .limit-pill{display:inline-flex;margin-top:5px;padding:5px 7px;border-radius:8px;background:#dcfce7;color:#166534;font-size:11px;font-weight:900}
 .limit-pill.warning{background:#fef3c7;color:#92400e}
 .limit-pill.danger{background:#fee2e2;color:#991b1b}
+.billing-pill{display:inline-flex;margin-top:6px;padding:5px 7px;border-radius:8px;background:#dcfce7;color:#166534;font-size:11px;font-weight:900}
+.billing-pill.warning{background:#fef3c7;color:#92400e}
+.billing-pill.danger{background:#fee2e2;color:#991b1b}
 .recommendation-pill{display:inline-flex;margin-top:6px;padding:5px 7px;border-radius:8px;background:#eff6ff;color:#1e40af;font-size:11px;font-weight:900}
 @media(max-width:850px){.container{padding:16px}.company{grid-template-columns:1fr}h1{font-size:30px}}
 @media(max-width:850px){.filters{grid-template-columns:1fr}.filters button,.filters a{width:100%}}
@@ -185,6 +188,14 @@ h1{margin:0 0 12px;font-size:36px}
         <div class="summary-label">Проблем с лимитом</div>
         <div class="summary-value">{{ summary["limit_alerts"] }}</div>
     </div>
+    <div class="summary-item">
+        <div class="summary-label">Компаний с долгом</div>
+        <div class="summary-value">{{ summary["billing_risk_companies"] }}</div>
+    </div>
+    <div class="summary-item">
+        <div class="summary-label">К оплате</div>
+        <div class="summary-value">{{ summary["billing_unpaid_amount_label"] }}</div>
+    </div>
 </div>
 
 <div class="meta">Показано компаний: {{ companies|length }}</div>
@@ -212,7 +223,9 @@ h1{margin:0 0 12px;font-size:36px}
     <div class="meta">
         Статус: активна<br>
         Пользователи: {{ company["active_users_count"] }} / {{ company["users_count"] }}<br>
-        Заявки: {{ company["active_tasks_count"] }} активные · {{ company["archived_tasks_count"] }} архив
+        Заявки: {{ company["active_tasks_count"] }} активные · {{ company["archived_tasks_count"] }} архив<br>
+        Счета: {{ company["billing_invoice_summary"]["unpaid_amount_label"] }}
+        <span class="billing-pill {{ company['billing_status_tone'] }}">{{ company["billing_status_label"] }}</span>
     </div>
     <form class="company-settings" method="post" action="/platform/companies/{{ company['id'] }}/settings">
         <input type="hidden" name="return_search" value="{{ search }}">

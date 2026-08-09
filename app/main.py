@@ -7875,6 +7875,23 @@ def get_platform_company_items(
 
     query += " ORDER BY companies.id DESC"
     company_rows = c.execute(query, params).fetchall()
+    company_ids = [int(row["id"]) for row in company_rows]
+    billing_by_company = {company_id: [] for company_id in company_ids}
+
+    if company_ids:
+        placeholders = ",".join("?" for _ in company_ids)
+        billing_rows = c.execute(f"""
+        SELECT *
+        FROM billing_invoices
+        WHERE company_id IN ({placeholders})
+        ORDER BY id DESC
+        """, company_ids).fetchall()
+
+        for invoice in build_billing_invoice_rows(billing_rows):
+            billing_by_company.setdefault(
+                int(invoice.get("company_id") or 0),
+                [],
+            ).append(invoice)
 
     conn.close()
     industry_labels = dict(INDUSTRY_OPTIONS)
@@ -7919,6 +7936,38 @@ def get_platform_company_items(
                 company["active_users_count"],
             )
 
+        company_billing_invoices = billing_by_company.get(company["id"], [])
+        billing_summary = build_billing_invoice_summary(company_billing_invoices)
+        billing_risk = build_platform_billing_risk_summary(
+            company_billing_invoices,
+        )
+        company["billing_invoice_summary"] = billing_summary
+        company["billing_risk_summary"] = billing_risk
+
+        if billing_risk["overdue_by_date_count"]:
+            company["billing_status_tone"] = "danger"
+            company["billing_status_label"] = (
+                f"Просрочено: {billing_risk['overdue_by_date_count']}"
+            )
+        elif billing_risk["due_soon_count"]:
+            company["billing_status_tone"] = "warning"
+            company["billing_status_label"] = (
+                f"Скоро к оплате: {billing_risk['due_soon_count']}"
+            )
+        elif billing_risk["draft_count"]:
+            company["billing_status_tone"] = "warning"
+            company["billing_status_label"] = (
+                f"Черновики: {billing_risk['draft_count']}"
+            )
+        elif billing_summary["unpaid_amount"] > 0:
+            company["billing_status_tone"] = "warning"
+            company["billing_status_label"] = (
+                f"К оплате: {billing_summary['unpaid_amount_label']}"
+            )
+        else:
+            company["billing_status_tone"] = "ok"
+            company["billing_status_label"] = "Счета в норме"
+
         companies.append(company)
 
     if selected_limit != "all":
@@ -7962,6 +8011,29 @@ def get_platform_company_items(
             1
             for company in companies
             if company["user_limit_tone"] == "ok"
+        ),
+        "billing_unpaid_amount": round(sum(
+            company["billing_invoice_summary"]["unpaid_amount"]
+            for company in companies
+        ), 2),
+        "billing_unpaid_amount_label": format_rub_amount(sum(
+            company["billing_invoice_summary"]["unpaid_amount"]
+            for company in companies
+        )),
+        "billing_risk_companies": sum(
+            1
+            for company in companies
+            if company["billing_status_tone"] in {"warning", "danger"}
+        ),
+        "billing_overdue_companies": sum(
+            1
+            for company in companies
+            if company["billing_risk_summary"]["overdue_by_date_count"] > 0
+        ),
+        "billing_due_soon_companies": sum(
+            1
+            for company in companies
+            if company["billing_risk_summary"]["due_soon_count"] > 0
         ),
     }
 

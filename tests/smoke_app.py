@@ -10438,10 +10438,22 @@ async def assert_platform_companies_page():
     assert "Осталось мест: 2" in list_html
     assert "Пользователи: 1 / 1" in list_html
     assert "Заявки: 0 активные · 0 архив" in list_html
+    assert "Компаний с долгом" in list_html
+    assert "Счета: 0 ₽" in list_html
+    assert "Счета в норме" in list_html
     assert list_response.context["summary"]["companies"] >= 1
     assert list_response.context["summary"]["active_users"] >= 1
     assert list_response.context["summary"]["active_tasks"] >= 0
     assert list_response.context["summary"]["limit_alerts"] >= 0
+    assert "billing_risk_companies" in list_response.context["summary"]
+    list_company = next(
+        company
+        for company in list_response.context["companies"]
+        if company["id"] == logistics_company_id
+    )
+    assert list_company["billing_invoice_summary"]["count"] == 0
+    assert list_company["billing_status_tone"] == "ok"
+    assert list_company["billing_status_label"] == "Счета в норме"
     assert f'href="/platform/companies/{logistics_company_id}"' in list_html
     assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
     assert 'name="return_search"' in list_html
@@ -10645,6 +10657,13 @@ async def assert_platform_companies_page():
         company["id"] == logistics_company_id
         for company in filtered_companies_api["companies"]
     )
+    filtered_api_company = next(
+        company
+        for company in filtered_companies_api["companies"]
+        if company["id"] == logistics_company_id
+    )
+    assert filtered_api_company["billing_invoice_summary"]["count"] == 0
+    assert filtered_api_company["billing_status_tone"] == "ok"
 
     module_export_response = await crm.platform_companies_export(
         make_asgi_request(
@@ -10934,6 +10953,21 @@ async def assert_platform_companies_page():
     assert platform_invoice_api["billing"]["recent_invoices"][0][
         "invoice_number"
     ] == f"BILL-{logistics_company_id}-202609"
+
+    platform_company_list_after_invoice = await crm.api_platform_companies(
+        make_asgi_request(
+            "super",
+            "/api/platform/companies?search=Smoke%20Logistics",
+        ),
+        search="Smoke Logistics",
+    )
+    list_invoice_company = next(
+        company
+        for company in platform_company_list_after_invoice["companies"]
+        if company["id"] == logistics_company_id
+    )
+    assert list_invoice_company["billing_invoice_summary"]["count"] == 1
+    assert list_invoice_company["billing_status_tone"] in {"warning", "danger"}
 
     platform_invoice_export = await crm.platform_company_export(
         make_asgi_request(
