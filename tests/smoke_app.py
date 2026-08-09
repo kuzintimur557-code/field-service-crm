@@ -10651,6 +10651,7 @@ async def assert_platform_companies_page():
     assert companies_api["filters"]["billing"] == "all"
     assert companies_api["summary"]["companies"] >= 1
     assert companies_api["links"]["page"] == "/platform/companies"
+    assert "search=Smoke+Logistics" in companies_api["links"]["filtered_page"]
     assert "search=Smoke+Logistics" in companies_api["links"]["export"]
     assert any(
         company["id"] == logistics_company_id

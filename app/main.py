@@ -9343,6 +9343,14 @@ async def api_platform_companies(
         "companies": company_data["companies"],
         "links": {
             "page": "/platform/companies",
+            "filtered_page": build_platform_companies_url(
+                search=company_data["search"],
+                industry=company_data["selected_industry"],
+                plan=company_data["selected_plan"],
+                limit=company_data["selected_limit"],
+                feature=company_data["selected_feature"],
+                billing=company_data["selected_billing"],
+            ),
             "export": (
                 "/platform/companies/export?"
                 + urlencode({
