@@ -7819,6 +7819,21 @@ def get_platform_dashboard_counts():
     return counts
 
 
+def get_platform_dashboard_alerts(platform_company_usage):
+    return {
+        "limit_alert_companies": [
+            company
+            for company in platform_company_usage["companies"]
+            if company["user_limit_tone"] in {"warning", "danger"}
+        ][:5],
+        "billing_alert_companies": [
+            company
+            for company in platform_company_usage["companies"]
+            if company["billing_status_tone"] in {"warning", "danger"}
+        ][:5],
+    }
+
+
 def get_platform_company_items(
     search="",
     industry="all",
@@ -12882,16 +12897,7 @@ async def api_platform_dashboard(request: Request):
     counts = get_platform_dashboard_counts()
 
     platform_company_usage = get_platform_company_items()
-    limit_alert_companies = [
-        company
-        for company in platform_company_usage["companies"]
-        if company["user_limit_tone"] in {"warning", "danger"}
-    ][:5]
-    billing_alert_companies = [
-        company
-        for company in platform_company_usage["companies"]
-        if company["billing_status_tone"] in {"warning", "danger"}
-    ][:5]
+    platform_alerts = get_platform_dashboard_alerts(platform_company_usage)
     platform_billing_summary = get_platform_billing_invoice_summary()
     platform_module_usage = get_platform_module_usage()
     platform_preset_usage = get_platform_preset_usage()
@@ -12900,8 +12906,8 @@ async def api_platform_dashboard(request: Request):
         "ok": True,
         "counts": counts,
         "company_usage_summary": platform_company_usage["summary"],
-        "limit_alert_companies": limit_alert_companies,
-        "billing_alert_companies": billing_alert_companies,
+        "limit_alert_companies": platform_alerts["limit_alert_companies"],
+        "billing_alert_companies": platform_alerts["billing_alert_companies"],
         "platform_billing_summary": platform_billing_summary,
         "module_usage_summary": platform_module_usage["summary"],
         "preset_usage_summary": platform_preset_usage["summary"],
@@ -13044,16 +13050,7 @@ async def platform_dashboard(request: Request):
         calendar_health_summary=calendar_health["summary"],
     )
     platform_company_usage = get_platform_company_items()
-    limit_alert_companies = [
-        company
-        for company in platform_company_usage["companies"]
-        if company["user_limit_tone"] in {"warning", "danger"}
-    ][:5]
-    billing_alert_companies = [
-        company
-        for company in platform_company_usage["companies"]
-        if company["billing_status_tone"] in {"warning", "danger"}
-    ][:5]
+    platform_alerts = get_platform_dashboard_alerts(platform_company_usage)
     platform_billing_summary = get_platform_billing_invoice_summary()
     platform_module_usage = get_platform_module_usage()
     platform_preset_usage = get_platform_preset_usage()
@@ -13080,8 +13077,8 @@ async def platform_dashboard(request: Request):
             "release_readiness": release_readiness,
             "release_dashboard": release_dashboard,
             "company_usage_summary": platform_company_usage["summary"],
-            "limit_alert_companies": limit_alert_companies,
-            "billing_alert_companies": billing_alert_companies,
+            "limit_alert_companies": platform_alerts["limit_alert_companies"],
+            "billing_alert_companies": platform_alerts["billing_alert_companies"],
             "platform_billing_summary": platform_billing_summary,
             "module_usage_summary": platform_module_usage["summary"],
             "preset_usage_summary": platform_preset_usage["summary"],
