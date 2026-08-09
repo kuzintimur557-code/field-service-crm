@@ -8927,6 +8927,39 @@ async def platform_company_export(request: Request, company_id: int):
     writer.writerow([])
 
     writer.writerow(["Счета платформы"])
+    writer.writerow(["Всего счетов", profile["billing_invoice_summary"]["count"]])
+    writer.writerow([
+        "Начислено",
+        profile["billing_invoice_summary"]["total_amount_label"],
+    ])
+    writer.writerow([
+        "К оплате",
+        profile["billing_invoice_summary"]["unpaid_amount_label"],
+    ])
+    writer.writerow([
+        "Просрочено по дате",
+        profile["billing_risk_summary"]["overdue_by_date_count"],
+    ])
+    writer.writerow([
+        "Сумма просрочки",
+        profile["billing_risk_summary"]["overdue_by_date_amount_label"],
+    ])
+    writer.writerow([
+        "Скоро к оплате",
+        profile["billing_risk_summary"]["due_soon_count"],
+    ])
+    writer.writerow(["Черновики", profile["billing_risk_summary"]["draft_count"]])
+    if profile["next_payment_summary"]["has_invoice"]:
+        next_invoice = profile["next_payment_summary"]["invoice"]
+        writer.writerow([
+            "Ближайший платёж",
+            next_invoice["invoice_number"] or f"#{next_invoice['id']}",
+        ])
+        writer.writerow(["Срок ближайшего платежа", next_invoice["due_date"] or ""])
+        writer.writerow([
+            "Статус ближайшего платежа",
+            profile["next_payment_summary"]["label"],
+        ])
     writer.writerow(["Номер", "Период", "Тариф", "Сумма", "Статус", "Оплатить до"])
     for invoice in profile["billing_invoices"]:
         writer.writerow([

@@ -10699,6 +10699,8 @@ async def assert_platform_companies_page():
     assert "Отклонений от пресета" in company_export_csv
     assert "История настроек" in company_export_csv
     assert "Счета платформы" in company_export_csv
+    assert "Просрочено по дате" in company_export_csv
+    assert "Сумма просрочки" in company_export_csv
     assert "Заявки всего" in company_export_csv
     assert "Активные заявки" in company_export_csv
     assert "Модули" in company_export_csv
@@ -10831,6 +10833,19 @@ async def assert_platform_companies_page():
     assert "Счёт платформы сформирован" in platform_invoice_html
     assert "Ближайший платёж" in platform_invoice_html
     assert f"BILL-{logistics_company_id}-202609" in platform_invoice_html
+
+    platform_invoice_export = await crm.platform_company_export(
+        make_asgi_request(
+            "super",
+            f"/platform/companies/{logistics_company_id}/export",
+        ),
+        logistics_company_id,
+    )
+    platform_invoice_export_csv = platform_invoice_export.body.decode("utf-8")
+    assert platform_invoice_export.status_code == 200
+    assert "Ближайший платёж" in platform_invoice_export_csv
+    assert "Статус ближайшего платежа" in platform_invoice_export_csv
+    assert f"BILL-{logistics_company_id}-202609" in platform_invoice_export_csv
 
     duplicate_platform_invoice = (
         await crm.generate_platform_company_billing_invoice(
