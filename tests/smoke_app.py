@@ -6243,6 +6243,9 @@ async def assert_billing_page():
     assert billing_export_csv.startswith("\ufeff")
     assert "Тарифы компании" in billing_export_csv
     assert "Текущий тариф" in billing_export_csv
+    assert "Состояние счетов" in billing_export_csv
+    assert "Просрочено по дате" in billing_export_csv
+    assert "Сумма просрочки" in billing_export_csv
     assert "История тарифа" in billing_export_csv
     assert "Тариф,Лимит пользователей,Стоимость,Звонки,1С,ИИ-звонки,Текущий" in (
         billing_export_csv

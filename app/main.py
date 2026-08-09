@@ -31430,7 +31430,10 @@ async def billing_export(request: Request):
     conn = connect()
     c = conn.cursor()
     plan_history = fetch_billing_plan_history(c, company_id, limit=None)
+    billing_invoices = fetch_billing_invoices(c, company_id)
     conn.close()
+    billing_invoice_summary = build_billing_invoice_summary(billing_invoices)
+    billing_risk_summary = build_platform_billing_risk_summary(billing_invoices)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -31465,6 +31468,32 @@ async def billing_export(request: Request):
             "Да" if definition["ai_calls_enabled"] else "Нет",
             "Да" if plan_key == plan else "Нет",
         ])
+
+    writer.writerow([])
+    writer.writerow(["Состояние счетов"])
+    writer.writerow(["Показатель", "Значение"])
+    writer.writerow(["Всего счетов", billing_invoice_summary["count"]])
+    writer.writerow(["Начислено", billing_invoice_summary["total_amount_label"]])
+    writer.writerow(["Оплачено", billing_invoice_summary["paid_amount_label"]])
+    writer.writerow(["К оплате", billing_invoice_summary["unpaid_amount_label"]])
+    writer.writerow([
+        "Просрочено по дате",
+        billing_risk_summary["overdue_by_date_count"],
+    ])
+    writer.writerow([
+        "Сумма просрочки",
+        billing_risk_summary["overdue_by_date_amount_label"],
+    ])
+    writer.writerow([
+        "Скоро к оплате",
+        billing_risk_summary["due_soon_count"],
+    ])
+    writer.writerow([
+        "Сумма скоро к оплате",
+        billing_risk_summary["due_soon_amount_label"],
+    ])
+    writer.writerow(["Черновики", billing_risk_summary["draft_count"]])
+    writer.writerow(["Выставленные", billing_risk_summary["issued_count"]])
 
     writer.writerow([])
     writer.writerow(["История тарифа"])
