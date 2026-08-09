@@ -10459,10 +10459,11 @@ async def assert_platform_companies_page():
     assert 'name="return_search"' in list_html
     assert 'name="return_limit"' in list_html
     assert 'name="return_feature"' in list_html
+    assert 'name="return_billing"' in list_html
     assert "Сохранить" in list_html
     assert (
         "/platform/companies/export?search=&amp;industry=all&amp;plan=all"
-        "&amp;limit=all&amp;feature=all"
+        "&amp;limit=all&amp;feature=all&amp;billing=all"
         in list_html
     )
 
@@ -10483,6 +10484,7 @@ async def assert_platform_companies_page():
     assert filtered_response.context["selected_plan"] == "basic"
     assert filtered_response.context["selected_limit"] == "all"
     assert filtered_response.context["selected_feature"] == "all"
+    assert filtered_response.context["selected_billing"] == "all"
     assert "Smoke Logistics Company" in filtered_html
     assert 'value="Smoke Logistics"' in filtered_html
     assert "Сбросить" in filtered_html
@@ -10505,6 +10507,21 @@ async def assert_platform_companies_page():
     assert limit_filter_response.context["summary"]["companies"] >= 1
     assert "Smoke Logistics Company" in limit_filter_html
     assert "Осталось мест: 2" in limit_filter_html
+
+    billing_filter_response = await crm.platform_companies_page(
+        make_asgi_request(
+            "super",
+            "/platform/companies",
+            "search=Smoke%20Logistics&billing=ok",
+        ),
+        search="Smoke Logistics",
+        billing="ok",
+    )
+    billing_filter_html = billing_filter_response.body.decode("utf-8")
+    assert billing_filter_response.status_code == 200
+    assert billing_filter_response.context["selected_billing"] == "ok"
+    assert billing_filter_response.context["summary"]["companies"] >= 1
+    assert "Smoke Logistics Company" in billing_filter_html
 
     module_filter_response = await crm.platform_companies_page(
         make_asgi_request(
@@ -10631,6 +10648,7 @@ async def assert_platform_companies_page():
     )
     assert companies_api["ok"] is True
     assert companies_api["filters"]["search"] == "Smoke Logistics"
+    assert companies_api["filters"]["billing"] == "all"
     assert companies_api["summary"]["companies"] >= 1
     assert companies_api["links"]["page"] == "/platform/companies"
     assert "search=Smoke+Logistics" in companies_api["links"]["export"]
@@ -10644,17 +10662,19 @@ async def assert_platform_companies_page():
             "super",
             (
                 "/api/platform/companies?search=Smoke%20Logistics"
-                "&industry=logistics&plan=basic&limit=ok"
+                "&industry=logistics&plan=basic&limit=ok&billing=ok"
             ),
         ),
         search="Smoke Logistics",
         industry="logistics",
         plan="basic",
         limit="ok",
+        billing="ok",
     )
     assert filtered_companies_api["filters"]["industry"] == "logistics"
     assert filtered_companies_api["filters"]["plan"] == "basic"
     assert filtered_companies_api["filters"]["limit"] == "ok"
+    assert filtered_companies_api["filters"]["billing"] == "ok"
     assert any(
         company["id"] == logistics_company_id
         for company in filtered_companies_api["companies"]
@@ -10970,6 +10990,23 @@ async def assert_platform_companies_page():
     )
     assert list_invoice_company["billing_invoice_summary"]["count"] == 1
     assert list_invoice_company["billing_status_tone"] in {"warning", "danger"}
+
+    billing_warning_filter_api = await crm.api_platform_companies(
+        make_asgi_request(
+            "super",
+            (
+                "/api/platform/companies?search=Smoke%20Logistics"
+                "&billing=warning"
+            ),
+        ),
+        search="Smoke Logistics",
+        billing="warning",
+    )
+    assert billing_warning_filter_api["filters"]["billing"] == "warning"
+    assert any(
+        company["id"] == logistics_company_id
+        for company in billing_warning_filter_api["companies"]
+    )
 
     platform_invoice_export = await crm.platform_company_export(
         make_asgi_request(

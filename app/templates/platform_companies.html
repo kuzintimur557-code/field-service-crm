@@ -19,7 +19,7 @@ h1{margin:0 0 12px;font-size:36px}
 .name a{color:#111827;text-decoration:none}
 .name a:hover{color:#2563eb}
 .meta{font-size:14px;color:#6b7280;font-weight:800}
-.filters{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 1fr auto auto;gap:10px;margin-bottom:18px;align-items:end}
+.filters{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr auto auto;gap:10px;margin-bottom:18px;align-items:end}
 .filters label{display:grid;gap:6px;color:#6b7280;font-size:13px;font-weight:900}
 .filters input,.filters select{padding:12px;border:1px solid #d1d5db;border-radius:12px;font-size:14px}
 .filters button,.filters a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 14px;border:0;border-radius:12px;background:#111827;color:white;text-decoration:none;font-weight:900;cursor:pointer}
@@ -164,11 +164,20 @@ h1{margin:0 0 12px;font-size:36px}
             {% endfor %}
         </select>
     </label>
+    <label>
+        Счета
+        <select name="billing">
+            <option value="all" {% if selected_billing == "all" %}selected{% endif %}>Все счета</option>
+            <option value="ok" {% if selected_billing == "ok" %}selected{% endif %}>В норме</option>
+            <option value="warning" {% if selected_billing == "warning" %}selected{% endif %}>Есть риск</option>
+            <option value="danger" {% if selected_billing == "danger" %}selected{% endif %}>Просрочено</option>
+        </select>
+    </label>
     <button type="submit">Найти</button>
-    {% if search or selected_industry != "all" or selected_plan != "all" or selected_limit != "all" or selected_feature != "all" %}
+    {% if search or selected_industry != "all" or selected_plan != "all" or selected_limit != "all" or selected_feature != "all" or selected_billing != "all" %}
     <a href="/platform/companies">Сбросить</a>
     {% endif %}
-    <a href="/platform/companies/export?search={{ search|urlencode }}&amp;industry={{ selected_industry|urlencode }}&amp;plan={{ selected_plan|urlencode }}&amp;limit={{ selected_limit|urlencode }}&amp;feature={{ selected_feature|urlencode }}">Экспорт CSV</a>
+    <a href="/platform/companies/export?search={{ search|urlencode }}&amp;industry={{ selected_industry|urlencode }}&amp;plan={{ selected_plan|urlencode }}&amp;limit={{ selected_limit|urlencode }}&amp;feature={{ selected_feature|urlencode }}&amp;billing={{ selected_billing|urlencode }}">Экспорт CSV</a>
 </form>
 
 <div class="summary-grid">
@@ -233,6 +242,7 @@ h1{margin:0 0 12px;font-size:36px}
         <input type="hidden" name="return_plan" value="{{ selected_plan }}">
         <input type="hidden" name="return_limit" value="{{ selected_limit }}">
         <input type="hidden" name="return_feature" value="{{ selected_feature }}">
+        <input type="hidden" name="return_billing" value="{{ selected_billing }}">
         <label>
             Сфера
             <select name="industry">
@@ -254,7 +264,7 @@ h1{margin:0 0 12px;font-size:36px}
 </div>
 {% endfor %}
 {% else %}
-{% if search or selected_industry != "all" or selected_plan != "all" or selected_limit != "all" or selected_feature != "all" %}
+{% if search or selected_industry != "all" or selected_plan != "all" or selected_limit != "all" or selected_feature != "all" or selected_billing != "all" %}
 <div class="meta">По выбранным условиям компаний не найдено</div>
 {% else %}
 <div class="meta">Компаний пока нет</div>

@@ -7738,14 +7738,23 @@ def build_platform_companies_url(
     extra_params=None,
     limit="all",
     feature="all",
+    billing="all",
 ):
     params = {}
-    search, industry, plan, limit, feature = normalize_platform_company_filters(
+    (
         search,
         industry,
         plan,
         limit,
         feature,
+        billing,
+    ) = normalize_platform_company_filters(
+        search,
+        industry,
+        plan,
+        limit,
+        feature,
+        billing,
     )
 
     if search:
@@ -7763,6 +7772,9 @@ def build_platform_companies_url(
     if feature != "all":
         params["feature"] = feature
 
+    if billing != "all":
+        params["billing"] = billing
+
     if extra_params:
         params.update(extra_params)
 
@@ -7778,17 +7790,20 @@ def normalize_platform_company_filters(
     plan="all",
     limit="all",
     feature="all",
+    billing="all",
 ):
     search = str(search or "").strip()[:80]
     allowed_industries = {industry_key for industry_key, _ in INDUSTRY_OPTIONS}
     allowed_limits = {"all", "ok", "warning", "danger"}
+    allowed_billing = {"all", "ok", "warning", "danger"}
     allowed_features = {feature_key for feature_key, _, _ in FEATURE_DEFINITIONS}
     industry = industry if industry in allowed_industries else "all"
     plan = plan if plan in PLAN_DEFINITIONS else "all"
     limit = limit if limit in allowed_limits else "all"
     feature = feature if feature in allowed_features else "all"
+    billing = billing if billing in allowed_billing else "all"
 
-    return search, industry, plan, limit, feature
+    return search, industry, plan, limit, feature, billing
 
 
 def get_platform_company_items(
@@ -7797,6 +7812,7 @@ def get_platform_company_items(
     plan="all",
     limit="all",
     feature="all",
+    billing="all",
 ):
     (
         search,
@@ -7804,12 +7820,14 @@ def get_platform_company_items(
         selected_plan,
         selected_limit,
         selected_feature,
+        selected_billing,
     ) = normalize_platform_company_filters(
         search,
         industry,
         plan,
         limit,
         feature,
+        billing,
     )
 
     conn = connect()
@@ -7984,6 +8002,13 @@ def get_platform_company_items(
             if get_company_features(company["id"]).get(selected_feature)
         ]
 
+    if selected_billing != "all":
+        companies = [
+            company
+            for company in companies
+            if company["billing_status_tone"] == selected_billing
+        ]
+
     summary = {
         "companies": len(companies),
         "active_users": sum(
@@ -8045,6 +8070,7 @@ def get_platform_company_items(
         "selected_plan": selected_plan,
         "selected_limit": selected_limit,
         "selected_feature": selected_feature,
+        "selected_billing": selected_billing,
     }
 
 
@@ -8577,12 +8603,14 @@ async def update_platform_company_settings(request: Request, company_id: int):
         return_plan,
         return_limit,
         return_feature,
+        return_billing,
     ) = normalize_platform_company_filters(
         form.get("return_search") or "",
         form.get("return_industry") or "all",
         form.get("return_plan") or "all",
         form.get("return_limit") or "all",
         form.get("return_feature") or "all",
+        form.get("return_billing") or "all",
     )
     visible_return_industry = return_industry
     visible_return_plan = return_plan
@@ -8602,6 +8630,7 @@ async def update_platform_company_settings(request: Request, company_id: int):
             visible_return_plan,
             limit=return_limit,
             feature=return_feature,
+            billing=return_billing,
         )
 
     conn = connect()
@@ -8622,6 +8651,7 @@ async def update_platform_company_settings(request: Request, company_id: int):
                 {"error": "company_not_found"},
                 limit=return_limit,
                 feature=return_feature,
+                billing=return_billing,
             ),
             status_code=302,
         )
@@ -8834,6 +8864,7 @@ async def platform_companies_export(
     plan: str = "all",
     limit: str = "all",
     feature: str = "all",
+    billing: str = "all",
 ):
 
     username = get_user(request)
@@ -8852,6 +8883,7 @@ async def platform_companies_export(
         plan,
         limit,
         feature,
+        billing,
     )
 
     output = io.StringIO()
@@ -8910,6 +8942,9 @@ async def platform_companies_export(
 
     if company_data["selected_feature"] != "all":
         filename_parts.append(company_data["selected_feature"])
+
+    if company_data["selected_billing"] != "all":
+        filename_parts.append(f"billing_{company_data['selected_billing']}")
 
     filename = "_".join(filename_parts) + ".csv"
 
@@ -9244,6 +9279,7 @@ async def api_platform_companies(
     plan: str = "all",
     limit: str = "all",
     feature: str = "all",
+    billing: str = "all",
 ):
 
     username = get_user(request)
@@ -9262,6 +9298,7 @@ async def api_platform_companies(
         plan,
         limit,
         feature,
+        billing,
     )
 
     return {
@@ -9272,6 +9309,7 @@ async def api_platform_companies(
             "plan": company_data["selected_plan"],
             "limit": company_data["selected_limit"],
             "feature": company_data["selected_feature"],
+            "billing": company_data["selected_billing"],
         },
         "summary": company_data["summary"],
         "companies": company_data["companies"],
@@ -9285,6 +9323,7 @@ async def api_platform_companies(
                     "plan": company_data["selected_plan"],
                     "limit": company_data["selected_limit"],
                     "feature": company_data["selected_feature"],
+                    "billing": company_data["selected_billing"],
                 })
             ),
         },
@@ -9299,6 +9338,7 @@ async def platform_companies_page(
     plan: str = "all",
     limit: str = "all",
     feature: str = "all",
+    billing: str = "all",
 ):
 
     username = get_user(request)
@@ -9317,6 +9357,7 @@ async def platform_companies_page(
         plan,
         limit,
         feature,
+        billing,
     )
 
     return templates.TemplateResponse(
@@ -9336,6 +9377,7 @@ async def platform_companies_page(
             "selected_plan": company_data["selected_plan"],
             "selected_limit": company_data["selected_limit"],
             "selected_feature": company_data["selected_feature"],
+            "selected_billing": company_data["selected_billing"],
         }
     )
 
