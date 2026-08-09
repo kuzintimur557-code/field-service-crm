@@ -12915,10 +12915,14 @@ async def api_platform_dashboard(request: Request):
             "page": "/platform",
             "export": "/platform/export",
             "companies": "/platform/companies",
+            "companies_export": "/platform/companies/export",
             "billing": "/platform/billing",
+            "billing_export": "/platform/billing/export",
             "billing_risks": "/platform/companies?billing=warning",
             "modules": "/platform/modules",
+            "modules_export": "/platform/modules/export",
             "presets": "/platform/presets",
+            "presets_export": "/platform/presets/export",
         },
     }
 

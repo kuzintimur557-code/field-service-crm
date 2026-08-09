@@ -15401,6 +15401,18 @@ async def assert_platform_calendar_health():
         )
         assert "risk_summary" in platform_api["platform_billing_summary"]
         assert platform_api["links"]["export"] == "/platform/export"
+        assert platform_api["links"]["companies_export"] == (
+            "/platform/companies/export"
+        )
+        assert platform_api["links"]["billing_export"] == (
+            "/platform/billing/export"
+        )
+        assert platform_api["links"]["modules_export"] == (
+            "/platform/modules/export"
+        )
+        assert platform_api["links"]["presets_export"] == (
+            "/platform/presets/export"
+        )
         assert platform_api["links"]["billing_risks"] == (
             "/platform/companies?billing=warning"
         )
