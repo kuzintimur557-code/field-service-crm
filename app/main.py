@@ -12877,6 +12877,16 @@ async def api_platform_dashboard(request: Request):
     conn.close()
 
     platform_company_usage = get_platform_company_items()
+    limit_alert_companies = [
+        company
+        for company in platform_company_usage["companies"]
+        if company["user_limit_tone"] in {"warning", "danger"}
+    ][:5]
+    billing_alert_companies = [
+        company
+        for company in platform_company_usage["companies"]
+        if company["billing_status_tone"] in {"warning", "danger"}
+    ][:5]
     platform_billing_summary = get_platform_billing_invoice_summary()
     platform_module_usage = get_platform_module_usage()
     platform_preset_usage = get_platform_preset_usage()
@@ -12885,6 +12895,8 @@ async def api_platform_dashboard(request: Request):
         "ok": True,
         "counts": counts,
         "company_usage_summary": platform_company_usage["summary"],
+        "limit_alert_companies": limit_alert_companies,
+        "billing_alert_companies": billing_alert_companies,
         "platform_billing_summary": platform_billing_summary,
         "module_usage_summary": platform_module_usage["summary"],
         "preset_usage_summary": platform_preset_usage["summary"],

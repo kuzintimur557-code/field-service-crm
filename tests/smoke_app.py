@@ -15389,6 +15389,16 @@ async def assert_platform_calendar_health():
         assert platform_api["ok"] is True
         assert platform_api["counts"]["companies"] >= 1
         assert "billing_risk_companies" in platform_api["company_usage_summary"]
+        assert len(platform_api["limit_alert_companies"]) <= 5
+        assert len(platform_api["billing_alert_companies"]) <= 5
+        assert all(
+            company["user_limit_tone"] in {"warning", "danger"}
+            for company in platform_api["limit_alert_companies"]
+        )
+        assert all(
+            company["billing_status_tone"] in {"warning", "danger"}
+            for company in platform_api["billing_alert_companies"]
+        )
         assert "risk_summary" in platform_api["platform_billing_summary"]
         assert platform_api["links"]["export"] == "/platform/export"
         assert platform_api["links"]["billing_risks"] == (
