@@ -12890,6 +12890,7 @@ async def api_platform_dashboard(request: Request):
         "preset_usage_summary": platform_preset_usage["summary"],
         "links": {
             "page": "/platform",
+            "export": "/platform/export",
             "companies": "/platform/companies",
             "billing": "/platform/billing",
             "billing_risks": "/platform/companies?billing=warning",

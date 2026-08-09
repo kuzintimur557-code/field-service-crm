@@ -15390,6 +15390,7 @@ async def assert_platform_calendar_health():
         assert platform_api["counts"]["companies"] >= 1
         assert "billing_risk_companies" in platform_api["company_usage_summary"]
         assert "risk_summary" in platform_api["platform_billing_summary"]
+        assert platform_api["links"]["export"] == "/platform/export"
         assert platform_api["links"]["billing_risks"] == (
             "/platform/companies?billing=warning"
         )
