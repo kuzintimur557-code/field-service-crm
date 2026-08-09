@@ -9156,6 +9156,61 @@ async def api_platform_company_detail(request: Request, company_id: int):
     }
 
 
+@app.get("/api/platform/companies")
+async def api_platform_companies(
+    request: Request,
+    search: str = "",
+    industry: str = "all",
+    plan: str = "all",
+    limit: str = "all",
+    feature: str = "all",
+):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    company_data = get_platform_company_items(
+        search,
+        industry,
+        plan,
+        limit,
+        feature,
+    )
+
+    return {
+        "ok": True,
+        "filters": {
+            "search": company_data["search"],
+            "industry": company_data["selected_industry"],
+            "plan": company_data["selected_plan"],
+            "limit": company_data["selected_limit"],
+            "feature": company_data["selected_feature"],
+        },
+        "summary": company_data["summary"],
+        "companies": company_data["companies"],
+        "links": {
+            "page": "/platform/companies",
+            "export": (
+                "/platform/companies/export?"
+                + urlencode({
+                    "search": company_data["search"],
+                    "industry": company_data["selected_industry"],
+                    "plan": company_data["selected_plan"],
+                    "limit": company_data["selected_limit"],
+                    "feature": company_data["selected_feature"],
+                })
+            ),
+        },
+    }
+
+
 @app.get("/platform/companies", response_class=HTMLResponse)
 async def platform_companies_page(
     request: Request,

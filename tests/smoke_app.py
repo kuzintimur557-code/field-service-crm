@@ -10598,6 +10598,54 @@ async def assert_platform_companies_page():
     assert ",1,1,0,0," in export_csv
     assert "Smoke Company 1" not in export_csv
 
+    anonymous_companies_api = await crm.api_platform_companies(
+        make_public_asgi_request("/api/platform/companies"),
+    )
+    assert anonymous_companies_api.status_code == 401
+
+    boss_companies_api = await crm.api_platform_companies(
+        make_asgi_request("owner2", "/api/platform/companies"),
+    )
+    assert boss_companies_api.status_code == 403
+
+    companies_api = await crm.api_platform_companies(
+        make_asgi_request(
+            "super",
+            "/api/platform/companies?search=Smoke%20Logistics",
+        ),
+        search="Smoke Logistics",
+    )
+    assert companies_api["ok"] is True
+    assert companies_api["filters"]["search"] == "Smoke Logistics"
+    assert companies_api["summary"]["companies"] >= 1
+    assert companies_api["links"]["page"] == "/platform/companies"
+    assert "search=Smoke+Logistics" in companies_api["links"]["export"]
+    assert any(
+        company["id"] == logistics_company_id
+        for company in companies_api["companies"]
+    )
+
+    filtered_companies_api = await crm.api_platform_companies(
+        make_asgi_request(
+            "super",
+            (
+                "/api/platform/companies?search=Smoke%20Logistics"
+                "&industry=logistics&plan=basic&limit=ok"
+            ),
+        ),
+        search="Smoke Logistics",
+        industry="logistics",
+        plan="basic",
+        limit="ok",
+    )
+    assert filtered_companies_api["filters"]["industry"] == "logistics"
+    assert filtered_companies_api["filters"]["plan"] == "basic"
+    assert filtered_companies_api["filters"]["limit"] == "ok"
+    assert any(
+        company["id"] == logistics_company_id
+        for company in filtered_companies_api["companies"]
+    )
+
     module_export_response = await crm.platform_companies_export(
         make_asgi_request(
             "super",
