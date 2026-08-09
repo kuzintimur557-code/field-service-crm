@@ -11658,11 +11658,16 @@ async def assert_platform_modules_page():
     assert "/platform/billing/export" in platform_html
     assert "Просрочено по сроку" in platform_html
     assert "Оплата в 7 дней" in platform_html
+    assert "Компаний с долгом" in platform_html
+    assert "Риски оплат" in platform_html
+    assert "/platform/companies?billing=warning" in platform_html
+    assert "/platform/companies?billing=danger" in platform_html
     assert "/platform/companies?limit=danger" in platform_html
     assert "/platform/companies?limit=warning" in platform_html
     assert "company_usage_summary" not in platform_html
     assert platform_page.context["company_usage_summary"]["companies"] >= 1
     assert "limit_danger" in platform_page.context["company_usage_summary"]
+    assert "billing_risk_companies" in platform_page.context["company_usage_summary"]
     assert "platform_billing_summary" not in platform_html
     assert platform_page.context["platform_billing_summary"]["count"] >= 0
     assert "unpaid_amount_label" in platform_page.context[

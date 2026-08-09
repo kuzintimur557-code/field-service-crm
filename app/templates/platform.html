@@ -283,11 +283,20 @@ h1{font-size:30px}
                 <div class="saas-label">Оплата в 7 дней</div>
                 <div class="saas-value">{{ platform_billing_summary["risk_summary"]["due_soon_count"] }}</div>
             </a>
+            <a class="saas-item" href="/platform/companies?billing=warning">
+                <div class="saas-label">Компаний с долгом</div>
+                <div class="saas-value">{{ company_usage_summary["billing_risk_companies"] }}</div>
+            </a>
+            <a class="saas-item" href="/platform/companies?billing=danger">
+                <div class="saas-label">Компаний с просрочкой</div>
+                <div class="saas-value">{{ company_usage_summary["billing_overdue_companies"] }}</div>
+            </a>
         </div>
     </div>
     <div class="saas-actions">
         <a href="/platform/billing">Счета</a>
         <a class="secondary" href="/platform/billing/export">Экспорт счетов</a>
+        <a class="secondary" href="/platform/companies?billing=warning">Риски оплат</a>
         <a class="secondary" href="/platform/companies?limit=danger">Риски тарифов</a>
     </div>
 </div>
