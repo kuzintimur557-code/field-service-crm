@@ -10719,6 +10719,8 @@ async def assert_platform_companies_page():
     assert detail_response.context["disabled_features_count"] >= 0
     assert detail_response.context["preset_drift"]["count"] == 0
     assert detail_response.context["billing_invoice_summary"]["count"] == 0
+    assert detail_response.context["billing_risk_summary"]["draft_count"] == 0
+    assert detail_response.context["next_payment_summary"]["has_invoice"] is False
     assert detail_response.context["task_stats"]["total"] == 0
     assert detail_response.context["task_stats"]["active"] == 0
     assert "Карточка компании" in detail_html
@@ -10728,6 +10730,8 @@ async def assert_platform_companies_page():
     assert "История настроек" in detail_html
     assert "История настроек пока пустая" in detail_html
     assert "Счета платформы" in detail_html
+    assert "Просрочено" in detail_html
+    assert "Скоро к оплате" in detail_html
     assert "Счета платформы пока не созданы" in detail_html
     assert (
         f"/platform/companies/{logistics_company_id}/billing/generate"
@@ -10822,7 +10826,10 @@ async def assert_platform_companies_page():
     platform_invoice_html = platform_invoice_detail.body.decode("utf-8")
     assert platform_invoice_detail.status_code == 200
     assert platform_invoice_detail.context["billing_invoice_summary"]["count"] == 1
+    assert platform_invoice_detail.context["billing_risk_summary"]["draft_count"] == 1
+    assert platform_invoice_detail.context["next_payment_summary"]["has_invoice"] is True
     assert "Счёт платформы сформирован" in platform_invoice_html
+    assert "Ближайший платёж" in platform_invoice_html
     assert f"BILL-{logistics_company_id}-202609" in platform_invoice_html
 
     duplicate_platform_invoice = (

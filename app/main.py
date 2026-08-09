@@ -8051,6 +8051,8 @@ def get_platform_company_profile(company_id):
     billing_invoices = fetch_billing_invoices(c, company_id)
     recent_billing_invoices = billing_invoices[:5]
     billing_invoice_summary = build_billing_invoice_summary(billing_invoices)
+    billing_risk_summary = build_platform_billing_risk_summary(billing_invoices)
+    next_payment_summary = build_billing_next_payment_summary(billing_invoices)
 
     task_stats = c.execute("""
     SELECT
@@ -8103,6 +8105,8 @@ def get_platform_company_profile(company_id):
         ],
         "billing_invoices": recent_billing_invoices,
         "billing_invoice_summary": billing_invoice_summary,
+        "billing_risk_summary": billing_risk_summary,
+        "next_payment_summary": next_payment_summary,
     }
 
 

@@ -49,6 +49,13 @@ h2{margin:0 0 16px;font-size:22px}
 .settings-form input{min-height:42px;padding:10px;border:1px solid #d1d5db;border-radius:11px;background:white;font-size:14px}
 .settings-form button{min-height:42px;padding:10px 14px;border:0;border-radius:11px;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .billing-form{grid-template-columns:minmax(160px,240px) auto;margin-top:14px;max-width:420px}
+.billing-risk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.billing-risk{padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb}
+.billing-risk.warning{background:#fffbeb;border-color:#fde68a;color:#92400e}
+.billing-risk.danger{background:#fee2e2;border-color:#fecaca;color:#991b1b}
+.next-payment{margin-top:14px;padding:14px;border:1px solid #bfdbfe;border-radius:14px;background:#eff6ff}
+.next-payment.warning{background:#fffbeb;border-color:#fde68a}
+.next-payment.danger{background:#fee2e2;border-color:#fecaca}
 .notice{padding:14px;border-radius:14px;font-weight:900;margin-bottom:18px}
 .notice.ok{background:#dcfce7;color:#166534}
 .notice.err{background:#fee2e2;color:#991b1b}
@@ -58,6 +65,7 @@ h2{margin:0 0 16px;font-size:22px}
     .features{grid-template-columns:1fr}
     .settings-form{grid-template-columns:1fr}
     .settings-form button{width:100%}
+    .billing-risk-grid{grid-template-columns:1fr}
     .row{grid-template-columns:1fr}
     .drift-row{grid-template-columns:1fr}
     h1{font-size:28px}
@@ -222,6 +230,31 @@ h2{margin:0 0 16px;font-size:22px}
         начислено: {{ billing_invoice_summary["total_amount_label"] }} ·
         к оплате: {{ billing_invoice_summary["unpaid_amount_label"] }}
     </div>
+    <div class="billing-risk-grid">
+        <div class="billing-risk danger">
+            <div class="stat-label">Просрочено</div>
+            <div class="stat-value">{{ billing_risk_summary["overdue_by_date_count"] }}</div>
+            <div class="meta">{{ billing_risk_summary["overdue_by_date_amount_label"] }}</div>
+        </div>
+        <div class="billing-risk warning">
+            <div class="stat-label">Скоро к оплате</div>
+            <div class="stat-value">{{ billing_risk_summary["due_soon_count"] }}</div>
+            <div class="meta">{{ billing_risk_summary["due_soon_amount_label"] }}</div>
+        </div>
+        <div class="billing-risk">
+            <div class="stat-label">Черновики</div>
+            <div class="stat-value">{{ billing_risk_summary["draft_count"] }}</div>
+            <div class="meta">Нужно выставить</div>
+        </div>
+    </div>
+    {% if next_payment_summary["has_invoice"] %}
+    {% set next_invoice = next_payment_summary["invoice"] %}
+    <div class="next-payment {{ next_payment_summary['tone'] }}">
+        <div class="stat-label">Ближайший платёж</div>
+        <div class="name">{{ next_invoice["invoice_number"] or ("#" ~ next_invoice["id"]) }} · {{ next_invoice["amount_label"] }}</div>
+        <div class="meta">{{ next_payment_summary["label"] }} · срок: {{ next_invoice["due_date"] or "не указан" }}</div>
+    </div>
+    {% endif %}
     <form class="settings-form billing-form" method="post" action="/platform/companies/{{ company['id'] }}/billing/generate">
         <label>
             Период счёта
