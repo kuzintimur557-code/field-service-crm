@@ -31306,7 +31306,10 @@ async def billing_page(request: Request):
     conn = connect()
     c = conn.cursor()
     plan_history = fetch_billing_plan_history(c, company_id)
+    billing_invoices = fetch_billing_invoices(c, company_id)
     conn.close()
+    billing_invoice_summary = build_billing_invoice_summary(billing_invoices)
+    billing_risk_summary = build_platform_billing_risk_summary(billing_invoices)
 
     plan_names = {
         plan_key: definition["label"]
@@ -31333,6 +31336,8 @@ async def billing_page(request: Request):
             "plan_names": plan_names,
             "plan_prices": plan_prices,
             "plan_history": plan_history,
+            "billing_invoice_summary": billing_invoice_summary,
+            "billing_risk_summary": billing_risk_summary,
         }
     )
 

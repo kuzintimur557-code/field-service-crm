@@ -41,6 +41,16 @@ h2{margin:0 0 16px;font-size:22px}
 .capability{display:inline-flex;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
 .capability.on{background:#dcfce7;color:#166534}
 .capability.off{background:#f3f4f6;color:#6b7280}
+.invoice-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.invoice-metric{display:block;padding:16px;border:1px solid #e5e7eb;border-radius:16px;background:#f9fafb;color:#111827;text-decoration:none}
+.invoice-metric.warning{background:#fffbeb;border-color:#fde68a}
+.invoice-metric.danger{background:#fff7f7;border-color:#fecaca}
+.invoice-label{color:#6b7280;font-size:12px;font-weight:900;text-transform:uppercase;line-height:1.35}
+.invoice-value{margin-top:8px;font-size:22px;font-weight:900}
+.invoice-note{margin-top:6px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.35}
+.invoice-alert{margin-top:14px;padding:14px;border-radius:14px;background:#eff6ff;color:#1e3a8a;font-weight:900;line-height:1.45}
+.invoice-alert.warning{background:#fffbeb;color:#92400e}
+.invoice-alert.danger{background:#fee2e2;color:#991b1b}
 .history-item{display:grid;grid-template-columns:150px minmax(0,1fr) 130px;gap:12px;padding:13px 0;border-bottom:1px solid #e5e7eb;align-items:start}
 .history-item:last-child{border-bottom:0}
 .history-title{font-weight:900;color:#111827}
@@ -51,6 +61,7 @@ h2{margin:0 0 16px;font-size:22px}
     .container{padding:16px 14px 92px}
     .card{padding:20px;border-radius:18px}
     .grid{grid-template-columns:1fr}
+    .invoice-grid{grid-template-columns:1fr}
     h1{font-size:28px}
     .feature{display:grid;grid-template-columns:auto minmax(0,1fr)}
     .history-item{grid-template-columns:1fr}
@@ -116,6 +127,45 @@ h2{margin:0 0 16px;font-size:22px}
 {% endif %}
 {% endif %}
 </div>
+</div>
+
+<div class="card">
+<h2>Состояние счетов</h2>
+<div class="invoice-grid">
+    <a class="invoice-metric danger" href="/billing/invoices">
+        <div class="invoice-label">Просрочено по дате</div>
+        <div class="invoice-value">{{ billing_risk_summary["overdue_by_date_count"] }}</div>
+        <div class="invoice-note">{{ billing_risk_summary["overdue_by_date_amount_label"] }}</div>
+    </a>
+    <a class="invoice-metric warning" href="/billing/invoices?status=issued">
+        <div class="invoice-label">Скоро к оплате</div>
+        <div class="invoice-value">{{ billing_risk_summary["due_soon_count"] }}</div>
+        <div class="invoice-note">{{ billing_risk_summary["due_soon_amount_label"] }}</div>
+    </a>
+    <a class="invoice-metric" href="/billing/invoices?status=draft">
+        <div class="invoice-label">Черновики</div>
+        <div class="invoice-value">{{ billing_risk_summary["draft_count"] }}</div>
+        <div class="invoice-note">Нужно выставить</div>
+    </a>
+    <a class="invoice-metric" href="/billing/invoices">
+        <div class="invoice-label">К оплате всего</div>
+        <div class="invoice-value">{{ billing_invoice_summary["unpaid_amount_label"] }}</div>
+        <div class="invoice-note">{{ billing_invoice_summary["count"] }} счетов</div>
+    </a>
+</div>
+{% if billing_risk_summary["overdue_by_date_count"] %}
+<div class="invoice-alert danger">
+Есть просроченные счета платформы. Проверьте оплату, чтобы в будущем не блокировать тарифные функции.
+</div>
+{% elif billing_risk_summary["due_soon_count"] %}
+<div class="invoice-alert warning">
+Есть счета, которые скоро нужно оплатить. Откройте список счетов и проверьте дату оплаты.
+</div>
+{% else %}
+<div class="invoice-alert">
+Критичных счетов нет. Тарифный контур работает штатно.
+</div>
+{% endif %}
 </div>
 
 <div class="card">
