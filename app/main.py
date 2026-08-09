@@ -31342,6 +31342,67 @@ async def billing_page(request: Request):
     )
 
 
+@app.get("/api/billing")
+async def api_billing(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role not in ("boss", "superadmin"):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    company_id = get_user_company_id(username)
+
+    if not company_id:
+        return JSONResponse({"error": "company_required"}, status_code=400)
+
+    settings = get_company_settings(company_id)
+    plan = normalize_plan(
+        settings["plan"] if settings and "plan" in settings.keys() else "basic"
+    )
+    plan_features = get_plan_feature_flags(plan)
+    user_limit_usage = get_company_user_limit_usage(company_id, settings)
+    recommended_plan = None
+
+    if user_limit_usage["tone"] in ("warning", "danger"):
+        recommended_plan = get_recommended_user_limit_plan(
+            plan,
+            user_limit_usage["active_users_count"],
+        )
+
+    conn = connect()
+    c = conn.cursor()
+    invoices = fetch_billing_invoices(c, company_id)
+    conn.close()
+
+    return {
+        "ok": True,
+        "company_id": company_id,
+        "plan": {
+            "code": plan,
+            "label": get_plan_label(plan),
+            "price_label": get_plan_price_label(plan),
+            "user_limit": get_plan_user_limit(plan),
+            "user_limit_label": user_limit_usage["user_limit_label"],
+            "features": plan_features,
+        },
+        "user_limit_usage": user_limit_usage,
+        "recommended_plan": recommended_plan,
+        "invoice_summary": build_billing_invoice_summary(invoices),
+        "invoice_risk_summary": build_platform_billing_risk_summary(invoices),
+        "links": {
+            "page": "/billing",
+            "export": "/billing/export",
+            "invoices": "/billing/invoices",
+            "invoices_api": "/api/billing/invoices",
+        },
+    }
+
+
 @app.get("/billing/export")
 async def billing_export(request: Request):
 

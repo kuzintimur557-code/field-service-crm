@@ -6209,6 +6209,29 @@ async def assert_billing_page():
     assert "❌" not in html
     assert "🔗 Настройка 1С" not in html
 
+    anonymous_billing_api = await crm.api_billing(
+        make_public_asgi_request("/api/billing"),
+    )
+    assert anonymous_billing_api.status_code == 401
+    worker_billing_api = await crm.api_billing(
+        make_asgi_request("worker2", "/api/billing"),
+    )
+    assert worker_billing_api.status_code == 403
+    owner_billing_api = await crm.api_billing(
+        make_asgi_request("owner2", "/api/billing"),
+    )
+    assert owner_billing_api["ok"] is True
+    assert owner_billing_api["company_id"] == 2
+    assert owner_billing_api["plan"]["code"] in crm.PLAN_DEFINITIONS
+    assert owner_billing_api["plan"]["price_label"] == crm.get_plan_price_label(
+        owner_billing_api["plan"]["code"],
+    )
+    assert "calls_enabled" in owner_billing_api["plan"]["features"]
+    assert owner_billing_api["invoice_summary"]["count"] >= 1
+    assert owner_billing_api["invoice_risk_summary"]["overdue_by_date_count"] >= 1
+    assert owner_billing_api["links"]["invoices"] == "/billing/invoices"
+    assert owner_billing_api["links"]["invoices_api"] == "/api/billing/invoices"
+
     billing_export = await crm.billing_export(
         make_asgi_request("owner2", "/billing/export")
     )
