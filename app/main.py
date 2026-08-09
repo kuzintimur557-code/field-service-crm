@@ -8869,6 +8869,10 @@ async def platform_companies_export(
         "Пользователи всего",
         "Активные заявки",
         "Архивные заявки",
+        "Статус счетов",
+        "К оплате",
+        "Просрочено счетов",
+        "Скоро к оплате",
         "Создана",
     ])
 
@@ -8890,6 +8894,10 @@ async def platform_companies_export(
             company["users_count"],
             company["active_tasks_count"],
             company["archived_tasks_count"],
+            company["billing_status_label"],
+            company["billing_invoice_summary"]["unpaid_amount_label"],
+            company["billing_risk_summary"]["overdue_by_date_count"],
+            company["billing_risk_summary"]["due_soon_count"],
             company["created_at"],
         ])
 

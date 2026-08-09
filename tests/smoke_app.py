@@ -10600,14 +10600,16 @@ async def assert_platform_companies_page():
         "ID,Компания,Владелец,Сфера,Тариф,Лимит пользователей,"
         "Статус лимита,Рекомендуемый тариф,Активные пользователи,"
         "Пользователи всего,"
-        "Активные заявки,Архивные заявки,Создана"
+        "Активные заявки,Архивные заявки,Статус счетов,"
+        "К оплате,Просрочено счетов,Скоро к оплате,Создана"
     ) in export_csv
     assert "Smoke Logistics Company" in export_csv
     assert "smoke_logistics_owner" in export_csv
     assert "Грузоперевозки" in export_csv
     assert "Базовый" in export_csv
     assert "Осталось мест: 2" in export_csv
-    assert ",1,1,0,0," in export_csv
+    assert "Счета в норме" in export_csv
+    assert "0 ₽" in export_csv
     assert "Smoke Company 1" not in export_csv
 
     anonymous_companies_api = await crm.api_platform_companies(
