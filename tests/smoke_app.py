@@ -10877,6 +10877,10 @@ async def assert_platform_companies_page():
     assert detail_api["links"]["page"] == (
         f"/platform/companies/{logistics_company_id}"
     )
+    assert detail_api["links"]["companies"] == "/platform/companies"
+    assert detail_api["links"]["billing_export"] == (
+        f"/platform/billing/export?company_id={logistics_company_id}"
+    )
 
     anonymous_platform_invoice = (
         await crm.generate_platform_company_billing_invoice(

@@ -9293,8 +9293,13 @@ async def api_platform_company_detail(request: Request, company_id: int):
         },
         "links": {
             "page": f"/platform/companies/{company['id']}",
+            "companies": "/platform/companies",
             "export": f"/platform/companies/{company['id']}/export",
             "billing": f"/platform/billing?company_id={company['id']}",
+            "billing_export": build_platform_billing_url(
+                company_id=company["id"],
+                export=True,
+            ),
         },
     }
 
