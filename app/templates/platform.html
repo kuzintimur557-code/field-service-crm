@@ -292,6 +292,19 @@ h1{font-size:30px}
                 <div class="saas-value">{{ company_usage_summary["billing_overdue_companies"] }}</div>
             </a>
         </div>
+        {% if billing_alert_companies %}
+        <div class="limit-company-list">
+            {% for company in billing_alert_companies %}
+            <a class="limit-company {{ company['billing_status_tone'] }}" href="/platform/companies/{{ company['id'] }}">
+                <div>
+                    <strong>{{ company["name"] }}</strong>
+                    <span>{{ company["billing_status_label"] }} · к оплате: {{ company["billing_invoice_summary"]["unpaid_amount_label"] }}</span>
+                </div>
+                <span>{{ company["plan_label"] }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
     <div class="saas-actions">
         <a href="/platform/billing">Счета</a>
