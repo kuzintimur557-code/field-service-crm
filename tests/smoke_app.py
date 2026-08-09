@@ -15432,6 +15432,8 @@ async def assert_platform_calendar_health():
         assert platform_export_csv.startswith("\ufeff")
         assert "Панель платформы" in platform_export_csv
         assert "Тарифы и лимиты" in platform_export_csv
+        assert "Компании с риском лимита" in platform_export_csv
+        assert "Компании с риском оплаты" in platform_export_csv
         assert "Счета и подписки" in platform_export_csv
         assert "Модульность SaaS" in platform_export_csv
         assert "Компаний с долгом" in platform_export_csv

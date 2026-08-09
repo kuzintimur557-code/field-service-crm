@@ -12956,6 +12956,7 @@ async def platform_dashboard_export(request: Request):
     counts = get_platform_dashboard_counts()
 
     platform_company_usage = get_platform_company_items()
+    platform_alerts = get_platform_dashboard_alerts(platform_company_usage)
     company_summary = platform_company_usage["summary"]
     platform_billing_summary = get_platform_billing_invoice_summary()
     platform_module_usage = get_platform_module_usage()
@@ -12978,6 +12979,41 @@ async def platform_dashboard_export(request: Request):
     writer.writerow(["В норме", company_summary["limit_ok"]])
     writer.writerow(["Компаний с долгом", company_summary["billing_risk_companies"]])
     writer.writerow(["К оплате", company_summary["billing_unpaid_amount_label"]])
+    writer.writerow([])
+    writer.writerow(["Компании с риском лимита"])
+    writer.writerow(["ID", "Компания", "Тариф", "Пользователи", "Статус"])
+
+    for company in platform_alerts["limit_alert_companies"]:
+        writer.writerow([
+            company["id"],
+            company["name"],
+            company["plan_label"],
+            (
+                f"{company['active_users_count']} / "
+                f"{company['user_limit_label']}"
+            ),
+            company["user_limit_status"],
+        ])
+
+    if not platform_alerts["limit_alert_companies"]:
+        writer.writerow(["", "Нет компаний с риском лимита", "", "", ""])
+
+    writer.writerow([])
+    writer.writerow(["Компании с риском оплаты"])
+    writer.writerow(["ID", "Компания", "Тариф", "К оплате", "Статус"])
+
+    for company in platform_alerts["billing_alert_companies"]:
+        writer.writerow([
+            company["id"],
+            company["name"],
+            company["plan_label"],
+            company["billing_invoice_summary"]["unpaid_amount_label"],
+            company["billing_status_label"],
+        ])
+
+    if not platform_alerts["billing_alert_companies"]:
+        writer.writerow(["", "Нет компаний с риском оплаты", "", "", ""])
+
     writer.writerow([])
     writer.writerow(["Счета и подписки"])
     writer.writerow(["Счетов", platform_billing_summary["count"]])
