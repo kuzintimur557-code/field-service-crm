@@ -7806,6 +7806,19 @@ def normalize_platform_company_filters(
     return search, industry, plan, limit, feature, billing
 
 
+def get_platform_dashboard_counts():
+    conn = connect()
+    c = conn.cursor()
+    counts = {
+        "companies": c.execute("SELECT COUNT(*) FROM companies").fetchone()[0],
+        "users": c.execute("SELECT COUNT(*) FROM users").fetchone()[0],
+        "tasks": c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],
+        "clients": c.execute("SELECT COUNT(*) FROM clients").fetchone()[0],
+    }
+    conn.close()
+    return counts
+
+
 def get_platform_company_items(
     search="",
     industry="all",
@@ -12866,15 +12879,7 @@ async def api_platform_dashboard(request: Request):
     if role != "superadmin":
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
-    conn = connect()
-    c = conn.cursor()
-    counts = {
-        "companies": c.execute("SELECT COUNT(*) FROM companies").fetchone()[0],
-        "users": c.execute("SELECT COUNT(*) FROM users").fetchone()[0],
-        "tasks": c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],
-        "clients": c.execute("SELECT COUNT(*) FROM clients").fetchone()[0],
-    }
-    conn.close()
+    counts = get_platform_dashboard_counts()
 
     platform_company_usage = get_platform_company_items()
     limit_alert_companies = [
@@ -12925,15 +12930,7 @@ async def platform_dashboard_export(request: Request):
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    conn = connect()
-    c = conn.cursor()
-    counts = {
-        "companies": c.execute("SELECT COUNT(*) FROM companies").fetchone()[0],
-        "users": c.execute("SELECT COUNT(*) FROM users").fetchone()[0],
-        "tasks": c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],
-        "clients": c.execute("SELECT COUNT(*) FROM clients").fetchone()[0],
-    }
-    conn.close()
+    counts = get_platform_dashboard_counts()
 
     platform_company_usage = get_platform_company_items()
     company_summary = platform_company_usage["summary"]
@@ -13005,14 +13002,14 @@ async def platform_dashboard(request: Request):
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
+    counts = get_platform_dashboard_counts()
+    companies_count = counts["companies"]
+    users_count = counts["users"]
+    tasks_count = counts["tasks"]
+    clients_count = counts["clients"]
+
     conn = connect()
     c = conn.cursor()
-
-    companies_count = c.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
-    users_count = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    tasks_count = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
-    clients_count = c.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
-
     companies = c.execute("""
     SELECT *
     FROM companies
