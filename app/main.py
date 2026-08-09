@@ -9098,6 +9098,64 @@ async def platform_company_detail_page(request: Request, company_id: int):
     )
 
 
+@app.get("/api/platform/companies/{company_id}")
+async def api_platform_company_detail(request: Request, company_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    profile = get_platform_company_profile(company_id)
+
+    if not profile:
+        return JSONResponse({"error": "company_not_found"}, status_code=404)
+
+    settings = profile["settings"]
+    company = profile["company"]
+
+    return {
+        "ok": True,
+        "company": company,
+        "settings": {
+            "industry": settings["industry"],
+            "task_label": settings["task_label"],
+            "worker_label": settings["worker_label"],
+            "client_label": settings["client_label"],
+            "service_label": settings["service_label"],
+        },
+        "usage": profile["usage"],
+        "recommended_plan": profile["recommended_plan"],
+        "industry_label": profile["industry_label"],
+        "feature_summary": {
+            "enabled": profile["enabled_features_count"],
+            "disabled": profile["disabled_features_count"],
+        },
+        "preset_drift": {
+            "count": profile["preset_drift"]["count"],
+            "status_label": profile["preset_drift"]["status_label"],
+            "items": profile["preset_drift"]["items"],
+        },
+        "task_stats": profile["task_stats"],
+        "billing": {
+            "summary": profile["billing_invoice_summary"],
+            "risk_summary": profile["billing_risk_summary"],
+            "next_payment": profile["next_payment_summary"],
+            "recent_invoices": profile["billing_invoices"],
+        },
+        "links": {
+            "page": f"/platform/companies/{company['id']}",
+            "export": f"/platform/companies/{company['id']}/export",
+            "billing": f"/platform/billing?company_id={company['id']}",
+        },
+    }
+
+
 @app.get("/platform/companies", response_class=HTMLResponse)
 async def platform_companies_page(
     request: Request,

@@ -10647,6 +10647,29 @@ async def assert_platform_companies_page():
         "/platform/companies?error=company_not_found"
     )
 
+    anonymous_detail_api = await crm.api_platform_company_detail(
+        make_public_asgi_request(
+            f"/api/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    assert anonymous_detail_api.status_code == 401
+
+    boss_detail_api = await crm.api_platform_company_detail(
+        make_asgi_request(
+            "owner2",
+            f"/api/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    assert boss_detail_api.status_code == 403
+
+    missing_detail_api = await crm.api_platform_company_detail(
+        make_asgi_request("super", "/api/platform/companies/999999"),
+        999999,
+    )
+    assert missing_detail_api.status_code == 404
+
     anonymous_company_export = await crm.platform_company_export(
         make_public_asgi_request(
             f"/platform/companies/{logistics_company_id}/export",
@@ -10749,6 +10772,22 @@ async def assert_platform_companies_page():
     assert "последний вход:" in detail_html
     assert "Заявок пока нет" in detail_html
 
+    detail_api = await crm.api_platform_company_detail(
+        make_asgi_request(
+            "super",
+            f"/api/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    assert detail_api["ok"] is True
+    assert detail_api["company"]["id"] == logistics_company_id
+    assert detail_api["billing"]["summary"]["count"] == 0
+    assert detail_api["billing"]["risk_summary"]["draft_count"] == 0
+    assert detail_api["billing"]["next_payment"]["has_invoice"] is False
+    assert detail_api["links"]["page"] == (
+        f"/platform/companies/{logistics_company_id}"
+    )
+
     anonymous_platform_invoice = (
         await crm.generate_platform_company_billing_invoice(
             make_public_asgi_request(
@@ -10833,6 +10872,20 @@ async def assert_platform_companies_page():
     assert "Счёт платформы сформирован" in platform_invoice_html
     assert "Ближайший платёж" in platform_invoice_html
     assert f"BILL-{logistics_company_id}-202609" in platform_invoice_html
+
+    platform_invoice_api = await crm.api_platform_company_detail(
+        make_asgi_request(
+            "super",
+            f"/api/platform/companies/{logistics_company_id}",
+        ),
+        logistics_company_id,
+    )
+    assert platform_invoice_api["billing"]["summary"]["count"] == 1
+    assert platform_invoice_api["billing"]["risk_summary"]["draft_count"] == 1
+    assert platform_invoice_api["billing"]["next_payment"]["has_invoice"] is True
+    assert platform_invoice_api["billing"]["recent_invoices"][0][
+        "invoice_number"
+    ] == f"BILL-{logistics_company_id}-202609"
 
     platform_invoice_export = await crm.platform_company_export(
         make_asgi_request(
