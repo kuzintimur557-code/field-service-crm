@@ -15321,12 +15321,23 @@ async def assert_platform_calendar_health():
             make_asgi_request("owner2", "/api/platform"),
         )
         assert boss_platform_api.status_code == 403
+        anonymous_platform_export = await crm.platform_dashboard_export(
+            make_public_asgi_request("/platform/export"),
+        )
+        assert anonymous_platform_export.status_code == 302
+        assert anonymous_platform_export.headers["location"] == "/login"
+        boss_platform_export = await crm.platform_dashboard_export(
+            make_asgi_request("owner2", "/platform/export"),
+        )
+        assert boss_platform_export.status_code == 302
+        assert boss_platform_export.headers["location"] == "/"
         platform_page = await crm.platform_dashboard(
             make_asgi_request("super", "/platform"),
         )
         platform_html = platform_page.body.decode("utf-8")
         assert "/platform/calendar-health" in platform_html
         assert "/platform/readiness" in platform_html
+        assert "/platform/export" in platform_html
         assert "/platform/modules" in platform_html
         assert "/platform/presets" in platform_html
         assert "Готовность релиза" in platform_html
@@ -15382,6 +15393,21 @@ async def assert_platform_calendar_health():
         assert platform_api["links"]["billing_risks"] == (
             "/platform/companies?billing=warning"
         )
+        platform_export = await crm.platform_dashboard_export(
+            make_asgi_request("super", "/platform/export"),
+        )
+        platform_export_csv = platform_export.body.decode("utf-8")
+        assert platform_export.status_code == 200
+        assert platform_export.headers["content-disposition"] == (
+            "attachment; filename=platform_dashboard.csv"
+        )
+        assert platform_export_csv.startswith("\ufeff")
+        assert "Панель платформы" in platform_export_csv
+        assert "Тарифы и лимиты" in platform_export_csv
+        assert "Счета и подписки" in platform_export_csv
+        assert "Модульность SaaS" in platform_export_csv
+        assert "Компаний с долгом" in platform_export_csv
+        assert "Просрочено по сроку" in platform_export_csv
         assert "secret_key" in {
             item["key"]
             for item in platform_page.context["release_readiness"]["checks"]

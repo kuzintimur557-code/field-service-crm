@@ -12899,6 +12899,86 @@ async def api_platform_dashboard(request: Request):
     }
 
 
+@app.get("/platform/export")
+async def platform_dashboard_export(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    conn = connect()
+    c = conn.cursor()
+    counts = {
+        "companies": c.execute("SELECT COUNT(*) FROM companies").fetchone()[0],
+        "users": c.execute("SELECT COUNT(*) FROM users").fetchone()[0],
+        "tasks": c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],
+        "clients": c.execute("SELECT COUNT(*) FROM clients").fetchone()[0],
+    }
+    conn.close()
+
+    platform_company_usage = get_platform_company_items()
+    company_summary = platform_company_usage["summary"]
+    platform_billing_summary = get_platform_billing_invoice_summary()
+    platform_module_usage = get_platform_module_usage()
+    module_summary = platform_module_usage["summary"]
+    platform_preset_usage = get_platform_preset_usage()
+    preset_summary = platform_preset_usage["summary"]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Панель платформы"])
+    writer.writerow(["Компании", counts["companies"]])
+    writer.writerow(["Пользователи", counts["users"]])
+    writer.writerow(["Заявки", counts["tasks"]])
+    writer.writerow(["Клиенты", counts["clients"]])
+    writer.writerow([])
+    writer.writerow(["Тарифы и лимиты"])
+    writer.writerow(["Компаний", company_summary["companies"]])
+    writer.writerow(["Превышен лимит", company_summary["limit_danger"]])
+    writer.writerow(["Лимит заполнен", company_summary["limit_warning"]])
+    writer.writerow(["В норме", company_summary["limit_ok"]])
+    writer.writerow(["Компаний с долгом", company_summary["billing_risk_companies"]])
+    writer.writerow(["К оплате", company_summary["billing_unpaid_amount_label"]])
+    writer.writerow([])
+    writer.writerow(["Счета и подписки"])
+    writer.writerow(["Счетов", platform_billing_summary["count"]])
+    writer.writerow([
+        "Компаний со счетами",
+        platform_billing_summary["companies_with_invoices"],
+    ])
+    writer.writerow(["Начислено", platform_billing_summary["total_amount_label"]])
+    writer.writerow(["К оплате", platform_billing_summary["unpaid_amount_label"]])
+    writer.writerow([
+        "Просрочено по сроку",
+        platform_billing_summary["risk_summary"]["overdue_by_date_count"],
+    ])
+    writer.writerow([
+        "Оплата в 7 дней",
+        platform_billing_summary["risk_summary"]["due_soon_count"],
+    ])
+    writer.writerow([])
+    writer.writerow(["Модульность SaaS"])
+    writer.writerow(["Модулей", module_summary["modules_count"]])
+    writer.writerow(["Покрытие модулей", f"{module_summary['coverage_percent']}%"])
+    writer.writerow(["Пресетов", preset_summary["presets_count"]])
+    writer.writerow(["Активных сфер", preset_summary["active_presets_count"]])
+    writer.writerow(["Отклонений", preset_summary["drift_count"]])
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=platform_dashboard.csv"
+        },
+    )
+
+
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_dashboard(request: Request):
 
