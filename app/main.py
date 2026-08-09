@@ -12853,6 +12853,52 @@ def compare_platform_release_readiness_snapshots(
     }
 
 
+@app.get("/api/platform")
+async def api_platform_dashboard(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    conn = connect()
+    c = conn.cursor()
+    counts = {
+        "companies": c.execute("SELECT COUNT(*) FROM companies").fetchone()[0],
+        "users": c.execute("SELECT COUNT(*) FROM users").fetchone()[0],
+        "tasks": c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],
+        "clients": c.execute("SELECT COUNT(*) FROM clients").fetchone()[0],
+    }
+    conn.close()
+
+    platform_company_usage = get_platform_company_items()
+    platform_billing_summary = get_platform_billing_invoice_summary()
+    platform_module_usage = get_platform_module_usage()
+    platform_preset_usage = get_platform_preset_usage()
+
+    return {
+        "ok": True,
+        "counts": counts,
+        "company_usage_summary": platform_company_usage["summary"],
+        "platform_billing_summary": platform_billing_summary,
+        "module_usage_summary": platform_module_usage["summary"],
+        "preset_usage_summary": platform_preset_usage["summary"],
+        "links": {
+            "page": "/platform",
+            "companies": "/platform/companies",
+            "billing": "/platform/billing",
+            "billing_risks": "/platform/companies?billing=warning",
+            "modules": "/platform/modules",
+            "presets": "/platform/presets",
+        },
+    }
+
+
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_dashboard(request: Request):
 

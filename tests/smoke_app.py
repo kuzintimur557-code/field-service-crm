@@ -15313,6 +15313,14 @@ async def assert_platform_calendar_health():
         assert missing_detail.headers["location"] == (
             "/platform/calendar-health?error=company_not_found"
         )
+        anonymous_platform_api = await crm.api_platform_dashboard(
+            make_public_asgi_request("/api/platform"),
+        )
+        assert anonymous_platform_api.status_code == 401
+        boss_platform_api = await crm.api_platform_dashboard(
+            make_asgi_request("owner2", "/api/platform"),
+        )
+        assert boss_platform_api.status_code == 403
         platform_page = await crm.platform_dashboard(
             make_asgi_request("super", "/platform"),
         )
@@ -15364,6 +15372,16 @@ async def assert_platform_calendar_health():
         )
         assert platform_page.context["preset_usage_summary"]["drift_count"] >= 0
         assert platform_page.context["platform_billing_summary"]["count"] >= 0
+        platform_api = await crm.api_platform_dashboard(
+            make_asgi_request("super", "/api/platform"),
+        )
+        assert platform_api["ok"] is True
+        assert platform_api["counts"]["companies"] >= 1
+        assert "billing_risk_companies" in platform_api["company_usage_summary"]
+        assert "risk_summary" in platform_api["platform_billing_summary"]
+        assert platform_api["links"]["billing_risks"] == (
+            "/platform/companies?billing=warning"
+        )
         assert "secret_key" in {
             item["key"]
             for item in platform_page.context["release_readiness"]["checks"]
