@@ -7784,6 +7784,29 @@ def build_platform_companies_url(
     return "/platform/companies?" + urlencode(params)
 
 
+def build_platform_companies_export_url(
+    search="",
+    industry="all",
+    plan="all",
+    limit="all",
+    feature="all",
+    billing="all",
+):
+    url = build_platform_companies_url(
+        search=search,
+        industry=industry,
+        plan=plan,
+        limit=limit,
+        feature=feature,
+        billing=billing,
+    )
+    return url.replace(
+        "/platform/companies",
+        "/platform/companies/export",
+        1,
+    )
+
+
 def normalize_platform_company_filters(
     search="",
     industry="all",
@@ -9401,16 +9424,13 @@ async def api_platform_companies(
                 feature=company_data["selected_feature"],
                 billing=company_data["selected_billing"],
             ),
-            "export": (
-                "/platform/companies/export?"
-                + urlencode({
-                    "search": company_data["search"],
-                    "industry": company_data["selected_industry"],
-                    "plan": company_data["selected_plan"],
-                    "limit": company_data["selected_limit"],
-                    "feature": company_data["selected_feature"],
-                    "billing": company_data["selected_billing"],
-                })
+            "export": build_platform_companies_export_url(
+                search=company_data["search"],
+                industry=company_data["selected_industry"],
+                plan=company_data["selected_plan"],
+                limit=company_data["selected_limit"],
+                feature=company_data["selected_feature"],
+                billing=company_data["selected_billing"],
             ),
         },
     }
@@ -9520,6 +9540,50 @@ async def api_platform_modules(request: Request):
             "platform": "/platform",
             "page": "/platform/modules",
             "export": "/platform/modules/export",
+        },
+    }
+
+
+@app.get("/api/platform/modules/{feature_key}")
+async def api_platform_module_detail(request: Request, feature_key: str):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    module_usage = get_platform_module_usage()
+    feature_key = str(feature_key or "").strip()
+    module = next(
+        (
+            item
+            for item in module_usage["modules"]
+            if item["key"] == feature_key
+        ),
+        None,
+    )
+
+    if not module:
+        return JSONResponse({"error": "module_not_found"}, status_code=404)
+
+    return {
+        "ok": True,
+        "generated_at": get_platform_generated_at(),
+        "summary": module_usage["summary"],
+        "module": module,
+        "links": {
+            "platform": "/platform",
+            "modules": "/platform/modules",
+            "page": f"/platform/modules/{feature_key}",
+            "companies": build_platform_companies_url(feature=feature_key),
+            "companies_export": build_platform_companies_export_url(
+                feature=feature_key,
+            ),
         },
     }
 
@@ -9668,6 +9732,39 @@ async def api_platform_presets(request: Request):
             "platform": "/platform",
             "page": "/platform/presets",
             "export": "/platform/presets/export",
+        },
+    }
+
+
+@app.get("/api/platform/presets/{industry_key}")
+async def api_platform_preset_detail(request: Request, industry_key: str):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    profile = get_platform_preset_profile(industry_key)
+
+    if not profile:
+        return JSONResponse({"error": "preset_not_found"}, status_code=404)
+
+    preset_key = profile["preset"]["key"]
+
+    return {
+        "ok": True,
+        "generated_at": get_platform_generated_at(),
+        **profile,
+        "links": {
+            "platform": "/platform",
+            "presets": "/platform/presets",
+            "page": f"/platform/presets/{preset_key}",
+            "companies": build_platform_companies_url(industry=preset_key),
         },
     }
 

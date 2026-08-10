@@ -11675,6 +11675,36 @@ async def assert_platform_modules_page():
     ) in detail_html
     assert 'class="platform-mobile-nav"' in detail_html
 
+    anonymous_detail_api = await crm.api_platform_module_detail(
+        make_public_asgi_request("/api/platform/modules/automation"),
+        "automation",
+    )
+    assert anonymous_detail_api.status_code == 401
+    boss_detail_api = await crm.api_platform_module_detail(
+        make_asgi_request("owner2", "/api/platform/modules/automation"),
+        "automation",
+    )
+    assert boss_detail_api.status_code == 403
+    missing_detail_api = await crm.api_platform_module_detail(
+        make_asgi_request("super", "/api/platform/modules/no_such_module"),
+        "no_such_module",
+    )
+    assert missing_detail_api.status_code == 404
+    module_detail_api = await crm.api_platform_module_detail(
+        make_asgi_request("super", "/api/platform/modules/automation"),
+        "automation",
+    )
+    assert module_detail_api["ok"] is True
+    assert module_detail_api["generated_at"]
+    assert module_detail_api["module"]["key"] == "automation"
+    assert module_detail_api["links"]["modules"] == "/platform/modules"
+    assert module_detail_api["links"]["companies"] == (
+        "/platform/companies?feature=automation"
+    )
+    assert module_detail_api["links"]["companies_export"] == (
+        "/platform/companies/export?feature=automation"
+    )
+
     platform_page = await crm.platform_dashboard(
         make_asgi_request("super", "/platform"),
     )
@@ -12926,6 +12956,33 @@ async def assert_platform_presets_page():
     assert "Компании сферы" in detail_html
     assert "/platform/companies?industry=beauty" in detail_html
     assert 'class="platform-mobile-nav"' in detail_html
+
+    anonymous_detail_api = await crm.api_platform_preset_detail(
+        make_public_asgi_request("/api/platform/presets/beauty"),
+        "beauty",
+    )
+    assert anonymous_detail_api.status_code == 401
+    boss_detail_api = await crm.api_platform_preset_detail(
+        make_asgi_request("owner2", "/api/platform/presets/beauty"),
+        "beauty",
+    )
+    assert boss_detail_api.status_code == 403
+    missing_detail_api = await crm.api_platform_preset_detail(
+        make_asgi_request("super", "/api/platform/presets/no_such_preset"),
+        "no_such_preset",
+    )
+    assert missing_detail_api.status_code == 404
+    preset_detail_api = await crm.api_platform_preset_detail(
+        make_asgi_request("super", "/api/platform/presets/beauty"),
+        "beauty",
+    )
+    assert preset_detail_api["ok"] is True
+    assert preset_detail_api["generated_at"]
+    assert preset_detail_api["preset"]["key"] == "beauty"
+    assert preset_detail_api["links"]["presets"] == "/platform/presets"
+    assert preset_detail_api["links"]["companies"] == (
+        "/platform/companies?industry=beauty"
+    )
 
     platform_page = await crm.platform_dashboard(
         make_asgi_request("super", "/platform"),
