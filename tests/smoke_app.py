@@ -13703,6 +13703,14 @@ async def assert_platform_calendar_health():
         assert page.context["links"]["export"] == (
             "/platform/calendar-health/export?status=problem&assignee=all"
         )
+        assert page.context["links"]["base"] == "/platform/calendar-health"
+        assert page.context["links"]["claim_visible"] == (
+            "/platform/calendar-health/claim-visible?status=problem&assignee=all"
+        )
+        assert page.context["links"]["reassign_visible"] == (
+            "/platform/calendar-health/reassign-visible?"
+            "status=problem&assignee=all"
+        )
         assert len(page.context["status_filter_options"]) == 9
         problem_filter = next(
             option

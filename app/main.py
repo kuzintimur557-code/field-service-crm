@@ -7449,8 +7449,16 @@ def build_platform_calendar_health_export_url(status="all", assignee="all"):
 
 
 def build_platform_calendar_health_links(status="all", assignee="all"):
+    status = str(status or "all").strip()
+    assignee = str(assignee or "all").strip()[:100] or "all"
+    action_params = urlencode({
+        "status": status,
+        "assignee": assignee,
+    })
+
     return {
         "platform": "/platform",
+        "base": "/platform/calendar-health",
         "page": build_platform_calendar_health_queue_url(
             status=status,
             assignee=assignee,
@@ -7460,6 +7468,12 @@ def build_platform_calendar_health_links(status="all", assignee="all"):
             assignee=assignee,
         ),
         "analytics": "/platform/calendar-health/analytics",
+        "claim_visible": (
+            "/platform/calendar-health/claim-visible?" + action_params
+        ),
+        "reassign_visible": (
+            "/platform/calendar-health/reassign-visible?" + action_params
+        ),
     }
 
 

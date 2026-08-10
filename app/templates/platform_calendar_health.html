@@ -216,7 +216,7 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
             <form
                 class="bulk-claim-form"
                 method="post"
-                action="/platform/calendar-health/claim-visible?status={{ selected_status|urlencode }}&amp;assignee={{ selected_assignee|urlencode }}"
+                action="{{ links['claim_visible'] }}"
                 onsubmit="return confirm('Принять видимые непринятые инциденты на себя? Максимум {{ bulk_claim_limit }} за один раз.');"
             >
                 <button class="bulk-claim-button" type="submit">
@@ -228,7 +228,7 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
             <form
                 class="bulk-reassign-form"
                 method="post"
-                action="/platform/calendar-health/reassign-visible?status={{ selected_status|urlencode }}&amp;assignee={{ selected_assignee|urlencode }}"
+                action="{{ links['reassign_visible'] }}"
                 onsubmit="return confirm('Передать видимые принятые инциденты выбранному администратору? Максимум {{ bulk_claim_limit }} за один раз.');"
             >
                 <select name="assignee_username" aria-label="Новый ответственный">
@@ -243,7 +243,7 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                 </button>
             </form>
             {% endif %}
-            <form class="assignee-form" method="get" action="/platform/calendar-health">
+            <form class="assignee-form" method="get" action="{{ links['base'] }}">
                 {% if selected_status != "all" %}
                 <input type="hidden" name="status" value="{{ selected_status }}">
                 {% endif %}
