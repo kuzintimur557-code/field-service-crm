@@ -13863,6 +13863,15 @@ async def assert_platform_calendar_health():
             "healthy",
         }
         assert detail["company"]["risk_summary"]
+        assert detail["company"]["links"]["detail"] == (
+            f"/platform/calendar-health/{company_id}"
+        )
+        assert detail["company"]["links"]["acknowledge"] == (
+            f"/platform/calendar-health/{company_id}/acknowledge"
+        )
+        assert detail["company"]["links"]["recover"] == (
+            f"/platform/calendar-health/{company_id}/recover"
+        )
         assert detail["policy"] == health["policy"]
         assert "super" in detail["platform_admins"]
         assert backup_admin_username in detail["platform_admins"]
@@ -14606,6 +14615,9 @@ async def assert_platform_calendar_health():
         acknowledged_html = acknowledged_detail.body.decode("utf-8")
         assert "Инцидент принят в работу от имени платформы." in (
             acknowledged_html
+        )
+        assert acknowledged_detail.context["company"]["links"]["assign"] == (
+            f"/platform/calendar-health/{company_id}/assign"
         )
         assert "Принят в работу" in acknowledged_html
         assert (

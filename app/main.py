@@ -7488,6 +7488,22 @@ def build_platform_calendar_health_links(status="all", assignee="all"):
     }
 
 
+def build_platform_calendar_company_health_links(company_id):
+    company_id = int(company_id or 0)
+    base_url = f"/platform/calendar-health/{company_id}"
+
+    return {
+        "platform": "/platform",
+        "calendar_health": "/platform/calendar-health",
+        "detail": base_url,
+        "export": f"{base_url}/export",
+        "acknowledge": f"{base_url}/acknowledge",
+        "note": f"{base_url}/note",
+        "assign": f"{base_url}/assign",
+        "recover": f"{base_url}/recover",
+    }
+
+
 def claim_visible_calendar_scheduler_incidents(
     actor_username,
     status_filter="unacknowledged",
@@ -7716,6 +7732,7 @@ def get_platform_calendar_company_detail(
     company["risk_analytics_url"] = (
         "/platform/calendar-health/analytics"
     )
+    company["links"] = build_platform_calendar_company_health_links(company_id)
 
     conn = connect()
     c = conn.cursor()
