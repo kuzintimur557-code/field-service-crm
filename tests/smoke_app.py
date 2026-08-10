@@ -13721,6 +13721,18 @@ async def assert_platform_calendar_health():
             "/platform/calendar-health?status=problem"
         )
         assert problem_filter["label"].startswith("Проблемы ·")
+        page_company = next(
+            item
+            for item in page.context["companies"]
+            if item["company_id"] == company_id
+        )
+        assert page_company["links"]["detail"] == (
+            f"/platform/calendar-health/{company_id}"
+        )
+        assert page_company["links"]["acknowledge_queue"] == (
+            f"/platform/calendar-health/{company_id}/acknowledge?"
+            "return_to=queue&status=problem&assignee=all"
+        )
         assert any(
             item["company_id"] == company_id
             for item in page.context["companies"]

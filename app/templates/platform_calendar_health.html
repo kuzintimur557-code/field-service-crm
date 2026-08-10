@@ -417,14 +417,14 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
                             {% if company["requires_response"] %}
                             <form
                                 method="post"
-                                action="/platform/calendar-health/{{ company['company_id'] }}/acknowledge?return_to=queue&amp;status={{ selected_status|urlencode }}&amp;assignee={{ selected_assignee|urlencode }}"
+                                action="{{ company['links']['acknowledge_queue'] }}"
                             >
                                 <button class="quick-action" type="submit">
                                     Принять себе
                                 </button>
                             </form>
                             {% endif %}
-                            <a class="filter" href="{{ company['detail_url'] }}">
+                            <a class="filter" href="{{ company['links']['detail'] }}">
                                 Подробнее
                             </a>
                         </div>

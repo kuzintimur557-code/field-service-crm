@@ -7100,6 +7100,17 @@ def get_platform_calendar_health(
         item["detail_url"] = (
             f"/platform/calendar-health/{item['company_id']}"
         )
+        item["links"] = {
+            "detail": item["detail_url"],
+            "acknowledge_queue": (
+                f"/platform/calendar-health/{item['company_id']}/acknowledge?"
+                + urlencode({
+                    "return_to": "queue",
+                    "status": status_filter,
+                    "assignee": assignee_filter,
+                })
+            ),
+        }
         if item["requires_response"]:
             item["next_action_label"] = "Принять в работу"
             item["next_action_hint"] = (
