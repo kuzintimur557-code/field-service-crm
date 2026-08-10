@@ -9061,7 +9061,7 @@ async def platform_companies_export(
     filename = "_".join(filename_parts) + ".csv"
 
     return Response(
-        output.getvalue(),
+        "\ufeff" + output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f"attachment; filename={filename}"
@@ -9245,7 +9245,7 @@ async def platform_company_export(request: Request, company_id: int):
         ])
 
     return Response(
-        output.getvalue(),
+        "\ufeff" + output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": (
@@ -9647,7 +9647,7 @@ async def platform_modules_export(request: Request):
         ])
 
     return Response(
-        output.getvalue(),
+        "\ufeff" + output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": (
@@ -9836,7 +9836,7 @@ async def platform_presets_export(request: Request):
         ])
 
     return Response(
-        output.getvalue(),
+        "\ufeff" + output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": (

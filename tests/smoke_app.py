@@ -10613,6 +10613,7 @@ async def assert_platform_companies_page():
     assert export_response.headers["content-disposition"] == (
         "attachment; filename=platform_companies_logistics_basic_all.csv"
     )
+    assert export_csv.startswith("\ufeff")
     assert (
         "ID,Компания,Владелец,Сфера,Тариф,Лимит пользователей,"
         "Статус лимита,Рекомендуемый тариф,Активные пользователи,"
@@ -10801,6 +10802,7 @@ async def assert_platform_companies_page():
     assert company_export_response.headers["content-disposition"] == (
         f"attachment; filename=platform_company_{logistics_company_id}.csv"
     )
+    assert company_export_csv.startswith("\ufeff")
     assert "Карточка компании" in company_export_csv
     assert "Smoke Logistics Company" in company_export_csv
     assert "smoke_logistics_owner" in company_export_csv
@@ -11641,6 +11643,7 @@ async def assert_platform_modules_page():
     assert export_response.headers["content-disposition"] == (
         "attachment; filename=platform_modules.csv"
     )
+    assert export_csv.startswith("\ufeff")
     assert "Сформировано" in export_csv
     assert "Модуль,Ключ,Описание" in export_csv
     assert "Автоматизация,automation" in export_csv
@@ -12934,6 +12937,7 @@ async def assert_platform_presets_page():
     assert export_response.headers["content-disposition"] == (
         "attachment; filename=platform_presets.csv"
     )
+    assert export_csv.startswith("\ufeff")
     assert "Сформировано" in export_csv
     assert "Сфера,Ключ,Компаний" in export_csv
     assert "Отклонений" in export_csv
