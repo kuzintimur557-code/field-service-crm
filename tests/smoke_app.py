@@ -15564,9 +15564,11 @@ async def assert_platform_calendar_health():
         assert platform_api["links"]["modules_export"] == (
             "/platform/modules/export"
         )
+        assert platform_api["links"]["modules_api"] == "/api/platform/modules"
         assert platform_api["links"]["presets_export"] == (
             "/platform/presets/export"
         )
+        assert platform_api["links"]["presets_api"] == "/api/platform/presets"
         assert platform_api["links"]["billing_risks"] == (
             "/platform/companies?billing=warning"
         )

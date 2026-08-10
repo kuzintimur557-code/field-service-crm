@@ -7867,8 +7867,10 @@ def get_platform_dashboard_links():
         "billing_export": "/platform/billing/export",
         "billing_risks": "/platform/companies?billing=warning",
         "modules": "/platform/modules",
+        "modules_api": "/api/platform/modules",
         "modules_export": "/platform/modules/export",
         "presets": "/platform/presets",
+        "presets_api": "/api/platform/presets",
         "presets_export": "/platform/presets/export",
     }
 
