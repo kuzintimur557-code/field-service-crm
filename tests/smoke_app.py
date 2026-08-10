@@ -13662,6 +13662,16 @@ async def assert_platform_calendar_health():
         ) == (
             "/platform/calendar-health/export?status=problem&assignee=all"
         )
+        assert crm.build_platform_calendar_health_filter_url() == (
+            "/platform/calendar-health"
+        )
+        assert crm.build_platform_calendar_health_filter_url(
+            status="critical",
+            assignee="backup_admin",
+        ) == (
+            "/platform/calendar-health?"
+            "status=critical&assignee=backup_admin"
+        )
 
         anonymous = await crm.platform_calendar_health_page(
             make_public_asgi_request("/platform/calendar-health"),
@@ -13693,6 +13703,16 @@ async def assert_platform_calendar_health():
         assert page.context["links"]["export"] == (
             "/platform/calendar-health/export?status=problem&assignee=all"
         )
+        assert len(page.context["status_filter_options"]) == 9
+        problem_filter = next(
+            option
+            for option in page.context["status_filter_options"]
+            if option["key"] == "problem"
+        )
+        assert problem_filter["url"] == (
+            "/platform/calendar-health?status=problem"
+        )
+        assert problem_filter["label"].startswith("Проблемы ·")
         assert any(
             item["company_id"] == company_id
             for item in page.context["companies"]

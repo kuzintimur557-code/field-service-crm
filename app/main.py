@@ -7402,6 +7402,41 @@ def build_platform_calendar_health_queue_url(
     return "/platform/calendar-health?" + urlencode(params)
 
 
+def build_platform_calendar_health_filter_url(status="all", assignee="all"):
+    allowed_statuses = {
+        "all",
+        "problem",
+        "healthy",
+        "waiting",
+        "disabled",
+        "unacknowledged",
+        "response_overdue",
+        "recovery_overdue",
+        "critical",
+    }
+    status = str(status or "all").strip()
+    assignee = str(assignee or "all").strip()[:100]
+
+    if status not in allowed_statuses:
+        status = "all"
+
+    if not assignee:
+        assignee = "all"
+
+    params = {}
+
+    if status != "all":
+        params["status"] = status
+
+    if assignee != "all":
+        params["assignee"] = assignee
+
+    if not params:
+        return "/platform/calendar-health"
+
+    return "/platform/calendar-health?" + urlencode(params)
+
+
 def build_platform_calendar_health_export_url(status="all", assignee="all"):
     return build_platform_calendar_health_queue_url(
         status=status,
@@ -15233,6 +15268,83 @@ async def platform_calendar_health_page(
         health["status_filter"],
         health["assignee_filter"],
     )
+    status_filter_options = [
+        {
+            "key": "all",
+            "label": "Все",
+            "url": build_platform_calendar_health_filter_url(
+                "all",
+                health["assignee_filter"],
+            ),
+        },
+        {
+            "key": "critical",
+            "label": f"Критические · {health['summary']['critical']}",
+            "url": build_platform_calendar_health_filter_url(
+                "critical",
+                health["assignee_filter"],
+            ),
+        },
+        {
+            "key": "unacknowledged",
+            "label": f"Не приняты · {health['summary']['unacknowledged']}",
+            "url": build_platform_calendar_health_filter_url(
+                "unacknowledged",
+                health["assignee_filter"],
+            ),
+        },
+        {
+            "key": "response_overdue",
+            "label": f"Реакция · {health['summary']['response_overdue']}",
+            "url": build_platform_calendar_health_filter_url(
+                "response_overdue",
+                health["assignee_filter"],
+            ),
+        },
+        {
+            "key": "recovery_overdue",
+            "label": (
+                f"Восстановление · "
+                f"{health['summary']['recovery_overdue']}"
+            ),
+            "url": build_platform_calendar_health_filter_url(
+                "recovery_overdue",
+                health["assignee_filter"],
+            ),
+        },
+        {
+            "key": "problem",
+            "label": f"Проблемы · {health['summary']['problems']}",
+            "url": build_platform_calendar_health_filter_url(
+                "problem",
+                health["assignee_filter"],
+            ),
+        },
+        {
+            "key": "healthy",
+            "label": f"Работают · {health['summary']['healthy']}",
+            "url": build_platform_calendar_health_filter_url(
+                "healthy",
+                health["assignee_filter"],
+            ),
+        },
+        {
+            "key": "waiting",
+            "label": f"Ожидают · {health['summary']['waiting']}",
+            "url": build_platform_calendar_health_filter_url(
+                "waiting",
+                health["assignee_filter"],
+            ),
+        },
+        {
+            "key": "disabled",
+            "label": f"Выключены · {health['summary']['disabled']}",
+            "url": build_platform_calendar_health_filter_url(
+                "disabled",
+                health["assignee_filter"],
+            ),
+        },
+    ]
 
     return templates.TemplateResponse(
         request,
@@ -15253,6 +15365,7 @@ async def platform_calendar_health_page(
             "reassign_admins": reassign_admins,
             "bulk_claim_limit": 25,
             "links": links,
+            "status_filter_options": status_filter_options,
             "page_message": (
                 page_message[0] if page_message else ""
             ),

@@ -205,15 +205,11 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
 
     <div class="queue-tools">
         <nav class="filters" aria-label="Фильтры состояния">
-            <a class="filter {% if selected_status == 'all' %}active{% endif %}" href="/platform/calendar-health{% if selected_assignee != 'all' %}?assignee={{ selected_assignee|urlencode }}{% endif %}">Все</a>
-            <a class="filter {% if selected_status == 'critical' %}active{% endif %}" href="/platform/calendar-health?status=critical{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Критические · {{ summary["critical"] }}</a>
-            <a class="filter {% if selected_status == 'unacknowledged' %}active{% endif %}" href="/platform/calendar-health?status=unacknowledged{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Не приняты · {{ summary["unacknowledged"] }}</a>
-            <a class="filter {% if selected_status == 'response_overdue' %}active{% endif %}" href="/platform/calendar-health?status=response_overdue{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Реакция · {{ summary["response_overdue"] }}</a>
-            <a class="filter {% if selected_status == 'recovery_overdue' %}active{% endif %}" href="/platform/calendar-health?status=recovery_overdue{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Восстановление · {{ summary["recovery_overdue"] }}</a>
-            <a class="filter {% if selected_status == 'problem' %}active{% endif %}" href="/platform/calendar-health?status=problem{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Проблемы · {{ summary["problems"] }}</a>
-            <a class="filter {% if selected_status == 'healthy' %}active{% endif %}" href="/platform/calendar-health?status=healthy{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Работают · {{ summary["healthy"] }}</a>
-            <a class="filter {% if selected_status == 'waiting' %}active{% endif %}" href="/platform/calendar-health?status=waiting{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Ожидают · {{ summary["waiting"] }}</a>
-            <a class="filter {% if selected_status == 'disabled' %}active{% endif %}" href="/platform/calendar-health?status=disabled{% if selected_assignee != 'all' %}&assignee={{ selected_assignee|urlencode }}{% endif %}">Выключены · {{ summary["disabled"] }}</a>
+            {% for option in status_filter_options %}
+            <a class="filter {% if selected_status == option['key'] %}active{% endif %}" href="{{ option['url'] }}">
+                {{ option["label"] }}
+            </a>
+            {% endfor %}
         </nav>
         <div class="queue-side">
             {% if visible_claimable_count %}
