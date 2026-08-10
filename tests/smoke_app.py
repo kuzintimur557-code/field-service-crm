@@ -15348,6 +15348,8 @@ async def assert_platform_calendar_health():
         assert "Готовность релиза" in platform_html
         assert "Релизный штаб" in platform_html
         assert "Модульность SaaS" in platform_html
+        assert "Обновлено:" in platform_html
+        assert platform_page.context["generated_at"]
         assert "Счета и подписки" in platform_html
         assert "/platform/billing" in platform_html
         assert "/platform/billing/export" in platform_html

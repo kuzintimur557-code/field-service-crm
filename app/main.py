@@ -13117,6 +13117,7 @@ async def platform_dashboard(request: Request):
             "request": request,
             "username": username,
             "role": role,
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "companies_count": companies_count,
             "users_count": users_count,
             "tasks_count": tasks_count,
