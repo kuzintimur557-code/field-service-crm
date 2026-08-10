@@ -8337,6 +8337,11 @@ def get_platform_company_profile(company_id):
     """, (company_id,)).fetchall()
 
     billing_invoices = fetch_billing_invoices(c, company_id)
+    for invoice in billing_invoices:
+        invoice["links"] = build_platform_billing_invoice_links(
+            invoice["id"],
+            invoice["company_id"],
+        )
     recent_billing_invoices = billing_invoices[:5]
     billing_invoice_summary = build_billing_invoice_summary(billing_invoices)
     billing_risk_summary = build_platform_billing_risk_summary(billing_invoices)

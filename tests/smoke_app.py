@@ -11013,9 +11013,15 @@ async def assert_platform_companies_page():
     assert platform_invoice_detail.context["billing_invoice_summary"]["count"] == 1
     assert platform_invoice_detail.context["billing_risk_summary"]["draft_count"] == 1
     assert platform_invoice_detail.context["next_payment_summary"]["has_invoice"] is True
+    assert platform_invoice_detail.context["billing_invoices"][0]["links"]["page"] == (
+        f"/platform/billing/invoices/{platform_invoice['id']}"
+    )
     assert "Счёт платформы сформирован" in platform_invoice_html
     assert "Ближайший платёж" in platform_invoice_html
     assert f"BILL-{logistics_company_id}-202609" in platform_invoice_html
+    assert f"/platform/billing/invoices/{platform_invoice['id']}" in (
+        platform_invoice_html
+    )
 
     platform_invoice_api = await crm.api_platform_company_detail(
         make_asgi_request(
@@ -11030,6 +11036,9 @@ async def assert_platform_companies_page():
     assert platform_invoice_api["billing"]["recent_invoices"][0][
         "invoice_number"
     ] == f"BILL-{logistics_company_id}-202609"
+    assert platform_invoice_api["billing"]["recent_invoices"][0]["links"][
+        "page"
+    ] == f"/platform/billing/invoices/{platform_invoice['id']}"
 
     platform_company_list_after_invoice = await crm.api_platform_companies(
         make_asgi_request(

@@ -266,7 +266,11 @@ h2{margin:0 0 16px;font-size:22px}
     {% for invoice in billing_invoices %}
     <div class="row">
         <div>
-            <div class="name">{{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</div>
+            <div class="name">
+                <a href="{{ invoice['links']['page'] }}">
+                    {{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}
+                </a>
+            </div>
             <div class="meta">{{ invoice["period"] or "Период не указан" }} · {{ invoice["plan_label"] }}</div>
         </div>
         <div class="meta">{{ invoice["amount_label"] }}</div>
