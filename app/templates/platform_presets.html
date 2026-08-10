@@ -90,7 +90,7 @@ h2{margin:0 0 14px;font-size:22px}
     <div class="preset">
         <div>
             <div class="preset-title">
-                <a href="/platform/presets/{{ preset['key'] }}">{{ preset["title"] }}</a>
+                <a href="{{ preset['links']['page'] }}">{{ preset["title"] }}</a>
             </div>
             <div class="meta">
                 Компаний: {{ preset["companies_count"] }} ·
@@ -98,7 +98,7 @@ h2{margin:0 0 14px;font-size:22px}
                 модулей в пресете: {{ preset["modules_count"] }}
             </div>
             <div class="meta">
-                <a href="/platform/companies?industry={{ preset['key'] }}">Показать компании сферы</a>
+                <a href="{{ preset['links']['companies'] }}">Показать компании сферы</a>
             </div>
             <div class="labels">
                 <div class="label-chip">Заявка: {{ preset["labels"]["task_label"] }}</div>

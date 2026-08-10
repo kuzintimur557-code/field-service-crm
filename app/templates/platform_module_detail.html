@@ -48,8 +48,8 @@ h2{margin:0 0 14px;font-size:22px}
 
 <div class="top-actions">
     <a href="/platform/modules" class="back">Назад к модулям</a>
-    <a class="action-link" href="/platform/companies?feature={{ module['key'] }}">Компании с модулем</a>
-    <a class="action-link" href="/platform/companies/export?search=&amp;industry=all&amp;plan=all&amp;limit=all&amp;feature={{ module['key'] }}">Экспорт компаний</a>
+    <a class="action-link" href="{{ module['links']['companies'] }}">Компании с модулем</a>
+    <a class="action-link" href="{{ module['links']['companies_export'] }}">Экспорт компаний</a>
 </div>
 
 <div class="card header">

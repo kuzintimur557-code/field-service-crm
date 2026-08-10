@@ -11687,10 +11687,7 @@ async def assert_platform_modules_page():
     assert "Компании с модулем" in detail_html
     assert "Компании без модуля" in detail_html
     assert "/platform/companies?feature=automation" in detail_html
-    assert (
-        "/platform/companies/export?search=&amp;industry=all&amp;plan=all"
-        "&amp;limit=all&amp;feature=automation"
-    ) in detail_html
+    assert "/platform/companies/export?feature=automation" in detail_html
     assert 'class="platform-mobile-nav"' in detail_html
 
     anonymous_detail_api = await crm.api_platform_module_detail(
