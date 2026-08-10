@@ -7402,6 +7402,32 @@ def build_platform_calendar_health_queue_url(
     return "/platform/calendar-health?" + urlencode(params)
 
 
+def build_platform_calendar_health_export_url(status="all", assignee="all"):
+    return build_platform_calendar_health_queue_url(
+        status=status,
+        assignee=assignee,
+    ).replace(
+        "/platform/calendar-health",
+        "/platform/calendar-health/export",
+        1,
+    )
+
+
+def build_platform_calendar_health_links(status="all", assignee="all"):
+    return {
+        "platform": "/platform",
+        "page": build_platform_calendar_health_queue_url(
+            status=status,
+            assignee=assignee,
+        ),
+        "export": build_platform_calendar_health_export_url(
+            status=status,
+            assignee=assignee,
+        ),
+        "analytics": "/platform/calendar-health/analytics",
+    }
+
+
 def claim_visible_calendar_scheduler_incidents(
     actor_username,
     status_filter="unacknowledged",
@@ -15203,6 +15229,10 @@ async def platform_calendar_health_page(
         for admin_username in health["platform_admins"]
         if admin_username != username
     ]
+    links = build_platform_calendar_health_links(
+        health["status_filter"],
+        health["assignee_filter"],
+    )
 
     return templates.TemplateResponse(
         request,
@@ -15222,6 +15252,7 @@ async def platform_calendar_health_page(
             "visible_reassignable_count": visible_reassignable_count,
             "reassign_admins": reassign_admins,
             "bulk_claim_limit": 25,
+            "links": links,
             "page_message": (
                 page_message[0] if page_message else ""
             ),

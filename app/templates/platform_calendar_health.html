@@ -128,13 +128,13 @@ tr.priority-high td:first-child{box-shadow:inset 4px 0 #f59e0b}
             </div>
         </div>
         <div class="header-actions">
-            <a class="back secondary" href="/platform/calendar-health/analytics">
+            <a class="back secondary" href="{{ links['analytics'] }}">
                 Аналитика инцидентов
             </a>
-            <a class="back secondary" href="/platform/calendar-health/export?status={{ selected_status|urlencode }}&amp;assignee={{ selected_assignee|urlencode }}">
+            <a class="back secondary" href="{{ links['export'] }}">
                 Экспорт CSV
             </a>
-            <a class="back" href="/platform">Панель платформы</a>
+            <a class="back" href="{{ links['platform'] }}">Панель платформы</a>
         </div>
     </header>
 

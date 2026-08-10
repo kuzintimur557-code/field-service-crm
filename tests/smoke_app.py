@@ -13656,6 +13656,12 @@ async def assert_platform_calendar_health():
             "/platform/calendar-health?"
             "status=all&assignee=all&notice=acknowledged"
         )
+        assert crm.build_platform_calendar_health_export_url(
+            status="problem",
+            assignee="all",
+        ) == (
+            "/platform/calendar-health/export?status=problem&assignee=all"
+        )
 
         anonymous = await crm.platform_calendar_health_page(
             make_public_asgi_request("/platform/calendar-health"),
@@ -13680,6 +13686,13 @@ async def assert_platform_calendar_health():
         assert page.status_code == 200
         assert page.context["selected_status"] == "problem"
         assert page.context["selected_assignee"] == "all"
+        assert page.context["links"]["platform"] == "/platform"
+        assert page.context["links"]["analytics"] == (
+            "/platform/calendar-health/analytics"
+        )
+        assert page.context["links"]["export"] == (
+            "/platform/calendar-health/export?status=problem&assignee=all"
+        )
         assert any(
             item["company_id"] == company_id
             for item in page.context["companies"]
