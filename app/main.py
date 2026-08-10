@@ -12917,6 +12917,7 @@ async def api_platform_dashboard(request: Request):
 
     return {
         "ok": True,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "counts": counts,
         "company_usage_summary": platform_company_usage["summary"],
         "limit_alert_companies": platform_alerts["limit_alert_companies"],
@@ -12967,6 +12968,7 @@ async def platform_dashboard_export(request: Request):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Панель платформы"])
+    writer.writerow(["Сформировано", datetime.now().strftime("%Y-%m-%d %H:%M")])
     writer.writerow(["Компании", counts["companies"]])
     writer.writerow(["Пользователи", counts["users"]])
     writer.writerow(["Заявки", counts["tasks"]])

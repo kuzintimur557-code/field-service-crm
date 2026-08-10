@@ -15392,6 +15392,7 @@ async def assert_platform_calendar_health():
             make_asgi_request("super", "/api/platform"),
         )
         assert platform_api["ok"] is True
+        assert platform_api["generated_at"]
         assert platform_api["counts"]["companies"] >= 1
         assert "billing_risk_companies" in platform_api["company_usage_summary"]
         assert len(platform_api["limit_alert_companies"]) <= 5
@@ -15431,6 +15432,7 @@ async def assert_platform_calendar_health():
         )
         assert platform_export_csv.startswith("\ufeff")
         assert "Панель платформы" in platform_export_csv
+        assert "Сформировано" in platform_export_csv
         assert "Тарифы и лимиты" in platform_export_csv
         assert "Компании с риском лимита" in platform_export_csv
         assert "Компании с риском оплаты" in platform_export_csv
