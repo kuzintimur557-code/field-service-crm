@@ -11641,6 +11641,7 @@ async def assert_platform_modules_page():
     assert export_response.headers["content-disposition"] == (
         "attachment; filename=platform_modules.csv"
     )
+    assert "Сформировано" in export_csv
     assert "Модуль,Ключ,Описание" in export_csv
     assert "Автоматизация,automation" in export_csv
     assert "ИИ-инсайты,ai_insights" in export_csv
@@ -12933,6 +12934,7 @@ async def assert_platform_presets_page():
     assert export_response.headers["content-disposition"] == (
         "attachment; filename=platform_presets.csv"
     )
+    assert "Сформировано" in export_csv
     assert "Сфера,Ключ,Компаний" in export_csv
     assert "Отклонений" in export_csv
     assert "Бьюти,beauty" in export_csv

@@ -9623,6 +9623,8 @@ async def platform_modules_export(request: Request):
 
     output = io.StringIO()
     writer = csv.writer(output)
+    writer.writerow(["Сформировано", get_platform_generated_at()])
+    writer.writerow([])
     writer.writerow([
         "Модуль",
         "Ключ",
@@ -9804,6 +9806,8 @@ async def platform_presets_export(request: Request):
 
     output = io.StringIO()
     writer = csv.writer(output)
+    writer.writerow(["Сформировано", get_platform_generated_at()])
+    writer.writerow([])
     writer.writerow([
         "Сфера",
         "Ключ",
