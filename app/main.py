@@ -8325,6 +8325,23 @@ def get_platform_company_profile(company_id):
         "billing_invoice_summary": billing_invoice_summary,
         "billing_risk_summary": billing_risk_summary,
         "next_payment_summary": next_payment_summary,
+        "links": {
+            "page": f"/platform/companies/{company['id']}",
+            "companies": "/platform/companies",
+            "settings": f"/platform/companies/{company['id']}/settings",
+            "apply_preset": (
+                f"/platform/companies/{company['id']}/apply-preset"
+            ),
+            "export": f"/platform/companies/{company['id']}/export",
+            "billing": f"/platform/billing?company_id={company['id']}",
+            "billing_export": build_platform_billing_url(
+                company_id=company["id"],
+                export=True,
+            ),
+            "billing_generate": (
+                f"/platform/companies/{company['id']}/billing/generate"
+            ),
+        },
     }
 
 
@@ -9344,6 +9361,7 @@ async def platform_company_detail_page(request: Request, company_id: int):
             "request": request,
             "username": username,
             "role": role,
+            "generated_at": get_platform_generated_at(),
             "industry_options": INDUSTRY_OPTIONS,
             "plan_options": get_plan_options(),
             **profile,
@@ -9402,16 +9420,7 @@ async def api_platform_company_detail(request: Request, company_id: int):
             "next_payment": profile["next_payment_summary"],
             "recent_invoices": profile["billing_invoices"],
         },
-        "links": {
-            "page": f"/platform/companies/{company['id']}",
-            "companies": "/platform/companies",
-            "export": f"/platform/companies/{company['id']}/export",
-            "billing": f"/platform/billing?company_id={company['id']}",
-            "billing_export": build_platform_billing_url(
-                company_id=company["id"],
-                export=True,
-            ),
-        },
+        "links": profile["links"],
     }
 
 

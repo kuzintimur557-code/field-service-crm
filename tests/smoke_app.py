@@ -10857,6 +10857,7 @@ async def assert_platform_companies_page():
     detail_html = detail_response.body.decode("utf-8")
     assert detail_response.status_code == 200
     assert detail_response.context["company"]["id"] == logistics_company_id
+    assert detail_response.context["generated_at"]
     assert detail_response.context["usage"]["active_users_count"] == 1
     assert detail_response.context["enabled_features_count"] >= 1
     assert detail_response.context["disabled_features_count"] >= 0
@@ -10866,6 +10867,16 @@ async def assert_platform_companies_page():
     assert detail_response.context["next_payment_summary"]["has_invoice"] is False
     assert detail_response.context["task_stats"]["total"] == 0
     assert detail_response.context["task_stats"]["active"] == 0
+    assert detail_response.context["links"]["companies"] == "/platform/companies"
+    assert detail_response.context["links"]["settings"] == (
+        f"/platform/companies/{logistics_company_id}/settings"
+    )
+    assert detail_response.context["links"]["apply_preset"] == (
+        f"/platform/companies/{logistics_company_id}/apply-preset"
+    )
+    assert detail_response.context["links"]["billing_generate"] == (
+        f"/platform/companies/{logistics_company_id}/billing/generate"
+    )
     assert "Карточка компании" in detail_html
     assert "Настройки компании" in detail_html
     assert "Соответствие пресету" in detail_html
@@ -10876,6 +10887,7 @@ async def assert_platform_companies_page():
     assert "Просрочено" in detail_html
     assert "Скоро к оплате" in detail_html
     assert "Счета платформы пока не созданы" in detail_html
+    assert "обновлено:" in detail_html
     assert (
         f"/platform/companies/{logistics_company_id}/billing/generate"
         in detail_html
@@ -10907,6 +10919,15 @@ async def assert_platform_companies_page():
         f"/platform/companies/{logistics_company_id}"
     )
     assert detail_api["links"]["companies"] == "/platform/companies"
+    assert detail_api["links"]["settings"] == (
+        f"/platform/companies/{logistics_company_id}/settings"
+    )
+    assert detail_api["links"]["apply_preset"] == (
+        f"/platform/companies/{logistics_company_id}/apply-preset"
+    )
+    assert detail_api["links"]["billing_generate"] == (
+        f"/platform/companies/{logistics_company_id}/billing/generate"
+    )
     assert detail_api["links"]["billing_export"] == (
         f"/platform/billing/export?company_id={logistics_company_id}"
     )

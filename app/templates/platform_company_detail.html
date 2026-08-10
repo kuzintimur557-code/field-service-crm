@@ -77,8 +77,8 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="container">
 
 <div class="top-actions">
-    <a href="/platform/companies" class="back">Назад к компаниям</a>
-    <a href="/platform/companies/{{ company['id'] }}/export" class="export-link">Экспорт CSV</a>
+    <a href="{{ links['companies'] }}" class="back">Назад к компаниям</a>
+    <a href="{{ links['export'] }}" class="export-link">Экспорт CSV</a>
 </div>
 
 {% if request.query_params.get("updated") == "1" %}
@@ -101,7 +101,7 @@ h2{margin:0 0 16px;font-size:22px}
     <div>
         <h1>{{ company["name"] }}</h1>
         <div class="meta">
-            Карточка компании · владелец: {{ company["owner_username"] }} · создана: {{ company["created_at"] }}
+            Карточка компании · владелец: {{ company["owner_username"] }} · создана: {{ company["created_at"] }} · обновлено: {{ generated_at }}
         </div>
     </div>
     <span class="badge {{ usage['tone'] }}">{{ usage["status"] }}</span>
@@ -122,7 +122,7 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="card">
     <h2>Настройки компании</h2>
-    <form class="settings-form" method="post" action="/platform/companies/{{ company['id'] }}/settings">
+    <form class="settings-form" method="post" action="{{ links['settings'] }}">
         <input type="hidden" name="return_to" value="detail">
         <label>
             Сфера
@@ -150,7 +150,7 @@ h2{margin:0 0 16px;font-size:22px}
         Сфера: {{ industry_label }} · статус: {{ preset_drift["status_label"] }}
     </div>
     {% if preset_drift["items"] %}
-    <form class="preset-form" method="post" action="/platform/companies/{{ company['id'] }}/apply-preset">
+    <form class="preset-form" method="post" action="{{ links['apply_preset'] }}">
         <button type="submit">Применить пресет</button>
     </form>
     {% for drift in preset_drift["items"] %}
@@ -255,7 +255,7 @@ h2{margin:0 0 16px;font-size:22px}
         <div class="meta">{{ next_payment_summary["label"] }} · срок: {{ next_invoice["due_date"] or "не указан" }}</div>
     </div>
     {% endif %}
-    <form class="settings-form billing-form" method="post" action="/platform/companies/{{ company['id'] }}/billing/generate">
+    <form class="settings-form billing-form" method="post" action="{{ links['billing_generate'] }}">
         <label>
             Период счёта
             <input type="month" name="period">
