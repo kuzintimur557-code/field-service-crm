@@ -44,8 +44,8 @@ h2{margin:0 0 14px;font-size:22px}
 <div class="container">
 
 <div class="top-actions">
-    <a href="/platform" class="back">Назад к платформе</a>
-    <a href="/platform/presets/export" class="export-link">Экспорт CSV</a>
+    <a href="{{ links['platform'] }}" class="back">Назад к платформе</a>
+    <a href="{{ links['export'] }}" class="export-link">Экспорт CSV</a>
 </div>
 
 {% if request.query_params.get("error") == "preset_not_found" %}
@@ -110,7 +110,7 @@ h2{margin:0 0 14px;font-size:22px}
         <div>
             <div class="features">
                 {% for feature in preset["features"] %}
-                <a class="feature" href="/platform/modules/{{ feature['key'] }}">
+                <a class="feature" href="{{ feature['links']['page'] }}">
                     {{ feature["title"] }}
                 </a>
                 {% endfor %}

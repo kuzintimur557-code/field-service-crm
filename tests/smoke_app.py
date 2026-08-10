@@ -11635,6 +11635,9 @@ async def assert_platform_modules_page():
     )
     assert response.context["summary"]["companies_count"] >= 1
     assert response.context["summary"]["coverage_percent"] >= 0
+    assert response.context["links"]["platform"] == "/platform"
+    assert response.context["links"]["page"] == "/platform/modules"
+    assert response.context["links"]["export"] == "/platform/modules/export"
     assert any(
         module["key"] == "automation"
         for module in response.context["modules"]
@@ -12960,6 +12963,14 @@ async def assert_platform_presets_page():
     )
     assert response.context["summary"]["companies_count"] >= 1
     assert response.context["summary"]["drift_count"] >= 0
+    assert response.context["links"]["platform"] == "/platform"
+    assert response.context["links"]["page"] == "/platform/presets"
+    assert response.context["links"]["export"] == "/platform/presets/export"
+    assert any(
+        feature["links"]["page"] == "/platform/modules/calendar"
+        for preset in response.context["presets"]
+        for feature in preset["features"]
+    )
 
     anonymous_api = await crm.api_platform_presets(
         make_public_asgi_request("/api/platform/presets"),

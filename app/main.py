@@ -8441,6 +8441,11 @@ def get_platform_module_usage():
     return {
         "summary": summary,
         "modules": module_rows,
+        "links": {
+            "platform": "/platform",
+            "page": "/platform/modules",
+            "export": "/platform/modules/export",
+        },
     }
 
 
@@ -8575,6 +8580,11 @@ def get_platform_preset_usage():
     return {
         "summary": summary,
         "presets": preset_rows,
+        "links": {
+            "platform": "/platform",
+            "page": "/platform/presets",
+            "export": "/platform/presets/export",
+        },
     }
 
 
@@ -9563,6 +9573,7 @@ async def platform_modules_page(request: Request):
             "generated_at": get_platform_generated_at(),
             "summary": module_usage["summary"],
             "modules": module_usage["modules"],
+            "links": module_usage["links"],
         },
     )
 
@@ -9587,11 +9598,7 @@ async def api_platform_modules(request: Request):
         "generated_at": get_platform_generated_at(),
         "summary": module_usage["summary"],
         "modules": module_usage["modules"],
-        "links": {
-            "platform": "/platform",
-            "page": "/platform/modules",
-            "export": "/platform/modules/export",
-        },
+        "links": module_usage["links"],
     }
 
 
@@ -9759,6 +9766,7 @@ async def platform_presets_page(request: Request):
             "generated_at": get_platform_generated_at(),
             "summary": preset_usage["summary"],
             "presets": preset_usage["presets"],
+            "links": preset_usage["links"],
         },
     )
 
@@ -9783,11 +9791,7 @@ async def api_platform_presets(request: Request):
         "generated_at": get_platform_generated_at(),
         "summary": preset_usage["summary"],
         "presets": preset_usage["presets"],
-        "links": {
-            "platform": "/platform",
-            "page": "/platform/presets",
-            "export": "/platform/presets/export",
-        },
+        "links": preset_usage["links"],
     }
 
 
