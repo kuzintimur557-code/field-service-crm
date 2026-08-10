@@ -13430,6 +13430,18 @@ async def api_platform_billing(
             selected_company_id,
             export=True,
         ),
+        "links": {
+            "platform": "/platform",
+            "page": build_platform_billing_url(
+                status_filter,
+                selected_company_id,
+            ),
+            "export": build_platform_billing_url(
+                status_filter,
+                selected_company_id,
+                export=True,
+            ),
+        },
         "invoices": invoices,
     }
 

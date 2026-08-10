@@ -11718,6 +11718,9 @@ async def assert_platform_modules_page():
     assert "monthly_summary" in platform_billing_api
     assert platform_billing_api["company_options"]
     assert platform_billing_api["export_url"] == "/platform/billing/export"
+    assert platform_billing_api["links"]["platform"] == "/platform"
+    assert platform_billing_api["links"]["page"] == "/platform/billing"
+    assert platform_billing_api["links"]["export"] == "/platform/billing/export"
 
     platform_billing_page = await crm.platform_billing_page(
         make_asgi_request("super", "/platform/billing"),
@@ -12114,6 +12117,12 @@ async def assert_platform_modules_page():
     assert platform_billing_company_api["filters"]["status"] == "draft"
     assert platform_billing_company_api["filters"]["company_id"] == "2"
     assert platform_billing_company_api["export_url"] == (
+        "/platform/billing/export?status=draft&company_id=2"
+    )
+    assert platform_billing_company_api["links"]["page"] == (
+        "/platform/billing?status=draft&company_id=2"
+    )
+    assert platform_billing_company_api["links"]["export"] == (
         "/platform/billing/export?status=draft&company_id=2"
     )
     assert any(
