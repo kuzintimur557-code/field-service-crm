@@ -9496,6 +9496,34 @@ async def platform_modules_page(request: Request):
     )
 
 
+@app.get("/api/platform/modules")
+async def api_platform_modules(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    module_usage = get_platform_module_usage()
+
+    return {
+        "ok": True,
+        "generated_at": get_platform_generated_at(),
+        "summary": module_usage["summary"],
+        "modules": module_usage["modules"],
+        "links": {
+            "platform": "/platform",
+            "page": "/platform/modules",
+            "export": "/platform/modules/export",
+        },
+    }
+
+
 @app.get("/platform/modules/export")
 async def platform_modules_export(request: Request):
 
@@ -9614,6 +9642,34 @@ async def platform_presets_page(request: Request):
             "presets": preset_usage["presets"],
         },
     )
+
+
+@app.get("/api/platform/presets")
+async def api_platform_presets(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    role = get_role(username)
+
+    if role != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    preset_usage = get_platform_preset_usage()
+
+    return {
+        "ok": True,
+        "generated_at": get_platform_generated_at(),
+        "summary": preset_usage["summary"],
+        "presets": preset_usage["presets"],
+        "links": {
+            "platform": "/platform",
+            "page": "/platform/presets",
+            "export": "/platform/presets/export",
+        },
+    }
 
 
 @app.get("/platform/presets/export")

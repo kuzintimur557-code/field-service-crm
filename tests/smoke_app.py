@@ -11590,6 +11590,27 @@ async def assert_platform_modules_page():
         for module in response.context["modules"]
     )
 
+    anonymous_api = await crm.api_platform_modules(
+        make_public_asgi_request("/api/platform/modules"),
+    )
+    assert anonymous_api.status_code == 401
+    boss_api = await crm.api_platform_modules(
+        make_asgi_request("owner2", "/api/platform/modules"),
+    )
+    assert boss_api.status_code == 403
+    modules_api = await crm.api_platform_modules(
+        make_asgi_request("super", "/api/platform/modules"),
+    )
+    assert modules_api["ok"] is True
+    assert modules_api["generated_at"]
+    assert modules_api["summary"]["modules_count"] == len(
+        crm.FEATURE_DEFINITIONS
+    )
+    assert any(module["key"] == "automation" for module in modules_api["modules"])
+    assert modules_api["links"]["platform"] == "/platform"
+    assert modules_api["links"]["page"] == "/platform/modules"
+    assert modules_api["links"]["export"] == "/platform/modules/export"
+
     anonymous_export = await crm.platform_modules_export(
         make_public_asgi_request("/platform/modules/export"),
     )
@@ -12822,6 +12843,27 @@ async def assert_platform_presets_page():
     )
     assert response.context["summary"]["companies_count"] >= 1
     assert response.context["summary"]["drift_count"] >= 0
+
+    anonymous_api = await crm.api_platform_presets(
+        make_public_asgi_request("/api/platform/presets"),
+    )
+    assert anonymous_api.status_code == 401
+    boss_api = await crm.api_platform_presets(
+        make_asgi_request("owner2", "/api/platform/presets"),
+    )
+    assert boss_api.status_code == 403
+    presets_api = await crm.api_platform_presets(
+        make_asgi_request("super", "/api/platform/presets"),
+    )
+    assert presets_api["ok"] is True
+    assert presets_api["generated_at"]
+    assert presets_api["summary"]["presets_count"] == len(
+        crm.INDUSTRY_OPTIONS
+    )
+    assert any(preset["key"] == "beauty" for preset in presets_api["presets"])
+    assert presets_api["links"]["platform"] == "/platform"
+    assert presets_api["links"]["page"] == "/platform/presets"
+    assert presets_api["links"]["export"] == "/platform/presets/export"
 
     anonymous_export = await crm.platform_presets_export(
         make_public_asgi_request("/platform/presets/export"),
