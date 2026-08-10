@@ -53,7 +53,7 @@ h1{margin:0 0 12px;font-size:36px}
 
 <div class="card">
 <h1>Компании</h1>
-<div class="meta">SaaS-клиенты платформы</div>
+<div class="meta">SaaS-клиенты платформы · Обновлено: {{ generated_at }}</div>
 </div>
 
 <div class="card">
@@ -177,7 +177,7 @@ h1{margin:0 0 12px;font-size:36px}
     {% if search or selected_industry != "all" or selected_plan != "all" or selected_limit != "all" or selected_feature != "all" or selected_billing != "all" %}
     <a href="/platform/companies">Сбросить</a>
     {% endif %}
-    <a href="/platform/companies/export?search={{ search|urlencode }}&amp;industry={{ selected_industry|urlencode }}&amp;plan={{ selected_plan|urlencode }}&amp;limit={{ selected_limit|urlencode }}&amp;feature={{ selected_feature|urlencode }}&amp;billing={{ selected_billing|urlencode }}">Экспорт CSV</a>
+    <a href="{{ links['export'] }}">Экспорт CSV</a>
 </form>
 
 <div class="summary-grid">
@@ -215,7 +215,7 @@ h1{margin:0 0 12px;font-size:36px}
     <div class="name">#{{ company["id"] }}</div>
     <div>
         <div class="name">
-            <a href="/platform/companies/{{ company['id'] }}">{{ company["name"] }}</a>
+            <a href="{{ company['links']['page'] }}">{{ company["name"] }}</a>
         </div>
         <div class="meta">Создана: {{ company["created_at"] }}</div>
     </div>
@@ -236,7 +236,7 @@ h1{margin:0 0 12px;font-size:36px}
         Счета: {{ company["billing_invoice_summary"]["unpaid_amount_label"] }}
         <span class="billing-pill {{ company['billing_status_tone'] }}">{{ company["billing_status_label"] }}</span>
     </div>
-    <form class="company-settings" method="post" action="/platform/companies/{{ company['id'] }}/settings">
+    <form class="company-settings" method="post" action="{{ company['links']['settings'] }}">
         <input type="hidden" name="return_search" value="{{ search }}">
         <input type="hidden" name="return_industry" value="{{ selected_industry }}">
         <input type="hidden" name="return_plan" value="{{ selected_plan }}">

@@ -8035,6 +8035,11 @@ def get_platform_company_items(
         company["archived_tasks_count"] = int(
             company.get("archived_tasks_count") or 0
         )
+        company["links"] = {
+            "page": f"/platform/companies/{company['id']}",
+            "settings": f"/platform/companies/{company['id']}/settings",
+            "export": f"/platform/companies/{company['id']}/export",
+        }
 
         user_limit_status = get_user_limit_status(
             company["active_users_count"],
@@ -8167,6 +8172,25 @@ def get_platform_company_items(
         "selected_limit": selected_limit,
         "selected_feature": selected_feature,
         "selected_billing": selected_billing,
+        "links": {
+            "page": "/platform/companies",
+            "filtered_page": build_platform_companies_url(
+                search=search,
+                industry=selected_industry,
+                plan=selected_plan,
+                limit=selected_limit,
+                feature=selected_feature,
+                billing=selected_billing,
+            ),
+            "export": build_platform_companies_export_url(
+                search=search,
+                industry=selected_industry,
+                plan=selected_plan,
+                limit=selected_limit,
+                feature=selected_feature,
+                billing=selected_billing,
+            ),
+        },
     }
 
 
@@ -9434,25 +9458,7 @@ async def api_platform_companies(
         },
         "summary": company_data["summary"],
         "companies": company_data["companies"],
-        "links": {
-            "page": "/platform/companies",
-            "filtered_page": build_platform_companies_url(
-                search=company_data["search"],
-                industry=company_data["selected_industry"],
-                plan=company_data["selected_plan"],
-                limit=company_data["selected_limit"],
-                feature=company_data["selected_feature"],
-                billing=company_data["selected_billing"],
-            ),
-            "export": build_platform_companies_export_url(
-                search=company_data["search"],
-                industry=company_data["selected_industry"],
-                plan=company_data["selected_plan"],
-                limit=company_data["selected_limit"],
-                feature=company_data["selected_feature"],
-                billing=company_data["selected_billing"],
-            ),
-        },
+        "links": company_data["links"],
     }
 
 
@@ -9493,8 +9499,10 @@ async def platform_companies_page(
             "request": request,
             "username": username,
             "role": role,
+            "generated_at": get_platform_generated_at(),
             "companies": company_data["companies"],
             "summary": company_data["summary"],
+            "links": company_data["links"],
             "industry_options": INDUSTRY_OPTIONS,
             "plan_options": get_plan_options(),
             "feature_options": FEATURE_DEFINITIONS,

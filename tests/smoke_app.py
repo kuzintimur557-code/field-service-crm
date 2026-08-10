@@ -10445,6 +10445,8 @@ async def assert_platform_companies_page():
     assert list_response.context["summary"]["active_users"] >= 1
     assert list_response.context["summary"]["active_tasks"] >= 0
     assert list_response.context["summary"]["limit_alerts"] >= 0
+    assert list_response.context["generated_at"]
+    assert list_response.context["links"]["export"] == "/platform/companies/export"
     assert "billing_risk_companies" in list_response.context["summary"]
     list_company = next(
         company
@@ -10454,6 +10456,16 @@ async def assert_platform_companies_page():
     assert list_company["billing_invoice_summary"]["count"] == 0
     assert list_company["billing_status_tone"] == "ok"
     assert list_company["billing_status_label"] == "Счета в норме"
+    assert list_company["links"]["page"] == (
+        f"/platform/companies/{logistics_company_id}"
+    )
+    assert list_company["links"]["settings"] == (
+        f"/platform/companies/{logistics_company_id}/settings"
+    )
+    assert list_company["links"]["export"] == (
+        f"/platform/companies/{logistics_company_id}/export"
+    )
+    assert "Обновлено:" in list_html
     assert f'href="/platform/companies/{logistics_company_id}"' in list_html
     assert f'action="/platform/companies/{logistics_company_id}/settings"' in list_html
     assert 'name="return_search"' in list_html
@@ -10461,11 +10473,7 @@ async def assert_platform_companies_page():
     assert 'name="return_feature"' in list_html
     assert 'name="return_billing"' in list_html
     assert "Сохранить" in list_html
-    assert (
-        "/platform/companies/export?search=&amp;industry=all&amp;plan=all"
-        "&amp;limit=all&amp;feature=all&amp;billing=all"
-        in list_html
-    )
+    assert 'href="/platform/companies/export"' in list_html
 
     filtered_response = await crm.platform_companies_page(
         make_asgi_request(
@@ -10485,6 +10493,9 @@ async def assert_platform_companies_page():
     assert filtered_response.context["selected_limit"] == "all"
     assert filtered_response.context["selected_feature"] == "all"
     assert filtered_response.context["selected_billing"] == "all"
+    assert "search=Smoke+Logistics" in filtered_response.context["links"]["export"]
+    assert "industry=logistics" in filtered_response.context["links"]["export"]
+    assert "plan=basic" in filtered_response.context["links"]["export"]
     assert "Smoke Logistics Company" in filtered_html
     assert 'value="Smoke Logistics"' in filtered_html
     assert "Сбросить" in filtered_html
@@ -10655,6 +10666,20 @@ async def assert_platform_companies_page():
     assert companies_api["links"]["page"] == "/platform/companies"
     assert "search=Smoke+Logistics" in companies_api["links"]["filtered_page"]
     assert "search=Smoke+Logistics" in companies_api["links"]["export"]
+    api_company = next(
+        company
+        for company in companies_api["companies"]
+        if company["id"] == logistics_company_id
+    )
+    assert api_company["links"]["page"] == (
+        f"/platform/companies/{logistics_company_id}"
+    )
+    assert api_company["links"]["settings"] == (
+        f"/platform/companies/{logistics_company_id}/settings"
+    )
+    assert api_company["links"]["export"] == (
+        f"/platform/companies/{logistics_company_id}/export"
+    )
     assert any(
         company["id"] == logistics_company_id
         for company in companies_api["companies"]
