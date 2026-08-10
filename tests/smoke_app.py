@@ -11711,6 +11711,7 @@ async def assert_platform_modules_page():
         make_asgi_request("super", "/api/platform/billing"),
     )
     assert platform_billing_api["ok"] is True
+    assert platform_billing_api["generated_at"]
     assert platform_billing_api["filters"]["status"] == "all"
     assert platform_billing_api["filters"]["company_id"] == "all"
     assert "risk_summary" in platform_billing_api
@@ -12234,6 +12235,7 @@ async def assert_platform_modules_page():
         platform_generated_invoice_id,
     )
     assert platform_invoice_api["ok"] is True
+    assert platform_invoice_api["generated_at"]
     assert platform_invoice_api["invoice"]["invoice_number"] == "BILL-2-202610"
     assert platform_invoice_api["activity"]
     assert platform_invoice_api["activity_summary"]["total"] >= 1

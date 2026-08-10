@@ -13416,6 +13416,7 @@ async def api_platform_billing(
 
     return {
         "ok": True,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "filters": {
             "status": status_filter,
             "company_id": selected_company_id,
@@ -13466,6 +13467,7 @@ async def api_platform_billing_invoice(
 
     return {
         "ok": True,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "invoice": invoice,
         "activity": invoice_activity,
         "activity_summary": (
