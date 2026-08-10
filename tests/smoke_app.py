@@ -12253,6 +12253,16 @@ async def assert_platform_modules_page():
         f"/platform/billing/invoices/{platform_generated_invoice_id}/export"
     )
     assert platform_invoice_api["company_url"] == "/platform/companies/2"
+    assert platform_invoice_api["links"]["page"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}"
+    )
+    assert platform_invoice_api["links"]["export"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}/export"
+    )
+    assert platform_invoice_api["links"]["company"] == "/platform/companies/2"
+    assert platform_invoice_api["links"]["billing"] == (
+        "/platform/billing?company_id=2"
+    )
 
     anonymous_platform_invoice_export = await crm.platform_billing_invoice_export(
         make_public_asgi_request(

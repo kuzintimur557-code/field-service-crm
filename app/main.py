@@ -13487,6 +13487,14 @@ async def api_platform_billing_invoice(
         ),
         "export_url": f"/platform/billing/invoices/{invoice_id}/export",
         "company_url": f"/platform/companies/{invoice['company_id']}",
+        "links": {
+            "page": f"/platform/billing/invoices/{invoice_id}",
+            "export": f"/platform/billing/invoices/{invoice_id}/export",
+            "company": f"/platform/companies/{invoice['company_id']}",
+            "billing": build_platform_billing_url(
+                company_id=invoice["company_id"],
+            ),
+        },
     }
 
 
