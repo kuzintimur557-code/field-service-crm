@@ -15645,6 +15645,13 @@ async def assert_platform_calendar_health():
         assert "Счета и подписки" in platform_html
         assert "/platform/billing" in platform_html
         assert "/platform/billing/export" in platform_html
+        assert platform_page.context["links"]["companies"] == "/platform/companies"
+        assert platform_page.context["links"]["companies_limit_danger"] == (
+            "/platform/companies?limit=danger"
+        )
+        assert platform_page.context["links"]["companies_billing_warning"] == (
+            "/platform/companies?billing=warning"
+        )
         assert "Быстрые действия" in platform_html
         assert "🛠 Панель платформы" not in platform_html
         assert "🏢 Компании" not in platform_html
@@ -15703,6 +15710,12 @@ async def assert_platform_calendar_health():
         assert platform_api["links"]["export"] == "/platform/export"
         assert platform_api["links"]["companies_export"] == (
             "/platform/companies/export"
+        )
+        assert platform_api["links"]["companies_limit_warning"] == (
+            "/platform/companies?limit=warning"
+        )
+        assert platform_api["links"]["companies_billing_danger"] == (
+            "/platform/companies?billing=danger"
         )
         assert platform_api["links"]["billing_export"] == (
             "/platform/billing/export"

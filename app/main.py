@@ -7909,6 +7909,19 @@ def get_platform_dashboard_links():
         "export": "/platform/export",
         "companies": "/platform/companies",
         "companies_export": "/platform/companies/export",
+        "companies_limit_ok": build_platform_companies_url(limit="ok"),
+        "companies_limit_warning": build_platform_companies_url(
+            limit="warning",
+        ),
+        "companies_limit_danger": build_platform_companies_url(
+            limit="danger",
+        ),
+        "companies_billing_warning": build_platform_companies_url(
+            billing="warning",
+        ),
+        "companies_billing_danger": build_platform_companies_url(
+            billing="danger",
+        ),
         "billing": "/platform/billing",
         "billing_export": "/platform/billing/export",
         "billing_risks": "/platform/companies?billing=warning",
@@ -7918,6 +7931,17 @@ def get_platform_dashboard_links():
         "presets": "/platform/presets",
         "presets_api": "/api/platform/presets",
         "presets_export": "/platform/presets/export",
+        "readiness": "/platform/readiness",
+        "calendar_health": "/platform/calendar-health",
+        "admin": "/admin",
+        "debug": "/debug",
+        "system": "/system",
+        "backup": "/backup",
+        "admin_checklist": "/admin/checklist",
+        "admin_roadmap": "/admin/roadmap",
+        "admin_notes": "/admin/notes",
+        "profile": "/profile",
+        "logout": "/logout",
     }
 
 
@@ -13420,6 +13444,7 @@ async def platform_dashboard(request: Request):
             ),
             "module_usage_summary": dashboard_data["module_usage_summary"],
             "preset_usage_summary": dashboard_data["preset_usage_summary"],
+            "links": dashboard_data["links"],
         }
     )
 
