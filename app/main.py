@@ -7834,6 +7834,45 @@ def get_platform_dashboard_alerts(platform_company_usage):
     }
 
 
+def get_platform_dashboard_links():
+    return {
+        "page": "/platform",
+        "export": "/platform/export",
+        "companies": "/platform/companies",
+        "companies_export": "/platform/companies/export",
+        "billing": "/platform/billing",
+        "billing_export": "/platform/billing/export",
+        "billing_risks": "/platform/companies?billing=warning",
+        "modules": "/platform/modules",
+        "modules_export": "/platform/modules/export",
+        "presets": "/platform/presets",
+        "presets_export": "/platform/presets/export",
+    }
+
+
+def get_platform_dashboard_data():
+    platform_company_usage = get_platform_company_items()
+    platform_alerts = get_platform_dashboard_alerts(platform_company_usage)
+    platform_module_usage = get_platform_module_usage()
+    platform_preset_usage = get_platform_preset_usage()
+
+    return {
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "counts": get_platform_dashboard_counts(),
+        "platform_company_usage": platform_company_usage,
+        "platform_alerts": platform_alerts,
+        "platform_billing_summary": get_platform_billing_invoice_summary(),
+        "platform_module_usage": platform_module_usage,
+        "platform_preset_usage": platform_preset_usage,
+        "company_usage_summary": platform_company_usage["summary"],
+        "limit_alert_companies": platform_alerts["limit_alert_companies"],
+        "billing_alert_companies": platform_alerts["billing_alert_companies"],
+        "module_usage_summary": platform_module_usage["summary"],
+        "preset_usage_summary": platform_preset_usage["summary"],
+        "links": get_platform_dashboard_links(),
+    }
+
+
 def get_platform_company_items(
     search="",
     industry="all",
@@ -12909,37 +12948,19 @@ async def api_platform_dashboard(request: Request):
     if role != "superadmin":
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
-    counts = get_platform_dashboard_counts()
-
-    platform_company_usage = get_platform_company_items()
-    platform_alerts = get_platform_dashboard_alerts(platform_company_usage)
-    platform_billing_summary = get_platform_billing_invoice_summary()
-    platform_module_usage = get_platform_module_usage()
-    platform_preset_usage = get_platform_preset_usage()
+    dashboard_data = get_platform_dashboard_data()
 
     return {
         "ok": True,
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "counts": counts,
-        "company_usage_summary": platform_company_usage["summary"],
-        "limit_alert_companies": platform_alerts["limit_alert_companies"],
-        "billing_alert_companies": platform_alerts["billing_alert_companies"],
-        "platform_billing_summary": platform_billing_summary,
-        "module_usage_summary": platform_module_usage["summary"],
-        "preset_usage_summary": platform_preset_usage["summary"],
-        "links": {
-            "page": "/platform",
-            "export": "/platform/export",
-            "companies": "/platform/companies",
-            "companies_export": "/platform/companies/export",
-            "billing": "/platform/billing",
-            "billing_export": "/platform/billing/export",
-            "billing_risks": "/platform/companies?billing=warning",
-            "modules": "/platform/modules",
-            "modules_export": "/platform/modules/export",
-            "presets": "/platform/presets",
-            "presets_export": "/platform/presets/export",
-        },
+        "generated_at": dashboard_data["generated_at"],
+        "counts": dashboard_data["counts"],
+        "company_usage_summary": dashboard_data["company_usage_summary"],
+        "limit_alert_companies": dashboard_data["limit_alert_companies"],
+        "billing_alert_companies": dashboard_data["billing_alert_companies"],
+        "platform_billing_summary": dashboard_data["platform_billing_summary"],
+        "module_usage_summary": dashboard_data["module_usage_summary"],
+        "preset_usage_summary": dashboard_data["preset_usage_summary"],
+        "links": dashboard_data["links"],
     }
 
 
@@ -12956,21 +12977,18 @@ async def platform_dashboard_export(request: Request):
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    counts = get_platform_dashboard_counts()
-
-    platform_company_usage = get_platform_company_items()
-    platform_alerts = get_platform_dashboard_alerts(platform_company_usage)
-    company_summary = platform_company_usage["summary"]
-    platform_billing_summary = get_platform_billing_invoice_summary()
-    platform_module_usage = get_platform_module_usage()
-    module_summary = platform_module_usage["summary"]
-    platform_preset_usage = get_platform_preset_usage()
-    preset_summary = platform_preset_usage["summary"]
+    dashboard_data = get_platform_dashboard_data()
+    counts = dashboard_data["counts"]
+    platform_alerts = dashboard_data["platform_alerts"]
+    company_summary = dashboard_data["company_usage_summary"]
+    platform_billing_summary = dashboard_data["platform_billing_summary"]
+    module_summary = dashboard_data["module_usage_summary"]
+    preset_summary = dashboard_data["preset_usage_summary"]
 
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Панель платформы"])
-    writer.writerow(["Сформировано", datetime.now().strftime("%Y-%m-%d %H:%M")])
+    writer.writerow(["Сформировано", dashboard_data["generated_at"]])
     writer.writerow(["Компании", counts["companies"]])
     writer.writerow(["Пользователи", counts["users"]])
     writer.writerow(["Заявки", counts["tasks"]])
@@ -13065,7 +13083,8 @@ async def platform_dashboard(request: Request):
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    counts = get_platform_dashboard_counts()
+    dashboard_data = get_platform_dashboard_data()
+    counts = dashboard_data["counts"]
     companies_count = counts["companies"]
     users_count = counts["users"]
     tasks_count = counts["tasks"]
@@ -13106,12 +13125,6 @@ async def platform_dashboard(request: Request):
         release_readiness,
         calendar_health_summary=calendar_health["summary"],
     )
-    platform_company_usage = get_platform_company_items()
-    platform_alerts = get_platform_dashboard_alerts(platform_company_usage)
-    platform_billing_summary = get_platform_billing_invoice_summary()
-    platform_module_usage = get_platform_module_usage()
-    platform_preset_usage = get_platform_preset_usage()
-
     return templates.TemplateResponse(
         request,
         "platform.html",
@@ -13119,7 +13132,7 @@ async def platform_dashboard(request: Request):
             "request": request,
             "username": username,
             "role": role,
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "generated_at": dashboard_data["generated_at"],
             "companies_count": companies_count,
             "users_count": users_count,
             "tasks_count": tasks_count,
@@ -13134,12 +13147,14 @@ async def platform_dashboard(request: Request):
             "calendar_recommendations": calendar_recommendations,
             "release_readiness": release_readiness,
             "release_dashboard": release_dashboard,
-            "company_usage_summary": platform_company_usage["summary"],
-            "limit_alert_companies": platform_alerts["limit_alert_companies"],
-            "billing_alert_companies": platform_alerts["billing_alert_companies"],
-            "platform_billing_summary": platform_billing_summary,
-            "module_usage_summary": platform_module_usage["summary"],
-            "preset_usage_summary": platform_preset_usage["summary"],
+            "company_usage_summary": dashboard_data["company_usage_summary"],
+            "limit_alert_companies": dashboard_data["limit_alert_companies"],
+            "billing_alert_companies": dashboard_data["billing_alert_companies"],
+            "platform_billing_summary": (
+                dashboard_data["platform_billing_summary"]
+            ),
+            "module_usage_summary": dashboard_data["module_usage_summary"],
+            "preset_usage_summary": dashboard_data["preset_usage_summary"],
         }
     )
 
