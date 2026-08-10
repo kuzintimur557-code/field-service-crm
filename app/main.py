@@ -7504,6 +7504,17 @@ def build_platform_calendar_company_health_links(company_id):
     }
 
 
+def build_platform_calendar_incident_analytics_links(days=30):
+    days = int(days or 30)
+
+    return {
+        "platform": "/platform",
+        "calendar_health": "/platform/calendar-health",
+        "page": f"/platform/calendar-health/analytics?days={days}",
+        "export": f"/platform/calendar-health/analytics/export?days={days}",
+    }
+
+
 def claim_visible_calendar_scheduler_incidents(
     actor_username,
     status_filter="unacknowledged",
@@ -15673,6 +15684,20 @@ async def platform_calendar_incident_analytics_page(
     analytics = get_platform_calendar_incident_analytics(
         days=days,
     )
+    links = build_platform_calendar_incident_analytics_links(
+        analytics["days"],
+    )
+    period_filter_options = [
+        {
+            "days": option_days,
+            "label": f"{option_days} дней",
+            "url": (
+                "/platform/calendar-health/analytics?"
+                + urlencode({"days": option_days})
+            ),
+        }
+        for option_days in (7, 30, 90)
+    ]
 
     return templates.TemplateResponse(
         request,
@@ -15689,6 +15714,8 @@ async def platform_calendar_incident_analytics_page(
             "recent_sessions": analytics["recent_sessions"],
             "recommendations": analytics["recommendations"],
             "selected_days": analytics["days"],
+            "links": links,
+            "period_filter_options": period_filter_options,
         },
     )
 

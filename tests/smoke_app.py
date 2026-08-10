@@ -15591,6 +15591,16 @@ async def assert_platform_calendar_health():
         )
         assert analytics_page.status_code == 200
         assert analytics_page.context["selected_days"] == 30
+        assert analytics_page.context["links"]["calendar_health"] == (
+            "/platform/calendar-health"
+        )
+        assert analytics_page.context["links"]["export"] == (
+            "/platform/calendar-health/analytics/export?days=30"
+        )
+        assert [
+            option["days"]
+            for option in analytics_page.context["period_filter_options"]
+        ] == [7, 30, 90]
         analytics_html = analytics_page.body.decode("utf-8")
         assert "Аналитика календарных инцидентов" in analytics_html
         assert 'class="platform-mobile-nav"' in analytics_html
