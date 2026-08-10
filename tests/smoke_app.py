@@ -11639,6 +11639,11 @@ async def assert_platform_modules_page():
         module["key"] == "automation"
         for module in response.context["modules"]
     )
+    assert all(
+        company["links"]["page"].startswith("/platform/companies/")
+        for module in response.context["modules"]
+        for company in module["enabled_companies"] + module["disabled_companies"]
+    )
 
     anonymous_api = await crm.api_platform_modules(
         make_public_asgi_request("/api/platform/modules"),
@@ -11666,6 +11671,11 @@ async def assert_platform_modules_page():
     )
     assert automation_api_module["links"]["companies"] == (
         "/platform/companies?feature=automation"
+    )
+    assert all(
+        company["links"]["page"].startswith("/platform/companies/")
+        for module in modules_api["modules"]
+        for company in module["enabled_companies"] + module["disabled_companies"]
     )
     assert modules_api["links"]["platform"] == "/platform"
     assert modules_api["links"]["page"] == "/platform/modules"
@@ -11728,6 +11738,13 @@ async def assert_platform_modules_page():
     assert detail_response.status_code == 200
     assert detail_response.context["module"]["key"] == "automation"
     assert detail_response.context["generated_at"]
+    assert all(
+        company["links"]["page"].startswith("/platform/companies/")
+        for company in (
+            detail_response.context["module"]["enabled_companies"]
+            + detail_response.context["module"]["disabled_companies"]
+        )
+    )
     assert "Модуль: Автоматизация" in detail_html
     assert "Обновлено:" in detail_html
     assert "Компании с модулем" in detail_html
@@ -11764,6 +11781,13 @@ async def assert_platform_modules_page():
     )
     assert module_detail_api["links"]["companies_export"] == (
         "/platform/companies/export?feature=automation"
+    )
+    assert all(
+        company["links"]["page"].startswith("/platform/companies/")
+        for company in (
+            module_detail_api["module"]["enabled_companies"]
+            + module_detail_api["module"]["disabled_companies"]
+        )
     )
 
     platform_page = await crm.platform_dashboard(
@@ -12962,6 +12986,10 @@ async def assert_platform_presets_page():
     assert beauty_api_preset["links"]["companies"] == (
         "/platform/companies?industry=beauty"
     )
+    assert any(
+        feature["links"]["page"] == "/platform/modules/calendar"
+        for feature in beauty_api_preset["features"]
+    )
     assert presets_api["links"]["platform"] == "/platform"
     assert presets_api["links"]["page"] == "/platform/presets"
     assert presets_api["links"]["export"] == "/platform/presets/export"
@@ -13024,6 +13052,14 @@ async def assert_platform_presets_page():
     assert detail_response.status_code == 200
     assert detail_response.context["preset"]["key"] == "beauty"
     assert detail_response.context["generated_at"]
+    assert any(
+        feature["links"]["page"] == "/platform/modules/calendar"
+        for feature in detail_response.context["preset"]["features"]
+    )
+    assert all(
+        company["links"]["page"].startswith("/platform/companies/")
+        for company in detail_response.context["companies"]
+    )
     assert "Пресет: Бьюти" in detail_html
     assert "Обновлено:" in detail_html
     assert "Названия интерфейса" in detail_html
@@ -13057,6 +13093,14 @@ async def assert_platform_presets_page():
     assert preset_detail_api["links"]["presets"] == "/platform/presets"
     assert preset_detail_api["links"]["companies"] == (
         "/platform/companies?industry=beauty"
+    )
+    assert any(
+        feature["links"]["page"] == "/platform/modules/calendar"
+        for feature in preset_detail_api["preset"]["features"]
+    )
+    assert all(
+        company["links"]["page"].startswith("/platform/companies/")
+        for company in preset_detail_api["companies"]
     )
 
     platform_page = await crm.platform_dashboard(

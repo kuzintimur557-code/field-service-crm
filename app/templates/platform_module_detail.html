@@ -96,7 +96,7 @@ h2{margin:0 0 14px;font-size:22px}
         <div class="company">
             <div>
                 <div class="company-name">
-                    <a href="/platform/companies/{{ company['id'] }}">{{ company["name"] }}</a>
+                    <a href="{{ company['links']['page'] }}">{{ company["name"] }}</a>
                 </div>
                 <div class="meta">{{ company["industry_label"] }} · {{ company["owner_username"] }}</div>
             </div>
@@ -115,7 +115,7 @@ h2{margin:0 0 14px;font-size:22px}
         <div class="company">
             <div>
                 <div class="company-name">
-                    <a href="/platform/companies/{{ company['id'] }}">{{ company["name"] }}</a>
+                    <a href="{{ company['links']['page'] }}">{{ company["name"] }}</a>
                 </div>
                 <div class="meta">{{ company["industry_label"] }} · {{ company["owner_username"] }}</div>
             </div>

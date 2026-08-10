@@ -8373,6 +8373,11 @@ def get_platform_module_usage():
             company["industry"],
             "Сфера не указана",
         )
+        company["links"] = {
+            "page": f"/platform/companies/{company['id']}",
+            "settings": f"/platform/companies/{company['id']}/settings",
+            "export": f"/platform/companies/{company['id']}/export",
+        }
         company["features"] = get_company_features(company["id"])
         companies.append(company)
 
@@ -8528,6 +8533,9 @@ def get_platform_preset_usage():
             {
                 "key": feature_key,
                 "title": feature_titles.get(feature_key, feature_key),
+                "links": {
+                    "page": f"/platform/modules/{feature_key}",
+                },
             }
             for feature_key, _, _ in FEATURE_DEFINITIONS
             if feature_key in expected_features
@@ -8616,6 +8624,11 @@ def get_platform_preset_profile(industry_key):
             industry_key,
             get_company_features(company["id"]),
         )
+        company["links"] = {
+            "page": f"/platform/companies/{company['id']}",
+            "settings": f"/platform/companies/{company['id']}/settings",
+            "export": f"/platform/companies/{company['id']}/export",
+        }
         companies.append(company)
 
     return {

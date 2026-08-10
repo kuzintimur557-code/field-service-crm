@@ -92,7 +92,7 @@ h2{margin:0 0 14px;font-size:22px}
         <h2>Модули пресета</h2>
         <div class="features">
             {% for feature in preset["features"] %}
-            <a class="feature" href="/platform/modules/{{ feature['key'] }}">
+            <a class="feature" href="{{ feature['links']['page'] }}">
                 {{ feature["title"] }}
             </a>
             {% endfor %}
@@ -107,7 +107,7 @@ h2{margin:0 0 14px;font-size:22px}
     <div class="company">
         <div>
             <div class="company-name">
-                <a href="/platform/companies/{{ company['id'] }}">{{ company["name"] }}</a>
+                <a href="{{ company['links']['page'] }}">{{ company["name"] }}</a>
             </div>
             <div class="meta">
                 {{ company["owner_username"] }} · {{ company["created_at"] }}
