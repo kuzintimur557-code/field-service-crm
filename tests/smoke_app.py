@@ -15673,6 +15673,12 @@ async def assert_platform_calendar_health():
         assert platform_page.context["links"]["companies_billing_warning"] == (
             "/platform/companies?billing=warning"
         )
+        assert platform_page.context["links"]["calendar_health_critical"] == (
+            "/platform/calendar-health?status=critical"
+        )
+        assert platform_page.context["links"]["calendar_health_mine"] == (
+            "/platform/calendar-health?assignee=me"
+        )
         assert "Быстрые действия" in platform_html
         assert "🛠 Панель платформы" not in platform_html
         assert "🏢 Компании" not in platform_html
@@ -15751,6 +15757,13 @@ async def assert_platform_calendar_health():
         assert platform_api["links"]["presets_api"] == "/api/platform/presets"
         assert platform_api["links"]["billing_risks"] == (
             "/platform/companies?billing=warning"
+        )
+        assert platform_api["links"]["calendar_health_unacknowledged"] == (
+            "/platform/calendar-health?status=unacknowledged"
+            "&assignee=unassigned"
+        )
+        assert platform_api["links"]["calendar_health_analytics"] == (
+            "/platform/calendar-health/analytics"
         )
         platform_export = await crm.platform_dashboard_export(
             make_asgi_request("super", "/platform/export"),

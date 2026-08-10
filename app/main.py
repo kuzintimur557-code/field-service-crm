@@ -7933,6 +7933,16 @@ def get_platform_dashboard_links():
         "presets_export": "/platform/presets/export",
         "readiness": "/platform/readiness",
         "calendar_health": "/platform/calendar-health",
+        "calendar_health_critical": "/platform/calendar-health?status=critical",
+        "calendar_health_unacknowledged": (
+            "/platform/calendar-health?status=unacknowledged"
+            "&assignee=unassigned"
+        ),
+        "calendar_health_response_overdue": (
+            "/platform/calendar-health?status=response_overdue"
+        ),
+        "calendar_health_analytics": "/platform/calendar-health/analytics",
+        "calendar_health_mine": "/platform/calendar-health?assignee=me",
         "admin": "/admin",
         "debug": "/debug",
         "system": "/system",

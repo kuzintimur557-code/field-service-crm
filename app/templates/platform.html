@@ -507,11 +507,11 @@ h1{font-size:30px}
         </div>
     </div>
     <div class="ops-actions">
-        <a href="/platform/calendar-health?status=critical">Критические</a>
-        <a href="/platform/calendar-health?status=unacknowledged&amp;assignee=unassigned">Не приняты</a>
-        <a href="/platform/calendar-health?status=response_overdue">Реакция</a>
-        <a href="/platform/calendar-health/analytics">Риски</a>
-        <a class="secondary" href="/platform/calendar-health?assignee=me">Мои</a>
+        <a href="{{ links['calendar_health_critical'] }}">Критические</a>
+        <a href="{{ links['calendar_health_unacknowledged'] }}">Не приняты</a>
+        <a href="{{ links['calendar_health_response_overdue'] }}">Реакция</a>
+        <a href="{{ links['calendar_health_analytics'] }}">Риски</a>
+        <a class="secondary" href="{{ links['calendar_health_mine'] }}">Мои</a>
     </div>
     {% if calendar_health_incidents %}
     <div class="incident-list">
