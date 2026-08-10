@@ -11681,7 +11681,9 @@ async def assert_platform_modules_page():
     detail_html = detail_response.body.decode("utf-8")
     assert detail_response.status_code == 200
     assert detail_response.context["module"]["key"] == "automation"
+    assert detail_response.context["generated_at"]
     assert "Модуль: Автоматизация" in detail_html
+    assert "Обновлено:" in detail_html
     assert "Компании с модулем" in detail_html
     assert "Компании без модуля" in detail_html
     assert "/platform/companies?feature=automation" in detail_html
@@ -12978,7 +12980,9 @@ async def assert_platform_presets_page():
     detail_html = detail_response.body.decode("utf-8")
     assert detail_response.status_code == 200
     assert detail_response.context["preset"]["key"] == "beauty"
+    assert detail_response.context["generated_at"]
     assert "Пресет: Бьюти" in detail_html
+    assert "Обновлено:" in detail_html
     assert "Названия интерфейса" in detail_html
     assert "Модули пресета" in detail_html
     assert "Компании сферы" in detail_html

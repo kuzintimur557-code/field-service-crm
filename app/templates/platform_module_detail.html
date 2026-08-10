@@ -55,7 +55,10 @@ h2{margin:0 0 14px;font-size:22px}
 <div class="card header">
     <div>
         <h1>Модуль: {{ module["title"] }}</h1>
-        <div class="meta">{{ module["description"] }}</div>
+        <div class="meta">
+            {{ module["description"] }}
+            Обновлено: {{ generated_at }}.
+        </div>
         <div class="key">{{ module["key"] }}</div>
     </div>
     <div>

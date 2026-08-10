@@ -9697,6 +9697,7 @@ async def platform_module_detail_page(request: Request, feature_key: str):
             "request": request,
             "username": username,
             "role": role,
+            "generated_at": get_platform_generated_at(),
             "summary": module_usage["summary"],
             "module": module,
         },
@@ -9878,6 +9879,7 @@ async def platform_preset_detail_page(request: Request, industry_key: str):
             "request": request,
             "username": username,
             "role": role,
+            "generated_at": get_platform_generated_at(),
             **profile,
         },
     )
