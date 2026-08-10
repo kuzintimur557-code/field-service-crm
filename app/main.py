@@ -9264,6 +9264,7 @@ async def api_platform_company_detail(request: Request, company_id: int):
 
     return {
         "ok": True,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "company": company,
         "settings": {
             "industry": settings["industry"],
@@ -9336,6 +9337,7 @@ async def api_platform_companies(
 
     return {
         "ok": True,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "filters": {
             "search": company_data["search"],
             "industry": company_data["selected_industry"],

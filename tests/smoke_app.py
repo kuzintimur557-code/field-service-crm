@@ -10647,6 +10647,7 @@ async def assert_platform_companies_page():
         search="Smoke Logistics",
     )
     assert companies_api["ok"] is True
+    assert companies_api["generated_at"]
     assert companies_api["filters"]["search"] == "Smoke Logistics"
     assert companies_api["filters"]["billing"] == "all"
     assert companies_api["summary"]["companies"] >= 1
@@ -10870,6 +10871,7 @@ async def assert_platform_companies_page():
         logistics_company_id,
     )
     assert detail_api["ok"] is True
+    assert detail_api["generated_at"]
     assert detail_api["company"]["id"] == logistics_company_id
     assert detail_api["billing"]["summary"]["count"] == 0
     assert detail_api["billing"]["risk_summary"]["draft_count"] == 0
