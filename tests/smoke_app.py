@@ -11576,6 +11576,8 @@ async def assert_platform_modules_page():
     assert response.status_code == 200
     assert "Модули платформы" in html
     assert "Покрытие модулей" in html
+    assert "Обновлено:" in html
+    assert response.context["generated_at"]
     assert "Автоматизация" in html
     assert "ИИ-инсайты" in html
     assert "/platform/companies/" in html
@@ -12870,6 +12872,8 @@ async def assert_platform_presets_page():
     assert response.status_code == 200
     assert "Отраслевые пресеты" in html
     assert "Сферы бизнеса" in html
+    assert "Обновлено:" in html
+    assert response.context["generated_at"]
     assert "Бьюти" in html
     assert "Грузоперевозки" in html
     assert "Отклонений" in html
