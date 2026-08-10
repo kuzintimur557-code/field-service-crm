@@ -7850,6 +7850,10 @@ def get_platform_dashboard_links():
     }
 
 
+def get_platform_generated_at():
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+
 def get_platform_dashboard_data():
     platform_company_usage = get_platform_company_items()
     platform_alerts = get_platform_dashboard_alerts(platform_company_usage)
@@ -7857,7 +7861,7 @@ def get_platform_dashboard_data():
     platform_preset_usage = get_platform_preset_usage()
 
     return {
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated_at": get_platform_generated_at(),
         "counts": get_platform_dashboard_counts(),
         "platform_company_usage": platform_company_usage,
         "platform_alerts": platform_alerts,
@@ -9303,7 +9307,7 @@ async def api_platform_company_detail(request: Request, company_id: int):
 
     return {
         "ok": True,
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated_at": get_platform_generated_at(),
         "company": company,
         "settings": {
             "industry": settings["industry"],
@@ -9376,7 +9380,7 @@ async def api_platform_companies(
 
     return {
         "ok": True,
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated_at": get_platform_generated_at(),
         "filters": {
             "search": company_data["search"],
             "industry": company_data["selected_industry"],
@@ -13416,7 +13420,7 @@ async def api_platform_billing(
 
     return {
         "ok": True,
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated_at": get_platform_generated_at(),
         "filters": {
             "status": status_filter,
             "company_id": selected_company_id,
@@ -13479,7 +13483,7 @@ async def api_platform_billing_invoice(
 
     return {
         "ok": True,
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated_at": get_platform_generated_at(),
         "invoice": invoice,
         "activity": invoice_activity,
         "activity_summary": (
