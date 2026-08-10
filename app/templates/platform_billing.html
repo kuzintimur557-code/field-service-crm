@@ -79,13 +79,13 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="container">
 
 <div class="actions">
-    <a href="/platform" class="back">← Назад к платформе</a>
-    <a href="{{ export_url }}" class="back">Скачать CSV</a>
+    <a href="{{ links['platform'] }}" class="back">Назад к платформе</a>
+    <a href="{{ links['export'] }}" class="back">Скачать CSV</a>
 </div>
 
 <div class="card">
     <h1>Счета платформы</h1>
-    <div class="small">Единый список начислений по компаниям и будущим подпискам.</div>
+    <div class="small">Единый список начислений по компаниям и будущим подпискам. Обновлено: {{ generated_at }}.</div>
 </div>
 
 {% if request.query_params.get("invoice_created") == "1" %}
@@ -166,12 +166,12 @@ h2{margin:0 0 16px;font-size:22px}
         </div>
     </div>
     <div class="billing-action-forms">
-        <form class="billing-action-form" method="post" action="/platform/billing/reminders/send">
+        <form class="billing-action-form" method="post" action="{{ links['reminders'] }}">
             <input type="hidden" name="company_id" value="{{ selected_company_id }}">
             <input type="hidden" name="status" value="{{ status_filter }}">
             <button type="submit">Отправить напоминания владельцам</button>
         </form>
-        <form class="billing-action-form" method="post" action="/platform/billing/overdue/sync">
+        <form class="billing-action-form" method="post" action="{{ links['sync_overdue'] }}">
             <input type="hidden" name="company_id" value="{{ selected_company_id }}">
             <input type="hidden" name="status" value="{{ status_filter }}">
             <button class="secondary-action" type="submit">Синхронизировать просрочки</button>
@@ -210,7 +210,7 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="card">
     <h2>Сформировать счёт</h2>
     {% if company_options %}
-    <form class="generate-form" method="post" action="/platform/billing/generate">
+    <form class="generate-form" method="post" action="{{ links['generate'] }}">
         <label class="field">
             Компания
             <select name="company_id" required>
@@ -234,7 +234,7 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="card">
     <h2>Фильтр</h2>
-    <form class="company-filter" method="get" action="/platform/billing">
+    <form class="company-filter" method="get" action="{{ links['base'] }}">
         <input type="hidden" name="status" value="{{ status_filter }}">
         <label class="field">
             Компания
@@ -274,7 +274,7 @@ h2{margin:0 0 16px;font-size:22px}
         <div class="row">
             <div>
                 <div class="value">
-                    <a href="/platform/companies/{{ invoice['company_id'] }}">
+                    <a href="{{ invoice['links']['company'] }}">
                         {{ invoice["company_name"] or ("Компания #" ~ invoice["company_id"]) }}
                     </a>
                 </div>
@@ -282,7 +282,7 @@ h2{margin:0 0 16px;font-size:22px}
             </div>
             <div>
                 <div class="value">
-                    <a href="/platform/billing/invoices/{{ invoice['id'] }}">
+                    <a href="{{ invoice['links']['page'] }}">
                         {{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}
                     </a>
                 </div>
@@ -291,7 +291,7 @@ h2{margin:0 0 16px;font-size:22px}
             <div class="value">{{ invoice["period"] or "не указан" }}</div>
             <div class="value">{{ invoice["amount_label"] }}</div>
             <div><span class="status {{ invoice['status_tone'] }}">{{ invoice["status_label"] }}</span></div>
-            <form class="status-form" method="post" action="/platform/billing/invoices/{{ invoice['id'] }}/status">
+            <form class="status-form" method="post" action="{{ invoice['links']['status'] }}">
                 <select name="status" aria-label="Статус счёта">
                     {% for option in status_options %}
                     {% if option["key"] != "all" %}

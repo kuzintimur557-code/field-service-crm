@@ -11858,8 +11858,20 @@ async def assert_platform_modules_page():
     assert platform_billing_api["company_options"]
     assert platform_billing_api["export_url"] == "/platform/billing/export"
     assert platform_billing_api["links"]["platform"] == "/platform"
+    assert platform_billing_api["links"]["base"] == "/platform/billing"
     assert platform_billing_api["links"]["page"] == "/platform/billing"
     assert platform_billing_api["links"]["export"] == "/platform/billing/export"
+    assert platform_billing_api["links"]["generate"] == "/platform/billing/generate"
+    assert platform_billing_api["links"]["reminders"] == (
+        "/platform/billing/reminders/send"
+    )
+    assert platform_billing_api["links"]["sync_overdue"] == (
+        "/platform/billing/overdue/sync"
+    )
+    assert all(
+        company["links"]["page"].startswith("/platform/companies/")
+        for company in platform_billing_api["company_options"]
+    )
 
     platform_billing_page = await crm.platform_billing_page(
         make_asgi_request("super", "/platform/billing"),
@@ -11868,11 +11880,17 @@ async def assert_platform_modules_page():
     assert platform_billing_page.status_code == 200
     assert platform_billing_page.context["status_filter"] == "all"
     assert platform_billing_page.context["selected_company_id"] == "all"
+    assert platform_billing_page.context["generated_at"]
     assert platform_billing_page.context["summary"]["count"] >= 0
     assert "risk_summary" in platform_billing_page.context
     assert "monthly_summary" in platform_billing_page.context
+    assert platform_billing_page.context["links"]["base"] == "/platform/billing"
+    assert platform_billing_page.context["links"]["export"] == (
+        "/platform/billing/export"
+    )
     assert platform_billing_page.context["company_options"]
     assert "Счета платформы" in platform_billing_html
+    assert "Обновлено:" in platform_billing_html
     assert "Контроль оплат" in platform_billing_html
     assert "Динамика по месяцам" in platform_billing_html
     assert "Просрочено по сроку" in platform_billing_html
@@ -12272,6 +12290,20 @@ async def assert_platform_modules_page():
         invoice["invoice_number"] == "BILL-2-202610"
         for invoice in platform_billing_company_api["invoices"]
     )
+    platform_generated_invoice_api_row = next(
+        invoice
+        for invoice in platform_billing_company_api["invoices"]
+        if invoice["invoice_number"] == "BILL-2-202610"
+    )
+    assert platform_generated_invoice_api_row["links"]["page"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}"
+    )
+    assert platform_generated_invoice_api_row["links"]["status"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}/status"
+    )
+    assert platform_generated_invoice_api_row["links"]["company"] == (
+        "/platform/companies/2"
+    )
 
     platform_created_page = await crm.platform_billing_page(
         make_asgi_request(
@@ -12339,7 +12371,12 @@ async def assert_platform_modules_page():
     assert platform_invoice_detail_page.context["invoice"]["id"] == (
         platform_generated_invoice_id
     )
+    assert platform_invoice_detail_page.context["generated_at"]
+    assert platform_invoice_detail_page.context["invoice"]["links"]["status"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}/status"
+    )
     assert "Счёт BILL-2-202610" in platform_invoice_detail_html
+    assert "обновлено:" in platform_invoice_detail_html
     assert "Управление статусом" in platform_invoice_detail_html
     assert "Карточка компании" in platform_invoice_detail_html
     assert "Контроль истории" in platform_invoice_detail_html
@@ -12397,6 +12434,9 @@ async def assert_platform_modules_page():
     )
     assert platform_invoice_api["links"]["export"] == (
         f"/platform/billing/invoices/{platform_generated_invoice_id}/export"
+    )
+    assert platform_invoice_api["links"]["status"] == (
+        f"/platform/billing/invoices/{platform_generated_invoice_id}/status"
     )
     assert platform_invoice_api["links"]["company"] == "/platform/companies/2"
     assert platform_invoice_api["links"]["billing"] == (

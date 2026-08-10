@@ -52,9 +52,9 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="container">
 
 <div class="actions">
-    <a href="/platform/billing" class="back">← Назад к счетам платформы</a>
-    <a href="/platform/companies/{{ invoice['company_id'] }}" class="back">Карточка компании</a>
-    <a href="/platform/billing/invoices/{{ invoice['id'] }}/export" class="back">Экспорт CSV</a>
+    <a href="{{ invoice['links']['billing'] }}" class="back">Назад к счетам платформы</a>
+    <a href="{{ invoice['links']['company'] }}" class="back">Карточка компании</a>
+    <a href="{{ invoice['links']['export'] }}" class="back">Экспорт CSV</a>
 </div>
 
 {% if request.query_params.get("invoice_updated") == "1" %}
@@ -69,17 +69,18 @@ h2{margin:0 0 16px;font-size:22px}
     <h1>Счёт {{ invoice["invoice_number"] or ("#" ~ invoice["id"]) }}</h1>
     <div class="small">
         Компания:
-        <a href="/platform/companies/{{ invoice['company_id'] }}">
+        <a href="{{ invoice['links']['company'] }}">
             {{ invoice["company_name"] or ("Компания #" ~ invoice["company_id"]) }}
         </a>
         · владелец: {{ invoice["owner_username"] or "не указан" }}
+        · обновлено: {{ generated_at }}
     </div>
     <span class="status {{ invoice['status_tone'] }}">{{ invoice["status_label"] }}</span>
 </div>
 
 <div class="card">
     <h2>Управление статусом</h2>
-    <form class="status-form" method="post" action="/platform/billing/invoices/{{ invoice['id'] }}/status">
+    <form class="status-form" method="post" action="{{ invoice['links']['status'] }}">
         <input type="hidden" name="return_to" value="detail">
         <label>
             Статус счёта
@@ -122,7 +123,7 @@ h2{margin:0 0 16px;font-size:22px}
         <div class="field">
             <div class="label">Компания</div>
             <div class="value">
-                <a href="/platform/companies/{{ invoice['company_id'] }}">
+                <a href="{{ invoice['links']['company'] }}">
                     {{ invoice["company_name"] or ("Компания #" ~ invoice["company_id"]) }}
                 </a>
             </div>

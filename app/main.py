@@ -2003,6 +2003,38 @@ def build_platform_billing_url(status_filter="all", company_id="all", export=Fal
     return base_url + "?" + urlencode(params)
 
 
+def build_platform_billing_invoice_links(invoice_id, company_id):
+    invoice_id = int(invoice_id or 0)
+    company_id = int(company_id or 0)
+
+    return {
+        "page": f"/platform/billing/invoices/{invoice_id}",
+        "export": f"/platform/billing/invoices/{invoice_id}/export",
+        "status": f"/platform/billing/invoices/{invoice_id}/status",
+        "company": f"/platform/companies/{company_id}",
+        "billing": build_platform_billing_url(company_id=company_id),
+    }
+
+
+def build_platform_billing_links(status_filter="all", company_id="all"):
+    status_filter = normalize_billing_invoice_filter(status_filter)
+    company_id = normalize_platform_billing_company_id(company_id)
+
+    return {
+        "platform": "/platform",
+        "base": "/platform/billing",
+        "page": build_platform_billing_url(status_filter, company_id),
+        "export": build_platform_billing_url(
+            status_filter,
+            company_id,
+            export=True,
+        ),
+        "generate": "/platform/billing/generate",
+        "reminders": "/platform/billing/reminders/send",
+        "sync_overdue": "/platform/billing/overdue/sync",
+    }
+
+
 def normalize_billing_period(period=""):
     value = str(period or "").strip()
 
@@ -2197,6 +2229,10 @@ def fetch_platform_billing_invoices(c, status_filter="all", company_id="all"):
         invoice = build_billing_invoice_rows([row])[0]
         invoice["company_name"] = row["company_name"] or ""
         invoice["owner_username"] = row["owner_username"] or ""
+        invoice["links"] = build_platform_billing_invoice_links(
+            invoice["id"],
+            invoice["company_id"],
+        )
         invoices.append(invoice)
 
     return invoices
@@ -2220,6 +2256,10 @@ def fetch_platform_billing_invoice(c, invoice_id):
     invoice = build_billing_invoice_rows([row])[0]
     invoice["company_name"] = row["company_name"] or ""
     invoice["owner_username"] = row["owner_username"] or ""
+    invoice["links"] = build_platform_billing_invoice_links(
+        invoice["id"],
+        invoice["company_id"],
+    )
     return invoice
 
 
@@ -2247,6 +2287,12 @@ def get_platform_billing_company_options(c):
             "plan": plan,
             "plan_label": get_plan_label(plan),
             "price_label": get_plan_price_label(plan),
+            "links": {
+                "page": f"/platform/companies/{row['id']}",
+                "billing": build_platform_billing_url(
+                    company_id=row["id"],
+                ),
+            },
         })
 
     return options
@@ -13410,6 +13456,7 @@ async def platform_billing_page(
     summary = build_billing_invoice_summary(invoices)
     risk_summary = build_platform_billing_risk_summary(invoices)
     monthly_summary = build_platform_billing_monthly_summary(invoices)
+    links = build_platform_billing_links(status_filter, selected_company_id)
     status_filter_options = [
         {
             **option,
@@ -13428,20 +13475,18 @@ async def platform_billing_page(
             "request": request,
             "username": username,
             "role": role,
+            "generated_at": get_platform_generated_at(),
             "invoices": invoices,
             "summary": summary,
             "risk_summary": risk_summary,
             "monthly_summary": monthly_summary,
+            "links": links,
             "status_filter": status_filter,
             "status_options": get_billing_invoice_status_options(),
             "status_filter_options": status_filter_options,
             "company_options": company_options,
             "selected_company_id": selected_company_id,
-            "export_url": build_platform_billing_url(
-                status_filter,
-                selected_company_id,
-                export=True,
-            ),
+            "export_url": links["export"],
         },
     )
 
@@ -13632,6 +13677,7 @@ async def api_platform_billing(
     summary = build_billing_invoice_summary(invoices)
     risk_summary = build_platform_billing_risk_summary(invoices)
     monthly_summary = build_platform_billing_monthly_summary(invoices)
+    links = build_platform_billing_links(status_filter, selected_company_id)
 
     return {
         "ok": True,
@@ -13644,23 +13690,8 @@ async def api_platform_billing(
         "risk_summary": risk_summary,
         "monthly_summary": monthly_summary,
         "company_options": company_options,
-        "export_url": build_platform_billing_url(
-            status_filter,
-            selected_company_id,
-            export=True,
-        ),
-        "links": {
-            "platform": "/platform",
-            "page": build_platform_billing_url(
-                status_filter,
-                selected_company_id,
-            ),
-            "export": build_platform_billing_url(
-                status_filter,
-                selected_company_id,
-                export=True,
-            ),
-        },
+        "export_url": links["export"],
+        "links": links,
         "invoices": invoices,
     }
 
@@ -13704,16 +13735,9 @@ async def api_platform_billing_invoice(
         "activity_summary": (
             build_platform_billing_invoice_activity_summary(invoice_activity)
         ),
-        "export_url": f"/platform/billing/invoices/{invoice_id}/export",
-        "company_url": f"/platform/companies/{invoice['company_id']}",
-        "links": {
-            "page": f"/platform/billing/invoices/{invoice_id}",
-            "export": f"/platform/billing/invoices/{invoice_id}/export",
-            "company": f"/platform/companies/{invoice['company_id']}",
-            "billing": build_platform_billing_url(
-                company_id=invoice["company_id"],
-            ),
-        },
+        "export_url": invoice["links"]["export"],
+        "company_url": invoice["links"]["company"],
+        "links": invoice["links"],
     }
 
 
@@ -13910,6 +13934,7 @@ async def platform_billing_invoice_detail_page(
             "request": request,
             "username": username,
             "role": role,
+            "generated_at": get_platform_generated_at(),
             "invoice": invoice,
             "invoice_activity": invoice_activity,
             "activity_summary": (
