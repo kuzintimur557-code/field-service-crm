@@ -8364,6 +8364,15 @@ def get_platform_module_usage():
             "enabled_companies": enabled_companies,
             "disabled_companies": disabled_companies,
             "companies": enabled_companies[:5],
+            "links": {
+                "page": f"/platform/modules/{feature_key}",
+                "companies": build_platform_companies_url(
+                    feature=feature_key,
+                ),
+                "companies_export": build_platform_companies_export_url(
+                    feature=feature_key,
+                ),
+            },
         })
 
     enabled_links = sum(module["enabled_count"] for module in module_rows)
@@ -8489,6 +8498,15 @@ def get_platform_preset_usage():
             "modules_count": len(feature_items),
             "features": feature_items,
             "labels": labels,
+            "links": {
+                "page": f"/platform/presets/{industry_key}",
+                "companies": build_platform_companies_url(
+                    industry=industry_key,
+                ),
+                "companies_export": build_platform_companies_export_url(
+                    industry=industry_key,
+                ),
+            },
         })
 
     summary = {

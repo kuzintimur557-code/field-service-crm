@@ -11607,6 +11607,16 @@ async def assert_platform_modules_page():
         crm.FEATURE_DEFINITIONS
     )
     assert any(module["key"] == "automation" for module in modules_api["modules"])
+    automation_api_module = next(
+        module for module in modules_api["modules"]
+        if module["key"] == "automation"
+    )
+    assert automation_api_module["links"]["page"] == (
+        "/platform/modules/automation"
+    )
+    assert automation_api_module["links"]["companies"] == (
+        "/platform/companies?feature=automation"
+    )
     assert modules_api["links"]["platform"] == "/platform"
     assert modules_api["links"]["page"] == "/platform/modules"
     assert modules_api["links"]["export"] == "/platform/modules/export"
@@ -12891,6 +12901,14 @@ async def assert_platform_presets_page():
         crm.INDUSTRY_OPTIONS
     )
     assert any(preset["key"] == "beauty" for preset in presets_api["presets"])
+    beauty_api_preset = next(
+        preset for preset in presets_api["presets"]
+        if preset["key"] == "beauty"
+    )
+    assert beauty_api_preset["links"]["page"] == "/platform/presets/beauty"
+    assert beauty_api_preset["links"]["companies"] == (
+        "/platform/companies?industry=beauty"
+    )
     assert presets_api["links"]["platform"] == "/platform"
     assert presets_api["links"]["page"] == "/platform/presets"
     assert presets_api["links"]["export"] == "/platform/presets/export"
