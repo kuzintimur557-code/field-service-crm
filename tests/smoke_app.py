@@ -11750,6 +11750,10 @@ async def assert_platform_modules_page():
     assert detail_response.status_code == 200
     assert detail_response.context["module"]["key"] == "automation"
     assert detail_response.context["generated_at"]
+    assert detail_response.context["links"]["modules"] == "/platform/modules"
+    assert detail_response.context["links"]["page"] == (
+        "/platform/modules/automation"
+    )
     assert all(
         company["links"]["page"].startswith("/platform/companies/")
         for company in (
@@ -13112,6 +13116,11 @@ async def assert_platform_presets_page():
     assert detail_response.status_code == 200
     assert detail_response.context["preset"]["key"] == "beauty"
     assert detail_response.context["generated_at"]
+    assert detail_response.context["links"]["presets"] == "/platform/presets"
+    assert detail_response.context["links"]["page"] == "/platform/presets/beauty"
+    assert detail_response.context["links"]["companies_export"] == (
+        "/platform/companies/export?industry=beauty"
+    )
     assert any(
         feature["links"]["page"] == "/platform/modules/calendar"
         for feature in detail_response.context["preset"]["features"]
@@ -13153,6 +13162,9 @@ async def assert_platform_presets_page():
     assert preset_detail_api["links"]["presets"] == "/platform/presets"
     assert preset_detail_api["links"]["companies"] == (
         "/platform/companies?industry=beauty"
+    )
+    assert preset_detail_api["links"]["companies_export"] == (
+        "/platform/companies/export?industry=beauty"
     )
     assert any(
         feature["links"]["page"] == "/platform/modules/calendar"

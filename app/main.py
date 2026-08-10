@@ -8720,6 +8720,11 @@ def get_platform_preset_profile(industry_key):
         "summary": preset_usage["summary"],
         "preset": preset,
         "companies": companies,
+        "links": {
+            "platform": preset_usage["links"]["platform"],
+            "presets": preset_usage["links"]["page"],
+            **preset["links"],
+        },
     }
 
 
@@ -9704,20 +9709,18 @@ async def api_platform_module_detail(request: Request, feature_key: str):
     if not module:
         return JSONResponse({"error": "module_not_found"}, status_code=404)
 
+    links = {
+        "platform": module_usage["links"]["platform"],
+        "modules": module_usage["links"]["page"],
+        **module["links"],
+    }
+
     return {
         "ok": True,
         "generated_at": get_platform_generated_at(),
         "summary": module_usage["summary"],
         "module": module,
-        "links": {
-            "platform": "/platform",
-            "modules": "/platform/modules",
-            "page": f"/platform/modules/{feature_key}",
-            "companies": build_platform_companies_url(feature=feature_key),
-            "companies_export": build_platform_companies_export_url(
-                feature=feature_key,
-            ),
-        },
+        "links": links,
     }
 
 
@@ -9802,6 +9805,12 @@ async def platform_module_detail_page(request: Request, feature_key: str):
             status_code=302,
         )
 
+    links = {
+        "platform": module_usage["links"]["platform"],
+        "modules": module_usage["links"]["page"],
+        **module["links"],
+    }
+
     return templates.TemplateResponse(
         request,
         "platform_module_detail.html",
@@ -9812,6 +9821,7 @@ async def platform_module_detail_page(request: Request, feature_key: str):
             "generated_at": get_platform_generated_at(),
             "summary": module_usage["summary"],
             "module": module,
+            "links": links,
         },
     )
 
@@ -9888,18 +9898,10 @@ async def api_platform_preset_detail(request: Request, industry_key: str):
     if not profile:
         return JSONResponse({"error": "preset_not_found"}, status_code=404)
 
-    preset_key = profile["preset"]["key"]
-
     return {
         "ok": True,
         "generated_at": get_platform_generated_at(),
         **profile,
-        "links": {
-            "platform": "/platform",
-            "presets": "/platform/presets",
-            "page": f"/platform/presets/{preset_key}",
-            "companies": build_platform_companies_url(industry=preset_key),
-        },
     }
 
 
