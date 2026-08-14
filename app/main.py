@@ -39205,6 +39205,12 @@ async def api_platform_backup_status(request: Request):
     return get_backup_status()
 
 
+def build_debug_links():
+    return {
+        "clear_login_attempts": "/debug/login-attempts/clear",
+    }
+
+
 @app.get("/debug", response_class=HTMLResponse)
 async def debug_page(request: Request):
 
@@ -39281,7 +39287,8 @@ async def debug_page(request: Request):
             "plan_names": plan_names,
             "recent_users": recent_users,
             "login_events": login_events,
-            "login_attempts": login_attempts
+            "login_attempts": login_attempts,
+            "links": build_debug_links(),
         }
     )
 

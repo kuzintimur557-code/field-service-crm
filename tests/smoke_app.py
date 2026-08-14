@@ -16390,6 +16390,9 @@ async def assert_platform_calendar_health():
         )
         assert debug_page.status_code == 200
         debug_html = debug_page.body.decode("utf-8")
+        assert debug_page.context["links"]["clear_login_attempts"] == (
+            "/debug/login-attempts/clear"
+        )
         assert "Диагностика / проверка системы" in debug_html
         assert "Проверка изоляции компаний" in debug_html
         assert "Проблемы company_id" in debug_html
