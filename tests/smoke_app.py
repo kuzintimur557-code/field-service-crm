@@ -16844,6 +16844,20 @@ async def assert_platform_calendar_health():
         )
         assert readiness_page.status_code == 200
         readiness_html = readiness_page.body.decode("utf-8")
+        assert readiness_page.context["links"]["platform"] == "/platform"
+        assert readiness_page.context["links"]["page"] == "/platform/readiness"
+        assert readiness_page.context["links"]["snapshot"] == (
+            "/platform/readiness/snapshot"
+        )
+        assert readiness_page.context["links"]["signoff"] == (
+            "/platform/readiness/signoff"
+        )
+        assert readiness_page.context["links"]["export"] == (
+            "/platform/readiness/export"
+        )
+        assert readiness_page.context["links"]["calendar_health"] == (
+            "/platform/calendar-health"
+        )
         assert "Готовность релиза" in readiness_html
         assert 'class="platform-mobile-nav"' in readiness_html
         assert 'class="platform-mobile-nav-grid"' in readiness_html
@@ -17004,6 +17018,16 @@ async def assert_platform_calendar_health():
         )
         assert snapshot_page.status_code == 200
         snapshot_html = snapshot_page.body.decode("utf-8")
+        assert snapshot_page.context["links"]["page"] == "/platform/readiness"
+        assert snapshot_page.context["links"]["calendar_health"] == (
+            "/platform/calendar-health"
+        )
+        assert snapshot_page.context["links"]["snapshot_page"] == (
+            f"/platform/readiness/snapshots/{snapshot_id}"
+        )
+        assert snapshot_page.context["links"]["snapshot_export"] == (
+            f"/platform/readiness/snapshots/{snapshot_id}/export"
+        )
         assert "Снимок готовности релиза" in snapshot_html
         assert 'class="platform-mobile-nav"' in snapshot_html
         assert 'class="platform-mobile-nav-grid"' in snapshot_html

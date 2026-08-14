@@ -11563,6 +11563,27 @@ def get_platform_release_readiness(
     }
 
 
+def build_platform_readiness_links(snapshot_id=None):
+    links = {
+        "platform": "/platform",
+        "system": "/system",
+        "page": "/platform/readiness",
+        "snapshot": "/platform/readiness/snapshot",
+        "signoff": "/platform/readiness/signoff",
+        "export": "/platform/readiness/export",
+        "calendar_health": "/platform/calendar-health",
+    }
+
+    if snapshot_id is not None:
+        snapshot_id = int(snapshot_id or 0)
+        links["snapshot_page"] = f"/platform/readiness/snapshots/{snapshot_id}"
+        links["snapshot_export"] = (
+            f"/platform/readiness/snapshots/{snapshot_id}/export"
+        )
+
+    return links
+
+
 def make_release_launch_item(
     title,
     description,
@@ -14277,6 +14298,7 @@ async def platform_readiness_page(
             "runbook": runbook,
             "control_center": control_center,
             "post_launch_review": post_launch_review,
+            "links": build_platform_readiness_links(),
             "notice": notice,
             "error": error,
         },
@@ -14809,6 +14831,7 @@ async def platform_readiness_snapshot_page(
             "snapshot_comparison": snapshot_comparison,
             "launch_plan": snapshot["launch_plan"],
             "snapshot_signoffs": snapshot_signoffs,
+            "links": build_platform_readiness_links(snapshot_id),
         },
     )
 

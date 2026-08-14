@@ -279,13 +279,13 @@ button.button{border:0;cursor:pointer}
             </div>
         </div>
         <div class="actions">
-            <a class="button secondary" href="/platform">Назад</a>
-            <a class="button secondary" href="/system">Система</a>
-            <a class="button secondary" href="{{ readiness['export_url'] }}">Экспорт CSV</a>
-            <form method="post" action="/platform/readiness/snapshot">
+            <a class="button secondary" href="{{ links['platform'] }}">Назад</a>
+            <a class="button secondary" href="{{ links['system'] }}">Система</a>
+            <a class="button secondary" href="{{ links['export'] }}">Экспорт CSV</a>
+            <form method="post" action="{{ links['snapshot'] }}">
                 <button class="button secondary" type="submit">Сохранить снимок</button>
             </form>
-            <a class="button" href="/platform/calendar-health">Инциденты</a>
+            <a class="button" href="{{ links['calendar_health'] }}">Инциденты</a>
         </div>
     </header>
 
@@ -481,7 +481,7 @@ button.button{border:0;cursor:pointer}
                 <div class="empty offset">Подтверждений запуска пока нет.</div>
                 {% endif %}
             </div>
-            <form class="signoff-form" method="post" action="/platform/readiness/signoff">
+            <form class="signoff-form" method="post" action="{{ links['signoff'] }}">
                 <select name="decision">
                     <option value="blocked">Отложить запуск</option>
                     <option value="pilot">Подтвердить пилот</option>
