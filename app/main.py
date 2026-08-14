@@ -16549,6 +16549,7 @@ async def my_tasks_page(request: Request, status: str = ""):
 def build_dashboard_links():
     return {
         "home": "/",
+        "my_tasks": "/my-tasks",
         "create_task": "/create-task",
         "calendar": "/calendar",
         "sla": "/sla",
@@ -16571,6 +16572,7 @@ def build_dashboard_links():
         "settings": "/settings",
         "notifications": "/notifications",
         "profile": "/profile",
+        "more": "/more",
         "logout": "/logout",
         "today": "/today",
         "overdue": "/overdue",

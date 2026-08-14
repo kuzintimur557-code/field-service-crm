@@ -6758,6 +6758,8 @@ async def assert_calls_page():
             "/sla?filter=overdue"
         )
         assert dashboard_response.context["links"]["settings"] == "/settings"
+        assert dashboard_response.context["links"]["more"] == "/more"
+        assert dashboard_response.context["links"]["my_tasks"] == "/my-tasks"
         dashboard_html = dashboard_response.body.decode("utf-8")
         assert "Нужен контакт после звонков" in dashboard_html
         assert 'href="/calls?status=follow_up"' in dashboard_html
