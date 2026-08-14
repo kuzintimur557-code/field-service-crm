@@ -8367,6 +8367,7 @@ def get_platform_company_items(
         "selected_feature": selected_feature,
         "selected_billing": selected_billing,
         "links": {
+            "platform": "/platform",
             "page": "/platform/companies",
             "filtered_page": build_platform_companies_url(
                 search=search,

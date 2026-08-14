@@ -10446,6 +10446,8 @@ async def assert_platform_companies_page():
     assert list_response.context["summary"]["active_tasks"] >= 0
     assert list_response.context["summary"]["limit_alerts"] >= 0
     assert list_response.context["generated_at"]
+    assert list_response.context["links"]["platform"] == "/platform"
+    assert list_response.context["links"]["page"] == "/platform/companies"
     assert list_response.context["links"]["export"] == "/platform/companies/export"
     assert "billing_risk_companies" in list_response.context["summary"]
     list_company = next(
@@ -10663,6 +10665,7 @@ async def assert_platform_companies_page():
     assert companies_api["filters"]["search"] == "Smoke Logistics"
     assert companies_api["filters"]["billing"] == "all"
     assert companies_api["summary"]["companies"] >= 1
+    assert companies_api["links"]["platform"] == "/platform"
     assert companies_api["links"]["page"] == "/platform/companies"
     assert "search=Smoke+Logistics" in companies_api["links"]["filtered_page"]
     assert "search=Smoke+Logistics" in companies_api["links"]["export"]
