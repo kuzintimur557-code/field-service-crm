@@ -37957,7 +37957,8 @@ async def admin_notes_page(request: Request):
         {
             "request": request,
             "username": username,
-            "role": role
+            "role": role,
+            "links": build_admin_links(),
         }
     )
 
@@ -37981,7 +37982,8 @@ async def admin_roadmap_page(request: Request):
         {
             "request": request,
             "username": username,
-            "role": role
+            "role": role,
+            "links": build_admin_links(),
         }
     )
 
@@ -38005,7 +38007,8 @@ async def admin_checklist_page(request: Request):
         {
             "request": request,
             "username": username,
-            "role": role
+            "role": role,
+            "links": build_admin_links(),
         }
     )
 
@@ -38013,6 +38016,7 @@ async def admin_checklist_page(request: Request):
 def build_admin_links():
     return {
         "home": "/",
+        "admin": "/admin",
         "debug": "/debug",
         "system": "/system",
         "backup": "/backup",

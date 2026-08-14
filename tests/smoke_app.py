@@ -16302,6 +16302,7 @@ async def assert_platform_calendar_health():
         )
         assert checklist_page.status_code == 200
         checklist_html = checklist_page.body.decode("utf-8")
+        assert checklist_page.context["links"]["admin"] == "/admin"
         assert "Чеклист запуска" in checklist_html
         assert "FastAPI приложение" in checklist_html
         assert "✅ FastAPI приложение" not in checklist_html
@@ -16311,6 +16312,7 @@ async def assert_platform_calendar_health():
         )
         assert roadmap_page.status_code == 200
         roadmap_html = roadmap_page.body.decode("utf-8")
+        assert roadmap_page.context["links"]["admin"] == "/admin"
         assert "План развития продукта" in roadmap_html
         assert "Этап 1 — базовая CRM" in roadmap_html
         assert "🧭 План развития продукта" not in roadmap_html
@@ -16320,6 +16322,7 @@ async def assert_platform_calendar_health():
         )
         assert notes_page.status_code == 200
         notes_html = notes_page.body.decode("utf-8")
+        assert notes_page.context["links"]["admin"] == "/admin"
         assert "Рабочие заметки" in notes_html
         assert "Для клиентов РФ нужен российский рабочий сервер" in notes_html
         assert "📝 Рабочие заметки" not in notes_html
