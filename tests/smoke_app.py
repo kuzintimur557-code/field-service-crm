@@ -5540,6 +5540,9 @@ async def assert_ai_insights_page():
 async def assert_more_page():
     response = await crm.more_page(make_asgi_request("owner2", "/more"))
     assert response.status_code == 200
+    assert response.context["links"]["settings"] == "/settings"
+    assert response.context["links"]["logout"] == "/logout"
+    assert response.context["links"]["ai_insights"] == "/ai/insights"
     html = response.body.decode("utf-8")
     assert "Ещё" in html
     assert "Главная" in html

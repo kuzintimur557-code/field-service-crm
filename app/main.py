@@ -16548,11 +16548,13 @@ async def my_tasks_page(request: Request, status: str = ""):
 
 def build_dashboard_links():
     return {
+        "home": "/",
         "create_task": "/create-task",
         "calendar": "/calendar",
         "sla": "/sla",
         "clients": "/clients",
         "catalog": "/catalog",
+        "custom_fields": "/custom-fields",
         "recurring": "/recurring",
         "finance": "/finance",
         "payroll": "/payroll",
@@ -36121,7 +36123,8 @@ async def more_page(request: Request):
             "role": role,
             "features": features,
             "settings": settings,
-            "unread_notification_count": unread_notification_count
+            "unread_notification_count": unread_notification_count,
+            "links": build_dashboard_links(),
         }
     )
 

@@ -39,56 +39,56 @@ h1{margin:0 0 8px;font-size:32px}
 {% set client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 {% set worker_label = settings["worker_label"] if settings is defined and settings["worker_label"] else "Команда" %}
 
-<a href="/">Главная</a>
-<a href="/profile">Мой профиль</a>
+<a href="{{ links['home'] }}">Главная</a>
+<a href="{{ links['profile'] }}">Мой профиль</a>
 {% if f.get("notifications", True) %}
-<a href="/notifications">Уведомления{% if unread_notification_count and unread_notification_count > 0 %} · {{ unread_notification_count }}{% endif %}</a>
+<a href="{{ links['notifications'] }}">Уведомления{% if unread_notification_count and unread_notification_count > 0 %} · {{ unread_notification_count }}{% endif %}</a>
 {% endif %}
 {% if f.get("calendar", True) %}
-<a href="/calendar">Календарь</a>
+<a href="{{ links['calendar'] }}">Календарь</a>
 {% endif %}
 
 {% if role in ["boss", "manager"] %}
 {% if f.get("clients", True) %}
-<a href="/clients">{{ client_label }}</a>
+<a href="{{ links['clients'] }}">{{ client_label }}</a>
 {% endif %}
 {% if f.get("finance", True) %}
-<a href="/finance">Финансы</a>
+<a href="{{ links['finance'] }}">Финансы</a>
 {% endif %}
 {% if f.get("payroll", True) %}
-<a href="/payroll">Зарплаты</a>
+<a href="{{ links['payroll'] }}">Зарплаты</a>
 {% endif %}
 {% if f.get("catalog", True) %}
-<a href="/catalog">Каталог</a>
+<a href="{{ links['catalog'] }}">Каталог</a>
 {% endif %}
 {% if f.get("custom_fields", True) %}
-<a href="/custom-fields">Поля компании</a>
+<a href="{{ links['custom_fields'] }}">Поля компании</a>
 {% endif %}
 {% if f.get("recurring", True) %}
-<a href="/recurring">Регулярные работы</a>
+<a href="{{ links['recurring'] }}">Регулярные работы</a>
 {% endif %}
-<a href="/workers">Команда: {{ worker_label|lower }}</a>
+<a href="{{ links['workers'] }}">Команда: {{ worker_label|lower }}</a>
 {% if f.get("archive", True) %}
-<a href="/archive">Архив</a>
+<a href="{{ links['archive'] }}">Архив</a>
 {% endif %}
 {% if f.get("calls", True) %}
-<a href="/calls">Звонки</a>
+<a href="{{ links['calls'] }}">Звонки</a>
 {% endif %}
 {% if f.get("automation", True) %}
-<a href="/automation">Автоматизация</a>
+<a href="{{ links['automation'] }}">Автоматизация</a>
 {% endif %}
 {% if f.get("ai_insights", True) %}
-<a href="/ai/insights">ИИ-инсайты</a>
-<a href="/ai/assistant">ИИ-помощник</a>
+<a href="{{ links['ai_insights'] }}">ИИ-инсайты</a>
+<a href="{{ links['ai_assistant'] }}">ИИ-помощник</a>
 {% endif %}
 {% endif %}
 
 {% if role == "boss" %}
-<a href="/admin">Админ-центр</a>
-<a href="/settings">Настройки</a>
+<a href="{{ links['admin'] }}">Админ-центр</a>
+<a href="{{ links['settings'] }}">Настройки</a>
 {% endif %}
 
-<a class="red" href="/logout">Выйти</a>
+<a class="red" href="{{ links['logout'] }}">Выйти</a>
 
 </div>
 </div>
