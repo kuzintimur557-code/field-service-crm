@@ -16546,6 +16546,38 @@ async def my_tasks_page(request: Request, status: str = ""):
     )
 
 
+def build_dashboard_links():
+    return {
+        "create_task": "/create-task",
+        "calendar": "/calendar",
+        "sla": "/sla",
+        "clients": "/clients",
+        "catalog": "/catalog",
+        "recurring": "/recurring",
+        "finance": "/finance",
+        "payroll": "/payroll",
+        "owner_dashboard": "/owner/dashboard",
+        "sla_analytics": "/sla/analytics",
+        "archive": "/archive",
+        "calls": "/calls",
+        "calls_follow_up": "/calls?status=follow_up",
+        "automation": "/automation",
+        "ai_insights": "/ai/insights",
+        "ai_assistant": "/ai/assistant",
+        "workers": "/workers",
+        "admin": "/admin",
+        "settings": "/settings",
+        "notifications": "/notifications",
+        "profile": "/profile",
+        "logout": "/logout",
+        "today": "/today",
+        "overdue": "/overdue",
+        "sla_overdue": "/sla?filter=overdue",
+        "sla_soon": "/sla?filter=soon",
+        "workload": "/workload",
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(
     request: Request,
@@ -16821,7 +16853,8 @@ async def home(
             "selected_date": task_date,
             "search": selected_search,
             "features": features,
-            "settings": settings
+            "settings": settings,
+            "links": build_dashboard_links(),
         }
     )
 

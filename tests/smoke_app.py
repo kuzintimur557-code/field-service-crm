@@ -6748,6 +6748,13 @@ async def assert_calls_page():
 
         dashboard_response = await crm.home(make_asgi_request("owner2", "/"))
         assert dashboard_response.status_code == 200
+        assert dashboard_response.context["links"]["calls_follow_up"] == (
+            "/calls?status=follow_up"
+        )
+        assert dashboard_response.context["links"]["sla_overdue"] == (
+            "/sla?filter=overdue"
+        )
+        assert dashboard_response.context["links"]["settings"] == "/settings"
         dashboard_html = dashboard_response.body.decode("utf-8")
         assert "Нужен контакт после звонков" in dashboard_html
         assert 'href="/calls?status=follow_up"' in dashboard_html

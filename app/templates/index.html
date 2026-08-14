@@ -71,75 +71,75 @@ h1{font-size:30px}
 
     <div class="nav">
         {% set f = features if features is defined else {} %}
-        <a href="/create-task">{{ task_label }}: создать</a>
+        <a href="{{ links['create_task'] }}">{{ task_label }}: создать</a>
         {% if f.get("calendar", True) %}
-        <a href="/calendar">Календарь</a>
+        <a href="{{ links['calendar'] }}">Календарь</a>
         {% endif %}
         {% if f.get("sla", True) %}
-        <a href="/sla">SLA</a>
+        <a href="{{ links['sla'] }}">SLA</a>
         {% endif %}
 
         {% if role in ["boss", "manager"] %}
         {% if f.get("clients", True) %}
-        <a href="/clients">{{ client_label }}</a>
+        <a href="{{ links['clients'] }}">{{ client_label }}</a>
         {% endif %}
         {% if f.get("catalog", True) %}
-        <a href="/catalog">Каталог</a>
+        <a href="{{ links['catalog'] }}">Каталог</a>
         {% endif %}
         {% if f.get("recurring", True) %}
-        <a href="/recurring">Регулярные</a>
+        <a href="{{ links['recurring'] }}">Регулярные</a>
         {% endif %}
         {% if f.get("finance", True) %}
-        <a href="/finance">Финансы</a>
+        <a href="{{ links['finance'] }}">Финансы</a>
         {% endif %}
         {% if f.get("payroll", True) %}
-        <a href="/payroll">Зарплаты</a>
+        <a href="{{ links['payroll'] }}">Зарплаты</a>
         {% endif %}
         {% if f.get("analytics", True) %}
-        <a href="/owner/dashboard">Аналитика владельца</a>
+        <a href="{{ links['owner_dashboard'] }}">Аналитика владельца</a>
         {% endif %}
         {% if f.get("sla", True) %}
-        <a href="/sla/analytics">SLA-аналитика</a>
+        <a href="{{ links['sla_analytics'] }}">SLA-аналитика</a>
         {% endif %}
         {% if f.get("archive", True) %}
-        <a href="/archive" class="dark">Архив</a>
+        <a href="{{ links['archive'] }}" class="dark">Архив</a>
         {% endif %}
         {% if f.get("calls", True) %}
-        <a href="/calls">Звонки</a>
+        <a href="{{ links['calls'] }}">Звонки</a>
         {% endif %}
         {% if f.get("automation", True) %}
-        <a href="/automation">Автоматизация</a>
+        <a href="{{ links['automation'] }}">Автоматизация</a>
         {% endif %}
 
         {% if f.get("ai_insights", True) %}
-        <a href="/ai/insights">ИИ-инсайты</a>
-        <a href="/ai/assistant">ИИ-помощник</a>
+        <a href="{{ links['ai_insights'] }}">ИИ-инсайты</a>
+        <a href="{{ links['ai_assistant'] }}">ИИ-помощник</a>
         {% endif %}
         {% endif %}
 
         {% if role == "boss" %}
-        <a href="/workers" class="dark">{{ worker_label }}</a>
+        <a href="{{ links['workers'] }}" class="dark">{{ worker_label }}</a>
         {% endif %}
 
         {% if role == "boss" %}
         {% if role == "superadmin" %}
-        <a href="/admin" class="dark">Админ</a>
+        <a href="{{ links['admin'] }}" class="dark">Админ</a>
         {% endif %}
-        <a href="/settings" class="dark">Настройки</a>
+        <a href="{{ links['settings'] }}" class="dark">Настройки</a>
         {% endif %}
 
         {% if f.get("notifications", True) %}
-        <a href="/notifications" class="dark">Уведомления{% if unread_notification_count and unread_notification_count > 0 %} · {{ unread_notification_count }}{% endif %}</a>
+        <a href="{{ links['notifications'] }}" class="dark">Уведомления{% if unread_notification_count and unread_notification_count > 0 %} · {{ unread_notification_count }}{% endif %}</a>
         {% endif %}
-        <a href="/profile" class="dark">Профиль</a>
-        <a href="/logout" class="red">Выйти</a>
+        <a href="{{ links['profile'] }}" class="dark">Профиль</a>
+        <a href="{{ links['logout'] }}" class="red">Выйти</a>
     </div>
 </div>
 
 {% if f.get("sla", True) and sla_breached_tasks and sla_breached_tasks > 0 %}
 <div class="alert danger">
     Есть просроченные SLA: {{ sla_breached_tasks }}
-    <a href="/sla?filter=overdue">
+    <a href="{{ links['sla_overdue'] }}">
         Открыть
     </a>
 </div>
@@ -148,7 +148,7 @@ h1{font-size:30px}
 {% if f.get("sla", True) and sla_due_soon_tasks and sla_due_soon_tasks > 0 %}
 <div class="alert warning">
     Горит SLA в ближайшие 24 часа: {{ sla_due_soon_tasks }}
-    <a href="/sla?filter=soon">
+    <a href="{{ links['sla_soon'] }}">
         Открыть
     </a>
 </div>
@@ -157,7 +157,7 @@ h1{font-size:30px}
 {% if overdue_tasks and overdue_tasks > 0 %}
 <div class="alert danger">
     Просрочено: {{ task_label|lower }} · {{ overdue_tasks }}
-    <a href="/overdue">
+    <a href="{{ links['overdue'] }}">
         Открыть
     </a>
 </div>
@@ -166,7 +166,7 @@ h1{font-size:30px}
 {% if today_tasks and today_tasks > 0 %}
 <div class="alert info">
     Сегодня: {{ task_label|lower }} · {{ today_tasks }}
-    <a href="/today">
+    <a href="{{ links['today'] }}">
         Открыть
     </a>
 </div>
@@ -175,7 +175,7 @@ h1{font-size:30px}
 {% if role in ["boss", "manager"] and f.get("calls", True) and settings["calls_enabled"] and call_follow_up_count > 0 %}
 <div class="alert warning">
     Нужен контакт после звонков: {{ call_follow_up_count }}
-    <a href="/calls?status=follow_up">
+    <a href="{{ links['calls_follow_up'] }}">
         Открыть
     </a>
 </div>
@@ -183,37 +183,37 @@ h1{font-size:30px}
 
 <div class="stats">
 
-    <a href="/today" class="stat" style="text-decoration:none;color:inherit">
+    <a href="{{ links['today'] }}" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">Сегодня: {{ task_label|lower }}</div>
         <div class="stat-value">{{ today_tasks }}</div>
     </a>
 
-    <a href="/overdue" class="stat" style="text-decoration:none;color:inherit">
+    <a href="{{ links['overdue'] }}" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">Просрочено</div>
         <div class="stat-value">{{ overdue_tasks }}</div>
     </a>
 
     {% if f.get("sla", True) %}
-    <a href="/sla" class="stat" style="text-decoration:none;color:inherit">
+    <a href="{{ links['sla'] }}" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">SLA просрочено</div>
         <div class="stat-value">{{ sla_breached_tasks }}</div>
     </a>
 
-    <a href="/sla?filter=soon" class="stat" style="text-decoration:none;color:inherit">
+    <a href="{{ links['sla_soon'] }}" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">SLA горит</div>
         <div class="stat-value">{{ sla_due_soon_tasks }}</div>
     </a>
     {% endif %}
 
     {% if f.get("workload", True) %}
-    <a href="/workload" class="stat" style="text-decoration:none;color:inherit">
+    <a href="{{ links['workload'] }}" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">{{ worker_label }} в работе</div>
         <div class="stat-value">{{ active_workers }}</div>
     </a>
     {% endif %}
 
     {% if role in ["boss", "manager"] and f.get("calls", True) and settings["calls_enabled"] %}
-    <a href="/calls?status=follow_up" class="stat" style="text-decoration:none;color:inherit">
+    <a href="{{ links['calls_follow_up'] }}" class="stat" style="text-decoration:none;color:inherit">
         <div class="stat-title">Нужен контакт</div>
         <div class="stat-value">{{ call_follow_up_count }}</div>
     </a>
