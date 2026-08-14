@@ -38069,6 +38069,17 @@ def get_public_build_metadata():
     }
 
 
+def build_system_links():
+    return {
+        "admin": "/admin",
+        "readiness": build_platform_readiness_links()["page"],
+        "export": "/system/export",
+        "events_export": "/system/events/export",
+        "backup": "/backup",
+        "debug": "/debug",
+    }
+
+
 def build_system_diagnostics(role=""):
     db_path = DATA_DIR / "crm.db"
     uploads_path = UPLOAD_DIR
@@ -38095,6 +38106,7 @@ def build_system_diagnostics(role=""):
     build_metadata = get_build_metadata()
     system_event_summary = get_recent_system_event_summary()
     system_generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    system_links = build_system_links()
 
     system_checks = [
         make_system_check(
@@ -38413,6 +38425,12 @@ def build_system_diagnostics(role=""):
         "system_generated_at": system_generated_at,
         "system_events": system_events,
         "system_event_retention": system_event_retention,
+        "system_links": system_links,
+        "superadmin_only_urls": [
+            system_links["debug"],
+            system_links["readiness"],
+            system_links["backup"],
+        ],
     }
 
 

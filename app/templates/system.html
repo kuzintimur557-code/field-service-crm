@@ -99,12 +99,12 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             </p>
         </div>
         <div class="actions">
-            <a class="button" href="/admin">Админ-панель</a>
+            <a class="button" href="{{ system_links['admin'] }}">Админ-панель</a>
             {% if role == "superadmin" %}
-            <a class="button" href="/platform/readiness">Готовность</a>
-            <a class="button" href="/system/export">Экспорт отчёта</a>
-            <a class="button" href="/system/events/export">Экспорт событий</a>
-            <a class="button primary" href="/backup">Резервные копии</a>
+            <a class="button" href="{{ system_links['readiness'] }}">Готовность</a>
+            <a class="button" href="{{ system_links['export'] }}">Экспорт отчёта</a>
+            <a class="button" href="{{ system_links['events_export'] }}">Экспорт событий</a>
+            <a class="button primary" href="{{ system_links['backup'] }}">Резервные копии</a>
             {% endif %}
         </div>
     </div>
@@ -264,7 +264,7 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
                     <br>{{ check.action }}
                 </div>
                 {% if check.url %}
-                    {% if role == "superadmin" or check.url not in ["/debug", "/platform/readiness", "/backup"] %}
+                    {% if role == "superadmin" or check.url not in superadmin_only_urls %}
                     <a class="check-action" href="{{ check.url }}">Открыть</a>
                     {% endif %}
                 {% endif %}
@@ -338,7 +338,7 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
                 <div class="section-note">Последние технические события платформы: backup, проверки и служебные операции.</div>
             </div>
             <div class="actions">
-                <a class="button" href="/system/events/export">CSV</a>
+                <a class="button" href="{{ system_links['events_export'] }}">CSV</a>
                 {% if system_event_retention.cleanup_count %}
                 <form class="inline-form" method="post" action="{{ system_event_retention.cleanup_url }}">
                     <button class="button warning" type="submit">Очистить старые</button>

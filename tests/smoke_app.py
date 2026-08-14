@@ -16150,6 +16150,18 @@ async def assert_platform_calendar_health():
         assert "commit" in system_page.context["build_metadata"]
         assert system_page.context["public_health_status"]["ok"] is True
         assert system_page.context["public_readiness_status"]["ok"] is True
+        assert system_page.context["system_links"]["readiness"] == (
+            "/platform/readiness"
+        )
+        assert system_page.context["system_links"]["export"] == "/system/export"
+        assert system_page.context["system_links"]["events_export"] == (
+            "/system/events/export"
+        )
+        assert system_page.context["system_links"]["backup"] == "/backup"
+        assert "/platform/readiness" in system_page.context[
+            "superadmin_only_urls"
+        ]
+        assert "/backup" in system_page.context["superadmin_only_urls"]
         assert {
             "/health",
             "/ready",
