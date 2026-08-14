@@ -33,8 +33,8 @@ p{margin:0;color:#475569;line-height:1.55;font-weight:700}
         <div class="code">Код ошибки: {{ error_id }}</div>
         <div class="code">Код запроса: {{ request_id }}</div>
         <div class="actions">
-            <a class="button" href="/">На главную</a>
-            <a class="button secondary" href="/system">Система</a>
+            <a class="button" href="{{ links['home'] }}">На главную</a>
+            <a class="button secondary" href="{{ links['system'] }}">Система</a>
         </div>
     </section>
 </main>

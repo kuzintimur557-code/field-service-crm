@@ -16512,6 +16512,7 @@ async def assert_platform_calendar_health():
         not_found_html = not_found_response.body.decode("utf-8")
         assert "Страница не найдена" in not_found_html
         assert "Код запроса: smoke-http-404" in not_found_html
+        assert 'href="/admin"' in not_found_html
         assert not_found_response.headers["x-request-id"] == "smoke-http-404"
         assert not_found_response.headers["x-frame-options"] == "DENY"
         api_method_response = await crm.http_exception_handler(
@@ -16541,6 +16542,7 @@ async def assert_platform_calendar_health():
         assert "Что-то пошло не так" in runtime_error_html
         assert "Код ошибки:" in runtime_error_html
         assert "Код запроса:" in runtime_error_html
+        assert 'href="/system"' in runtime_error_html
         assert runtime_error_response.headers["x-request-id"]
         assert runtime_error_response.headers["x-frame-options"] == "DENY"
         assert runtime_error_response.headers["x-content-type-options"] == (

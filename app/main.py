@@ -10529,6 +10529,14 @@ def get_http_error_meta(status_code):
     })
 
 
+def build_error_links():
+    return {
+        "home": "/",
+        "system": "/system",
+        "admin": "/admin",
+    }
+
+
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(
     request: Request,
@@ -10561,6 +10569,7 @@ async def http_exception_handler(
                 "title": meta["title"],
                 "message": meta["message"],
                 "request_id": request_id,
+                "links": build_error_links(),
             },
             status_code=status_code,
         )
@@ -10641,6 +10650,7 @@ async def unhandled_exception_handler(request: Request, error: Exception):
                 "request": request,
                 "error_id": error_id,
                 "request_id": request_id,
+                "links": build_error_links(),
             },
             status_code=500,
         )
