@@ -38000,6 +38000,27 @@ async def admin_checklist_page(request: Request):
     )
 
 
+def build_admin_links():
+    return {
+        "home": "/",
+        "debug": "/debug",
+        "system": "/system",
+        "backup": "/backup",
+        "billing": "/billing",
+        "integration_1c": "/integrations/1c",
+        "workers": "/workers",
+        "settings": "/settings",
+        "checklist": "/admin/checklist",
+        "roadmap": "/admin/roadmap",
+        "notes": "/admin/notes",
+        "health": "/health",
+        "ready": "/ready",
+        "clients": "/clients",
+        "finance": "/finance",
+        "calls": "/calls",
+    }
+
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
 
@@ -38019,7 +38040,8 @@ async def admin_page(request: Request):
         {
             "request": request,
             "username": username,
-            "role": role
+            "role": role,
+            "links": build_admin_links(),
         }
     )
 

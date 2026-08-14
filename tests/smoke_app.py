@@ -16284,6 +16284,10 @@ async def assert_platform_calendar_health():
         )
         assert admin_page.status_code == 200
         admin_html = admin_page.body.decode("utf-8")
+        assert admin_page.context["links"]["system"] == "/system"
+        assert admin_page.context["links"]["backup"] == "/backup"
+        assert admin_page.context["links"]["checklist"] == "/admin/checklist"
+        assert admin_page.context["links"]["ready"] == "/ready"
         assert "Админ-центр" in admin_html
         assert 'href="/health"' in admin_html
         assert 'href="/ready"' in admin_html
