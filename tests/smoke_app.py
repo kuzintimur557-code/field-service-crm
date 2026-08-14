@@ -5815,6 +5815,10 @@ async def assert_settings_page():
     response = await crm.settings_page(make_asgi_request("owner2", "/settings"))
     assert response.status_code == 200
     assert ("team", "Команда — звонки без 1С") in response.context["plan_options"]
+    assert response.context["links"]["debug"] == "/debug"
+    assert response.context["links"]["billing"] == "/billing"
+    assert response.context["links"]["custom_fields"] == "/custom-fields"
+    assert response.context["links"]["history"] == "/settings/history"
     html = response.body.decode("utf-8")
     assert "Настройки компании" in html
     assert "Диагностика системы" in html

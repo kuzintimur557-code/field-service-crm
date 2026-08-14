@@ -54,7 +54,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 <body>
 <div class="container">
 
-<a href="/" class="back">← Назад</a>
+<a href="{{ links['home'] }}" class="back">← Назад</a>
 
 <div class="card">
 <h1>Настройки компании</h1>
@@ -63,10 +63,10 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 </div>
 
 <div class="quick-links">
-    <a href="/debug" class="dark">Диагностика системы</a>
-    <a href="/billing" class="blue">Тарифы</a>
-    <a href="/custom-fields" class="green">Поля компании</a>
-    <a href="/settings/history" class="dark">История настроек</a>
+    <a href="{{ links['debug'] }}" class="dark">Диагностика системы</a>
+    <a href="{{ links['billing'] }}" class="blue">Тарифы</a>
+    <a href="{{ links['custom_fields'] }}" class="green">Поля компании</a>
+    <a href="{{ links['history'] }}" class="dark">История настроек</a>
 </div>
 	</div>
 
@@ -196,7 +196,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
     {% if recommended_plan %}
     <br>Рекомендуемый тариф: {{ recommended_plan["label"] }}.
     {% endif %}
-    <br><a href="/billing">Открыть страницу тарифов</a>
+    <br><a href="{{ links['billing'] }}">Открыть страницу тарифов</a>
 </div>
 
 <button type="submit">Сохранить настройки</button>

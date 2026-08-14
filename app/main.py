@@ -33688,6 +33688,16 @@ async def create_ai_insights_digest(request: Request):
 
     return RedirectResponse("/ai/insights?digest=1", status_code=302)
 
+def build_settings_links():
+    return {
+        "home": "/",
+        "debug": "/debug",
+        "billing": "/billing",
+        "custom_fields": "/custom-fields",
+        "history": "/settings/history",
+    }
+
+
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
 
@@ -33732,7 +33742,8 @@ async def settings_page(request: Request):
             "recommended_plan": recommended_plan,
             "plan_options": get_plan_options(),
             "industry_options": INDUSTRY_OPTIONS,
-            "business_presets": BUSINESS_PRESETS
+            "business_presets": BUSINESS_PRESETS,
+            "links": build_settings_links(),
         }
     )
 
