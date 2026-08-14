@@ -88,13 +88,13 @@ h1{font-size:28px}
             </div>
         </div>
         <div class="actions">
-            <a class="button secondary" href="/platform">Платформа</a>
-            <a class="button secondary" href="/system">Система</a>
+            <a class="button secondary" href="{{ links['platform'] }}">Платформа</a>
+            <a class="button secondary" href="{{ links['system'] }}">Система</a>
             <a class="button secondary" href="{{ backup_status['export_url'] }}">Экспорт CSV</a>
             {% if backup_status["latest_download_url"] %}
             <a class="button secondary" href="{{ backup_status['latest_download_url'] }}">Скачать последнюю</a>
             {% endif %}
-            <form method="post" action="/backup/create">
+            <form method="post" action="{{ links['create'] }}">
                 <button class="button" type="submit">Создать копию</button>
             </form>
         </div>

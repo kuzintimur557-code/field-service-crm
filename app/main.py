@@ -11079,6 +11079,14 @@ def cleanup_old_database_backups():
     }
 
 
+def build_backup_links():
+    return {
+        "platform": get_platform_dashboard_links()["page"],
+        "system": "/system",
+        "create": "/backup/create",
+    }
+
+
 def run_backup_restore_drill(filename=""):
     if filename:
         source_path, error = get_backup_download_path(filename)
@@ -38887,6 +38895,7 @@ async def backup_page(
             "role": role,
             "backup_status": backup_status,
             "backup_events": backup_events,
+            "links": build_backup_links(),
             "notice": notice,
             "error": error,
             "file": file,

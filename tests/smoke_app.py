@@ -16605,6 +16605,9 @@ async def assert_platform_calendar_health():
         assert "Создать копию" in backup_html
         assert "Экспорт CSV" in backup_html
         assert "Журнал операций" in backup_html
+        assert backup_page.context["links"]["platform"] == "/platform"
+        assert backup_page.context["links"]["system"] == "/system"
+        assert backup_page.context["links"]["create"] == "/backup/create"
         assert backup_page.context["backup_status"]["status_label"]
         assert "backup_events" in backup_page.context
         anonymous_backup_export = await crm.backup_export(
