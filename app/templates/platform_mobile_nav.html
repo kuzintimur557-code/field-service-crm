@@ -42,20 +42,25 @@
 </style>
 
 <nav class="platform-mobile-nav" aria-label="Навигация платформы">
+    {% set nav_platform_url = links['platform'] if links is defined and links.get('platform') else '/platform' %}
+    {% set nav_companies_url = links['companies'] if links is defined and links.get('companies') else '/platform/companies' %}
+    {% set nav_readiness_url = links['readiness'] if links is defined and links.get('readiness') else links['page'] if links is defined and request.url.path.startswith('/platform/readiness') and links.get('page') else '/platform/readiness' %}
+    {% set nav_calendar_health_url = links['calendar_health'] if links is defined and links.get('calendar_health') else links['base'] if links is defined and request.url.path.startswith('/platform/calendar-health') and links.get('base') else '/platform/calendar-health' %}
+    {% set nav_logout_url = links['logout'] if links is defined and links.get('logout') else '/logout' %}
     <div class="platform-mobile-nav-grid">
-        <a href="/platform" class="{% if request.url.path == '/platform' %}active{% endif %}">
+        <a href="{{ nav_platform_url }}" class="{% if request.url.path == '/platform' %}active{% endif %}">
             <span>Панель</span>
         </a>
-        <a href="/platform/companies" class="{% if '/platform/companies' in request.url.path %}active{% endif %}">
+        <a href="{{ nav_companies_url }}" class="{% if '/platform/companies' in request.url.path %}active{% endif %}">
             <span>Компании</span>
         </a>
-        <a href="/platform/readiness" class="{% if '/platform/readiness' in request.url.path %}active{% endif %}">
+        <a href="{{ nav_readiness_url }}" class="{% if '/platform/readiness' in request.url.path %}active{% endif %}">
             <span>Релиз</span>
         </a>
-        <a href="/platform/calendar-health" class="{% if '/platform/calendar-health' in request.url.path %}active{% endif %}">
+        <a href="{{ nav_calendar_health_url }}" class="{% if '/platform/calendar-health' in request.url.path %}active{% endif %}">
             <span>Контроль</span>
         </a>
-        <a href="/logout">
+        <a href="{{ nav_logout_url }}">
             <span>Выход</span>
         </a>
     </div>
