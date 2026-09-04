@@ -1,4 +1,7 @@
+from datetime import datetime, timedelta
+
 from app.database import connect
+from app.services.governance import APPROVAL_OVERDUE_MINUTES
 
 
 def require_company_id(company_id):
@@ -19,6 +22,20 @@ def get_predictive_signals(company_id):
         ORDER BY id DESC
         LIMIT 200
     """, (company_id,)).fetchall()
+
+    approval_overdue_cutoff = (
+        datetime.now() - timedelta(minutes=APPROVAL_OVERDUE_MINUTES)
+    ).isoformat(timespec="seconds")
+    approval_overdue_count = c.execute("""
+        SELECT COUNT(*) AS total
+        FROM autonomous_action_queue
+        WHERE company_id=?
+          AND status='awaiting_approval'
+          AND created_at <= ?
+    """, (
+        company_id,
+        approval_overdue_cutoff,
+    )).fetchone()["total"]
 
     conn.close()
 
@@ -80,6 +97,16 @@ def get_predictive_signals(company_id):
             "prediction": "Потребность в самовосстановлении, вероятно, увеличится.",
         })
 
+    if approval_overdue_count:
+        signals.append({
+            "severity": "critical",
+            "title": "Подтверждения задерживают автоматизацию",
+            "prediction": (
+                "Неподтверждённые действия ИИ могут задержать "
+                "восстановление и важные изменения правил."
+            ),
+        })
+
     if not signals:
         signals.append({
             "severity": "healthy",
@@ -92,4 +119,5 @@ def get_predictive_signals(company_id):
         "items": signals,
         "success_rate": success_rate,
         "total_events": total,
+        "approval_overdue_count": approval_overdue_count,
     }

@@ -1,4 +1,10 @@
+from datetime import datetime, timedelta
+
 from app.database import connect
+from app.services.governance import (
+    APPROVAL_ATTENTION_MINUTES,
+    APPROVAL_OVERDUE_MINUTES,
+)
 
 
 def require_company_id(company_id):
@@ -19,6 +25,28 @@ def get_operations_insights(company_id):
         GROUP BY status
     """, (company_id,)).fetchall()
 
+    now = datetime.now()
+    attention_cutoff = (
+        now - timedelta(minutes=APPROVAL_ATTENTION_MINUTES)
+    ).isoformat(timespec="seconds")
+    overdue_cutoff = (
+        now - timedelta(minutes=APPROVAL_OVERDUE_MINUTES)
+    ).isoformat(timespec="seconds")
+
+    approval_counts = c.execute("""
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN created_at <= ? THEN 1 ELSE 0 END) AS attention,
+            SUM(CASE WHEN created_at <= ? THEN 1 ELSE 0 END) AS overdue
+        FROM autonomous_action_queue
+        WHERE company_id=?
+          AND status='awaiting_approval'
+    """, (
+        attention_cutoff,
+        overdue_cutoff,
+        company_id,
+    )).fetchone()
+
     conn.close()
 
     counts = {row["status"]: row["count"] for row in rows}
@@ -27,6 +55,9 @@ def get_operations_insights(company_id):
     skipped_total = counts.get("skipped", 0)
     failed_total = counts.get("failed", 0)
     pending_total = counts.get("pending", 0)
+    approval_total = approval_counts["total"] or 0
+    approval_attention = approval_counts["attention"] or 0
+    approval_overdue = approval_counts["overdue"] or 0
 
     total = done_total + skipped_total + failed_total + pending_total
 
@@ -60,6 +91,25 @@ def get_operations_insights(company_id):
             "message": "В очереди накопилось много ожидающих событий.",
         })
 
+    if approval_overdue:
+        insights.append({
+            "level": "critical",
+            "title": "Просрочены подтверждения ИИ",
+            "message": (
+                "Есть действия ИИ, которые ожидают решения владельца "
+                "больше суток."
+            ),
+        })
+    elif approval_attention:
+        insights.append({
+            "level": "warning",
+            "title": "Задерживаются подтверждения ИИ",
+            "message": (
+                "Есть действия ИИ, которые ожидают решения владельца "
+                "больше 6 часов."
+            ),
+        })
+
     success_rate = round((done_total / total) * 100) if total else 100
 
     if success_rate < 70:
@@ -79,4 +129,7 @@ def get_operations_insights(company_id):
     return {
         "count": len(insights),
         "items": insights,
+        "awaiting_approval_count": approval_total,
+        "approval_attention_count": approval_attention,
+        "approval_overdue_count": approval_overdue,
     }

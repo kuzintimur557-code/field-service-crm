@@ -2,7 +2,12 @@ from datetime import datetime, timedelta
 import json
 
 from app.database import connect
-from app.services.governance import get_governance_settings
+from app.services.governance import (
+    action_label,
+    approval_request_context,
+    get_governance_settings,
+    target_label,
+)
 from app.services.ops_timeline import create_ops_timeline_event
 
 
@@ -13,6 +18,24 @@ SUPPORTED_AUTONOMOUS_ACTIONS = {
 
 AUTONOMOUS_ACTION_COOLDOWN_MINUTES = 10
 AUTONOMOUS_ACTION_COOLDOWN_LIMIT = 3
+
+STATUS_LABELS = {
+    "pending": "Ожидает выполнения",
+    "awaiting_approval": "Ожидает подтверждения",
+    "approved": "Подтверждено",
+    "completed": "Выполнено",
+    "failed": "Ошибка",
+    "rejected": "Отклонено",
+}
+
+STATUS_TONES = {
+    "pending": "warning",
+    "awaiting_approval": "warning",
+    "approved": "info",
+    "completed": "success",
+    "failed": "danger",
+    "rejected": "muted",
+}
 
 
 def require_company_id(company_id):
@@ -199,17 +222,22 @@ def get_autonomous_actions(company_id, limit=50):
 
     rows = c.execute("""
         SELECT
-            id,
-            action_type,
-            target_type,
-            target_id,
-            status,
-            payload_json,
-            created_at,
-            processed_at
+            autonomous_action_queue.id,
+            autonomous_action_queue.action_type,
+            autonomous_action_queue.target_type,
+            autonomous_action_queue.target_id,
+            autonomous_action_queue.status,
+            autonomous_action_queue.payload_json,
+            autonomous_action_queue.created_at,
+            autonomous_action_queue.processed_at,
+            automation_rules.name AS target_name
         FROM autonomous_action_queue
-        WHERE company_id=?
-        ORDER BY id DESC
+        LEFT JOIN automation_rules
+          ON automation_rules.id=autonomous_action_queue.target_id
+          AND automation_rules.company_id=autonomous_action_queue.company_id
+          AND autonomous_action_queue.target_type='automation_rule'
+        WHERE autonomous_action_queue.company_id=?
+        ORDER BY autonomous_action_queue.id DESC
         LIMIT ?
     """, (
         company_id,
@@ -218,11 +246,68 @@ def get_autonomous_actions(company_id, limit=50):
 
     conn.close()
 
-    return [dict(row) for row in rows]
+    items = []
+
+    for row in rows:
+        item = dict(row)
+        item["action_label"] = action_label(item.get("action_type"))
+        item["target_label"] = target_label(item.get("target_type"))
+        item["status_label"] = STATUS_LABELS.get(
+            item.get("status"),
+            item.get("status") or "Статус не указан",
+        )
+        item["status_tone"] = STATUS_TONES.get(
+            item.get("status"),
+            "muted",
+        )
+        item.update(approval_request_context(item.get("payload_json")))
+        items.append(item)
+
+    return items
 
 
-def process_autonomous_actions(company_id):
+def get_autonomous_action_summary(company_id):
     require_company_id(company_id)
+
+    conn = connect()
+    c = conn.cursor()
+
+    rows = c.execute("""
+        SELECT status, COUNT(*) AS total
+        FROM autonomous_action_queue
+        WHERE company_id=?
+        GROUP BY status
+    """, (company_id,)).fetchall()
+
+    conn.close()
+
+    counts = {
+        "pending": 0,
+        "awaiting_approval": 0,
+        "approved": 0,
+        "completed": 0,
+        "failed": 0,
+        "rejected": 0,
+    }
+
+    for row in rows:
+        if row["status"] in counts:
+            counts[row["status"]] = row["total"]
+
+    counts["total"] = sum(counts.values())
+    counts["active"] = (
+        counts["pending"]
+        + counts["awaiting_approval"]
+        + counts["approved"]
+    )
+
+    return counts
+
+
+def process_autonomous_actions(company_id, triggered_by="system"):
+    require_company_id(company_id)
+
+    triggered_by = str(triggered_by or "system").strip()[:120] or "system"
 
     governance = get_governance_settings(company_id)
 
@@ -231,6 +316,7 @@ def process_autonomous_actions(company_id):
             "processed": 0,
             "blocked": True,
             "reason": "autonomous_disabled",
+            "triggered_by": triggered_by,
         }
 
     conn = connect()
@@ -253,12 +339,24 @@ def process_autonomous_actions(company_id):
     processed = 0
     awaiting_approval = 0
     failed = 0
+    retried_events = 0
+    disabled_rules = 0
+    action_events = []
+
+    def record_action_event(row, severity, message):
+        action_events.append({
+            "action_id": row["id"],
+            "severity": severity,
+            "title": action_label(row["action_type"]),
+            "message": message,
+        })
 
     for row in rows:
         action_type = row["action_type"]
         target_type = row["target_type"]
         target_id = row["target_id"]
         status = row["status"]
+        affected_count = 0
 
         if (
             action_type == "disable_rule"
@@ -275,6 +373,11 @@ def process_autonomous_actions(company_id):
                 row["id"],
             ))
             failed += 1
+            record_action_event(
+                row,
+                "warning",
+                "Действие отклонено: правило защищено настройками A3.",
+            )
             continue
 
         if (
@@ -289,6 +392,11 @@ def process_autonomous_actions(company_id):
             """, (row["id"],))
 
             awaiting_approval += 1
+            record_action_event(
+                row,
+                "warning",
+                "Критическое действие передано владельцу на подтверждение.",
+            )
             continue
 
         if action_type == "retry_events":
@@ -304,6 +412,11 @@ def process_autonomous_actions(company_id):
                         row["id"],
                     ))
                     failed += 1
+                    record_action_event(
+                        row,
+                        "error",
+                        "Действие не выполнено: правило автоматизации не найдено.",
+                    )
                     continue
 
             c.execute("""
@@ -321,6 +434,8 @@ def process_autonomous_actions(company_id):
                 target_type,
                 target_id,
             ))
+            affected_count = max(0, c.rowcount)
+            retried_events += affected_count
         elif action_type == "disable_rule" and target_type == "automation_rule":
             if not _automation_rule_exists(c, company_id, target_id):
                 c.execute("""
@@ -333,6 +448,11 @@ def process_autonomous_actions(company_id):
                     row["id"],
                 ))
                 failed += 1
+                record_action_event(
+                    row,
+                    "error",
+                    "Действие не выполнено: правило автоматизации не найдено.",
+                )
                 continue
 
             c.execute("""
@@ -344,6 +464,8 @@ def process_autonomous_actions(company_id):
                 company_id,
                 target_id,
             ))
+            affected_count = max(0, c.rowcount)
+            disabled_rules += affected_count
         else:
             c.execute("""
                 UPDATE autonomous_action_queue
@@ -355,6 +477,11 @@ def process_autonomous_actions(company_id):
                 row["id"],
             ))
             failed += 1
+            record_action_event(
+                row,
+                "error",
+                "Действие не выполнено: такой тип операции не поддерживается.",
+            )
             continue
 
         c.execute("""
@@ -368,14 +495,67 @@ def process_autonomous_actions(company_id):
         ))
 
         processed += 1
+        result_message = f"Действие выполнено. Запустил: {triggered_by}."
+
+        if action_type == "retry_events":
+            result_message = (
+                "События поставлены на повтор: "
+                f"{affected_count}. Запустил: {triggered_by}."
+            )
+        elif action_type == "disable_rule":
+            result_message = (
+                "Правило отключено: "
+                f"{affected_count}. Запустил: {triggered_by}."
+            )
+
+        record_action_event(
+            row,
+            "info",
+            result_message,
+        )
 
     conn.commit()
     conn.close()
+
+    for event in action_events:
+        create_ops_timeline_event(
+            company_id=company_id,
+            event_type="autonomous_action",
+            severity=event["severity"],
+            title=event["title"],
+            message=event["message"],
+            source="autonomous_runner",
+            target_type="autonomous_action",
+            target_id=event["action_id"],
+            cooldown_minutes=60,
+        )
+
+    if processed or awaiting_approval or failed:
+        severity = "warning" if failed else "info"
+        create_ops_timeline_event(
+            company_id=company_id,
+            event_type="autonomous_execution",
+            severity=severity,
+            title="Завершён цикл автономных действий",
+            message=(
+                f"Запустил: {triggered_by}. "
+                f"Выполнено: {processed}; "
+                f"ждут подтверждения: {awaiting_approval}; "
+                f"ошибок: {failed}; "
+                f"событий на повторе: {retried_events}; "
+                f"правил отключено: {disabled_rules}"
+            ),
+            target_type="autonomous_action",
+            target_id=None,
+        )
 
     return {
         "processed": processed,
         "awaiting_approval": awaiting_approval,
         "failed": failed,
+        "retried_events": retried_events,
+        "disabled_rules": disabled_rules,
+        "triggered_by": triggered_by,
     }
 
 

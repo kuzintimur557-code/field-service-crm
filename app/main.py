@@ -8,10 +8,12 @@ from app.services.autonomous_actions import (
     approve_safe_autonomous_actions,
     enqueue_autonomous_action,
     get_autonomous_actions,
+    get_autonomous_action_summary,
     process_autonomous_actions,
     reject_autonomous_action,
     reject_unsafe_autonomous_actions,
 )
+from app.services.a3_runner import run_a3_autonomous_cycle
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -43244,7 +43246,21 @@ def get_a3_company_id(request: Request):
     if role not in ("boss", "manager"):
         return None
 
-    return get_user_company_id(username)
+    company_id = get_user_company_id(username)
+
+    if not has_feature(company_id, "automation"):
+        return None
+
+    return company_id
+
+
+def get_a3_owner_company_id(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id or get_role(get_user(request)) != "boss":
+        return None
+
+    return company_id
 
 
 def parse_a3_governance_bool(value):
@@ -43268,7 +43284,7 @@ def parse_a3_governance_bool(value):
 
 A3_API_ERROR_MESSAGES = {
     "forbidden": "Доступ запрещён",
-    "not_found": "Цепочка не найдена",
+    "not_found": "Объект не найден",
     "unsupported_action": "Действие не поддерживается",
     "invalid_target_id": "Некорректный номер цели",
     "rule_not_found": "Правило не найдено",
@@ -43281,13 +43297,111 @@ A3_API_ERROR_MESSAGES = {
 }
 
 
-def a3_api_error(error, status_code):
+def notify_a3_approval_required(company_id, action_count):
+    if not action_count:
+        return False
+
+    conn = connect()
+    c = conn.cursor()
+    company = c.execute("""
+        SELECT owner_username
+        FROM companies
+        WHERE id=?
+    """, (company_id,)).fetchone()
+    conn.close()
+
+    owner_username = str(
+        company["owner_username"] if company else ""
+    ).strip()
+
+    if not owner_username:
+        return False
+
+    create_notification(
+        company_id,
+        owner_username,
+        "Требуется подтверждение ИИ-действия",
+        (
+            "Автоматизация подготовила критические действия: "
+            f"{action_count}. Проверьте очередь подтверждений."
+        ),
+        "/automation",
+    )
+
+    return True
+
+
+def run_a3_autonomous_cycle_for_all_companies():
+    summary = {
+        "companies": 0,
+        "skipped": 0,
+        "feature_disabled": 0,
+        "autonomous_disabled": 0,
+        "queued": 0,
+        "processed": 0,
+        "awaiting_approval": 0,
+        "failed": 0,
+        "errors": 0,
+    }
+
+    conn = connect()
+    c = conn.cursor()
+    companies = c.execute("""
+        SELECT id
+        FROM companies
+        ORDER BY id
+    """).fetchall()
+    conn.close()
+
+    for company in companies:
+        company_id = company["id"]
+
+        if not has_feature(company_id, "automation"):
+            summary["skipped"] += 1
+            summary["feature_disabled"] += 1
+            continue
+
+        if not get_governance_settings(company_id).get(
+            "autonomous_enabled",
+            1,
+        ):
+            summary["skipped"] += 1
+            summary["autonomous_disabled"] += 1
+            continue
+
+        try:
+            cycle = run_a3_autonomous_cycle(
+                company_id=company_id,
+                triggered_by="scheduler",
+            )
+            result = cycle["result"]
+
+            summary["companies"] += 1
+            summary["queued"] += cycle["queued_from_decisions"]
+            summary["processed"] += result.get("processed", 0)
+            summary["awaiting_approval"] += result.get(
+                "awaiting_approval",
+                0,
+            )
+            summary["failed"] += result.get("failed", 0)
+
+            notify_a3_approval_required(
+                company_id,
+                result.get("awaiting_approval", 0),
+            )
+        except Exception:
+            summary["errors"] += 1
+
+    return summary
+
+
+def a3_api_error(error, status_code, message=None):
 
     return JSONResponse(
         {
             "ok": False,
             "error": error,
-            "message": A3_API_ERROR_MESSAGES.get(error, "Ошибка A3"),
+            "message": message or A3_API_ERROR_MESSAGES.get(error, "Ошибка A3"),
         },
         status_code=status_code,
     )
@@ -43428,7 +43542,7 @@ def api_a3_workflow_rule_graph(request: Request, rule_id: int):
     graph = get_rule_workflow_graph(company_id, rule_id)
 
     if not graph:
-        return a3_api_error("not_found", 404)
+        return a3_api_error("not_found", 404, "Цепочка не найдена")
 
     return graph
 
@@ -43443,7 +43557,7 @@ def api_a3_workflow_rule_debug(request: Request, rule_id: int):
     debug = get_rule_workflow_debug(company_id, rule_id)
 
     if not debug:
-        return a3_api_error("not_found", 404)
+        return a3_api_error("not_found", 404, "Цепочка не найдена")
 
     return debug
 
@@ -43466,7 +43580,8 @@ def api_a3_autonomous_actions(request: Request):
         return a3_api_error("forbidden", 403)
 
     return {
-        "items": get_autonomous_actions(company_id, limit=50)
+        "items": get_autonomous_actions(company_id, limit=50),
+        "summary": get_autonomous_action_summary(company_id),
     }
 
 
@@ -43477,11 +43592,53 @@ def api_a3_process_autonomous_actions(request: Request):
     if not company_id:
         return a3_api_error("forbidden", 403)
 
-    result = process_autonomous_actions(company_id=company_id)
+    cycle = run_a3_autonomous_cycle(
+        company_id=company_id,
+        triggered_by=get_user(request) or "system",
+    )
+    result = cycle["result"]
+
+    notify_a3_approval_required(
+        company_id,
+        result.get("awaiting_approval", 0),
+    )
 
     return {
         "ok": True,
+        "decision_count": cycle["decision_count"],
+        "queued_from_decisions": cycle["queued_from_decisions"],
+        "max_actions_per_cycle": cycle["max_actions_per_cycle"],
+        "pending_action_count": cycle["pending_action_count"],
+        "queue_capacity_remaining": cycle["queue_capacity_remaining"],
         "result": result,
+    }
+
+
+@app.post("/automation/cron/a3-autonomous")
+async def run_a3_autonomous_cron(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
+            status_code=503,
+        )
+
+    token = (
+        request.headers.get("x-automation-secret")
+        or request.query_params.get("token")
+        or ""
+    ).strip()
+
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    return {
+        "ok": True,
+        "summary": run_a3_autonomous_cycle_for_all_companies(),
     }
 
 
@@ -43535,6 +43692,10 @@ async def api_a3_request_autonomous_action_approval(request: Request):
     if not rule:
         return a3_api_error("rule_not_found", 404)
 
+    request_reason = str(
+        payload.get("reason") or "Запрошено из диагностики цепочки A3"
+    ).strip()[:500]
+
     result = enqueue_autonomous_action(
         company_id=company_id,
         action_type=action_type,
@@ -43542,7 +43703,7 @@ async def api_a3_request_autonomous_action_approval(request: Request):
         target_id=target_id,
         payload_json=json.dumps({
             "requested_by": get_user(request) or "system",
-            "reason": payload.get("reason") or "Запрошено из диагностики цепочки A3",
+            "reason": request_reason,
         }, ensure_ascii=False),
     )
 
@@ -43559,7 +43720,14 @@ async def api_a3_request_autonomous_action_approval(request: Request):
             ),
         }
 
-    process_result = process_autonomous_actions(company_id=company_id)
+    process_result = process_autonomous_actions(
+        company_id=company_id,
+        triggered_by=get_user(request) or "system",
+    )
+    notify_a3_approval_required(
+        company_id,
+        process_result.get("awaiting_approval", 0),
+    )
 
     return {
         "ok": True,
@@ -43580,7 +43748,7 @@ def api_a3_governance_settings(request: Request):
 
 @app.post("/api/a3/governance-settings/update")
 async def api_a3_governance_settings_update(request: Request):
-    company_id = get_a3_company_id(request)
+    company_id = get_a3_owner_company_id(request)
 
     if not company_id:
         return a3_api_error("forbidden", 403)
@@ -43666,17 +43834,23 @@ async def api_a3_governance_settings_update(request: Request):
 
 
 @app.post("/api/a3/autonomous-actions/{action_id}/approve")
-def api_a3_approve_autonomous_action(request: Request, action_id: int):
-    company_id = get_a3_company_id(request)
+async def api_a3_approve_autonomous_action(request: Request, action_id: int):
+    company_id = get_a3_owner_company_id(request)
 
     if not company_id:
         return a3_api_error("forbidden", 403)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
 
     decided_by = get_user(request) or "system"
     result = approve_autonomous_action(
         company_id=company_id,
         action_id=action_id,
         decided_by=decided_by,
+        reason=payload.get("reason"),
     )
 
     if not result.get("ok"):
@@ -43690,7 +43864,7 @@ def api_a3_approve_autonomous_action(request: Request, action_id: int):
 
 @app.post("/api/a3/autonomous-actions/approve-safe")
 def api_a3_approve_safe_autonomous_actions(request: Request):
-    company_id = get_a3_company_id(request)
+    company_id = get_a3_owner_company_id(request)
 
     if not company_id:
         return a3_api_error("forbidden", 403)
@@ -43704,17 +43878,23 @@ def api_a3_approve_safe_autonomous_actions(request: Request):
 
 
 @app.post("/api/a3/autonomous-actions/{action_id}/reject")
-def api_a3_reject_autonomous_action(request: Request, action_id: int):
-    company_id = get_a3_company_id(request)
+async def api_a3_reject_autonomous_action(request: Request, action_id: int):
+    company_id = get_a3_owner_company_id(request)
 
     if not company_id:
         return a3_api_error("forbidden", 403)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
 
     decided_by = get_user(request) or "system"
     result = reject_autonomous_action(
         company_id=company_id,
         action_id=action_id,
         decided_by=decided_by,
+        reason=payload.get("reason"),
     )
 
     if not result.get("ok"):
@@ -43725,7 +43905,7 @@ def api_a3_reject_autonomous_action(request: Request, action_id: int):
 
 @app.post("/api/a3/autonomous-actions/reject-unsafe")
 def api_a3_reject_unsafe_autonomous_actions(request: Request):
-    company_id = get_a3_company_id(request)
+    company_id = get_a3_owner_company_id(request)
 
     if not company_id:
         return a3_api_error("forbidden", 403)
@@ -43753,6 +43933,8 @@ def api_a3_approval_queue(request: Request):
         "protected": 0,
         "missing_target": 0,
         "unsupported": 0,
+        "attention": 0,
+        "overdue": 0,
     }
 
     for item in items:
@@ -43770,6 +43952,11 @@ def api_a3_approval_queue(request: Request):
         elif reason == "unsupported_action":
             summary["unsupported"] += 1
 
+        if item.get("approval_urgency") == "attention":
+            summary["attention"] += 1
+        elif item.get("approval_urgency") == "overdue":
+            summary["overdue"] += 1
+
     summary.update({
         "total_label": f"Всего: {summary['total']}",
         "safe_label": f"Можно подтвердить: {summary['safe']}",
@@ -43777,6 +43964,8 @@ def api_a3_approval_queue(request: Request):
         "protected_label": f"Защищённые: {summary['protected']}",
         "missing_target_label": f"Цель не найдена: {summary['missing_target']}",
         "unsupported_label": f"Неподдерживаемые: {summary['unsupported']}",
+        "attention_label": f"Ждут больше 6 часов: {summary['attention']}",
+        "overdue_label": f"Ждут больше суток: {summary['overdue']}",
     })
 
     return {
@@ -43848,6 +44037,8 @@ def api_a3_approval_history_export(request: Request):
         "Решение",
         "Кто решил",
         "Причина",
+        "Кто запросил",
+        "Основание запроса",
         "Тип действия",
         "Тип цели",
         "Номер цели",
@@ -43863,6 +44054,8 @@ def api_a3_approval_history_export(request: Request):
             item.get("decision_label") or item.get("decision"),
             item.get("decided_by_label") or item.get("decided_by"),
             item.get("reason") or "",
+            item.get("requested_by_label") or item.get("requested_by") or "",
+            item.get("request_reason") or "",
             item.get("action_label") or item.get("action_type"),
             item.get("target_label") or item.get("target_type"),
             item.get("target_id"),
@@ -44267,7 +44460,7 @@ def api_a3_workflow_timeline(
     )
 
     if not timeline:
-        return a3_api_error("not_found", 404)
+        return a3_api_error("not_found", 404, "Цепочка не найдена")
 
     return {
         "ok": True,

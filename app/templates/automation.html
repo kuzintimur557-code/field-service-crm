@@ -27,13 +27,17 @@ input,select,textarea,button{width:100%;padding:14px;border-radius:14px;font-siz
 input,select,textarea{border:1px solid #d1d5db;background:white}
 textarea{height:90px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.55}
 .notice{padding:14px;border-radius:16px;font-weight:900;margin-bottom:16px}
 .notice.ok{background:#dcfce7;color:#166534}
 .notice.err{background:#fee2e2;color:#991b1b}
 .rule{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin-bottom:10px}
 .rule-title{font-size:18px;font-weight:900;margin-bottom:6px}
 .pill{display:inline-block;padding:7px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:13px;margin-right:6px;margin-top:6px}
+.pill.ok{background:#dcfce7;color:#166534}
+.pill.warn{background:#fef3c7;color:#92400e}
 .pill.off{background:#fee2e2;color:#991b1b}
+.pill.muted{background:#e5e7eb;color:#4b5563}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .filters a{padding:9px 12px;border-radius:999px;background:#f3f4f6;color:#374151;text-decoration:none;font-weight:900;font-size:13px}
 .filters a.active{background:#111827;color:white}
@@ -247,6 +251,7 @@ function a3TargetLabel(targetType) {
 function a3RecommendationLabel(recommendation) {
     const labels = {
         stable: "Стабильно",
+        inactive: "Выключено",
         retry_recommended: "Рекомендуется повтор",
         investigate_rule: "Проверить правило",
         disable_rule: "Отключить правило"
@@ -259,10 +264,22 @@ function a3EventTypeLabel(eventType) {
         system_health: "Состояние системы",
         self_healing: "Самовосстановление",
         approval: "Подтверждение",
+        autonomous_execution: "Автономное выполнение",
+        autonomous_action: "ИИ-действие",
         autonomous_action_approved: "Действие одобрено",
         autonomous_action_rejected: "Действие отклонено"
     };
     return labels[eventType] || eventType || "-";
+}
+
+function a3SourceLabel(source) {
+    const labels = {
+        a3: "A3",
+        autonomous_runner: "Автономный запуск",
+        system: "Система",
+        manual: "Вручную"
+    };
+    return labels[source] || source || "A3";
 }
 
 function a3DecisionLabel(decision) {
@@ -279,6 +296,26 @@ function a3ActorLabel(actor) {
     }
 
     return actor;
+}
+
+function a3EscapeHtml(value) {
+    return String(value ?? "").replace(/[&<>'"]/g, character => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        "\"": "&quot;"
+    }[character]));
+}
+
+function a3StatusPillClass(tone) {
+    const classes = {
+        success: "ok",
+        warning: "warn",
+        danger: "off",
+        muted: "muted"
+    };
+    return classes[tone] || "";
 }
 
 function refreshA3ApprovalWidgets() {
@@ -434,9 +471,9 @@ async function loadA3SystemHealth() {
         badgeEl.style.background = "#fee2e2";
         badgeEl.style.color = "#991b1b";
         badgeEl.textContent = "НЕДОСТУПНО";
-        breakdownEl.innerHTML = `<div class="pill off">${message}</div>`;
+        breakdownEl.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
         trendEl.innerHTML = '<div class="meta">Динамика недоступна</div>';
-        warningsEl.innerHTML = `<div class="pill off">${message}</div>`;
+        warningsEl.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -589,8 +626,8 @@ async function loadA3Analytics() {
         console.error("Ошибка загрузки аналитики автоматизации", err);
         const message = err.message || "Не удалось загрузить аналитику автоматизации";
         successRateEl.textContent = "--";
-        statsEl.innerHTML = `<div class="pill off">${message}</div>`;
-        trendEl.innerHTML = `<div class="meta">${message}</div>`;
+        statsEl.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
+        trendEl.innerHTML = `<div class="meta">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -664,11 +701,11 @@ async function loadA3OperationsInsights() {
 
             card.innerHTML = `
                 <div style="font-weight:900;font-size:15px">
-                    ${item.title}
+                    ${a3EscapeHtml(item.title)}
                 </div>
 
                 <div style="margin-top:6px;color:#374151">
-                    ${item.message}
+                    ${a3EscapeHtml(item.message)}
                 </div>
             `;
 
@@ -677,7 +714,7 @@ async function loadA3OperationsInsights() {
     } catch (err) {
         console.error("Ошибка загрузки операционных инсайтов", err);
         const message = err.message || "Не удалось загрузить операционные инсайты";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -736,6 +773,15 @@ async function runA3SelfHealing() {
 
         const result = data.result || {};
 
+        if (result.blocked) {
+            status.innerHTML = `
+                <div class="pill warn">
+                    Автономный режим выключен. Выполнение не запускалось.
+                </div>
+            `;
+            return;
+        }
+
         status.innerHTML = `
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <div class="pill">
@@ -753,7 +799,7 @@ async function runA3SelfHealing() {
 
         status.innerHTML = `
             <div class="pill off">
-                ${message}
+                ${a3EscapeHtml(message)}
             </div>
         `;
     } finally {
@@ -837,7 +883,7 @@ async function loadA3RecoveryHistory() {
                     </div>
 
                     <div style="display:flex;gap:12px;flex-wrap:wrap">
-                        <div class="pill">
+                        <div class="pill ${a3StatusPillClass(item.status_tone)}">
                             Повторно: ${item.retried_events}
                         </div>
 
@@ -857,7 +903,7 @@ async function loadA3RecoveryHistory() {
     } catch (err) {
         console.error("Ошибка загрузки истории восстановления", err);
         const message = err.message || "Не удалось загрузить историю восстановления";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -944,27 +990,31 @@ async function loadA3OpsTimeline() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.title}
+                            ${a3EscapeHtml(item.title)}
                         </div>
 
                         <div style="margin-top:6px;color:#374151">
-                            ${item.message}
+                            ${a3EscapeHtml(item.message)}
                         </div>
                     </div>
 
                     <div style="text-align:right">
                         <div class="pill">
-                            ${a3EventTypeLabel(item.event_type)}
+                            ${a3EscapeHtml(a3EventTypeLabel(item.event_type))}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
-                            ${item.created_at}
+                            ${a3EscapeHtml(item.created_at)}
+                        </div>
+
+                        <div class="meta" style="margin-top:6px">
+                            Источник: ${a3EscapeHtml(a3SourceLabel(item.source))}
                         </div>
 
                         ${item.target_type ? `
                             <div class="meta" style="margin-top:8px">
-                                ${a3TargetLabel(item.target_type)}
-                                #${item.target_id || "-"}
+                                ${a3EscapeHtml(a3TargetLabel(item.target_type))}
+                                #${a3EscapeHtml(item.target_id || "-")}
                             </div>
                         ` : ""}
                     </div>
@@ -976,7 +1026,7 @@ async function loadA3OpsTimeline() {
     } catch (err) {
         console.error("Ошибка загрузки ленты A3", err);
         const message = err.message || "Не удалось загрузить ленту операций";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -1073,16 +1123,16 @@ async function loadA3PredictiveSignals() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.title}
+                            ${a3EscapeHtml(item.title)}
                         </div>
 
                         <div style="margin-top:6px;color:#374151">
-                            ${item.prediction}
+                            ${a3EscapeHtml(item.prediction)}
                         </div>
                     </div>
 
                     <div class="pill">
-                        ${a3StatusLabel(item.severity)}
+                        ${a3EscapeHtml(a3StatusLabel(item.severity))}
                     </div>
                 </div>
             `;
@@ -1092,7 +1142,7 @@ async function loadA3PredictiveSignals() {
     } catch (err) {
         console.error("Ошибка загрузки прогнозов A3", err);
         const message = err.message || "Не удалось загрузить прогнозы A3";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -1118,11 +1168,16 @@ setInterval(loadA3PredictiveSignals, 30000);
     <div id="a3-decision-engine"
          style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
     </div>
+
+    <div id="a3-decision-summary"
+         style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+    </div>
 </div>
 
 <script>
 async function loadA3DecisionEngine() {
     const container = document.getElementById("a3-decision-engine");
+    const summaryContainer = document.getElementById("a3-decision-summary");
 
     if (!container) {
         return;
@@ -1137,6 +1192,17 @@ async function loadA3DecisionEngine() {
         }
 
         container.innerHTML = "";
+
+        const summary = data.summary || {};
+
+        if (summaryContainer) {
+            summaryContainer.innerHTML = `
+                <div class="pill ok">Стабильно: ${summary.stable || 0}</div>
+                <div class="pill warn">Требуют внимания: ${summary.attention || 0}</div>
+                <div class="pill">Готовы к запуску: ${summary.ready || 0}</div>
+                <div class="pill muted">Выключено: ${summary.inactive || 0}</div>
+            `;
+        }
 
         const items = data.items || [];
 
@@ -1179,12 +1245,20 @@ async function loadA3DecisionEngine() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.rule_name || "Правило без названия"}
+                            ${a3EscapeHtml(item.rule_name || "Правило без названия")}
                         </div>
 
                         <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
                             <div class="pill">
-                                Уверенность: ${item.confidence_score}%
+                                Стабильность правила: ${item.confidence_score}%
+                            </div>
+
+                            <div class="pill ${item.autonomous_ready ? "ok" : item.recommendation === "stable" ? "muted" : "warn"}">
+                                Уверенность ИИ: ${item.decision_confidence ?? "-"}%
+                            </div>
+
+                            <div class="pill muted">
+                                Порог: ${item.confidence_threshold ?? "-"}%
                             </div>
 
                             <div class="pill">
@@ -1199,11 +1273,15 @@ async function loadA3DecisionEngine() {
 
                     <div style="text-align:right">
                         <div class="pill">
-                            ${a3RecommendationLabel(item.recommendation)}
+                            ${a3EscapeHtml(a3RecommendationLabel(item.recommendation))}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
                             ${item.total_events} событий
+                        </div>
+
+                        <div class="meta" style="margin-top:8px;max-width:260px">
+                            ${a3EscapeHtml(item.autonomous_status || "Действие не требуется")}
                         </div>
                     </div>
                 </div>
@@ -1214,7 +1292,11 @@ async function loadA3DecisionEngine() {
     } catch (err) {
         console.error("Ошибка загрузки центра решений", err);
         const message = err.message || "Не удалось загрузить центр решений";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+
+        if (summaryContainer) {
+            summaryContainer.innerHTML = "";
+        }
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -1243,6 +1325,20 @@ setInterval(loadA3DecisionEngine, 30000);
 </div>
 
 <script>
+function renderA3AutonomousSummary(summary) {
+    return `
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <div class="pill">Активно: ${summary.active || 0}</div>
+            <div class="pill muted">В журнале: ${summary.total || 0}</div>
+            <div class="pill warn">Ожидают: ${summary.pending || 0}</div>
+            <div class="pill warn">Ждут владельца: ${summary.awaiting_approval || 0}</div>
+            <div class="pill ok">Подтверждены: ${summary.approved || 0}</div>
+            <div class="pill ok">Выполнены: ${summary.completed || 0}</div>
+            <div class="pill ${summary.failed ? "off" : "muted"}">Ошибки: ${summary.failed || 0}</div>
+        </div>
+    `;
+}
+
 async function loadA3AutonomousActions() {
     const container = document.getElementById("a3-autonomous-actions");
 
@@ -1261,15 +1357,20 @@ async function loadA3AutonomousActions() {
         container.innerHTML = "";
 
         const items = data.items || [];
+        const summary = data.summary || {};
+        const summaryHtml = renderA3AutonomousSummary(summary);
 
         if (!items.length) {
             container.innerHTML = `
+                ${summaryHtml}
                 <div class="pill">
                     Очередь автономных действий пуста
                 </div>
             `;
             return;
         }
+
+        container.innerHTML = summaryHtml;
 
         for (const item of items.slice(0, 12)) {
             const card = document.createElement("div");
@@ -1301,24 +1402,49 @@ async function loadA3AutonomousActions() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${a3ActionLabel(item.action_type)}
+                            ${a3EscapeHtml(item.action_label || a3ActionLabel(item.action_type))}
                         </div>
 
                         <div style="margin-top:6px;color:#374151">
-                            Цель: ${a3TargetLabel(item.target_type)} #${item.target_id || "-"}
+                            Цель: ${a3EscapeHtml(item.target_label || a3TargetLabel(item.target_type))}
+                            #${a3EscapeHtml(item.target_id || "-")}
                         </div>
+
+                        ${item.target_name ? `
+                            <div class="meta" style="margin-top:6px">
+                                Правило: ${a3EscapeHtml(item.target_name)}
+                            </div>
+                        ` : ""}
                     </div>
 
                     <div style="text-align:right">
-                        <div class="pill">
-                            ${a3StatusLabel(item.status)}
+                        <div class="pill ${a3StatusPillClass(item.status_tone)}">
+                            ${a3EscapeHtml(item.status_label || a3StatusLabel(item.status))}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
-                            ${item.created_at}
+                            Создано: ${a3EscapeHtml(item.created_at)}
                         </div>
+
+                        ${item.processed_at ? `
+                            <div class="meta" style="margin-top:6px">
+                                Обновлено: ${a3EscapeHtml(item.processed_at)}
+                            </div>
+                        ` : ""}
                     </div>
                 </div>
+
+                ${item.request_reason ? `
+                    <div class="meta" style="margin-top:12px">
+                        Основание: ${a3EscapeHtml(item.request_reason)}
+                    </div>
+                ` : ""}
+
+                ${item.requested_by_label ? `
+                    <div class="meta" style="margin-top:6px">
+                        Запросил: ${a3EscapeHtml(item.requested_by_label)}
+                    </div>
+                ` : ""}
             `;
 
             container.appendChild(card);
@@ -1326,13 +1452,26 @@ async function loadA3AutonomousActions() {
     } catch (err) {
         console.error("Ошибка загрузки автономных действий", err);
         const message = err.message || "Не удалось загрузить автономные действия";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
 async function approveA3AutonomousAction(actionId) {
+    const reason = window.prompt(
+        "Комментарий к одобрению (необязательно)",
+        ""
+    );
+
+    if (reason === null) {
+        return;
+    }
+
     const response = await fetch(`/api/a3/autonomous-actions/${actionId}/approve`, {
-        method: "POST"
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ reason })
     });
     const data = await response.json();
 
@@ -1345,8 +1484,21 @@ async function approveA3AutonomousAction(actionId) {
 }
 
 async function rejectA3AutonomousAction(actionId) {
+    const reason = window.prompt(
+        "Причина отклонения (необязательно)",
+        ""
+    );
+
+    if (reason === null) {
+        return;
+    }
+
     const response = await fetch(`/api/a3/autonomous-actions/${actionId}/reject`, {
-        method: "POST"
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ reason })
     });
     const data = await response.json();
 
@@ -1374,7 +1526,7 @@ setInterval(loadA3AutonomousActions, 30000);
 
         <button id="a3-process-autonomous-actions"
                 class="btn">
-            Выполнить ИИ-действия
+            Запустить анализ и ИИ-действия
         </button>
     </div>
 
@@ -1397,7 +1549,7 @@ async function processA3AutonomousActions() {
 
         status.innerHTML = `
             <div class="pill">
-                Запущен ИИ-движок выполнения...
+                ИИ анализирует рекомендации и запускает разрешённые действия...
             </div>
         `;
 
@@ -1416,13 +1568,62 @@ async function processA3AutonomousActions() {
 
         const result = data.result || {};
 
+        if (result.blocked) {
+            status.innerHTML = `
+                <div class="pill off">
+                    Автономный режим выключен. Выполнение не запускалось.
+                </div>
+            `;
+            return;
+        }
+
         status.innerHTML = `
             <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <div class="pill">
+                    Проанализировано правил: ${data.decision_count || 0}
+                </div>
+
+                <div class="pill">
+                    Добавлено из рекомендаций: ${data.queued_from_decisions || 0}
+                </div>
+
+                <div class="pill muted">
+                    Лимит на цикл: ${data.max_actions_per_cycle || 0}
+                </div>
+
+                <div class="pill muted">
+                    В очереди: ${data.pending_action_count || 0}
+                </div>
+
+                <div class="pill ${data.queue_capacity_remaining ? "ok" : "warn"}">
+                    Свободно в очереди: ${data.queue_capacity_remaining || 0}
+                </div>
+
                 <div class="pill">
                     Обработано действий: ${result.processed || 0}
                 </div>
 
+                <div class="pill muted">
+                    Запустил: ${a3EscapeHtml(result.triggered_by || "система")}
+                </div>
+
                 <div class="pill">
+                    Событий на повторе: ${result.retried_events || 0}
+                </div>
+
+                <div class="pill">
+                    Отключено правил: ${result.disabled_rules || 0}
+                </div>
+
+                <div class="pill warn">
+                    Ждут подтверждения: ${result.awaiting_approval || 0}
+                </div>
+
+                <div class="pill ${result.failed ? "off" : "ok"}">
+                    Ошибок: ${result.failed || 0}
+                </div>
+
+                <div class="pill ok">
                     ИИ-выполнение завершено
                 </div>
             </div>
@@ -1432,18 +1633,22 @@ async function processA3AutonomousActions() {
             loadA3AutonomousActions();
         }
 
+        if (window.loadA3DecisionEngine) {
+            loadA3DecisionEngine();
+        }
+
     } catch (err) {
         console.error(err);
         const message = err.message || "Не удалось выполнить ИИ-действия";
 
         status.innerHTML = `
             <div class="pill off">
-                ${message}
+                ${a3EscapeHtml(message)}
             </div>
         `;
     } finally {
         button.disabled = false;
-        button.textContent = "Выполнить ИИ-действия";
+        button.textContent = "Запустить анализ и ИИ-действия";
     }
 }
 
@@ -1458,7 +1663,7 @@ document
         <div>
             <h2 style="margin-bottom:8px">A3 Управление ИИ</h2>
             <div class="meta">
-                Контроль безопасности и управление автономным ИИ.
+                Контроль безопасности и управление автономным ИИ. Изменения вносит владелец компании.
             </div>
         </div>
 
@@ -1482,6 +1687,7 @@ document
                 max="100"
                 value="70"
                 class="input"
+                {% if role != "boss" %}disabled{% endif %}
             >
         </label>
 
@@ -1495,23 +1701,27 @@ document
                 max="100"
                 value="20"
                 class="input"
+                {% if role != "boss" %}disabled{% endif %}
             >
         </label>
     </div>
 
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
         <button id="a3-toggle-autonomous-mode"
-                class="btn">
+                class="btn"
+                disabled>
             Переключить автономный режим
         </button>
 
         <button id="a3-toggle-critical-approval"
-                class="btn">
+                class="btn"
+                disabled>
             Переключить критическое подтверждение
         </button>
 
         <button id="a3-save-governance"
-                class="btn btn-primary">
+                class="btn btn-primary"
+                disabled>
             Сохранить настройки
         </button>
     </div>
@@ -1522,6 +1732,22 @@ document
 </div>
 
 <script>
+const a3CanManageGovernance = {{ "true" if role == "boss" else "false" }};
+
+function setA3GovernanceControlsDisabled(disabled) {
+    [
+        "a3-toggle-autonomous-mode",
+        "a3-toggle-critical-approval",
+        "a3-save-governance"
+    ].forEach(id => {
+        const control = document.getElementById(id);
+
+        if (control) {
+            control.disabled = disabled || !a3CanManageGovernance;
+        }
+    });
+}
+
 async function loadA3GovernanceSettings() {
     const container = document.getElementById("a3-governance-settings");
     const saveStatus = document.getElementById("a3-governance-save-status");
@@ -1542,11 +1768,13 @@ async function loadA3GovernanceSettings() {
 
         window.a3GovernanceState = data;
 
-        document.getElementById("a3-governance-confidence").value =
-            data.confidence_threshold || 70;
+        if (!window.a3GovernanceFormDirty) {
+            document.getElementById("a3-governance-confidence").value =
+                data.confidence_threshold || 70;
 
-        document.getElementById("a3-governance-max-actions").value =
-            data.max_actions_per_cycle || 20;
+            document.getElementById("a3-governance-max-actions").value =
+                data.max_actions_per_cycle || 20;
+        }
 
         const items = [
             [
@@ -1587,13 +1815,15 @@ async function loadA3GovernanceSettings() {
 
             container.appendChild(card);
         }
+
+        setA3GovernanceControlsDisabled(false);
     } catch (err) {
         console.error("Ошибка загрузки настроек управления ИИ", err);
         const message = err.message || "Не удалось загрузить настройки управления ИИ";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
 
         if (saveStatus) {
-            saveStatus.innerHTML = `<div class="pill off">${message}</div>`;
+            saveStatus.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
         }
     }
 }
@@ -1609,11 +1839,12 @@ setInterval(loadA3GovernanceSettings, 30000);
             <h2 style="margin-bottom:8px">A3 Подтверждения</h2>
 
             <div class="meta">
-                Действия ИИ, требующие ручного подтверждения.
+                Действия ИИ, требующие ручного подтверждения владельцем компании.
             </div>
         </div>
 
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            {% if role == "boss" %}
             <button class="btn"
                     onclick="approveSafeA3Actions()">
                 Одобрить безопасные
@@ -1623,6 +1854,11 @@ setInterval(loadA3GovernanceSettings, 30000);
                     onclick="rejectUnsafeA3Actions()">
                 Отклонить небезопасные
             </button>
+            {% else %}
+            <div class="pill muted">
+                Просмотр для менеджера
+            </div>
+            {% endif %}
 
             <div class="pill off">
                 Требует подтверждения
@@ -1636,6 +1872,8 @@ setInterval(loadA3GovernanceSettings, 30000);
 </div>
 
 <script>
+const a3CanApproveAutonomousActions = {{ "true" if role == "boss" else "false" }};
+
 async function loadA3ApprovalQueue() {
     const container = document.getElementById("a3-approval-queue");
 
@@ -1676,35 +1914,65 @@ async function loadA3ApprovalQueue() {
             card.style.background = "#fff7ed";
             card.style.border = "1px solid #fdba74";
 
+            if (item.approval_urgency === "overdue") {
+                card.style.background = "#fee2e2";
+                card.style.border = "1px solid #fca5a5";
+            } else if (item.approval_urgency === "attention") {
+                card.style.background = "#fef3c7";
+                card.style.border = "1px solid #fde68a";
+            }
+
             card.innerHTML = `
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.action_label || a3ActionLabel(item.action_type)}
+                            ${a3EscapeHtml(item.action_label || a3ActionLabel(item.action_type))}
                         </div>
 
                         <div style="margin-top:8px;color:#374151">
-                            ${item.target_label || a3TargetLabel(item.target_type)}
-                            #${item.target_id || "-"}
+                            ${a3EscapeHtml(item.target_label || a3TargetLabel(item.target_type))}
+                            #${a3EscapeHtml(item.target_id || "-")}
                         </div>
 
                         ${item.target_name ? `
                             <div class="meta" style="margin-top:6px">
-                                Правило: ${item.target_name}
+                                Правило: ${a3EscapeHtml(item.target_name)}
                             </div>
                         ` : ""}
 
                         <div class="meta" style="margin-top:8px">
-                            ${item.created_at}
+                            ${a3EscapeHtml(item.created_at)}
+                        </div>
+
+                        <div style="margin-top:8px">
+                            <span class="pill ${item.approval_urgency === "overdue" ? "off" : item.approval_urgency === "attention" ? "warn" : ""}">
+                                ${a3EscapeHtml(item.approval_urgency_label || "Нужно проверить")}
+                            </span>
+                            <span class="pill muted">
+                                ${a3EscapeHtml(item.approval_age_label || "Время не указано")}
+                            </span>
                         </div>
 
                         <div style="margin-top:10px">
                             <span class="pill ${item.approval_safety === "safe" ? "ok" : "off"}">
-                                ${item.approval_safety_label || "Требует проверки"}
+                                ${a3EscapeHtml(item.approval_safety_label || "Требует проверки")}
                             </span>
                         </div>
+
+                        ${item.request_reason ? `
+                            <div class="meta" style="margin-top:10px">
+                                Основание: ${a3EscapeHtml(item.request_reason)}
+                            </div>
+                        ` : ""}
+
+                        ${item.requested_by_label ? `
+                            <div class="meta" style="margin-top:6px">
+                                Запросил: ${a3EscapeHtml(item.requested_by_label)}
+                            </div>
+                        ` : ""}
                     </div>
 
+                    ${a3CanApproveAutonomousActions ? `
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                         <button
                             class="btn"
@@ -1718,6 +1986,11 @@ async function loadA3ApprovalQueue() {
                             Отклонить
                         </button>
                     </div>
+                    ` : `
+                    <div class="meta">
+                        Подтверждение доступно владельцу компании
+                    </div>
+                    `}
                 </div>
             `;
 
@@ -1726,7 +1999,7 @@ async function loadA3ApprovalQueue() {
     } catch (err) {
         console.error("Ошибка загрузки очереди подтверждений", err);
         const message = err.message || "Не удалось загрузить очередь подтверждений";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -1739,6 +2012,8 @@ function renderA3ApprovalSummary(summary) {
             <span class="pill off">${summary.protected_label || `Защищённые: ${summary.protected || 0}`}</span>
             <span class="pill">${summary.missing_target_label || `Цель не найдена: ${summary.missing_target || 0}`}</span>
             <span class="pill">${summary.unsupported_label || `Неподдерживаемые: ${summary.unsupported || 0}`}</span>
+            <span class="pill warn">${summary.attention_label || `Ждут больше 6 часов: ${summary.attention || 0}`}</span>
+            <span class="pill off">${summary.overdue_label || `Ждут больше суток: ${summary.overdue || 0}`}</span>
         </div>
     `;
 }
@@ -1920,38 +2195,50 @@ async function loadA3ApprovalHistory() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900;font-size:15px">
-                            ${item.action_label || a3ActionLabel(item.action_type)}
+                            ${a3EscapeHtml(item.action_label || a3ActionLabel(item.action_type))}
                         </div>
 
                         <div style="margin-top:8px;color:#374151">
-                            ${item.target_label || a3TargetLabel(item.target_type)}
-                            #${item.target_id || "-"}
+                            ${a3EscapeHtml(item.target_label || a3TargetLabel(item.target_type))}
+                            #${a3EscapeHtml(item.target_id || "-")}
                         </div>
 
                         ${item.target_name ? `
                             <div class="meta" style="margin-top:6px">
-                                Правило: ${item.target_name}
+                                Правило: ${a3EscapeHtml(item.target_name)}
                             </div>
                         ` : ""}
 
                         <div style="margin-top:8px">
                             <span class="pill">
-                                ${item.decision_label || a3DecisionLabel(item.decision)}
+                                ${a3EscapeHtml(item.decision_label || a3DecisionLabel(item.decision))}
                             </span>
                         </div>
 
                         <div class="meta" style="margin-top:8px">
-                            ${item.reason || "-"}
+                            Решение: ${a3EscapeHtml(item.reason || "Без комментария")}
                         </div>
+
+                        ${item.request_reason ? `
+                            <div class="meta" style="margin-top:6px">
+                                Основание: ${a3EscapeHtml(item.request_reason)}
+                            </div>
+                        ` : ""}
+
+                        ${item.requested_by_label ? `
+                            <div class="meta" style="margin-top:6px">
+                                Запросил: ${a3EscapeHtml(item.requested_by_label)}
+                            </div>
+                        ` : ""}
                     </div>
 
                     <div style="text-align:right">
                         <div class="meta">
-                            ${item.decided_by_label || a3ActorLabel(item.decided_by)}
+                            ${a3EscapeHtml(item.decided_by_label || a3ActorLabel(item.decided_by))}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
-                            ${item.created_at}
+                            ${a3EscapeHtml(item.created_at)}
                         </div>
                     </div>
                 </div>
@@ -1962,7 +2249,7 @@ async function loadA3ApprovalHistory() {
     } catch (err) {
         console.error("Ошибка загрузки истории подтверждений", err);
         const message = err.message || "Не удалось загрузить историю подтверждений";
-        container.innerHTML = `<div class="pill off">${message}</div>`;
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
     }
 }
 
@@ -2180,7 +2467,7 @@ function renderA3ApprovalHistorySummary(summary) {
                 </span>
             ` : ""}
             ${activeFilterLabels.map(label => `
-                <span class="pill">${label}</span>
+                <span class="pill">${a3EscapeHtml(label)}</span>
             `).join("")}
         </div>
     `;
@@ -2583,7 +2870,13 @@ if (newRuleActionKey) {
 <script>
 async function saveA3GovernanceSettings() {
     try {
-        const current = window.a3GovernanceState || {};
+        const current = window.a3GovernanceState;
+
+        if (!current) {
+            throw new Error("Настройки ИИ ещё загружаются");
+        }
+
+        setA3GovernanceControlsDisabled(true);
 
         const payload = {
             autonomous_enabled: current.autonomous_enabled,
@@ -2613,8 +2906,9 @@ async function saveA3GovernanceSettings() {
             throw new Error(data.message || "Не удалось сохранить настройки управления ИИ");
         }
 
+        window.a3GovernanceFormDirty = false;
         document.getElementById("a3-governance-save-status").innerHTML = `
-            <div class="pill">
+            <div class="pill ok">
                 Настройки сохранены
             </div>
         `;
@@ -2627,11 +2921,21 @@ async function saveA3GovernanceSettings() {
 
         document.getElementById("a3-governance-save-status").innerHTML = `
             <div class="pill off">
-                ${message}
+                ${a3EscapeHtml(message)}
             </div>
         `;
+        setA3GovernanceControlsDisabled(false);
     }
 }
+
+[
+    "a3-governance-confidence",
+    "a3-governance-max-actions"
+].forEach(id => {
+    document.getElementById(id)?.addEventListener("input", () => {
+        window.a3GovernanceFormDirty = true;
+    });
+});
 
 document
     .getElementById("a3-save-governance")
@@ -2640,6 +2944,10 @@ document
 document
     .getElementById("a3-toggle-autonomous-mode")
     .addEventListener("click", () => {
+        if (!window.a3GovernanceState) {
+            return;
+        }
+
         window.a3GovernanceState.autonomous_enabled =
             !window.a3GovernanceState.autonomous_enabled;
 
@@ -2649,6 +2957,10 @@ document
 document
     .getElementById("a3-toggle-critical-approval")
     .addEventListener("click", () => {
+        if (!window.a3GovernanceState) {
+            return;
+        }
+
         window.a3GovernanceState.require_critical_approval =
             !window.a3GovernanceState.require_critical_approval;
 

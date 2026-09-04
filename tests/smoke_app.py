@@ -24764,7 +24764,12 @@ async def assert_a3_api_layer():
     ]
 
     for func, args in a3_company_guarded_routes:
-        assert_forbidden(func(*args))
+        response = func(*args)
+
+        if asyncio.iscoroutine(response):
+            response = await response
+
+        assert_forbidden(response)
 
     async_a3_company_guarded_routes = [
         crm.api_a3_request_autonomous_action_approval(
@@ -25251,10 +25256,16 @@ async def assert_a3_api_layer():
     assert approval_queue_items[approve_action_id]["can_bulk_approve"] is True
     assert approval_queue_items[approve_action_id]["can_bulk_reject"] is False
 
-    approve_result = crm.api_a3_approve_autonomous_action(request, approve_action_id)
+    approve_result = await crm.api_a3_approve_autonomous_action(
+        request,
+        approve_action_id,
+    )
     assert approve_result["ok"] is True
 
-    reject_result = crm.api_a3_reject_autonomous_action(request, reject_action_id)
+    reject_result = await crm.api_a3_reject_autonomous_action(
+        request,
+        reject_action_id,
+    )
     assert reject_result["ok"] is True
 
     conn = connect()
@@ -25690,7 +25701,7 @@ async def assert_a3_api_layer():
     conn.commit()
     conn.close()
 
-    missing_approval_target = crm.api_a3_approve_autonomous_action(
+    missing_approval_target = await crm.api_a3_approve_autonomous_action(
         request,
         missing_approval_target_id,
     )
@@ -25732,7 +25743,7 @@ async def assert_a3_api_layer():
     conn.commit()
     conn.close()
 
-    unsupported_approval = crm.api_a3_approve_autonomous_action(
+    unsupported_approval = await crm.api_a3_approve_autonomous_action(
         request,
         unsupported_approval_id,
     )
@@ -26523,7 +26534,7 @@ async def assert_a3_api_layer():
     conn.commit()
     conn.close()
 
-    protected_approval = crm.api_a3_approve_autonomous_action(
+    protected_approval = await crm.api_a3_approve_autonomous_action(
         request,
         protected_approval_action_id,
     )

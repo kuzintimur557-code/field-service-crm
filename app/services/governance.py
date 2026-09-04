@@ -5,6 +5,8 @@ from app.database import connect
 
 
 APPROVAL_HISTORY_LIMIT = 100
+APPROVAL_ATTENTION_MINUTES = 6 * 60
+APPROVAL_OVERDUE_MINUTES = 24 * 60
 
 ACTION_LABELS = {
     "retry_events": "Повторить события",
@@ -30,6 +32,65 @@ def action_label(action_type):
 
 def target_label(target_type):
     return TARGET_LABELS.get(target_type, target_type or "-")
+
+
+def approval_request_context(payload_json):
+    try:
+        payload = json.loads(payload_json or "{}")
+    except (TypeError, ValueError):
+        payload = {}
+
+    reason = str(payload.get("reason") or "").strip()
+    requested_by = str(payload.get("requested_by") or "").strip()
+
+    return {
+        "request_reason": reason[:500],
+        "requested_by": requested_by[:120],
+        "requested_by_label": "Система" if requested_by == "system" else requested_by,
+    }
+
+
+def approval_age_context(created_at):
+    try:
+        created = datetime.fromisoformat(
+            str(created_at or "").replace("Z", "+00:00")
+        )
+    except (TypeError, ValueError):
+        return {
+            "approval_age_minutes": None,
+            "approval_age_label": "Время не указано",
+            "approval_urgency": "unknown",
+            "approval_urgency_label": "Нужно проверить время",
+        }
+
+    now = datetime.now(created.tzinfo) if created.tzinfo else datetime.now()
+    age_minutes = max(0, int((now - created).total_seconds() // 60))
+
+    if age_minutes >= APPROVAL_OVERDUE_MINUTES:
+        urgency = "overdue"
+        urgency_label = "Ожидает больше суток"
+    elif age_minutes >= APPROVAL_ATTENTION_MINUTES:
+        urgency = "attention"
+        urgency_label = "Ожидает больше 6 часов"
+    else:
+        urgency = "normal"
+        urgency_label = "Новый запрос"
+
+    if age_minutes < 1:
+        age_label = "Меньше минуты назад"
+    elif age_minutes < 60:
+        age_label = f"{age_minutes} мин. назад"
+    elif age_minutes < 24 * 60:
+        age_label = f"{age_minutes // 60} ч. назад"
+    else:
+        age_label = f"{age_minutes // (24 * 60)} дн. назад"
+
+    return {
+        "approval_age_minutes": age_minutes,
+        "approval_age_label": age_label,
+        "approval_urgency": urgency,
+        "approval_urgency_label": urgency_label,
+    }
 
 
 def get_governance_settings(company_id):
@@ -206,6 +267,8 @@ def get_approval_queue(company_id):
         item["approval_safety_label"] = label
         item["can_bulk_approve"] = safe
         item["can_bulk_reject"] = not safe
+        item.update(approval_request_context(item.get("payload_json")))
+        item.update(approval_age_context(item.get("created_at")))
 
         items.append(item)
 
@@ -276,6 +339,7 @@ def get_approval_history(
             autonomous_action_queue.action_type,
             autonomous_action_queue.target_type,
             autonomous_action_queue.target_id,
+            autonomous_action_queue.payload_json,
             automation_rules.name AS target_name,
             automation_rules.active AS target_active
         FROM autonomous_action_approvals
@@ -310,6 +374,7 @@ def get_approval_history(
         item["decided_by_label"] = (
             "Система" if decided_by == "system" else decided_by
         )
+        item.update(approval_request_context(item.get("payload_json")))
 
         items.append(item)
 
