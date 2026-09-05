@@ -2932,6 +2932,12 @@ if (newRuleActionKey) {
         {% if event["processed_at"] %}
         <br>Обработано: {{ event["processed_at"] }}
         {% endif %}
+        {% if event["retry_state"]["retry_count"] %}
+        <br>Попыток повтора: {{ event["retry_state"]["retry_count"] }}
+        {% endif %}
+        {% if event["retry_state"]["last_retried_at"] %}
+        <br>Последний повтор: {{ event["retry_state"]["last_retried_at"] }}
+        {% endif %}
     </div>
     <div>
         <div class="rule-title">{{ trigger_labels.get(event["trigger_key"], event["trigger_key"]) }}</div>
@@ -2958,8 +2964,15 @@ if (newRuleActionKey) {
                     {% if role != "boss" %}
                     disabled
                     title="Повтор событий может запускать действия и доступен владельцу компании"
+                    {% elif not event["retry_state"]["available"] %}
+                    disabled
+                    title="{{ event['retry_state']['label'] }}"
                     {% endif %}>
+                {% if event["retry_state"]["remaining_minutes"] %}
+                Повтор через {{ event["retry_state"]["remaining_minutes"] }} мин.
+                {% else %}
                 Повторить
+                {% endif %}
             </button>
         </form>
         {% endif %}

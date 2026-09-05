@@ -4,6 +4,7 @@ from app.services.automation_analytics import (
     get_unhealthy_rules,
 )
 from app.services.autonomous_actions import (
+    SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES,
     approve_autonomous_action,
     approve_safe_autonomous_actions,
     enqueue_autonomous_action,
@@ -4879,6 +4880,57 @@ def run_automation_event(
         }
 
     return created_events
+
+
+def build_a3_event_retry_state(event, now_dt=None):
+    event = dict(event or {})
+    status = str(event.get("status") or "").strip()
+    rule_id = event.get("rule_id")
+    retry_count = max(0, int(event.get("retry_count") or 0))
+    last_retried_at = str(event.get("last_retried_at") or "").strip()
+    retryable_status = status in {"pending", "skipped"}
+    available_at = ""
+    remaining_minutes = 0
+
+    if last_retried_at:
+        try:
+            retry_at = datetime.fromisoformat(last_retried_at)
+            available_dt = retry_at + timedelta(
+                minutes=SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES,
+            )
+            remaining_seconds = max(
+                0,
+                int((available_dt - (now_dt or datetime.now())).total_seconds()),
+            )
+            remaining_minutes = (remaining_seconds + 59) // 60
+            available_at = available_dt.isoformat(timespec="minutes")
+        except (TypeError, ValueError):
+            last_retried_at = ""
+
+    available = bool(
+        retryable_status
+        and rule_id
+        and remaining_minutes == 0
+    )
+
+    if not retryable_status:
+        label = "Повтор не требуется"
+    elif not rule_id:
+        label = "Правило события не найдено"
+    elif remaining_minutes:
+        label = f"Повтор через {remaining_minutes} мин."
+    else:
+        label = "Можно повторить"
+
+    return {
+        "available": available,
+        "label": label,
+        "retry_count": retry_count,
+        "last_retried_at": last_retried_at,
+        "available_at": available_at,
+        "remaining_minutes": remaining_minutes,
+        "cooldown_minutes": SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES,
+    }
 
 
 def replay_a3_skipped_automation_events(company_id, rule_id, events):
@@ -17634,7 +17686,7 @@ async def automation_page(
     ORDER BY automation_rules.id DESC
     """, (company_id,)).fetchall()
 
-    events = c.execute(f"""
+    event_rows = c.execute(f"""
     SELECT
         automation_events.*,
         automation_rules.name AS rule_name
@@ -17679,6 +17731,12 @@ async def automation_page(
     """, (company_id,)).fetchall()
 
     conn.close()
+
+    events = []
+    for event_row in event_rows:
+        event = dict(event_row)
+        event["retry_state"] = build_a3_event_retry_state(event)
+        events.append(event)
 
     rules = []
     unhealthy_rules = []
@@ -18780,7 +18838,9 @@ async def automation_events_export(
         "entity_id",
         "message",
         "created_at",
-        "processed_at"
+        "processed_at",
+        "retry_count",
+        "last_retried_at",
     ])
 
     for event in events:
@@ -18794,7 +18854,9 @@ async def automation_events_export(
             event["entity_id"],
             event["message"] or "",
             event["created_at"],
-            event["processed_at"] or ""
+            event["processed_at"] or "",
+            event["retry_count"] or 0,
+            event["last_retried_at"] or "",
         ])
 
     content = "\ufeff" + output.getvalue()
@@ -19986,7 +20048,9 @@ async def retry_skipped_automation_events(request: Request):
     conn = connect()
     c = conn.cursor()
     retry_cutoff = (
-        datetime.now() - timedelta(minutes=30)
+        datetime.now() - timedelta(
+            minutes=SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES,
+        )
     ).isoformat(timespec="seconds")
 
     skipped_events = c.execute("""
@@ -20144,7 +20208,7 @@ async def automation_diagnostics_export(request: Request):
     ORDER BY automation_rules.id DESC
     """, (company_id,)).fetchall()
 
-    recent_skipped_events = c.execute("""
+    recent_skipped_event_rows = c.execute("""
     SELECT
         automation_events.id,
         automation_rules.name AS rule_name,
@@ -20153,7 +20217,9 @@ async def automation_diagnostics_export(request: Request):
         automation_events.entity_id,
         automation_events.message,
         automation_events.created_at,
-        automation_events.processed_at
+        automation_events.processed_at,
+        automation_events.retry_count,
+        automation_events.last_retried_at
     FROM automation_events
     LEFT JOIN automation_rules
       ON automation_rules.id=automation_events.rule_id
@@ -20169,7 +20235,19 @@ async def automation_diagnostics_export(request: Request):
     output = io.StringIO()
     writer = csv.writer(output)
 
-    writer.writerow(["section", "id", "name_or_rule", "trigger_key", "entity_type", "entity_id", "message", "created_at", "updated_or_processed_at"])
+    writer.writerow([
+        "section",
+        "id",
+        "name_or_rule",
+        "trigger_key",
+        "entity_type",
+        "entity_id",
+        "message",
+        "created_at",
+        "updated_or_processed_at",
+        "retry_count",
+        "last_retried_at",
+    ])
 
     for rule in disabled_rules:
         writer.writerow([
@@ -20181,7 +20259,9 @@ async def automation_diagnostics_export(request: Request):
             "",
             "",
             "",
-            rule["updated_at"] or ""
+            rule["updated_at"] or "",
+            "",
+            "",
         ])
 
     for rule in rules_without_actions:
@@ -20194,10 +20274,12 @@ async def automation_diagnostics_export(request: Request):
             "",
             "",
             rule["created_at"] or "",
-            ""
+            "",
+            "",
+            "",
         ])
 
-    for event in recent_skipped_events:
+    for event in recent_skipped_event_rows:
         writer.writerow([
             "skipped_event",
             event["id"],
@@ -20207,7 +20289,9 @@ async def automation_diagnostics_export(request: Request):
             event["entity_id"] or "",
             event["message"] or "",
             event["created_at"] or "",
-            event["processed_at"] or ""
+            event["processed_at"] or "",
+            event["retry_count"] or 0,
+            event["last_retried_at"] or "",
         ])
 
     csv_data = output.getvalue()
@@ -20286,7 +20370,7 @@ async def automation_diagnostics_page(request: Request):
       AND status='done'
     """, (company_id,)).fetchone()[0]
 
-    recent_skipped_events = c.execute("""
+    recent_skipped_event_rows = c.execute("""
     SELECT
         automation_events.*,
         automation_rules.name AS rule_name
@@ -20400,6 +20484,12 @@ async def automation_diagnostics_page(request: Request):
 
     conn.close()
 
+    recent_skipped_events = []
+    for event_row in recent_skipped_event_rows:
+        event = dict(event_row)
+        event["retry_state"] = build_a3_event_retry_state(event)
+        recent_skipped_events.append(event)
+
     return templates.TemplateResponse(
         request,
         "automation_diagnostics.html",
@@ -20464,6 +20554,9 @@ async def automation_event_detail(request: Request, event_id: int):
     if not event:
         return RedirectResponse("/automation", status_code=302)
 
+    event = dict(event)
+    event["retry_state"] = build_a3_event_retry_state(event)
+
     trigger_labels = dict(AUTOMATION_TRIGGERS)
 
     status_labels = AUTOMATION_STATUS_LABELS
@@ -20510,7 +20603,9 @@ async def retry_automation_event(request: Request, event_id: int):
     conn = connect()
     c = conn.cursor()
     retry_cutoff = (
-        datetime.now() - timedelta(minutes=30)
+        datetime.now() - timedelta(
+            minutes=SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES,
+        )
     ).isoformat(timespec="seconds")
 
     event = c.execute("""
@@ -20822,7 +20917,9 @@ async def retry_rule_skipped_events(request: Request, rule_id: int):
     conn = connect()
     c = conn.cursor()
     retry_cutoff = (
-        datetime.now() - timedelta(minutes=30)
+        datetime.now() - timedelta(
+            minutes=SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES,
+        )
     ).isoformat(timespec="seconds")
 
     events = c.execute("""

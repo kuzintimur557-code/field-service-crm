@@ -24987,6 +24987,85 @@ async def assert_a3_api_layer():
     assert retry_rows[0]["last_retried_at"]
     assert retry_index is not None
 
+    retry_now = datetime.fromisoformat(
+        retry_rows[0]["last_retried_at"]
+    ) + timedelta(minutes=5)
+    retry_state = crm.build_a3_event_retry_state(
+        {
+            "status": "skipped",
+            "rule_id": retry_rule_id,
+            "retry_count": retry_rows[0]["retry_count"],
+            "last_retried_at": retry_rows[0]["last_retried_at"],
+        },
+        now_dt=retry_now,
+    )
+    assert retry_state["available"] is False
+    assert retry_state["remaining_minutes"] == 25
+    assert retry_state["label"] == "Повтор через 25 мин."
+
+    expired_retry_state = crm.build_a3_event_retry_state(
+        {
+            "status": "skipped",
+            "rule_id": retry_rule_id,
+            "retry_count": 1,
+            "last_retried_at": retry_rows[0]["last_retried_at"],
+        },
+        now_dt=retry_now + timedelta(minutes=30),
+    )
+    assert expired_retry_state["available"] is True
+    assert expired_retry_state["remaining_minutes"] == 0
+    assert expired_retry_state["label"] == "Можно повторить"
+
+    cooldown_response = await crm.retry_automation_event(
+        request,
+        skipped_retry_event["id"],
+    )
+    assert cooldown_response.status_code == 302
+    assert cooldown_response.headers["location"] == (
+        "/automation?retry_unavailable=1"
+    )
+
+    retry_detail_response = await crm.automation_event_detail(
+        make_asgi_request(
+            "owner2",
+            f"/automation/events/{skipped_retry_event['id']}",
+        ),
+        skipped_retry_event["id"],
+    )
+    assert retry_detail_response.status_code == 200
+    retry_detail_html = retry_detail_response.body.decode("utf-8")
+    assert "Попыток повтора" in retry_detail_html
+    assert "Последний повтор" in retry_detail_html
+    assert "Повтор через" in retry_detail_html
+
+    retry_page_response = await crm.automation_page(
+        make_asgi_request("owner2", "/automation"),
+        event_rule_id=str(retry_rule_id),
+    )
+    assert retry_page_response.status_code == 200
+    retry_page_html = retry_page_response.body.decode("utf-8")
+    assert "Попыток повтора: 1" in retry_page_html
+    assert "Последний повтор:" in retry_page_html
+
+    retry_diagnostics_response = await crm.automation_diagnostics_page(
+        make_asgi_request("owner2", "/automation/diagnostics")
+    )
+    assert retry_diagnostics_response.status_code == 200
+    retry_diagnostics_html = retry_diagnostics_response.body.decode("utf-8")
+    assert "<th>Попытки</th>" in retry_diagnostics_html
+    assert "<th>Последний повтор</th>" in retry_diagnostics_html
+
+    retry_events_export = await crm.automation_events_export(
+        request,
+        event_rule_id=str(retry_rule_id),
+    )
+    retry_events_csv = retry_events_export.body.decode("utf-8")
+    assert "retry_count,last_retried_at" in retry_events_csv
+
+    retry_diagnostics_export = await crm.automation_diagnostics_export(request)
+    retry_diagnostics_csv = retry_diagnostics_export.body.decode("utf-8")
+    assert "retry_count,last_retried_at" in retry_diagnostics_csv
+
     try:
         crm.run_self_healing_cycle(company_id=None)
         assert False, "run_self_healing_cycle must require company_id"

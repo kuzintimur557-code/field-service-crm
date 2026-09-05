@@ -21,6 +21,7 @@
         pre { max-width:100%; white-space:pre-wrap; word-break:break-word; background:#f9fafb; border-radius:16px; padding:16px; margin:0; font-weight:800; line-height:1.45; }
         .event-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
         .event-actions form { margin:0; }
+        .btn:disabled { cursor:not-allowed; opacity:.58; }
         @media(max-width:760px){
             body { padding:16px 14px; }
             .container { padding:0 0 92px; }
@@ -91,6 +92,19 @@
                 <div class="label">Обработано</div>
                 <div class="value">{{ event["processed_at"] or "Ещё не обработано" }}</div>
             </div>
+
+            <div>
+                <div class="label">Попыток повтора</div>
+                <div class="value">{{ event["retry_state"]["retry_count"] }}</div>
+            </div>
+
+            <div>
+                <div class="label">Последний повтор</div>
+                <div class="value">{{ event["retry_state"]["last_retried_at"] or "Ещё не запускалось" }}</div>
+                {% if event["retry_state"]["remaining_minutes"] %}
+                <div class="pill">{{ event["retry_state"]["label"] }}</div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
@@ -114,8 +128,15 @@
                         {% if role != "boss" %}
                         disabled
                         title="Повтор событий может запускать действия и доступен владельцу компании"
+                        {% elif not event["retry_state"]["available"] %}
+                        disabled
+                        title="{{ event['retry_state']['label'] }}"
                         {% endif %}>
+                    {% if event["retry_state"]["remaining_minutes"] %}
+                    Повтор через {{ event["retry_state"]["remaining_minutes"] }} мин.
+                    {% else %}
                     Повторить
+                    {% endif %}
                 </button>
             </form>
             {% endif %}
