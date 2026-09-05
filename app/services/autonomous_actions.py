@@ -18,6 +18,7 @@ SUPPORTED_AUTONOMOUS_ACTIONS = {
 
 AUTONOMOUS_ACTION_COOLDOWN_MINUTES = 10
 AUTONOMOUS_ACTION_COOLDOWN_LIMIT = 3
+SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES = 30
 
 STATUS_LABELS = {
     "pending": "Ожидает выполнения",
@@ -85,8 +86,12 @@ def enqueue_autonomous_action(
     target_type,
     target_id=None,
     payload_json=None,
+    initial_status="pending",
 ):
     require_company_id(company_id)
+
+    if initial_status not in {"pending", "awaiting_approval"}:
+        raise ValueError("unsupported initial action status")
 
     if not _is_supported_action(action_type, target_type):
         return {
@@ -194,14 +199,16 @@ def enqueue_autonomous_action(
             action_type,
             target_type,
             target_id,
+            status,
             payload_json,
             created_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
         company_id,
         action_type,
         target_type,
         target_id,
+        initial_status,
         payload_json,
         now_value.isoformat(timespec="seconds"),
     ))
@@ -304,7 +311,11 @@ def get_autonomous_action_summary(company_id):
     return counts
 
 
-def process_autonomous_actions(company_id, triggered_by="system"):
+def process_autonomous_actions(
+    company_id,
+    triggered_by="system",
+    retry_events_handler=None,
+):
     require_company_id(company_id)
 
     triggered_by = str(triggered_by or "system").strip()[:120] or "system"
@@ -340,8 +351,10 @@ def process_autonomous_actions(company_id, triggered_by="system"):
     awaiting_approval = 0
     failed = 0
     retried_events = 0
+    retry_requested_events = 0
     disabled_rules = 0
     action_events = []
+    retry_requests = []
 
     def record_action_event(row, severity, message):
         action_events.append({
@@ -419,23 +432,66 @@ def process_autonomous_actions(company_id, triggered_by="system"):
                     )
                     continue
 
-            c.execute("""
-                UPDATE automation_events
-                SET status='pending',
-                    processed_at=NULL
+            skipped_events = c.execute("""
+                SELECT id, trigger_key, entity_type, entity_id, message
+                FROM automation_events
                 WHERE company_id=?
                   AND status='skipped'
+                  AND (
+                    last_retried_at IS NULL
+                    OR last_retried_at < ?
+                  )
                   AND (
                     ?!='automation_rule'
                     OR rule_id=?
                   )
+                ORDER BY id ASC
+                LIMIT 10
             """, (
                 company_id,
+                (
+                    datetime.now()
+                    - timedelta(minutes=SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES)
+                ).isoformat(timespec="seconds"),
                 target_type,
                 target_id,
-            ))
-            affected_count = max(0, c.rowcount)
-            retried_events += affected_count
+            )).fetchall()
+            affected_count = len(skipped_events)
+            retry_requested_events += affected_count
+
+            if retry_events_handler and skipped_events:
+                retry_requests.append({
+                    "rule_id": target_id,
+                    "events": [dict(event) for event in skipped_events],
+                })
+            elif not retry_events_handler and affected_count:
+                c.execute("""
+                    UPDATE automation_events
+                    SET status='pending',
+                        processed_at=NULL,
+                        last_retried_at=?,
+                        retry_count=COALESCE(retry_count, 0) + 1
+                    WHERE company_id=?
+                      AND status='skipped'
+                      AND (
+                        last_retried_at IS NULL
+                        OR last_retried_at < ?
+                      )
+                      AND (
+                        ?!='automation_rule'
+                        OR rule_id=?
+                      )
+                """, (
+                    datetime.now().isoformat(timespec="seconds"),
+                    company_id,
+                    (
+                        datetime.now()
+                        - timedelta(minutes=SKIPPED_EVENT_RETRY_COOLDOWN_MINUTES)
+                    ).isoformat(timespec="seconds"),
+                    target_type,
+                    target_id,
+                ))
+                retried_events += max(0, c.rowcount)
         elif action_type == "disable_rule" and target_type == "automation_rule":
             if not _automation_rule_exists(c, company_id, target_id):
                 c.execute("""
@@ -517,6 +573,50 @@ def process_autonomous_actions(company_id, triggered_by="system"):
     conn.commit()
     conn.close()
 
+    retry_summary = {
+        "requested": retry_requested_events,
+        "replayed": 0,
+        "not_ready": 0,
+        "failed": 0,
+    }
+
+    if retry_events_handler:
+        for retry_request in retry_requests:
+            try:
+                handler_result = retry_events_handler(
+                    company_id=company_id,
+                    rule_id=retry_request["rule_id"],
+                    events=retry_request["events"],
+                ) or {}
+                retry_summary["replayed"] += handler_result.get("replayed", 0)
+                retry_summary["not_ready"] += handler_result.get("not_ready", 0)
+                retry_summary["failed"] += handler_result.get("failed", 0)
+            except Exception:
+                retry_summary["failed"] += len(retry_request["events"])
+
+        retried_events = retry_summary["replayed"]
+
+        if retry_summary["requested"]:
+            create_ops_timeline_event(
+                company_id=company_id,
+                event_type="autonomous_retry",
+                severity=(
+                    "warning"
+                    if retry_summary["failed"] or retry_summary["not_ready"]
+                    else "info"
+                ),
+                title="A3 повторно проверил события автоматизации",
+                message=(
+                    f"Проверено: {retry_summary['requested']}; "
+                    f"выполнено повторно: {retry_summary['replayed']}; "
+                    f"условия ещё не готовы: {retry_summary['not_ready']}; "
+                    f"ошибок запуска: {retry_summary['failed']}"
+                ),
+                source="autonomous_runner",
+                target_type="automation_rule",
+                cooldown_minutes=30,
+            )
+
     for event in action_events:
         create_ops_timeline_event(
             company_id=company_id,
@@ -531,7 +631,9 @@ def process_autonomous_actions(company_id, triggered_by="system"):
         )
 
     if processed or awaiting_approval or failed:
-        severity = "warning" if failed else "info"
+        severity = "warning" if (
+            failed or retry_summary["not_ready"]
+        ) else "info"
         create_ops_timeline_event(
             company_id=company_id,
             event_type="autonomous_execution",
@@ -554,6 +656,9 @@ def process_autonomous_actions(company_id, triggered_by="system"):
         "awaiting_approval": awaiting_approval,
         "failed": failed,
         "retried_events": retried_events,
+        "retry_requested_events": retry_requested_events,
+        "retry_not_ready_events": retry_summary["not_ready"],
+        "retry_failed_events": retry_summary["failed"],
         "disabled_rules": disabled_rules,
         "triggered_by": triggered_by,
     }

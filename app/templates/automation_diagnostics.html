@@ -66,7 +66,9 @@
     {% if request.query_params.get("retry_skipped") == "1" %}
     <div class="card" style="background:#dcfce7;">
         <h3>Повтор выполнен</h3>
-        <p>Создано повторных событий: {{ request.query_params.get("retried") or "0" }}</p>
+        <p>Повторно выполнено событий: {{ request.query_params.get("retried") or "0" }}</p>
+        <p>Условия ещё не готовы: {{ request.query_params.get("not_ready") or "0" }}</p>
+        <p>Ошибок повтора: {{ request.query_params.get("failed") or "0" }}</p>
     </div>
     {% endif %}
 
@@ -100,11 +102,20 @@
 
     <div class="card">
         <h2>Обслуживание журнала</h2>
-        <div class="label">Удаляет события автоматизации старше 30 дней и помогает повторить пропущенные события.</div>
+        <div class="label">
+            Удаляет события автоматизации старше 30 дней и помогает повторить пропущенные события.
+            Повтор доступен владельцу и не чаще одного раза в 30 минут для одинаковых событий.
+        </div>
 
         <div class="maintenance-actions" style="margin-top:14px;">
             <form method="post" action="/automation/diagnostics/retry-skipped" style="margin:0;">
-                <button type="submit" class="btn" style="background:#f59e0b;border:0;cursor:pointer;">
+                <button type="submit"
+                        class="btn"
+                        style="background:#f59e0b;border:0;cursor:pointer;"
+                        {% if role != "boss" %}
+                        disabled
+                        title="Повтор событий может запускать действия и доступен владельцу компании"
+                        {% endif %}>
                     Повторить пропущенные события
                 </button>
             </form>
@@ -278,7 +289,13 @@
                             {% endif %}
 
                             <form method="post" action="/automation/events/{{ event['id'] }}/retry" style="margin:0;">
-                                <button type="submit" class="btn" style="background:#f59e0b;border:0;cursor:pointer;">
+                                <button type="submit"
+                                        class="btn"
+                                        style="background:#f59e0b;border:0;cursor:pointer;"
+                                        {% if role != "boss" %}
+                                        disabled
+                                        title="Повтор событий может запускать действия и доступен владельцу компании"
+                                        {% endif %}>
                                     Повторить
                                 </button>
                             </form>

@@ -4588,27 +4588,42 @@ def run_automation_event(
     entity_type="",
     entity_id=None,
     message="",
-    link=""
+    link="",
+    only_rule_id=None,
+    return_details=False,
 ):
     company_id = require_company_id_value(company_id)
 
     if not has_feature(company_id, "automation"):
+        if return_details:
+            return {
+                "created_events": 0,
+                "events": [],
+            }
         return 0
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     created_events = 0
+    event_results = []
 
     conn = connect()
     c = conn.cursor()
 
-    rules = c.execute("""
+    rules_query = """
     SELECT *
     FROM automation_rules
     WHERE company_id=?
       AND trigger_key=?
       AND active=1
-    ORDER BY id
-    """, (company_id, trigger_key)).fetchall()
+    """
+    rules_params = [company_id, trigger_key]
+
+    if only_rule_id is not None:
+        rules_query += " AND id=?"
+        rules_params.append(only_rule_id)
+
+    rules_query += " ORDER BY id"
+    rules = c.execute(rules_query, rules_params).fetchall()
 
     for rule in rules:
         condition_ok, condition_message = automation_condition_matches(
@@ -4641,6 +4656,11 @@ def run_automation_event(
                 now,
                 now,
             ))
+            event_results.append({
+                "id": c.lastrowid,
+                "status": "skipped",
+                "message": skipped_message,
+            })
             continue
 
         c.execute("""
@@ -4843,11 +4863,149 @@ def run_automation_event(
         ))
 
         created_events += 1
+        event_results.append({
+            "id": event_id,
+            "status": status,
+            "message": event_message,
+        })
 
     conn.commit()
     conn.close()
 
+    if return_details:
+        return {
+            "created_events": created_events,
+            "events": event_results,
+        }
+
     return created_events
+
+
+def replay_a3_skipped_automation_events(company_id, rule_id, events):
+    result = {
+        "replayed": 0,
+        "not_ready": 0,
+        "failed": 0,
+    }
+
+    for event in events:
+        retried_at = datetime.now().isoformat(timespec="seconds")
+        processed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        try:
+            execution = run_automation_event(
+                company_id=company_id,
+                trigger_key=event.get("trigger_key") or "",
+                entity_type=event.get("entity_type") or "",
+                entity_id=event.get("entity_id"),
+                message=event.get("message") or "Повторная проверка A3",
+                link="/automation",
+                only_rule_id=rule_id,
+                return_details=True,
+            )
+        except Exception:
+            try:
+                conn = connect()
+                c = conn.cursor()
+                c.execute("""
+                    UPDATE automation_events
+                    SET last_retried_at=?,
+                        retry_count=COALESCE(retry_count, 0) + 1
+                    WHERE company_id=?
+                      AND id=?
+                      AND status IN ('pending', 'skipped')
+                """, (
+                    retried_at,
+                    company_id,
+                    event.get("id"),
+                ))
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+
+            result["failed"] += 1
+            continue
+
+        execution_events = execution.get("events", [])
+        successful_events = [
+            item for item in execution_events
+            if item.get("status") == "done"
+        ]
+
+        if not successful_events:
+            conn = connect()
+            c = conn.cursor()
+            latest_message = next(
+                (
+                    item.get("message")
+                    for item in reversed(execution_events)
+                    if item.get("message")
+                ),
+                event.get("message") or "Повторная проверка A3",
+            )
+            c.execute("""
+                UPDATE automation_events
+                SET status='skipped',
+                    message=?,
+                    processed_at=?,
+                    last_retried_at=?,
+                    retry_count=COALESCE(retry_count, 0) + 1
+                WHERE company_id=?
+                  AND id=?
+                  AND status IN ('pending', 'skipped')
+            """, (
+                latest_message,
+                processed_at,
+                retried_at,
+                company_id,
+                event.get("id"),
+            ))
+
+            generated_skipped_ids = [
+                item.get("id")
+                for item in execution_events
+                if item.get("status") == "skipped" and item.get("id")
+            ]
+            if generated_skipped_ids:
+                placeholders = ",".join("?" for _ in generated_skipped_ids)
+                c.execute(
+                    f"""
+                    DELETE FROM automation_events
+                    WHERE company_id=?
+                      AND id IN ({placeholders})
+                    """,
+                    [company_id, *generated_skipped_ids],
+                )
+            conn.commit()
+            conn.close()
+
+            result["not_ready"] += 1
+            continue
+
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+            UPDATE automation_events
+            SET status='done',
+                message=message || ' | Повторно проверено A3',
+                processed_at=?,
+                last_retried_at=?,
+                retry_count=COALESCE(retry_count, 0) + 1
+            WHERE company_id=?
+              AND id=?
+              AND status IN ('pending', 'skipped')
+        """, (
+            processed_at,
+            retried_at,
+            company_id,
+            event.get("id"),
+        ))
+        conn.commit()
+        conn.close()
+        result["replayed"] += 1
+
+    return result
 
 
 def run_ai_digest_scheduler(company_id, now_dt=None):
@@ -19816,7 +19974,7 @@ async def retry_skipped_automation_events(request: Request):
 
     role = get_role(username)
 
-    if role not in ("boss", "manager"):
+    if role != "boss":
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
@@ -19827,35 +19985,72 @@ async def retry_skipped_automation_events(request: Request):
 
     conn = connect()
     c = conn.cursor()
+    retry_cutoff = (
+        datetime.now() - timedelta(minutes=30)
+    ).isoformat(timespec="seconds")
 
     skipped_events = c.execute("""
-    SELECT *
+    SELECT id, rule_id, trigger_key, entity_type, entity_id, message
     FROM automation_events
     WHERE company_id=?
       AND status='skipped'
+      AND rule_id IS NOT NULL
+      AND (
+        last_retried_at IS NULL
+        OR last_retried_at < ?
+      )
     ORDER BY id DESC
     LIMIT 10
-    """, (company_id,)).fetchall()
+    """, (
+        company_id,
+        retry_cutoff,
+    )).fetchall()
 
     conn.close()
 
     retried = 0
+    not_ready = 0
+    failed = 0
+    events_by_rule = {}
 
     for event in skipped_events:
-        created_events = run_automation_event(
-            company_id,
-            event["trigger_key"],
-            event["entity_type"] or "",
-            event["entity_id"],
-            event["message"] or "Повтор пропущенного события",
-            "/automation/diagnostics"
-        )
+        events_by_rule.setdefault(event["rule_id"], []).append(dict(event))
 
-        if created_events:
-            retried += created_events
+    for rule_id, events in events_by_rule.items():
+        replay_result = replay_a3_skipped_automation_events(
+            company_id=company_id,
+            rule_id=rule_id,
+            events=events,
+        )
+        retried += replay_result.get("replayed", 0)
+        not_ready += replay_result.get("not_ready", 0)
+        failed += replay_result.get("failed", 0)
+
+    try:
+        create_ops_timeline_event(
+            company_id=company_id,
+            event_type="autonomous_retry",
+            severity="warning" if failed else "info",
+            title="Ручной повтор пропущенных событий",
+            message=(
+                f"Повторно выполнено: {retried}; "
+                f"условия ещё не готовы: {not_ready}; "
+                f"ошибок: {failed}"
+            ),
+            source="manual",
+            target_type="automation_event",
+            cooldown_minutes=5,
+        )
+    except Exception:
+        pass
 
     return RedirectResponse(
-        f"/automation/diagnostics?retry_skipped=1&retried={retried}",
+        (
+            "/automation/diagnostics?retry_skipped=1"
+            f"&retried={retried}"
+            f"&not_ready={not_ready}"
+            f"&failed={failed}"
+        ),
         status_code=302
     )
 
@@ -20303,7 +20498,7 @@ async def retry_automation_event(request: Request, event_id: int):
 
     role = get_role(username)
 
-    if role not in ("boss", "manager"):
+    if role != "boss":
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
@@ -20314,6 +20509,9 @@ async def retry_automation_event(request: Request, event_id: int):
 
     conn = connect()
     c = conn.cursor()
+    retry_cutoff = (
+        datetime.now() - timedelta(minutes=30)
+    ).isoformat(timespec="seconds")
 
     event = c.execute("""
     SELECT *
@@ -20321,26 +20519,39 @@ async def retry_automation_event(request: Request, event_id: int):
     WHERE id=?
       AND company_id=?
       AND status IN ('pending', 'skipped')
-    """, (event_id, company_id)).fetchone()
+      AND (
+        last_retried_at IS NULL
+        OR last_retried_at < ?
+      )
+    """, (
+        event_id,
+        company_id,
+        retry_cutoff,
+    )).fetchone()
 
     conn.close()
 
     if not event:
-        return RedirectResponse("/automation?retry_skipped=1", status_code=302)
+        return RedirectResponse("/automation?retry_unavailable=1", status_code=302)
 
-    created_events = run_automation_event(
-        company_id,
-        event["trigger_key"],
-        event["entity_type"] or "",
-        event["entity_id"],
-        event["message"] or "Повтор события автоматизации",
-        "/automation"
-    )
+    if event["rule_id"]:
+        replay_result = replay_a3_skipped_automation_events(
+            company_id=company_id,
+            rule_id=event["rule_id"],
+            events=[dict(event)],
+        )
 
-    if created_events:
-        return RedirectResponse("/automation?retry=1", status_code=302)
+        return RedirectResponse(
+            (
+                "/automation?retry_skipped=1"
+                f"&retried={replay_result.get('replayed', 0)}"
+                f"&not_ready={replay_result.get('not_ready', 0)}"
+                f"&failed={replay_result.get('failed', 0)}"
+            ),
+            status_code=302,
+        )
 
-    return RedirectResponse("/automation?retry_skipped=1", status_code=302)
+    return RedirectResponse("/automation?retry_unavailable=1", status_code=302)
 
 
 
@@ -20599,7 +20810,7 @@ async def retry_rule_skipped_events(request: Request, rule_id: int):
 
     role = get_role(username)
 
-    if role not in ("boss", "manager"):
+    if role != "boss":
         return RedirectResponse("/", status_code=302)
 
     company_id = get_user_company_id(username)
@@ -20610,36 +20821,66 @@ async def retry_rule_skipped_events(request: Request, rule_id: int):
 
     conn = connect()
     c = conn.cursor()
+    retry_cutoff = (
+        datetime.now() - timedelta(minutes=30)
+    ).isoformat(timespec="seconds")
 
     events = c.execute("""
-    SELECT *
+    SELECT id, rule_id, trigger_key, entity_type, entity_id, message
     FROM automation_events
     WHERE company_id=?
       AND rule_id=?
       AND status='skipped'
+      AND (
+        last_retried_at IS NULL
+        OR last_retried_at < ?
+      )
     ORDER BY id DESC
     LIMIT 10
-    """, (company_id, rule_id)).fetchall()
+    """, (
+        company_id,
+        rule_id,
+        retry_cutoff,
+    )).fetchall()
 
     conn.close()
 
-    retried = 0
+    replay_result = replay_a3_skipped_automation_events(
+        company_id=company_id,
+        rule_id=rule_id,
+        events=[dict(event) for event in events],
+    )
+    retried = replay_result.get("replayed", 0)
+    not_ready = replay_result.get("not_ready", 0)
+    failed = replay_result.get("failed", 0)
 
-    for event in events:
-        created_events = run_automation_event(
-            company_id,
-            event["trigger_key"],
-            event["entity_type"] or "",
-            event["entity_id"],
-            event["message"] or "Повтор пропущенного события правила",
-            f"/automation/rules/{rule_id}"
+    try:
+        create_ops_timeline_event(
+            company_id=company_id,
+            event_type="autonomous_retry",
+            severity="warning" if failed else "info",
+            title="Ручной повтор событий правила",
+            message=(
+                f"Правило #{rule_id}. "
+                f"Повторно выполнено: {retried}; "
+                f"условия ещё не готовы: {not_ready}; "
+                f"ошибок: {failed}"
+            ),
+            source="manual",
+            target_type="automation_rule",
+            target_id=rule_id,
+            cooldown_minutes=5,
         )
-
-        if created_events:
-            retried += created_events
+    except Exception:
+        pass
 
     return RedirectResponse(
-        f"/automation/rules/{rule_id}?retry_skipped=1&retried={retried}",
+        (
+            f"/automation/rules/{rule_id}?retry_skipped=1"
+            f"&retried={retried}"
+            f"&not_ready={not_ready}"
+            f"&failed={failed}"
+        ),
         status_code=302
     )
 
@@ -43301,32 +43542,59 @@ def notify_a3_approval_required(company_id, action_count):
     if not action_count:
         return False
 
-    conn = connect()
-    c = conn.cursor()
-    company = c.execute("""
-        SELECT owner_username
-        FROM companies
-        WHERE id=?
-    """, (company_id,)).fetchone()
-    conn.close()
+    try:
+        conn = connect()
+        c = conn.cursor()
+        company = c.execute("""
+            SELECT owner_username
+            FROM companies
+            WHERE id=?
+        """, (company_id,)).fetchone()
+        conn.close()
 
-    owner_username = str(
-        company["owner_username"] if company else ""
-    ).strip()
+        owner_username = str(
+            company["owner_username"] if company else ""
+        ).strip()
 
-    if not owner_username:
+        if not owner_username:
+            return False
+
+        create_notification(
+            company_id,
+            owner_username,
+            "Требуется подтверждение ИИ-действия",
+            (
+                "Автоматизация подготовила критические действия: "
+                f"{action_count}. Проверьте очередь подтверждений."
+            ),
+            "/automation",
+        )
+    except Exception:
         return False
 
-    create_notification(
-        company_id,
-        owner_username,
-        "Требуется подтверждение ИИ-действия",
-        (
-            "Автоматизация подготовила критические действия: "
-            f"{action_count}. Проверьте очередь подтверждений."
-        ),
-        "/automation",
-    )
+    return True
+
+
+def record_a3_scheduler_timeline(
+    company_id,
+    severity,
+    title,
+    message,
+):
+    try:
+        create_ops_timeline_event(
+            company_id=company_id,
+            event_type="a3_scheduler",
+            severity=severity,
+            title=title,
+            message=message,
+            source="scheduler",
+            target_type="company",
+            target_id=company_id,
+            cooldown_minutes=30,
+        )
+    except Exception:
+        return False
 
     return True
 
@@ -43341,7 +43609,14 @@ def run_a3_autonomous_cycle_for_all_companies():
         "processed": 0,
         "awaiting_approval": 0,
         "failed": 0,
+        "retried_events": 0,
+        "retry_requested_events": 0,
+        "retry_not_ready_events": 0,
+        "retry_failed_events": 0,
         "errors": 0,
+        "health_updated": 0,
+        "health_errors": 0,
+        "items": [],
     }
 
     conn = connect()
@@ -43356,24 +43631,48 @@ def run_a3_autonomous_cycle_for_all_companies():
     for company in companies:
         company_id = company["id"]
 
-        if not has_feature(company_id, "automation"):
-            summary["skipped"] += 1
-            summary["feature_disabled"] += 1
-            continue
-
-        if not get_governance_settings(company_id).get(
-            "autonomous_enabled",
-            1,
-        ):
-            summary["skipped"] += 1
-            summary["autonomous_disabled"] += 1
-            continue
-
         try:
+            if not has_feature(company_id, "automation"):
+                summary["skipped"] += 1
+                summary["feature_disabled"] += 1
+                summary["items"].append({
+                    "company_id": company_id,
+                    "status": "skipped",
+                    "reason": "feature_disabled",
+                    "message": "Модуль автоматизаций выключен для компании.",
+                })
+                continue
+
+            if not get_governance_settings(company_id).get(
+                "autonomous_enabled",
+                1,
+            ):
+                summary["skipped"] += 1
+                summary["autonomous_disabled"] += 1
+                summary["items"].append({
+                    "company_id": company_id,
+                    "status": "skipped",
+                    "reason": "autonomous_disabled",
+                    "message": "Автономный режим A3 выключен владельцем.",
+                })
+                continue
+
             cycle = run_a3_autonomous_cycle(
                 company_id=company_id,
                 triggered_by="scheduler",
+                retry_events_handler=replay_a3_skipped_automation_events,
             )
+
+            if cycle.get("skipped"):
+                summary["skipped"] += 1
+                summary["items"].append({
+                    "company_id": company_id,
+                    "status": "skipped",
+                    "reason": cycle.get("reason"),
+                    "message": "Цикл A3 уже выполняется для компании.",
+                })
+                continue
+
             result = cycle["result"]
 
             summary["companies"] += 1
@@ -43384,13 +43683,101 @@ def run_a3_autonomous_cycle_for_all_companies():
                 0,
             )
             summary["failed"] += result.get("failed", 0)
+            summary["retried_events"] += result.get("retried_events", 0)
+            summary["retry_requested_events"] += result.get(
+                "retry_requested_events",
+                0,
+            )
+            summary["retry_not_ready_events"] += result.get(
+                "retry_not_ready_events",
+                0,
+            )
+            summary["retry_failed_events"] += result.get(
+                "retry_failed_events",
+                0,
+            )
+            summary["items"].append({
+                "company_id": company_id,
+                "status": "completed",
+                "queued": cycle["queued_from_decisions"],
+                "processed": result.get("processed", 0),
+                "awaiting_approval": result.get("awaiting_approval", 0),
+                "failed": result.get("failed", 0),
+                "retried_events": result.get("retried_events", 0),
+                "retry_requested_events": result.get(
+                    "retry_requested_events",
+                    0,
+                ),
+                "retry_not_ready_events": result.get(
+                    "retry_not_ready_events",
+                    0,
+                ),
+                "retry_failed_events": result.get(
+                    "retry_failed_events",
+                    0,
+                ),
+                "disabled_rules": result.get("disabled_rules", 0),
+            })
+
+            try:
+                health = calculate_system_health(company_id)
+                summary["health_updated"] += 1
+                summary["items"][-1].update({
+                    "health_score": health.get("score"),
+                    "health_status": health.get("status"),
+                })
+            except Exception:
+                summary["health_errors"] += 1
+                summary["items"][-1]["health_status"] = "unavailable"
+                record_a3_scheduler_timeline(
+                    company_id=company_id,
+                    severity="warning",
+                    title="Не удалось обновить состояние A3",
+                    message=(
+                        "Цикл автоматизации завершён, но оценка "
+                        "состояния A3 временно недоступна."
+                    ),
+                )
 
             notify_a3_approval_required(
                 company_id,
                 result.get("awaiting_approval", 0),
             )
+
+            severity = "warning" if (
+                result.get("failed", 0)
+                or result.get("awaiting_approval", 0)
+                or result.get("retry_not_ready_events", 0)
+                or result.get("retry_failed_events", 0)
+            ) else "info"
+            record_a3_scheduler_timeline(
+                company_id=company_id,
+                severity=severity,
+                title="Фоновый цикл A3 завершён",
+                message=(
+                    f"Добавлено в очередь: {cycle['queued_from_decisions']}; "
+                    f"выполнено: {result.get('processed', 0)}; "
+                    f"повторно выполнено событий: {result.get('retried_events', 0)}; "
+                    f"условия ещё не готовы: {result.get('retry_not_ready_events', 0)}; "
+                    f"ошибок повтора: {result.get('retry_failed_events', 0)}; "
+                    f"ждут подтверждения: {result.get('awaiting_approval', 0)}; "
+                    f"ошибок: {result.get('failed', 0)}"
+                ),
+            )
         except Exception:
             summary["errors"] += 1
+            summary["items"].append({
+                "company_id": company_id,
+                "status": "error",
+                "message": "Фоновый запуск не завершился. Проверьте журнал A3.",
+            })
+
+            record_a3_scheduler_timeline(
+                company_id=company_id,
+                severity="error",
+                title="Ошибка фонового цикла A3",
+                message="Фоновый запуск не завершился. Проверьте состояние автоматизации.",
+            )
 
     return summary
 
@@ -43475,16 +43862,26 @@ def api_a3_operations_insights(request: Request):
 
 @app.post("/api/a3/self-healing/run")
 def api_a3_self_healing_run(request: Request):
-    company_id = get_a3_company_id(request)
+    company_id = get_a3_owner_company_id(request)
 
     if not company_id:
         return a3_api_error("forbidden", 403)
 
-    result = run_self_healing_cycle(company_id=company_id)
+    result = run_self_healing_cycle(
+        company_id=company_id,
+        retry_events_handler=replay_a3_skipped_automation_events,
+    )
+    health = None
+
+    try:
+        health = calculate_system_health(company_id)
+    except Exception:
+        health = None
 
     return {
         "ok": True,
         "result": result,
+        "health": health,
     }
 
 
@@ -43587,7 +43984,7 @@ def api_a3_autonomous_actions(request: Request):
 
 @app.post("/api/a3/autonomous-actions/process")
 def api_a3_process_autonomous_actions(request: Request):
-    company_id = get_a3_company_id(request)
+    company_id = get_a3_owner_company_id(request)
 
     if not company_id:
         return a3_api_error("forbidden", 403)
@@ -43595,13 +43992,28 @@ def api_a3_process_autonomous_actions(request: Request):
     cycle = run_a3_autonomous_cycle(
         company_id=company_id,
         triggered_by=get_user(request) or "system",
+        retry_events_handler=replay_a3_skipped_automation_events,
     )
     result = cycle["result"]
+
+    if cycle.get("skipped"):
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": cycle.get("reason"),
+            "message": "Цикл A3 уже выполняется. Дождитесь его завершения.",
+            "result": result,
+        }
 
     notify_a3_approval_required(
         company_id,
         result.get("awaiting_approval", 0),
     )
+
+    try:
+        health = calculate_system_health(company_id)
+    except Exception:
+        health = None
 
     return {
         "ok": True,
@@ -43610,6 +44022,7 @@ def api_a3_process_autonomous_actions(request: Request):
         "max_actions_per_cycle": cycle["max_actions_per_cycle"],
         "pending_action_count": cycle["pending_action_count"],
         "queue_capacity_remaining": cycle["queue_capacity_remaining"],
+        "health": health,
         "result": result,
     }
 
@@ -43705,6 +44118,7 @@ async def api_a3_request_autonomous_action_approval(request: Request):
             "requested_by": get_user(request) or "system",
             "reason": request_reason,
         }, ensure_ascii=False),
+        initial_status="awaiting_approval",
     )
 
     if not result.get("queued"):
@@ -43720,19 +44134,33 @@ async def api_a3_request_autonomous_action_approval(request: Request):
             ),
         }
 
-    process_result = process_autonomous_actions(
-        company_id=company_id,
-        triggered_by=get_user(request) or "system",
-    )
     notify_a3_approval_required(
         company_id,
-        process_result.get("awaiting_approval", 0),
+        1,
+    )
+    create_ops_timeline_event(
+        company_id=company_id,
+        severity="warning",
+        event_type="approval_requested",
+        title="Запрошено подтверждение отключения правила",
+        message=(
+            "Критическое действие ожидает решения владельца. "
+            f"Правило: #{target_id}."
+        ),
+        source="manual",
+        target_type="automation_rule",
+        target_id=target_id,
+        cooldown_minutes=5,
     )
 
     return {
         "ok": True,
         "queued": True,
-        "process_result": process_result,
+        "process_result": {
+            "processed": 0,
+            "awaiting_approval": 1,
+            "triggered_by": get_user(request) or "system",
+        },
     }
 
 

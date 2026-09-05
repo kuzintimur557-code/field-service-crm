@@ -425,6 +425,9 @@ def assert_company_features():
     assert "👷 Исполнители" not in reports_html
     assert "📦 Заявки" not in reports_html
 
+    # Restore the company preset so later module tests are isolated.
+    crm.apply_business_preset(2, "beauty")
+
 
 def assert_automation_foundation():
     conn = connect()
@@ -24656,6 +24659,7 @@ async def assert_a3_workflow_center():
 
 async def assert_a3_api_layer():
     request = make_request("owner2")
+    manager_request = make_request("manager2")
     companyless_request = make_request("companyless")
 
     def assert_forbidden(response):
@@ -24837,6 +24841,15 @@ async def assert_a3_api_layer():
     assert 0 <= data["score"] <= 100
     assert data["status"] in {"healthy", "warning", "degraded", "critical"}
 
+    manager_health = crm.api_a3_system_health(manager_request)
+    assert "score" in manager_health
+    manager_page = await crm.automation_page(
+        make_asgi_request("manager2", "/automation")
+    )
+    assert manager_page.status_code == 200
+    assert_forbidden(crm.api_a3_self_healing_run(manager_request))
+    assert_forbidden(crm.api_a3_process_autonomous_actions(manager_request))
+
     conn = connect()
     c = conn.cursor()
     approval_history_index = c.execute("""
@@ -24882,6 +24895,97 @@ async def assert_a3_api_layer():
     recovery_result = crm.api_a3_self_healing_run(request)
     assert recovery_result["ok"] is True
     assert "result" in recovery_result
+    assert "health" in recovery_result
+    assert "retry_not_ready_events" in recovery_result["result"]
+    assert "retry_failed_events" in recovery_result["result"]
+    assert recovery_result["result"]["retry_cooldown_minutes"] == 30
+
+    conn = connect()
+    c = conn.cursor()
+    now_value = datetime.now().isoformat(timespec="seconds")
+    c.execute("""
+    INSERT INTO automation_rules (
+        company_id, name, trigger_key, conditions_json,
+        active, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "A3 retry cooldown smoke",
+        "smoke_retry_guard",
+        json.dumps({"mode": "date_today", "label": "Только сегодня"}),
+        1,
+        "owner2",
+        now_value,
+        now_value,
+    ))
+    retry_rule_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    crm.run_automation_event(
+        company_id=2,
+        trigger_key="smoke_retry_guard",
+        entity_type="company",
+        entity_id=2,
+        message="Проверка безопасного повтора",
+        only_rule_id=retry_rule_id,
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    skipped_retry_event = c.execute("""
+    SELECT id, rule_id, trigger_key, entity_type, entity_id, message
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND status='skipped'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (retry_rule_id,)).fetchone()
+    conn.close()
+    assert skipped_retry_event is not None
+
+    manager_retry_response = await crm.retry_automation_event(
+        manager_request,
+        skipped_retry_event["id"],
+    )
+    assert manager_retry_response.status_code == 302
+    assert manager_retry_response.headers["location"] == "/"
+
+    retry_result = crm.replay_a3_skipped_automation_events(
+        company_id=2,
+        rule_id=retry_rule_id,
+        events=[dict(skipped_retry_event)],
+    )
+    assert retry_result == {
+        "replayed": 0,
+        "not_ready": 1,
+        "failed": 0,
+    }
+
+    conn = connect()
+    c = conn.cursor()
+    retry_rows = c.execute("""
+    SELECT id, retry_count, last_retried_at
+    FROM automation_events
+    WHERE company_id=2
+      AND rule_id=?
+      AND status='skipped'
+    """, (retry_rule_id,)).fetchall()
+    retry_index = c.execute("""
+    SELECT name
+    FROM sqlite_master
+    WHERE type='index'
+      AND name='idx_automation_events_retry_cooldown'
+    """).fetchone()
+    conn.close()
+
+    assert len(retry_rows) == 1
+    assert retry_rows[0]["id"] == skipped_retry_event["id"]
+    assert retry_rows[0]["retry_count"] == 1
+    assert retry_rows[0]["last_retried_at"]
+    assert retry_index is not None
 
     try:
         crm.run_self_healing_cycle(company_id=None)

@@ -567,7 +567,9 @@ def init_db():
         status TEXT DEFAULT 'pending',
         message TEXT,
         created_at TEXT,
-        processed_at TEXT
+        processed_at TEXT,
+        last_retried_at TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0
     )
     """)
 
@@ -676,6 +678,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
         retried_events INTEGER NOT NULL DEFAULT 0,
+        retry_not_ready_events INTEGER NOT NULL DEFAULT 0,
+        retry_failed_events INTEGER NOT NULL DEFAULT 0,
         reenabled_rules INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'done',
         duration_ms INTEGER NOT NULL DEFAULT 0,
@@ -739,6 +743,10 @@ def init_db():
     add_column_if_missing(c, "ai_assistant_notes", "done_by", "TEXT")
     add_column_if_missing(c, "ai_assistant_notes", "done_at", "TEXT")
     add_column_if_missing(c, "ai_assistant_notes", "created_task_id", "INTEGER")
+    add_column_if_missing(c, "automation_events", "last_retried_at", "TEXT")
+    add_column_if_missing(c, "automation_events", "retry_count", "INTEGER NOT NULL DEFAULT 0")
+    add_column_if_missing(c, "self_healing_runs", "retry_not_ready_events", "INTEGER NOT NULL DEFAULT 0")
+    add_column_if_missing(c, "self_healing_runs", "retry_failed_events", "INTEGER NOT NULL DEFAULT 0")
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "full_name", "TEXT")
@@ -1026,6 +1034,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_automation_events_company_status
     ON automation_events(company_id, status, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_automation_events_retry_cooldown
+    ON automation_events(company_id, status, last_retried_at)
     """)
 
     c.execute("""

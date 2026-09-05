@@ -109,7 +109,14 @@
 
             {% if event["status"] in ("pending", "skipped") %}
             <form method="post" action="/automation/events/{{ event['id'] }}/retry">
-                <button type="submit" class="btn btn-orange">Повторить</button>
+                <button type="submit"
+                        class="btn btn-orange"
+                        {% if role != "boss" %}
+                        disabled
+                        title="Повтор событий может запускать действия и доступен владельцу компании"
+                        {% endif %}>
+                    Повторить
+                </button>
             </form>
             {% endif %}
         </div>

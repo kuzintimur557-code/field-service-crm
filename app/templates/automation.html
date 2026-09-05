@@ -98,8 +98,17 @@ button:disabled{cursor:not-allowed;opacity:.55}
 <div class="notice ok">Событие автоматизации повторно запущено</div>
 {% endif %}
 
-{% if request.query_params.get("retry_skipped") == "1" %}
+{% if request.query_params.get("retry_unavailable") == "1" %}
 <div class="notice warn">Событие нельзя повторить: оно уже выполнено или не найдено</div>
+{% endif %}
+
+{% if request.query_params.get("retry_skipped") == "1" %}
+<div class="notice warn">
+    Повтор пропущенных событий:
+    выполнено {{ request.query_params.get("retried") or "0" }},
+    условия ещё не готовы {{ request.query_params.get("not_ready") or "0" }},
+    ошибок {{ request.query_params.get("failed") or "0" }}
+</div>
 {% endif %}
 
 {% if request.query_params.get("scheduler") == "1" %}
@@ -266,6 +275,9 @@ function a3EventTypeLabel(eventType) {
         approval: "Подтверждение",
         autonomous_execution: "Автономное выполнение",
         autonomous_action: "ИИ-действие",
+        autonomous_retry: "Повторная проверка",
+        approval_requested: "Запрос подтверждения",
+        a3_scheduler: "Фоновый запуск A3",
         autonomous_action_approved: "Действие одобрено",
         autonomous_action_rejected: "Действие отклонено"
     };
@@ -276,8 +288,11 @@ function a3SourceLabel(source) {
     const labels = {
         a3: "A3",
         autonomous_runner: "Автономный запуск",
+        self_healing: "Самовосстановление",
+        scheduler: "Планировщик",
         system: "Система",
-        manual: "Вручную"
+        manual: "Вручную",
+        manual_run: "Ручной запуск"
     };
     return labels[source] || source || "A3";
 }
@@ -316,6 +331,17 @@ function a3StatusPillClass(tone) {
         muted: "muted"
     };
     return classes[tone] || "";
+}
+
+function a3SeverityLabel(severity) {
+    const labels = {
+        info: "Информация",
+        warning: "Внимание",
+        degraded: "Снижено",
+        critical: "Критично",
+        error: "Ошибка"
+    };
+    return labels[severity] || severity || "Информация";
 }
 
 function refreshA3ApprovalWidgets() {
@@ -728,12 +754,16 @@ setInterval(loadA3OperationsInsights, 30000);
         <div>
             <h2 style="margin-bottom:8px">A3 Самовосстановление</h2>
             <div class="meta">
-                Автоматическое восстановление и ремонт автоматизаций.
+                Повторная проверка пропущенных событий и мягкое восстановление автоматизаций.
             </div>
         </div>
 
         <button id="a3-run-self-healing"
-                class="btn">
+                class="btn"
+                {% if role != "boss" %}
+                disabled
+                title="Самовосстановление может запускать действия и доступно владельцу компании"
+                {% endif %}>
             Запустить восстановление
         </button>
     </div>
@@ -742,6 +772,9 @@ setInterval(loadA3OperationsInsights, 30000);
          style="margin-top:18px">
         <div class="pill">
             Ожидание запуска
+        </div>
+        <div class="meta" style="margin-top:8px">
+            Повтор одинаковых пропущенных событий запускается не чаще одного раза в 30 минут.
         </div>
     </div>
 </div>
@@ -772,6 +805,16 @@ async function runA3SelfHealing() {
         }
 
         const result = data.result || {};
+        const health = data.health || null;
+
+        if (data.skipped && data.reason === "cycle_already_running") {
+            status.innerHTML = `
+                <div class="pill muted">
+                    Цикл A3 уже выполняется. Дождитесь его завершения.
+                </div>
+            `;
+            return;
+        }
 
         if (result.blocked) {
             status.innerHTML = `
@@ -785,12 +828,34 @@ async function runA3SelfHealing() {
         status.innerHTML = `
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <div class="pill">
-                    Повторно запущено: ${result.retried_events || 0}
+                    Повторно выполнено: ${result.retried_events || 0}
                 </div>
 
-                <div class="pill">
-                    Повторно включено правил: ${result.reenabled_rules || 0}
+                <div class="pill muted">
+                    Проверено событий: ${result.checked_events || 0}
                 </div>
+
+                <div class="pill muted">
+                    Условия ещё не готовы: ${result.retry_not_ready_events || 0}
+                </div>
+
+                <div class="pill ${(result.retry_failed_events || 0) ? "off" : "ok"}">
+                    Ошибок повтора: ${result.retry_failed_events || 0}
+                </div>
+
+                <div class="pill muted">
+                    Отключённые правила не включались автоматически
+                </div>
+
+                <div class="pill muted">
+                    Интервал повтора: ${result.retry_cooldown_minutes || 30} мин.
+                </div>
+
+                ${health ? `
+                    <div class="pill ${health.status === "healthy" ? "ok" : "warn"}">
+                        Состояние A3: ${a3EscapeHtml(health.score || 0)} / 100
+                    </div>
+                ` : ""}
             </div>
         `;
     } catch (err) {
@@ -864,6 +929,10 @@ async function loadA3RecoveryHistory() {
 
         for (const item of items.slice(0, 8)) {
             const card = document.createElement("div");
+            const status = item.status || "done";
+            const statusTone = status === "warning"
+                ? "warning"
+                : (item.status_tone || "success");
 
             card.style.padding = "16px";
             card.style.borderRadius = "18px";
@@ -874,7 +943,7 @@ async function loadA3RecoveryHistory() {
                 <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
                     <div>
                         <div style="font-weight:900">
-                            ${a3StatusLabel(item.status)}
+                            ${a3EscapeHtml(item.status_label || a3StatusLabel(status))}
                         </div>
 
                         <div class="meta" style="margin-top:4px">
@@ -883,16 +952,24 @@ async function loadA3RecoveryHistory() {
                     </div>
 
                     <div style="display:flex;gap:12px;flex-wrap:wrap">
-                        <div class="pill ${a3StatusPillClass(item.status_tone)}">
-                            Повторно: ${item.retried_events}
+                        <div class="pill ${a3StatusPillClass(statusTone)}">
+                            Повторно выполнено: ${item.retried_events || 0}
+                        </div>
+
+                        <div class="pill muted">
+                            Пока не готовы: ${item.retry_not_ready_events || 0}
+                        </div>
+
+                        <div class="pill ${(item.retry_failed_events || 0) ? "off" : "ok"}">
+                            Ошибок повтора: ${item.retry_failed_events || 0}
+                        </div>
+
+                        <div class="pill muted">
+                            Правила включены вручную: ${item.reenabled_rules || 0}
                         </div>
 
                         <div class="pill">
-                            Включено: ${item.reenabled_rules}
-                        </div>
-
-                        <div class="pill">
-                            ${item.duration_ms} мс
+                            ${item.duration_ms || 0} мс
                         </div>
                     </div>
                 </div>
@@ -971,7 +1048,7 @@ async function loadA3OpsTimeline() {
                 border = "#fde68a";
             }
 
-            if (item.severity === "critical") {
+            if (item.severity === "critical" || item.severity === "error") {
                 bg = "#fee2e2";
                 border = "#fecaca";
             }
@@ -1001,6 +1078,10 @@ async function loadA3OpsTimeline() {
                     <div style="text-align:right">
                         <div class="pill">
                             ${a3EscapeHtml(a3EventTypeLabel(item.event_type))}
+                        </div>
+
+                        <div class="pill ${item.severity === "error" || item.severity === "critical" ? "off" : item.severity === "warning" ? "warn" : "muted"}" style="margin-top:8px">
+                            ${a3EscapeHtml(a3SeverityLabel(item.severity))}
                         </div>
 
                         <div class="meta" style="margin-top:8px">
@@ -1525,7 +1606,11 @@ setInterval(loadA3AutonomousActions, 30000);
         </div>
 
         <button id="a3-process-autonomous-actions"
-                class="btn">
+                class="btn"
+                {% if role != "boss" %}
+                disabled
+                title="Запуск автономного цикла доступен владельцу компании"
+                {% endif %}>
             Запустить анализ и ИИ-действия
         </button>
     </div>
@@ -1611,6 +1696,18 @@ async function processA3AutonomousActions() {
                     Событий на повторе: ${result.retried_events || 0}
                 </div>
 
+                <div class="pill muted">
+                    Проверено для повтора: ${result.retry_requested_events || 0}
+                </div>
+
+                <div class="pill muted">
+                    Пока не готовы: ${result.retry_not_ready_events || 0}
+                </div>
+
+                <div class="pill ${result.retry_failed_events ? "off" : "ok"}">
+                    Ошибок повтора: ${result.retry_failed_events || 0}
+                </div>
+
                 <div class="pill">
                     Отключено правил: ${result.disabled_rules || 0}
                 </div>
@@ -1622,6 +1719,12 @@ async function processA3AutonomousActions() {
                 <div class="pill ${result.failed ? "off" : "ok"}">
                     Ошибок: ${result.failed || 0}
                 </div>
+
+                ${health ? `
+                    <div class="pill ${health.status === "healthy" ? "ok" : "warn"}">
+                        Состояние A3: ${a3EscapeHtml(health.score || 0)} / 100
+                    </div>
+                ` : ""}
 
                 <div class="pill ok">
                     ИИ-выполнение завершено
@@ -2850,7 +2953,12 @@ if (newRuleActionKey) {
 
         {% if event["status"] in ("pending", "skipped") %}
         <form method="post" action="/automation/events/{{ event['id'] }}/retry" style="margin-top:10px">
-            <button type="submit" style="background:#f59e0b;padding:8px 11px;border-radius:999px;font-size:13px">
+            <button type="submit"
+                    style="background:#f59e0b;padding:8px 11px;border-radius:999px;font-size:13px"
+                    {% if role != "boss" %}
+                    disabled
+                    title="Повтор событий может запускать действия и доступен владельцу компании"
+                    {% endif %}>
                 Повторить
             </button>
         </form>

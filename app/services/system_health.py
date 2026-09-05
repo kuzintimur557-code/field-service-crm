@@ -309,16 +309,25 @@ def calculate_system_health(company_id):
         data["status_title"] = "Критичное состояние"
         data["status_message"] = "Движок автоматизации требует срочного внимания."
 
-    save_system_health_snapshot(company_id, data)
+    try:
+        data["snapshot_saved"] = save_system_health_snapshot(
+            company_id,
+            data,
+        )
+    except Exception:
+        data["snapshot_saved"] = False
 
     if data["status"] in {"degraded", "critical"}:
-        create_ops_timeline_event(
-            company_id=company_id,
-            event_type="system_health",
-            severity=data["status"],
-            title="Состояние автоматизации ухудшилось",
-            message=data.get("status_message", ""),
-        )
+        try:
+            create_ops_timeline_event(
+                company_id=company_id,
+                event_type="system_health",
+                severity=data["status"],
+                title="Состояние автоматизации ухудшилось",
+                message=data.get("status_message", ""),
+            )
+        except Exception:
+            pass
 
     return data
 

@@ -84,7 +84,15 @@
             </a>
 
             <form method="post" action="/automation/rules/{{ rule['id'] }}/retry-skipped" style="margin:0;">
-                <button type="submit" class="btn" style="background:#f59e0b;">Повторить пропущенные</button>
+                <button type="submit"
+                        class="btn"
+                        style="background:#f59e0b;"
+                        {% if role != "boss" %}
+                        disabled
+                        title="Повтор событий может запускать действия и доступен владельцу компании"
+                        {% endif %}>
+                    Повторить пропущенные
+                </button>
             </form>
 
             <form method="post" action="/automation/rules/{{ rule['id'] }}/run" style="margin:0;">
@@ -97,7 +105,10 @@
     {% if request.query_params.get("retry_skipped") == "1" %}
     <div class="card" style="background:#dcfce7;">
         <h3>Повтор выполнен</h3>
-        <p>Создано повторных событий: {{ request.query_params.get("retried") or "0" }}</p>
+        <p>Повторно выполнено событий: {{ request.query_params.get("retried") or "0" }}</p>
+        <p>Условия ещё не готовы: {{ request.query_params.get("not_ready") or "0" }}</p>
+        <p>Ошибок повтора: {{ request.query_params.get("failed") or "0" }}</p>
+        <p>Одинаковые пропущенные события повторяются не чаще одного раза в 30 минут.</p>
     </div>
     {% endif %}
 
@@ -186,7 +197,15 @@
                 </form>
 
                 <form method="post" action="/automation/rules/{{ rule['id'] }}/retry-skipped" style="margin:0;">
-                    <button type="submit" class="btn" style="background:#f59e0b;">Повторить пропущенные</button>
+                    <button type="submit"
+                            class="btn"
+                            style="background:#f59e0b;"
+                            {% if role != "boss" %}
+                            disabled
+                            title="Повтор событий может запускать действия и доступен владельцу компании"
+                            {% endif %}>
+                        Повторить пропущенные
+                    </button>
                 </form>
 
                 <a href="/automation/rules/{{ rule['id'] }}/events/export" class="btn" style="background:#16a34a;">Скачать CSV</a>
