@@ -24,6 +24,9 @@ A3_CYCLE_HISTORY_LIMIT = 100
 A3_CYCLE_HISTORY_EXPORT_LIMIT = 500
 A3_CYCLE_HISTORY_KEEP = 500
 A3_CYCLE_HISTORY_RETENTION_DAYS = 90
+A3_SCHEDULER_HISTORY_WINDOW = 20
+A3_SCHEDULER_WARNING_HOURS = 24
+A3_SCHEDULER_CRITICAL_HOURS = 48
 
 
 def require_company_id(company_id):
@@ -266,4 +269,160 @@ def get_a3_cycle_summary(company_id, status_filter="all"):
             if total_runs
             else 0
         ),
+    }
+
+
+def _parse_cycle_datetime(value):
+    try:
+        return datetime.fromisoformat(str(value or ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _cycle_age_label(age_minutes):
+    if age_minutes is None:
+        return "Время неизвестно"
+
+    if age_minutes < 1:
+        return "Только что"
+
+    if age_minutes < 60:
+        return f"{age_minutes} мин. назад"
+
+    age_hours = age_minutes // 60
+    if age_hours < 24:
+        return f"{age_hours} ч. назад"
+
+    return f"{age_hours // 24} дн. назад"
+
+
+def get_a3_cycle_reliability(company_id, now=None):
+    require_company_id(company_id)
+    now_value = now or datetime.now()
+
+    conn = connect()
+    try:
+        rows = conn.cursor().execute("""
+            SELECT status, created_at, duration_ms
+            FROM a3_autonomous_cycle_runs
+            WHERE company_id=?
+              AND triggered_by='scheduler'
+            ORDER BY id DESC
+            LIMIT ?
+        """, (
+            company_id,
+            A3_SCHEDULER_HISTORY_WINDOW,
+        )).fetchall()
+    finally:
+        conn.close()
+
+    items = [dict(row) for row in rows]
+    completed_runs = sum(item.get("status") == "completed" for item in items)
+    warning_runs = sum(item.get("status") == "warning" for item in items)
+    error_runs = sum(item.get("status") == "error" for item in items)
+    consecutive_errors = 0
+    consecutive_attention = 0
+
+    for item in items:
+        if item.get("status") == "error":
+            consecutive_errors += 1
+        else:
+            break
+
+    for item in items:
+        if item.get("status") != "completed":
+            consecutive_attention += 1
+        else:
+            break
+
+    latest_item = items[0] if items else {}
+    latest_created_at = latest_item.get("created_at")
+    latest_datetime = _parse_cycle_datetime(latest_created_at)
+    age_minutes = None
+
+    if latest_datetime:
+        age_minutes = max(
+            0,
+            int((now_value - latest_datetime).total_seconds() // 60),
+        )
+
+    age_hours = age_minutes / 60 if age_minutes is not None else None
+    total_runs = len(items)
+    reliability_rate = (
+        round(completed_runs * 100 / total_runs, 1)
+        if total_runs
+        else None
+    )
+    status = "stable"
+    status_label = "Стабильно"
+    status_tone = "success"
+    message = "Фоновые циклы A3 выполняются без ошибок."
+    recommendation = "Продолжайте контролировать журнал автономных запусков."
+
+    if not items:
+        status = "unknown"
+        status_label = "Нет фоновых запусков"
+        status_tone = "warning"
+        message = "Планировщик A3 ещё не записал ни одного фонового цикла."
+        recommendation = "Настройте регулярный вызов фонового маршрута A3."
+    elif consecutive_errors >= 2:
+        status = "critical"
+        status_label = "Критично"
+        status_tone = "danger"
+        message = f"Подряд завершились ошибкой циклы: {consecutive_errors}."
+        recommendation = "Проверьте журнал, настройки A3 и доступность базы данных."
+    elif age_hours is not None and age_hours >= A3_SCHEDULER_CRITICAL_HOURS:
+        status = "critical"
+        status_label = "Планировщик остановлен"
+        status_tone = "danger"
+        message = "Фоновый цикл A3 не запускался больше 48 часов."
+        recommendation = "Проверьте cron, секрет запуска и доступность приложения."
+    elif latest_item.get("status") == "error":
+        status = "warning"
+        status_label = "Последний запуск с ошибкой"
+        status_tone = "warning"
+        message = "Последний фоновый цикл A3 завершился ошибкой."
+        recommendation = "Проверьте причину ошибки до следующего запуска."
+    elif age_hours is not None and age_hours >= A3_SCHEDULER_WARNING_HOURS:
+        status = "warning"
+        status_label = "Давно не запускался"
+        status_tone = "warning"
+        message = "Фоновый цикл A3 не запускался больше 24 часов."
+        recommendation = "Убедитесь, что внешний планировщик продолжает работу."
+    elif latest_item.get("status") == "warning":
+        status = "warning"
+        status_label = "Есть замечания"
+        status_tone = "warning"
+        message = "Последний фоновый цикл завершился с замечаниями."
+        recommendation = "Проверьте очередь подтверждений и ошибки повторов."
+    elif total_runs >= 3 and reliability_rate < 70:
+        status = "warning"
+        status_label = "Низкая надёжность"
+        status_tone = "warning"
+        message = "Меньше 70% последних фоновых циклов завершились без замечаний."
+        recommendation = "Проверьте повторяющиеся причины нестабильных запусков."
+
+    return {
+        "status": status,
+        "status_label": status_label,
+        "status_tone": status_tone,
+        "message": message,
+        "recommendation": recommendation,
+        "history_window": A3_SCHEDULER_HISTORY_WINDOW,
+        "scheduler_runs": total_runs,
+        "completed_runs": completed_runs,
+        "warning_runs": warning_runs,
+        "error_runs": error_runs,
+        "reliability_rate": reliability_rate,
+        "consecutive_errors": consecutive_errors,
+        "consecutive_attention": consecutive_attention,
+        "latest_status": latest_item.get("status"),
+        "latest_status_label": CYCLE_STATUS_LABELS.get(
+            latest_item.get("status"),
+            "Нет данных",
+        ),
+        "latest_scheduler_run_at": latest_created_at,
+        "latest_scheduler_age_minutes": age_minutes,
+        "latest_scheduler_age_label": _cycle_age_label(age_minutes),
+        "latest_duration_ms": int(latest_item.get("duration_ms") or 0),
     }

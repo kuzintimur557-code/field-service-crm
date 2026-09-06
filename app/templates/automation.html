@@ -1007,6 +1007,10 @@ setInterval(loadA3RecoveryHistory, 30000);
          class="cycle-history-filters">
     </div>
 
+    <div id="a3-autonomous-cycle-reliability"
+         style="margin-top:14px">
+    </div>
+
     <div id="a3-autonomous-cycle-summary"
          style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
     </div>
@@ -1081,6 +1085,54 @@ function renderA3AutonomousCycleSummary(summary, shownCount, filterLabel) {
     `;
 }
 
+function renderA3AutonomousCycleReliability(reliability) {
+    const container = document.getElementById(
+        "a3-autonomous-cycle-reliability"
+    );
+
+    if (!container) {
+        return;
+    }
+
+    const reliabilityRate = reliability.reliability_rate === null
+        || reliability.reliability_rate === undefined
+        ? "Нет данных"
+        : `${reliability.reliability_rate}%`;
+
+    container.innerHTML = `
+        <div style="padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+                <div>
+                    <div style="font-weight:900">Надёжность фонового планировщика</div>
+                    <div class="meta" style="margin-top:6px">
+                        ${a3EscapeHtml(reliability.message || "Нет данных о работе планировщика.")}
+                    </div>
+                    <div class="meta" style="margin-top:6px">
+                        Рекомендация: ${a3EscapeHtml(reliability.recommendation || "Проверьте журнал запусков.")}
+                    </div>
+                </div>
+                <span class="pill ${a3StatusPillClass(reliability.status_tone)}">
+                    ${a3EscapeHtml(reliability.status_label || "Нет данных")}
+                </span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                <span class="pill muted">
+                    Последний фоновый запуск: ${a3EscapeHtml(reliability.latest_scheduler_age_label || "Нет данных")}
+                </span>
+                <span class="pill muted">
+                    Надёжность последних ${reliability.history_window || 20}: ${a3EscapeHtml(reliabilityRate)}
+                </span>
+                <span class="pill ${(reliability.consecutive_errors || 0) ? "off" : "ok"}">
+                    Ошибок подряд: ${reliability.consecutive_errors || 0}
+                </span>
+                <span class="pill ${(reliability.consecutive_attention || 0) ? "warn" : "muted"}">
+                    Запусков с проблемами подряд: ${reliability.consecutive_attention || 0}
+                </span>
+            </div>
+        </div>
+    `;
+}
+
 async function loadA3AutonomousCycleHistory() {
     const container = document.getElementById("a3-autonomous-cycle-history");
 
@@ -1103,6 +1155,7 @@ async function loadA3AutonomousCycleHistory() {
 
         const items = data.items || [];
         container.innerHTML = "";
+        renderA3AutonomousCycleReliability(data.reliability || {});
         renderA3AutonomousCycleSummary(
             data.summary || {},
             data.count || 0,

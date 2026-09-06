@@ -731,6 +731,11 @@ async def assert_automation_page():
     assert "/api/a3/autonomous-cycle-history/export?" in html
     assert "Средняя длительность:" in html
     assert "Средняя оценка A3:" in html
+    assert "renderA3AutonomousCycleReliability" in html
+    assert "Надёжность фонового планировщика" in html
+    assert "Последний фоновый запуск:" in html
+    assert "Ошибок подряд:" in html
+    assert "Запусков с проблемами подряд:" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -26021,6 +26026,9 @@ async def assert_a3_api_layer():
     assert cycle_history["status_filter_label"] == "Все результаты"
     assert cycle_history["summary"]["total_runs"] >= 1
     assert cycle_history["summary"]["success_rate"] >= 0
+    assert "reliability" in cycle_history
+    assert "status_label" in cycle_history["reliability"]
+    assert "latest_scheduler_age_label" in cycle_history["reliability"]
     latest_cycle = cycle_history["items"][0]
     assert latest_cycle["triggered_by"] == "owner2"
     assert latest_cycle["source_label"] == "Вручную: owner2"
@@ -26120,6 +26128,78 @@ async def assert_a3_api_layer():
         'filename="a3_cycle_history_error.csv"'
         in cycle_export_response.headers["content-disposition"]
     )
+
+    reliability_company_id = 987654
+    crm.record_a3_cycle_run(
+        company_id=reliability_company_id,
+        triggered_by="scheduler",
+        status="error",
+        failed_actions=1,
+        message="Первая ошибка планировщика",
+    )
+    crm.record_a3_cycle_run(
+        company_id=reliability_company_id,
+        triggered_by="scheduler",
+        status="error",
+        failed_actions=1,
+        message="Вторая ошибка планировщика",
+    )
+    critical_reliability = crm.get_a3_cycle_reliability(
+        reliability_company_id
+    )
+    assert critical_reliability["status"] == "critical"
+    assert critical_reliability["status_label"] == "Критично"
+    assert critical_reliability["consecutive_errors"] == 2
+    assert critical_reliability["consecutive_attention"] == 2
+    assert critical_reliability["latest_status"] == "error"
+
+    crm.record_a3_cycle_run(
+        company_id=reliability_company_id,
+        triggered_by="scheduler",
+        status="completed",
+        duration_ms=125,
+        message="Планировщик восстановлен",
+    )
+    recovering_reliability = crm.get_a3_cycle_reliability(
+        reliability_company_id
+    )
+    assert recovering_reliability["status"] == "warning"
+    assert recovering_reliability["status_label"] == "Низкая надёжность"
+    assert recovering_reliability["consecutive_errors"] == 0
+    assert recovering_reliability["consecutive_attention"] == 0
+    assert recovering_reliability["latest_status"] == "completed"
+    assert recovering_reliability["latest_duration_ms"] == 125
+    assert recovering_reliability["reliability_rate"] < 70
+
+    for _ in range(4):
+        crm.record_a3_cycle_run(
+            company_id=reliability_company_id,
+            triggered_by="scheduler",
+            status="completed",
+            duration_ms=100,
+            message="Стабильный запуск планировщика",
+        )
+
+    stable_reliability = crm.get_a3_cycle_reliability(
+        reliability_company_id
+    )
+    assert stable_reliability["status"] == "stable"
+    assert stable_reliability["status_label"] == "Стабильно"
+    assert stable_reliability["reliability_rate"] >= 70
+
+    stale_reliability = crm.get_a3_cycle_reliability(
+        reliability_company_id,
+        now=datetime.now() + timedelta(hours=49),
+    )
+    assert stale_reliability["status"] == "critical"
+    assert stale_reliability["status_label"] == "Планировщик остановлен"
+    assert stale_reliability["latest_scheduler_age_minutes"] >= 49 * 60
+
+    try:
+        crm.get_a3_cycle_reliability(None)
+        assert False, "get_a3_cycle_reliability must require company_id"
+    except ValueError as exc:
+        assert "company_id is required" in str(exc)
 
     conn = connect()
     c = conn.cursor()

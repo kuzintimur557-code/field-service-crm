@@ -20,6 +20,7 @@ from app.services.a3_cycle_history import (
     A3_CYCLE_HISTORY_LIMIT,
     a3_cycle_status_filter_label,
     get_a3_cycle_history,
+    get_a3_cycle_reliability,
     get_a3_cycle_summary,
     normalize_a3_cycle_status_filter,
     record_a3_cycle_run,
@@ -44098,6 +44099,7 @@ def api_a3_autonomous_cycle_history(request: Request):
         "count": len(items),
         "status_filter": status_filter,
         "status_filter_label": a3_cycle_status_filter_label(status_filter),
+        "reliability": get_a3_cycle_reliability(company_id),
         "summary": get_a3_cycle_summary(company_id),
         "items": items,
     }
