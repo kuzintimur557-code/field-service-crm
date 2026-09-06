@@ -1,4 +1,5 @@
 from threading import Lock
+from time import monotonic
 
 from app.services.autonomous_actions import process_autonomous_actions
 from app.services.decision_engine import get_decision_engine
@@ -25,6 +26,7 @@ def run_a3_autonomous_cycle(
 ):
     """Build decisions first, then process the actions allowed by governance."""
     require_company_id(company_id)
+    started_at = monotonic()
 
     cycle_lock = _get_cycle_lock(company_id)
 
@@ -37,6 +39,7 @@ def run_a3_autonomous_cycle(
             "max_actions_per_cycle": 0,
             "pending_action_count": 0,
             "queue_capacity_remaining": 0,
+            "duration_ms": int((monotonic() - started_at) * 1000),
             "result": {
                 "processed": 0,
                 "triggered_by": triggered_by,
@@ -58,6 +61,7 @@ def run_a3_autonomous_cycle(
             "max_actions_per_cycle": decisions.get("max_actions_per_cycle", 0),
             "pending_action_count": decisions.get("pending_action_count", 0),
             "queue_capacity_remaining": decisions.get("queue_capacity_remaining", 0),
+            "duration_ms": int((monotonic() - started_at) * 1000),
             "result": result,
         }
     finally:

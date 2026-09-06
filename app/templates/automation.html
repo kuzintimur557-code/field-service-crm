@@ -992,6 +992,103 @@ setInterval(loadA3RecoveryHistory, 30000);
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
+            <h2 style="margin-bottom:8px">A3 История автономных запусков</h2>
+            <div class="meta">
+                Итоги ручных и фоновых циклов управления автоматизациями.
+            </div>
+        </div>
+
+        <div class="pill">Журнал запусков</div>
+    </div>
+
+    <div id="a3-autonomous-cycle-history"
+         style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
+        <div class="pill">Загрузка истории запусков...</div>
+    </div>
+</div>
+
+<script>
+async function loadA3AutonomousCycleHistory() {
+    const container = document.getElementById("a3-autonomous-cycle-history");
+
+    if (!container) {
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/a3/autonomous-cycle-history");
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось загрузить историю автономных запусков");
+        }
+
+        const items = data.items || [];
+        container.innerHTML = "";
+
+        if (!items.length) {
+            container.innerHTML = '<div class="pill">Автономных запусков пока нет</div>';
+            return;
+        }
+
+        for (const item of items.slice(0, 8)) {
+            const card = document.createElement("div");
+            const health = item.health_score === null || item.health_score === undefined
+                ? "Оценка недоступна"
+                : `Состояние A3: ${item.health_score} / 100`;
+
+            card.style.padding = "16px";
+            card.style.borderRadius = "8px";
+            card.style.background = "#f9fafb";
+            card.style.border = "1px solid #e5e7eb";
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                    <div>
+                        <div style="font-weight:900">
+                            ${a3EscapeHtml(item.status_label || a3StatusLabel(item.status))}
+                        </div>
+                        <div class="meta" style="margin-top:4px">
+                            ${a3EscapeHtml(item.source_label || item.triggered_by)} ·
+                            ${a3EscapeHtml(item.created_at || "Время не указано")}
+                        </div>
+                        ${item.message ? `<div class="meta" style="margin-top:6px">${a3EscapeHtml(item.message)}</div>` : ""}
+                    </div>
+
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <div class="pill ${a3StatusPillClass(item.status_tone)}">
+                            Решений: ${item.decision_count || 0}
+                        </div>
+                        <div class="pill muted">В очередь: ${item.queued_actions || 0}</div>
+                        <div class="pill ok">Выполнено: ${item.processed_actions || 0}</div>
+                        <div class="pill ${(item.awaiting_approval || 0) ? "warn" : "muted"}">
+                            Ждут подтверждения: ${item.awaiting_approval || 0}
+                        </div>
+                        <div class="pill ${(item.failed_actions || 0) ? "off" : "muted"}">
+                            Ошибок: ${item.failed_actions || 0}
+                        </div>
+                        <div class="pill muted">Повторно: ${item.retried_events || 0}</div>
+                        <div class="pill">${a3EscapeHtml(health)}</div>
+                        <div class="pill muted">${item.duration_ms || 0} мс</div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        }
+    } catch (err) {
+        console.error("Ошибка загрузки истории автономных запусков", err);
+        const message = err.message || "Не удалось загрузить историю автономных запусков";
+        container.innerHTML = `<div class="pill off">${a3EscapeHtml(message)}</div>`;
+    }
+}
+
+loadA3AutonomousCycleHistory();
+setInterval(loadA3AutonomousCycleHistory, 30000);
+</script>
+
+
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
             <h2 style="margin-bottom:8px">A3 Лента операций</h2>
             <div class="meta">
                 Единая лента ИИ-операций и автономных событий.

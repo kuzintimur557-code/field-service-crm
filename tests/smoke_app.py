@@ -715,6 +715,11 @@ async def assert_automation_page():
     assert "exportA3ApprovalHistory" in html
     assert "/api/a3/approval-history/export?" in html
     assert "Экспорт CSV" in html
+    assert "A3 История автономных запусков" in html
+    assert "Итоги ручных и фоновых циклов" in html
+    assert "/api/a3/autonomous-cycle-history" in html
+    assert "loadA3AutonomousCycleHistory" in html
+    assert "Автономных запусков пока нет" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -24698,6 +24703,10 @@ async def assert_a3_api_layer():
             (companyless_request,),
         ),
         (
+            crm.api_a3_autonomous_cycle_history,
+            (companyless_request,),
+        ),
+        (
             crm.api_a3_ops_timeline,
             (companyless_request,),
         ),
@@ -25988,6 +25997,36 @@ async def assert_a3_api_layer():
     assert process_result["ok"] is True
     assert "result" in process_result
     assert process_result["result"]["processed"] >= 1
+
+    cycle_history = crm.api_a3_autonomous_cycle_history(request)
+    assert "items" in cycle_history
+    assert cycle_history["items"]
+    latest_cycle = cycle_history["items"][0]
+    assert latest_cycle["triggered_by"] == "owner2"
+    assert latest_cycle["source_label"] == "Вручную: owner2"
+    assert latest_cycle["status"] in {"completed", "warning"}
+    assert latest_cycle["status_label"] in {
+        "Завершено",
+        "Завершено с замечаниями",
+    }
+    assert latest_cycle["duration_ms"] >= 0
+
+    conn = connect()
+    c = conn.cursor()
+    cycle_history_index = c.execute("""
+    SELECT name
+    FROM sqlite_master
+    WHERE type='index'
+      AND name='idx_a3_cycle_runs_company_created'
+    """).fetchone()
+    conn.close()
+    assert cycle_history_index is not None
+
+    try:
+        crm.get_a3_cycle_history(None)
+        assert False, "get_a3_cycle_history must require company_id"
+    except ValueError as exc:
+        assert "company_id is required" in str(exc)
 
     approval_request = await crm.api_a3_request_autonomous_action_approval(
         make_json_request(

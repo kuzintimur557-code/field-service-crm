@@ -688,6 +688,28 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS a3_autonomous_cycle_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        triggered_by TEXT NOT NULL,
+        status TEXT NOT NULL,
+        decision_count INTEGER NOT NULL DEFAULT 0,
+        queued_actions INTEGER NOT NULL DEFAULT 0,
+        processed_actions INTEGER NOT NULL DEFAULT 0,
+        awaiting_approval INTEGER NOT NULL DEFAULT 0,
+        failed_actions INTEGER NOT NULL DEFAULT 0,
+        retried_events INTEGER NOT NULL DEFAULT 0,
+        retry_not_ready_events INTEGER NOT NULL DEFAULT 0,
+        retry_failed_events INTEGER NOT NULL DEFAULT 0,
+        health_score INTEGER,
+        health_status TEXT,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        message TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS system_health_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1049,6 +1071,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_system_health_snapshots_company_created
     ON system_health_snapshots(company_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_cycle_runs_company_created
+    ON a3_autonomous_cycle_runs(company_id, created_at)
     """)
 
     c.execute("""

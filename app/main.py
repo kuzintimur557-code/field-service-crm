@@ -15,6 +15,10 @@ from app.services.autonomous_actions import (
     reject_unsafe_autonomous_actions,
 )
 from app.services.a3_runner import run_a3_autonomous_cycle
+from app.services.a3_cycle_history import (
+    get_a3_cycle_history,
+    record_a3_cycle_run,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -43696,6 +43700,54 @@ def record_a3_scheduler_timeline(
     return True
 
 
+def record_a3_cycle_result(
+    company_id,
+    cycle=None,
+    health=None,
+    status="",
+    message="",
+    triggered_by="",
+):
+    cycle = cycle or {}
+    result = cycle.get("result") or {}
+    health = health or {}
+    normalized_status = status or (
+        "warning"
+        if (
+            result.get("failed", 0)
+            or result.get("awaiting_approval", 0)
+            or result.get("retry_not_ready_events", 0)
+            or result.get("retry_failed_events", 0)
+        )
+        else "completed"
+    )
+
+    try:
+        return record_a3_cycle_run(
+            company_id=company_id,
+            triggered_by=(
+                triggered_by
+                or result.get("triggered_by")
+                or "system"
+            ),
+            status=normalized_status,
+            decision_count=cycle.get("decision_count", 0),
+            queued_actions=cycle.get("queued_from_decisions", 0),
+            processed_actions=result.get("processed", 0),
+            awaiting_approval=result.get("awaiting_approval", 0),
+            failed_actions=result.get("failed", 0),
+            retried_events=result.get("retried_events", 0),
+            retry_not_ready_events=result.get("retry_not_ready_events", 0),
+            retry_failed_events=result.get("retry_failed_events", 0),
+            health_score=health.get("score"),
+            health_status=health.get("status", ""),
+            duration_ms=cycle.get("duration_ms", 0),
+            message=message,
+        )
+    except Exception:
+        return None
+
+
 def run_a3_autonomous_cycle_for_all_companies():
     summary = {
         "companies": 0,
@@ -43816,6 +43868,7 @@ def run_a3_autonomous_cycle_for_all_companies():
                 "disabled_rules": result.get("disabled_rules", 0),
             })
 
+            health = None
             try:
                 health = calculate_system_health(company_id)
                 summary["health_updated"] += 1
@@ -43861,6 +43914,13 @@ def run_a3_autonomous_cycle_for_all_companies():
                     f"ошибок: {result.get('failed', 0)}"
                 ),
             )
+            record_a3_cycle_result(
+                company_id=company_id,
+                cycle=cycle,
+                health=health,
+                triggered_by="scheduler",
+                message="Фоновый цикл A3 завершён.",
+            )
         except Exception:
             summary["errors"] += 1
             summary["items"].append({
@@ -43874,6 +43934,12 @@ def run_a3_autonomous_cycle_for_all_companies():
                 severity="error",
                 title="Ошибка фонового цикла A3",
                 message="Фоновый запуск не завершился. Проверьте состояние автоматизации.",
+            )
+            record_a3_cycle_result(
+                company_id=company_id,
+                status="error",
+                triggered_by="scheduler",
+                message="Фоновый цикл A3 завершился с ошибкой.",
             )
 
     return summary
@@ -43994,6 +44060,18 @@ def api_a3_recovery_history(request: Request):
     }
 
 
+@app.get("/api/a3/autonomous-cycle-history")
+def api_a3_autonomous_cycle_history(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return a3_api_error("forbidden", 403)
+
+    return {
+        "items": get_a3_cycle_history(company_id, limit=20),
+    }
+
+
 @app.get("/api/a3/ops-timeline")
 def api_a3_ops_timeline(request: Request):
     company_id = get_a3_company_id(request)
@@ -44111,6 +44189,13 @@ def api_a3_process_autonomous_actions(request: Request):
         health = calculate_system_health(company_id)
     except Exception:
         health = None
+
+    record_a3_cycle_result(
+        company_id=company_id,
+        cycle=cycle,
+        health=health,
+        message="Ручной цикл A3 завершён.",
+    )
 
     return {
         "ok": True,
