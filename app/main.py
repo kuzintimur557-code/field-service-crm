@@ -43644,6 +43644,8 @@ A3_API_ERROR_MESSAGES = {
     "cooldown_active": "Слишком много одинаковых действий за короткое время",
 }
 
+A3_SCHEDULER_ALERT_COOLDOWN_HOURS = 6
+
 
 def notify_a3_approval_required(company_id, action_count):
     if not action_count:
@@ -43680,6 +43682,100 @@ def notify_a3_approval_required(company_id, action_count):
         return False
 
     return True
+
+
+def notify_a3_scheduler_reliability(
+    company_id,
+    reliability=None,
+    now=None,
+):
+    try:
+        reliability = reliability or get_a3_cycle_reliability(company_id)
+    except Exception:
+        return {"created": False, "reason": "reliability_unavailable"}
+
+    status = reliability.get("status") or "unknown"
+
+    if status not in {"warning", "critical"}:
+        return {"created": False, "reason": "status_not_alertable"}
+
+    now_value = now or datetime.now()
+    title = (
+        "A3: критическая ошибка планировщика"
+        if status == "critical"
+        else "A3: проверьте фоновый планировщик"
+    )
+    link = "/automation#a3-cycle-history-card"
+    cutoff = (
+        now_value - timedelta(hours=A3_SCHEDULER_ALERT_COOLDOWN_HOURS)
+    ).strftime("%Y-%m-%d %H:%M")
+
+    try:
+        conn = connect()
+        try:
+            c = conn.cursor()
+            company = c.execute("""
+                SELECT owner_username
+                FROM companies
+                WHERE id=?
+            """, (company_id,)).fetchone()
+            owner_username = str(
+                company["owner_username"] if company else ""
+            ).strip()
+
+            if not owner_username:
+                return {"created": False, "reason": "owner_not_found"}
+
+            duplicate = c.execute("""
+                SELECT id
+                FROM notifications
+                WHERE company_id=?
+                  AND username=?
+                  AND title=?
+                  AND link=?
+                  AND created_at>=?
+                ORDER BY id DESC
+                LIMIT 1
+            """, (
+                company_id,
+                owner_username,
+                title,
+                link,
+                cutoff,
+            )).fetchone()
+        finally:
+            conn.close()
+
+        if duplicate:
+            return {
+                "created": False,
+                "reason": "cooldown_active",
+                "notification_id": duplicate["id"],
+            }
+
+        message = (
+            f"{reliability.get('message') or 'Обнаружена проблема фонового запуска.'} "
+            f"Ошибок подряд: {reliability.get('consecutive_errors') or 0}. "
+            f"Последний запуск: "
+            f"{reliability.get('latest_scheduler_age_label') or 'нет данных'}. "
+            f"{reliability.get('recommendation') or 'Проверьте журнал A3.'}"
+        )
+        create_notification(
+            company_id,
+            owner_username,
+            title,
+            message,
+            link,
+        )
+    except Exception:
+        return {"created": False, "reason": "notification_failed"}
+
+    return {
+        "created": True,
+        "reason": "created",
+        "title": title,
+        "username": owner_username,
+    }
 
 
 def record_a3_scheduler_timeline(
@@ -43920,13 +44016,16 @@ def run_a3_autonomous_cycle_for_all_companies():
                     f"ошибок: {result.get('failed', 0)}"
                 ),
             )
-            record_a3_cycle_result(
+            cycle_run_id = record_a3_cycle_result(
                 company_id=company_id,
                 cycle=cycle,
                 health=health,
                 triggered_by="scheduler",
                 message="Фоновый цикл A3 завершён.",
             )
+
+            if cycle_run_id:
+                notify_a3_scheduler_reliability(company_id)
         except Exception:
             summary["errors"] += 1
             summary["items"].append({
@@ -43941,12 +44040,15 @@ def run_a3_autonomous_cycle_for_all_companies():
                 title="Ошибка фонового цикла A3",
                 message="Фоновый запуск не завершился. Проверьте состояние автоматизации.",
             )
-            record_a3_cycle_result(
+            cycle_run_id = record_a3_cycle_result(
                 company_id=company_id,
                 status="error",
                 triggered_by="scheduler",
                 message="Фоновый цикл A3 завершился с ошибкой.",
             )
+
+            if cycle_run_id:
+                notify_a3_scheduler_reliability(company_id)
 
     return summary
 

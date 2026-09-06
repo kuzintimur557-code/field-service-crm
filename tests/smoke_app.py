@@ -716,6 +716,7 @@ async def assert_automation_page():
     assert "/api/a3/approval-history/export?" in html
     assert "Экспорт CSV" in html
     assert "A3 История автономных запусков" in html
+    assert 'id="a3-cycle-history-card"' in html
     assert "Итоги ручных и фоновых циклов" in html
     assert "/api/a3/autonomous-cycle-history" in html
     assert "loadA3AutonomousCycleHistory" in html
@@ -736,6 +737,7 @@ async def assert_automation_page():
     assert "Последний фоновый запуск:" in html
     assert "Ошибок подряд:" in html
     assert "Запусков с проблемами подряд:" in html
+    assert "Уведомления владельцу: включены" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -26200,6 +26202,80 @@ async def assert_a3_api_layer():
         assert False, "get_a3_cycle_reliability must require company_id"
     except ValueError as exc:
         assert "company_id is required" in str(exc)
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    DELETE FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title LIKE 'A3:%планировщик%'
+    """)
+    conn.commit()
+    conn.close()
+
+    warning_reliability = {
+        "status": "warning",
+        "message": "Последний фоновый цикл завершился с замечаниями.",
+        "recommendation": "Проверьте очередь подтверждений.",
+        "consecutive_errors": 0,
+        "latest_scheduler_age_label": "5 мин. назад",
+    }
+    first_scheduler_alert = crm.notify_a3_scheduler_reliability(
+        2,
+        reliability=warning_reliability,
+    )
+    assert first_scheduler_alert["created"] is True
+    assert first_scheduler_alert["username"] == "owner2"
+    assert first_scheduler_alert["title"] == "A3: проверьте фоновый планировщик"
+
+    duplicate_scheduler_alert = crm.notify_a3_scheduler_reliability(
+        2,
+        reliability=warning_reliability,
+    )
+    assert duplicate_scheduler_alert["created"] is False
+    assert duplicate_scheduler_alert["reason"] == "cooldown_active"
+    assert duplicate_scheduler_alert["notification_id"] > 0
+
+    stable_scheduler_alert = crm.notify_a3_scheduler_reliability(
+        2,
+        reliability={"status": "stable"},
+    )
+    assert stable_scheduler_alert == {
+        "created": False,
+        "reason": "status_not_alertable",
+    }
+
+    critical_scheduler_alert = crm.notify_a3_scheduler_reliability(
+        2,
+        reliability={
+            "status": "critical",
+            "message": "Два фоновых цикла завершились ошибкой.",
+            "recommendation": "Проверьте журнал A3.",
+            "consecutive_errors": 2,
+            "latest_scheduler_age_label": "Только что",
+        },
+    )
+    assert critical_scheduler_alert["created"] is True
+    assert critical_scheduler_alert["title"] == (
+        "A3: критическая ошибка планировщика"
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    scheduler_alerts = c.execute("""
+    SELECT title, message, link
+    FROM notifications
+    WHERE company_id=2
+      AND username='owner2'
+      AND title LIKE 'A3:%планировщик%'
+    ORDER BY id
+    """).fetchall()
+    conn.close()
+    assert len(scheduler_alerts) == 2
+    assert scheduler_alerts[0]["link"] == "/automation#a3-cycle-history-card"
+    assert "Ошибок подряд: 0" in scheduler_alerts[0]["message"]
+    assert "Ошибок подряд: 2" in scheduler_alerts[1]["message"]
 
     conn = connect()
     c = conn.cursor()

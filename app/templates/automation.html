@@ -991,7 +991,7 @@ setInterval(loadA3RecoveryHistory, 30000);
 </script>
 
 
-<div class="card">
+<div class="card" id="a3-cycle-history-card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
         <div>
             <h2 style="margin-bottom:8px">A3 История автономных запусков</h2>
@@ -1128,6 +1128,7 @@ function renderA3AutonomousCycleReliability(reliability) {
                 <span class="pill ${(reliability.consecutive_attention || 0) ? "warn" : "muted"}">
                     Запусков с проблемами подряд: ${reliability.consecutive_attention || 0}
                 </span>
+                <span class="pill muted">Уведомления владельцу: включены</span>
             </div>
         </div>
     `;
