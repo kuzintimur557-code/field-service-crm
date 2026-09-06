@@ -16,7 +16,12 @@ from app.services.autonomous_actions import (
 )
 from app.services.a3_runner import run_a3_autonomous_cycle
 from app.services.a3_cycle_history import (
+    A3_CYCLE_HISTORY_EXPORT_LIMIT,
+    A3_CYCLE_HISTORY_LIMIT,
+    a3_cycle_status_filter_label,
     get_a3_cycle_history,
+    get_a3_cycle_summary,
+    normalize_a3_cycle_status_filter,
     record_a3_cycle_run,
 )
 from app.services.decision_engine import get_decision_engine
@@ -44067,9 +44072,112 @@ def api_a3_autonomous_cycle_history(request: Request):
     if not company_id:
         return a3_api_error("forbidden", 403)
 
+    query_params = getattr(request, "query_params", {}) or {}
+    status_filter = normalize_a3_cycle_status_filter(
+        query_params.get("status") or "all"
+    )
+
+    try:
+        limit = max(
+            1,
+            min(
+                A3_CYCLE_HISTORY_LIMIT,
+                int(query_params.get("limit") or 20),
+            ),
+        )
+    except (TypeError, ValueError):
+        limit = 20
+
+    items = get_a3_cycle_history(
+        company_id,
+        limit=limit,
+        status_filter=status_filter,
+    )
+
     return {
-        "items": get_a3_cycle_history(company_id, limit=20),
+        "count": len(items),
+        "status_filter": status_filter,
+        "status_filter_label": a3_cycle_status_filter_label(status_filter),
+        "summary": get_a3_cycle_summary(company_id),
+        "items": items,
     }
+
+
+@app.get("/api/a3/autonomous-cycle-history/export")
+def api_a3_autonomous_cycle_history_export(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return a3_api_error("forbidden", 403)
+
+    query_params = getattr(request, "query_params", {}) or {}
+    status_filter = normalize_a3_cycle_status_filter(
+        query_params.get("status") or "all"
+    )
+    items = get_a3_cycle_history(
+        company_id,
+        limit=A3_CYCLE_HISTORY_EXPORT_LIMIT,
+        status_filter=status_filter,
+    )
+
+    output = io.StringIO()
+    output.write("\ufeff")
+    writer = csv.writer(output)
+    writer.writerow([
+        "Фильтр",
+        a3_cycle_status_filter_label(status_filter),
+    ])
+    writer.writerow(["Количество запусков", len(items)])
+    writer.writerow([])
+    writer.writerow([
+        "Номер запуска",
+        "Результат",
+        "Источник",
+        "Решений",
+        "Поставлено в очередь",
+        "Выполнено действий",
+        "Ждут подтверждения",
+        "Ошибок действий",
+        "Повторено событий",
+        "Событий не готовы",
+        "Ошибок повтора",
+        "Оценка A3",
+        "Состояние A3",
+        "Длительность, мс",
+        "Сообщение",
+        "Дата",
+    ])
+
+    for item in items:
+        writer.writerow([
+            item.get("id"),
+            item.get("status_label") or item.get("status"),
+            item.get("source_label") or item.get("triggered_by"),
+            item.get("decision_count") or 0,
+            item.get("queued_actions") or 0,
+            item.get("processed_actions") or 0,
+            item.get("awaiting_approval") or 0,
+            item.get("failed_actions") or 0,
+            item.get("retried_events") or 0,
+            item.get("retry_not_ready_events") or 0,
+            item.get("retry_failed_events") or 0,
+            item.get("health_score") if item.get("health_score") is not None else "",
+            item.get("health_status") or "",
+            item.get("duration_ms") or 0,
+            item.get("message") or "",
+            item.get("created_at") or "",
+        ])
+
+    return Response(
+        output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; "
+                f'filename="a3_cycle_history_{status_filter}.csv"'
+            ),
+        },
+    )
 
 
 @app.get("/api/a3/ops-timeline")

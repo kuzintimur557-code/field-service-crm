@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.database import connect
 
@@ -20,10 +20,72 @@ CYCLE_SOURCE_LABELS = {
     "system": "Система",
 }
 
+A3_CYCLE_HISTORY_LIMIT = 100
+A3_CYCLE_HISTORY_EXPORT_LIMIT = 500
+A3_CYCLE_HISTORY_KEEP = 500
+A3_CYCLE_HISTORY_RETENTION_DAYS = 90
+
 
 def require_company_id(company_id):
     if not company_id:
         raise ValueError("company_id is required")
+
+
+def normalize_a3_cycle_status_filter(status_filter):
+    normalized_status = str(status_filter or "all").strip().lower()
+
+    if normalized_status not in {"all", *CYCLE_STATUS_LABELS.keys()}:
+        return "all"
+
+    return normalized_status
+
+
+def a3_cycle_status_filter_label(status_filter):
+    normalized_status = normalize_a3_cycle_status_filter(status_filter)
+
+    if normalized_status == "all":
+        return "Все результаты"
+
+    return CYCLE_STATUS_LABELS[normalized_status]
+
+
+def _build_cycle_history_where(company_id, status_filter):
+    normalized_status = normalize_a3_cycle_status_filter(status_filter)
+    where_sql = "WHERE company_id=?"
+    params = [company_id]
+
+    if normalized_status != "all":
+        where_sql += " AND status=?"
+        params.append(normalized_status)
+
+    return where_sql, params, normalized_status
+
+
+def _prune_a3_cycle_history(cursor, company_id, recorded_at):
+    cutoff = (
+        recorded_at - timedelta(days=A3_CYCLE_HISTORY_RETENTION_DAYS)
+    ).isoformat(timespec="seconds")
+
+    cursor.execute("""
+        DELETE FROM a3_autonomous_cycle_runs
+        WHERE company_id=?
+          AND created_at < ?
+    """, (company_id, cutoff))
+    cursor.execute("""
+        DELETE FROM a3_autonomous_cycle_runs
+        WHERE company_id=?
+          AND id NOT IN (
+              SELECT id
+              FROM a3_autonomous_cycle_runs
+              WHERE company_id=?
+              ORDER BY id DESC
+              LIMIT ?
+          )
+    """, (
+        company_id,
+        company_id,
+        A3_CYCLE_HISTORY_KEEP,
+    ))
 
 
 def record_a3_cycle_run(
@@ -57,6 +119,7 @@ def record_a3_cycle_run(
         except (TypeError, ValueError):
             normalized_health_score = None
 
+    recorded_at = datetime.now()
     conn = connect()
     try:
         c = conn.cursor()
@@ -95,35 +158,42 @@ def record_a3_cycle_run(
             str(health_status or "").strip()[:40],
             max(0, int(duration_ms or 0)),
             str(message or "").strip()[:1000],
-            datetime.now().isoformat(timespec="seconds"),
+            recorded_at.isoformat(timespec="seconds"),
         ))
         run_id = c.lastrowid
+        _prune_a3_cycle_history(c, company_id, recorded_at)
         conn.commit()
         return run_id
     finally:
         conn.close()
 
 
-def get_a3_cycle_history(company_id, limit=20):
+def get_a3_cycle_history(company_id, limit=20, status_filter="all"):
     require_company_id(company_id)
 
     try:
-        normalized_limit = max(1, min(100, int(limit or 20)))
+        normalized_limit = max(
+            1,
+            min(A3_CYCLE_HISTORY_EXPORT_LIMIT, int(limit or 20)),
+        )
     except (TypeError, ValueError):
         normalized_limit = 20
+
+    where_sql, params, _ = _build_cycle_history_where(
+        company_id,
+        status_filter,
+    )
+    params.append(normalized_limit)
 
     conn = connect()
     try:
         rows = conn.cursor().execute("""
             SELECT *
             FROM a3_autonomous_cycle_runs
-            WHERE company_id=?
+            {where_sql}
             ORDER BY id DESC
             LIMIT ?
-        """, (
-            company_id,
-            normalized_limit,
-        )).fetchall()
+        """.format(where_sql=where_sql), params).fetchall()
     finally:
         conn.close()
 
@@ -141,3 +211,59 @@ def get_a3_cycle_history(company_id, limit=20):
         items.append(item)
 
     return items
+
+
+def get_a3_cycle_summary(company_id, status_filter="all"):
+    require_company_id(company_id)
+    where_sql, params, normalized_status = _build_cycle_history_where(
+        company_id,
+        status_filter,
+    )
+
+    conn = connect()
+    try:
+        row = conn.cursor().execute("""
+            SELECT
+                COUNT(*) AS total_runs,
+                SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END)
+                    AS completed_runs,
+                SUM(CASE WHEN status='warning' THEN 1 ELSE 0 END)
+                    AS warning_runs,
+                SUM(CASE WHEN status='error' THEN 1 ELSE 0 END)
+                    AS error_runs,
+                COALESCE(SUM(processed_actions), 0) AS processed_actions,
+                COALESCE(SUM(failed_actions), 0) AS failed_actions,
+                COALESCE(AVG(duration_ms), 0) AS avg_duration_ms,
+                AVG(health_score) AS avg_health_score
+            FROM a3_autonomous_cycle_runs
+            {where_sql}
+        """.format(where_sql=where_sql), params).fetchone()
+    finally:
+        conn.close()
+
+    item = dict(row or {})
+    total_runs = int(item.get("total_runs") or 0)
+    completed_runs = int(item.get("completed_runs") or 0)
+    avg_health_score = item.get("avg_health_score")
+
+    return {
+        "status_filter": normalized_status,
+        "status_filter_label": a3_cycle_status_filter_label(normalized_status),
+        "total_runs": total_runs,
+        "completed_runs": completed_runs,
+        "warning_runs": int(item.get("warning_runs") or 0),
+        "error_runs": int(item.get("error_runs") or 0),
+        "processed_actions": int(item.get("processed_actions") or 0),
+        "failed_actions": int(item.get("failed_actions") or 0),
+        "avg_duration_ms": int(round(float(item.get("avg_duration_ms") or 0))),
+        "avg_health_score": (
+            None
+            if avg_health_score is None
+            else int(round(float(avg_health_score)))
+        ),
+        "success_rate": (
+            round(completed_runs * 100 / total_runs, 1)
+            if total_runs
+            else 0
+        ),
+    }

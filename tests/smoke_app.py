@@ -720,6 +720,17 @@ async def assert_automation_page():
     assert "/api/a3/autonomous-cycle-history" in html
     assert "loadA3AutonomousCycleHistory" in html
     assert "Автономных запусков пока нет" in html
+    assert "История хранится 90 дней" in html
+    assert "Все запуски" in html
+    assert "Без замечаний" in html
+    assert "С замечаниями" in html
+    assert "С ошибками" in html
+    assert "buildA3AutonomousCycleHistoryQuery" in html
+    assert "setA3AutonomousCycleStatus" in html
+    assert "exportA3AutonomousCycleHistory" in html
+    assert "/api/a3/autonomous-cycle-history/export?" in html
+    assert "Средняя длительность:" in html
+    assert "Средняя оценка A3:" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -24707,6 +24718,10 @@ async def assert_a3_api_layer():
             (companyless_request,),
         ),
         (
+            crm.api_a3_autonomous_cycle_history_export,
+            (companyless_request,),
+        ),
+        (
             crm.api_a3_ops_timeline,
             (companyless_request,),
         ),
@@ -26001,6 +26016,11 @@ async def assert_a3_api_layer():
     cycle_history = crm.api_a3_autonomous_cycle_history(request)
     assert "items" in cycle_history
     assert cycle_history["items"]
+    assert cycle_history["count"] == len(cycle_history["items"])
+    assert cycle_history["status_filter"] == "all"
+    assert cycle_history["status_filter_label"] == "Все результаты"
+    assert cycle_history["summary"]["total_runs"] >= 1
+    assert cycle_history["summary"]["success_rate"] >= 0
     latest_cycle = cycle_history["items"][0]
     assert latest_cycle["triggered_by"] == "owner2"
     assert latest_cycle["source_label"] == "Вручную: owner2"
@@ -26010,6 +26030,96 @@ async def assert_a3_api_layer():
         "Завершено с замечаниями",
     }
     assert latest_cycle["duration_ms"] >= 0
+
+    filtered_cycle_history = crm.api_a3_autonomous_cycle_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/autonomous-cycle-history",
+            f"status={latest_cycle['status']}",
+        )
+    )
+    assert filtered_cycle_history["status_filter"] == latest_cycle["status"]
+    assert filtered_cycle_history["items"]
+    assert all(
+        item["status"] == latest_cycle["status"]
+        for item in filtered_cycle_history["items"]
+    )
+
+    invalid_cycle_filter = crm.api_a3_autonomous_cycle_history(
+        make_asgi_request(
+            "owner2",
+            "/api/a3/autonomous-cycle-history",
+            "status=unknown&limit=invalid",
+        )
+    )
+    assert invalid_cycle_filter["status_filter"] == "all"
+
+    old_cycle_created_at = (
+        datetime.now() - timedelta(days=91)
+    ).isoformat(timespec="seconds")
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO a3_autonomous_cycle_runs (
+        company_id,
+        triggered_by,
+        status,
+        created_at
+    ) VALUES (?, ?, ?, ?)
+    """, (
+        2,
+        "retention-smoke",
+        "completed",
+        old_cycle_created_at,
+    ))
+    old_cycle_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
+    crm.record_a3_cycle_run(
+        company_id=2,
+        triggered_by="retention-smoke",
+        status="error",
+        failed_actions=1,
+        message="Проверка хранения истории",
+    )
+
+    conn = connect()
+    c = conn.cursor()
+    old_cycle = c.execute("""
+    SELECT id
+    FROM a3_autonomous_cycle_runs
+    WHERE id=?
+      AND company_id=2
+    """, (old_cycle_id,)).fetchone()
+    conn.close()
+    assert old_cycle is None
+
+    error_cycle_request = make_asgi_request(
+        "owner2",
+        "/api/a3/autonomous-cycle-history",
+        "status=error",
+    )
+    error_cycle_history = crm.api_a3_autonomous_cycle_history(
+        error_cycle_request
+    )
+    assert error_cycle_history["status_filter"] == "error"
+    assert error_cycle_history["status_filter_label"] == "Ошибка"
+    assert error_cycle_history["items"]
+    assert all(item["status"] == "error" for item in error_cycle_history["items"])
+
+    cycle_export_response = crm.api_a3_autonomous_cycle_history_export(
+        error_cycle_request
+    )
+    assert cycle_export_response.status_code == 200
+    cycle_export_csv = cycle_export_response.body.decode("utf-8")
+    assert cycle_export_csv.startswith("\ufeffФильтр,Ошибка")
+    assert "Номер запуска,Результат,Источник" in cycle_export_csv
+    assert "Проверка хранения истории" in cycle_export_csv
+    assert (
+        'filename="a3_cycle_history_error.csv"'
+        in cycle_export_response.headers["content-disposition"]
+    )
 
     conn = connect()
     c = conn.cursor()
