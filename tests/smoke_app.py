@@ -742,7 +742,8 @@ async def assert_automation_page():
     assert "Проверка запуска, автономного управления" in html
     assert "/api/a3/scheduler-readiness" in html
     assert "loadA3SchedulerReadiness" in html
-    assert "Фоновый маршрут:" in html
+    assert "Основной запуск:" in html
+    assert "Контроль планировщика:" in html
     assert "Фоновый режим готов к работе" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
@@ -24902,6 +24903,10 @@ async def assert_a3_api_layer():
     )
     assert scheduler_readiness["cron_method"] == "POST"
     assert scheduler_readiness["cron_header"] == "x-automation-secret"
+    assert scheduler_readiness["watchdog_method"] == "POST"
+    assert scheduler_readiness["watchdog_path"] == (
+        "/automation/cron/a3-watchdog"
+    )
     assert 0 <= scheduler_readiness["score"] <= 100
     assert scheduler_readiness["status"] in {"ok", "warning", "critical"}
     assert len(scheduler_readiness["checks"]) == 5
@@ -24933,6 +24938,228 @@ async def assert_a3_api_layer():
         "Добавьте AUTOMATION_CRON_SECRET" in action
         for action in missing_cron_readiness["next_actions"]
     )
+
+    watchdog_report = crm.get_a3_scheduler_watchdog_report(
+        now=datetime.now()
+    )
+    assert watchdog_report["companies_total"] >= 1
+    assert watchdog_report["grace_hours"] == 24
+    assert len(watchdog_report["items"]) == (
+        watchdog_report["companies_total"]
+    )
+    assert len({
+        item["company_id"]
+        for item in watchdog_report["items"]
+    }) == watchdog_report["companies_total"]
+    assert all(
+        item["status"] in {
+            "stable",
+            "warning",
+            "critical",
+            "waiting",
+            "skipped",
+            "error",
+        }
+        for item in watchdog_report["items"]
+    )
+
+    watchdog_company_ids = [9801, 9802, 9803, 9804]
+    watchdog_now = datetime(2026, 6, 15, 12, 0)
+    conn = connect()
+    c = conn.cursor()
+    for company_id, created_at in (
+        (9801, "2026-06-10T12:00:00"),
+        (9802, "2026-06-15T06:00:00"),
+        (9803, "2026-06-10T12:00:00"),
+        (9804, "2026-06-10T12:00:00"),
+    ):
+        c.execute("""
+            INSERT INTO companies (id, name, owner_username, created_at)
+            VALUES (?, ?, ?, ?)
+        """, (
+            company_id,
+            f"Watchdog smoke {company_id}",
+            f"watchdog_owner_{company_id}",
+            created_at,
+        ))
+
+    c.execute("""
+        INSERT INTO company_features (
+            company_id, feature_key, enabled, updated_at
+        ) VALUES (9803, 'automation', 0, ?)
+    """, (watchdog_now.isoformat(timespec="seconds"),))
+    c.execute("""
+        INSERT INTO autonomous_governance_settings (
+            company_id,
+            autonomous_enabled,
+            max_actions_per_cycle,
+            require_critical_approval,
+            confidence_threshold,
+            protected_rules_json,
+            created_at
+        ) VALUES (9804, 0, 20, 1, 70, '[]', ?)
+    """, (watchdog_now.isoformat(timespec="seconds"),))
+    conn.commit()
+    conn.close()
+
+    try:
+        watchdog_state_report = crm.get_a3_scheduler_watchdog_report(
+            now=watchdog_now
+        )
+        watchdog_states = {
+            item["company_id"]: item
+            for item in watchdog_state_report["items"]
+            if item["company_id"] in watchdog_company_ids
+        }
+        assert watchdog_states[9801]["status"] == "warning"
+        assert watchdog_states[9801]["alertable"] is True
+        assert watchdog_states[9802]["status"] == "waiting"
+        assert watchdog_states[9802]["alertable"] is False
+        assert watchdog_states[9803]["reason"] == "feature_disabled"
+        assert watchdog_states[9803]["alertable"] is False
+        assert watchdog_states[9804]["reason"] == "autonomous_disabled"
+        assert watchdog_states[9804]["alertable"] is False
+    finally:
+        conn = connect()
+        c = conn.cursor()
+        placeholders = ",".join("?" for _ in watchdog_company_ids)
+        c.execute(
+            f"DELETE FROM company_features WHERE company_id IN ({placeholders})",
+            watchdog_company_ids,
+        )
+        c.execute(
+            "DELETE FROM autonomous_governance_settings "
+            f"WHERE company_id IN ({placeholders})",
+            watchdog_company_ids,
+        )
+        c.execute(
+            f"DELETE FROM companies WHERE id IN ({placeholders})",
+            watchdog_company_ids,
+        )
+        conn.commit()
+        conn.close()
+
+    watchdog_notifications = []
+
+    def fake_watchdog_notifier(company_id, reliability=None, now=None):
+        status = (reliability or {}).get("status")
+        watchdog_notifications.append((company_id, status, now))
+
+        if status == "stable":
+            return {
+                "created": True,
+                "reason": "recovery_created",
+                "telegram_sent": False,
+            }
+
+        if status == "critical":
+            return {
+                "created": True,
+                "reason": "created",
+                "telegram_sent": True,
+            }
+
+        return {
+            "created": False,
+            "reason": "cooldown_active",
+        }
+
+    deterministic_watchdog = (
+        crm.run_a3_scheduler_watchdog_for_all_companies(
+            now=watchdog_now,
+            notifier=fake_watchdog_notifier,
+            report={
+                "companies_total": 4,
+                "eligible_companies": 3,
+                "skipped_companies": 1,
+                "stable": 1,
+                "warning": 1,
+                "critical": 1,
+                "waiting": 0,
+                "errors": 0,
+                "items": [
+                    {
+                        "company_id": 201,
+                        "status": "critical",
+                        "alertable": True,
+                        "reliability": {"status": "critical"},
+                    },
+                    {
+                        "company_id": 202,
+                        "status": "stable",
+                        "alertable": True,
+                        "reliability": {"status": "stable"},
+                    },
+                    {
+                        "company_id": 203,
+                        "status": "warning",
+                        "alertable": True,
+                        "reliability": {"status": "warning"},
+                    },
+                    {
+                        "company_id": 204,
+                        "status": "skipped",
+                        "alertable": False,
+                    },
+                ],
+            },
+        )
+    )
+    assert watchdog_notifications == [
+        (201, "critical", watchdog_now),
+        (202, "stable", watchdog_now),
+        (203, "warning", watchdog_now),
+    ]
+    assert deterministic_watchdog["alerts_sent"] == 1
+    assert deterministic_watchdog["recoveries_sent"] == 1
+    assert deterministic_watchdog["telegram_sent"] == 1
+    assert deterministic_watchdog["suppressed"] == 1
+    assert deterministic_watchdog["notification_errors"] == 0
+
+    old_watchdog_secret = os.environ.get("AUTOMATION_CRON_SECRET")
+    os.environ.pop("AUTOMATION_CRON_SECRET", None)
+    missing_watchdog_secret = await crm.run_a3_scheduler_watchdog_cron(
+        make_public_asgi_request("/automation/cron/a3-watchdog")
+    )
+    assert missing_watchdog_secret.status_code == 503
+
+    os.environ["AUTOMATION_CRON_SECRET"] = "a3-watchdog-smoke-secret"
+    forbidden_watchdog = await crm.run_a3_scheduler_watchdog_cron(
+        make_public_asgi_request("/automation/cron/a3-watchdog")
+    )
+    assert forbidden_watchdog.status_code == 403
+    original_watchdog_runner = (
+        crm.run_a3_scheduler_watchdog_for_all_companies
+    )
+    crm.run_a3_scheduler_watchdog_for_all_companies = lambda: {
+        "companies_total": 2,
+        "critical": 1,
+        "alerts_sent": 1,
+    }
+
+    try:
+        watchdog_cron = await crm.run_a3_scheduler_watchdog_cron(
+            make_public_asgi_request(
+                "/automation/cron/a3-watchdog",
+                headers=[
+                    (
+                        b"x-automation-secret",
+                        b"a3-watchdog-smoke-secret",
+                    ),
+                ],
+            )
+        )
+    finally:
+        crm.run_a3_scheduler_watchdog_for_all_companies = (
+            original_watchdog_runner
+        )
+        if old_watchdog_secret is None:
+            os.environ.pop("AUTOMATION_CRON_SECRET", None)
+        else:
+            os.environ["AUTOMATION_CRON_SECRET"] = old_watchdog_secret
+
+    assert watchdog_cron["ok"] is True
+    assert watchdog_cron["summary"]["alerts_sent"] == 1
 
     try:
         crm.get_a3_scheduler_readiness(

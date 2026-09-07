@@ -26,6 +26,7 @@ from app.services.a3_cycle_history import (
     record_a3_cycle_run,
 )
 from app.services.a3_scheduler_readiness import get_a3_scheduler_readiness
+from app.services.a3_scheduler_watchdog import get_a3_scheduler_watchdog_report
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -44158,6 +44159,58 @@ def run_a3_autonomous_cycle_for_all_companies():
     return summary
 
 
+def run_a3_scheduler_watchdog_for_all_companies(
+    now=None,
+    notifier=None,
+    report=None,
+):
+    watchdog_report = report or get_a3_scheduler_watchdog_report(now=now)
+    notify = notifier or notify_a3_scheduler_reliability
+    watchdog_report.update({
+        "alerts_sent": 0,
+        "recoveries_sent": 0,
+        "telegram_sent": 0,
+        "suppressed": 0,
+        "notification_errors": 0,
+    })
+
+    for item in watchdog_report.get("items", []):
+        if not item.get("alertable"):
+            continue
+
+        try:
+            notification = notify(
+                item["company_id"],
+                reliability=item.get("reliability") or {},
+                now=now,
+            )
+        except Exception:
+            notification = {
+                "created": False,
+                "reason": "notification_failed",
+            }
+
+        item["notification"] = notification
+
+        if notification.get("created"):
+            if notification.get("reason") == "recovery_created":
+                watchdog_report["recoveries_sent"] += 1
+            else:
+                watchdog_report["alerts_sent"] += 1
+
+            if notification.get("telegram_sent"):
+                watchdog_report["telegram_sent"] += 1
+        elif notification.get("reason") in {
+            "notification_failed",
+            "reliability_unavailable",
+        }:
+            watchdog_report["notification_errors"] += 1
+        else:
+            watchdog_report["suppressed"] += 1
+
+    return watchdog_report
+
+
 def a3_api_error(error, status_code, message=None):
 
     return JSONResponse(
@@ -44570,6 +44623,34 @@ async def run_a3_autonomous_cron(request: Request):
     return {
         "ok": True,
         "summary": run_a3_autonomous_cycle_for_all_companies(),
+    }
+
+
+@app.post("/automation/cron/a3-watchdog")
+async def run_a3_scheduler_watchdog_cron(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
+            status_code=503,
+        )
+
+    token = (
+        request.headers.get("x-automation-secret")
+        or request.query_params.get("token")
+        or ""
+    ).strip()
+
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    return {
+        "ok": True,
+        "summary": run_a3_scheduler_watchdog_for_all_companies(),
     }
 
 

@@ -136,6 +136,12 @@ python3 tests/smoke_security.py
 - `POST /automation/cron/ai-digest`
 - `POST /automation/cron/calendar-plans`
 - `POST /automation/cron/calendar-plans/watchdog`
+- `POST /automation/cron/a3-autonomous` - выполняет автономный цикл A3
+- `POST /automation/cron/a3-watchdog` - независимо контролирует запуски A3
+
+Для A3 настройте два задания: основной цикл и watchdog. Watchdog должен
+вызываться отдельным внешним расписанием, чтобы сообщить об остановке
+основного задания.
 
 Пример:
 

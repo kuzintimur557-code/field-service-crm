@@ -1067,9 +1067,15 @@ async function loadA3SchedulerReadiness() {
             checks.appendChild(row);
         }
 
-        endpoint.textContent =
-            `Фоновый маршрут: ${data.cron_method || "POST"} ${data.cron_path || ""}; `
-            + `заголовок: ${data.cron_header || "x-automation-secret"}`;
+        endpoint.innerHTML = `
+            <div>Основной запуск: ${a3EscapeHtml(data.cron_method || "POST")}
+                ${a3EscapeHtml(data.cron_path || "")}</div>
+            <div style="margin-top:4px">Контроль планировщика:
+                ${a3EscapeHtml(data.watchdog_method || "POST")}
+                ${a3EscapeHtml(data.watchdog_path || "")}</div>
+            <div style="margin-top:4px">Заголовок:
+                ${a3EscapeHtml(data.cron_header || "x-automation-secret")}</div>
+        `;
         actions.innerHTML = "";
 
         for (const action of (data.next_actions || [])) {

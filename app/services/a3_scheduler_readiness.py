@@ -201,6 +201,8 @@ def get_a3_scheduler_readiness(
         "cron_method": "POST",
         "cron_path": "/automation/cron/a3-autonomous",
         "cron_header": "x-automation-secret",
+        "watchdog_method": "POST",
+        "watchdog_path": "/automation/cron/a3-watchdog",
         "checks": checks,
         "next_actions": next_actions,
         "reliability": reliability,
