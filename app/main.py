@@ -31,6 +31,10 @@ from app.services.a3_scheduler_watchdog import (
     get_a3_scheduler_watchdog_status,
     save_a3_scheduler_watchdog_status,
 )
+from app.services.a3_platform_health import (
+    build_a3_platform_health_url,
+    get_a3_platform_health,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -8274,6 +8278,8 @@ def get_platform_dashboard_links():
         "presets_api": "/api/platform/presets",
         "presets_export": "/platform/presets/export",
         "readiness": "/platform/readiness",
+        "a3_health": "/platform/a3-health",
+        "a3_health_problem": "/platform/a3-health?status=problem",
         "calendar_health": "/platform/calendar-health",
         "calendar_health_critical": "/platform/calendar-health?status=critical",
         "calendar_health_unacknowledged": (
@@ -15486,6 +15492,104 @@ async def api_platform_readiness_launch_plan(request: Request):
 
     readiness = get_platform_release_readiness()
     return get_platform_release_launch_plan(readiness)
+
+
+@app.get("/platform/a3-health", response_class=HTMLResponse)
+async def platform_a3_health_page(
+    request: Request,
+    status: str = "all",
+    search: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    health = get_a3_platform_health(
+        status_filter=status,
+        search=search,
+    )
+    links = get_platform_dashboard_links()
+    links.update({
+        "platform": links["page"],
+        "base": "/platform/a3-health",
+        "export": health["export_url"],
+    })
+
+    return templates.TemplateResponse(
+        request,
+        "platform_a3_health.html",
+        {
+            "request": request,
+            "username": username,
+            "health": health,
+            "summary": health["summary"],
+            "companies": health["items"],
+            "links": links,
+        },
+    )
+
+
+@app.get("/platform/a3-health/export")
+async def platform_a3_health_export(
+    request: Request,
+    status: str = "all",
+    search: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    health = get_a3_platform_health(
+        status_filter=status,
+        search=search,
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID компании",
+        "Компания",
+        "Владелец",
+        "Общее состояние",
+        "Основной запуск",
+        "Последний основной запуск",
+        "Контрольная проверка",
+        "Последняя контрольная проверка",
+        "Уведомление создано",
+        "Telegram отправлен",
+        "Рекомендация",
+    ])
+
+    for item in health["items"]:
+        writer.writerow([
+            item["company_id"],
+            item["company_name"],
+            item["owner_username"],
+            item["status_label"],
+            item["main_status_label"],
+            item["latest_scheduler_age_label"],
+            item["watchdog_status_label"],
+            item["watchdog_checked_age_label"],
+            "Да" if item["notification_created"] else "Нет",
+            "Да" if item["telegram_sent"] else "Нет",
+            item["recommendation"],
+        ])
+
+    filename = f"a3_platform_health_{health['status_filter']}.csv"
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+        },
+    )
 
 
 @app.get("/platform/calendar-health", response_class=HTMLResponse)

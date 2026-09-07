@@ -13238,6 +13238,129 @@ async def assert_platform_presets_page():
     )
     platform_html = platform_page.body.decode("utf-8")
     assert "/platform/presets" in platform_html
+    assert "/platform/a3-health" in platform_html
+
+
+async def assert_platform_a3_health():
+    health = crm.get_a3_platform_health()
+    summary = health["summary"]
+
+    assert summary["total"] >= 1
+    assert summary["total"] == len(health["all_items"])
+    assert summary["total"] == (
+        summary["stable"]
+        + summary["warning"]
+        + summary["critical"]
+        + summary["waiting"]
+        + summary["paused"]
+    )
+    assert summary["problems"] == (
+        summary["critical"] + summary["warning"] + summary["waiting"]
+    )
+    assert health["overall_status"] in {"stable", "warning", "critical"}
+    assert len(health["status_options"]) == 7
+    assert {
+        "all",
+        "problem",
+        "critical",
+        "warning",
+        "stable",
+        "waiting",
+        "paused",
+    } == {item["key"] for item in health["status_options"]}
+    assert all(
+        item["company_url"] == (
+            f"/platform/companies/{item['company_id']}"
+        )
+        for item in health["all_items"]
+    )
+
+    first_company = health["all_items"][0]
+    search_health = crm.get_a3_platform_health(
+        search=str(first_company["company_id"]),
+    )
+    assert search_health["items"]
+    assert all(
+        item["company_id"] == first_company["company_id"]
+        for item in search_health["items"]
+    )
+    problem_health = crm.get_a3_platform_health(status_filter="problem")
+    assert all(
+        item["status"] in {"critical", "warning", "waiting"}
+        for item in problem_health["items"]
+    )
+    invalid_health = crm.get_a3_platform_health(status_filter="broken")
+    assert invalid_health["status_filter"] == "all"
+    assert crm.build_a3_platform_health_url() == "/platform/a3-health"
+    assert crm.build_a3_platform_health_url(
+        "critical",
+        "Тест Компания",
+    ) == (
+        "/platform/a3-health?status=critical&search="
+        "%D0%A2%D0%B5%D1%81%D1%82+%D0%9A%D0%BE%D0%BC%D0%BF%D0%B0%D0%BD%D0%B8%D1%8F"
+    )
+
+    anonymous = await crm.platform_a3_health_page(
+        make_public_asgi_request("/platform/a3-health"),
+    )
+    assert anonymous.status_code == 302
+    assert anonymous.headers["location"] == "/login"
+    boss = await crm.platform_a3_health_page(
+        make_asgi_request("owner2", "/platform/a3-health"),
+    )
+    assert boss.status_code == 302
+    assert boss.headers["location"] == "/"
+    page = await crm.platform_a3_health_page(
+        make_asgi_request(
+            "super",
+            "/platform/a3-health",
+            "status=problem&search=owner",
+        ),
+        status="problem",
+        search="owner",
+    )
+    assert page.status_code == 200
+    html = page.body.decode("utf-8")
+    assert "Контроль фоновых процессов A3" in html
+    assert "Основной планировщик и независимая контрольная проверка" in html
+    assert "Требуют внимания" in html
+    assert "Основной запуск" in html
+    assert "Контрольная проверка" in html
+    assert "Следующее действие" in html
+    assert 'name="search"' in html
+    assert "/platform/a3-health/export" in html
+    assert "/platform/calendar-health" in html
+    assert 'class="platform-mobile-nav"' in html
+    assert "Watchdog" not in html
+    assert page.context["health"]["status_filter"] == "problem"
+    assert page.context["health"]["search"] == "owner"
+    assert page.context["links"]["platform"] == "/platform"
+    assert page.context["links"]["a3_health"] == "/platform/a3-health"
+
+    anonymous_export = await crm.platform_a3_health_export(
+        make_public_asgi_request("/platform/a3-health/export"),
+    )
+    assert anonymous_export.status_code == 302
+    assert anonymous_export.headers["location"] == "/login"
+    boss_export = await crm.platform_a3_health_export(
+        make_asgi_request("owner2", "/platform/a3-health/export"),
+    )
+    assert boss_export.status_code == 302
+    assert boss_export.headers["location"] == "/"
+    export = await crm.platform_a3_health_export(
+        make_asgi_request("super", "/platform/a3-health/export"),
+        status="all",
+    )
+    assert export.status_code == 200
+    assert export.media_type == "text/csv; charset=utf-8"
+    assert "a3_platform_health_all.csv" in export.headers[
+        "content-disposition"
+    ]
+    export_csv = export.body.decode("utf-8-sig")
+    assert "ID компании" in export_csv
+    assert "Общее состояние" in export_csv
+    assert "Последняя контрольная проверка" in export_csv
+    assert "Рекомендация" in export_csv
 
 
 async def assert_platform_calendar_health():
@@ -27608,6 +27731,7 @@ def main():
         asyncio.run(assert_platform_companies_page())
         asyncio.run(assert_platform_modules_page())
         asyncio.run(assert_platform_presets_page())
+        asyncio.run(assert_platform_a3_health())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))
