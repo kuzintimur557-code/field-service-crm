@@ -25,6 +25,7 @@ from app.services.a3_cycle_history import (
     normalize_a3_cycle_status_filter,
     record_a3_cycle_run,
 )
+from app.services.a3_scheduler_readiness import get_a3_scheduler_readiness
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -44270,6 +44271,25 @@ def api_a3_recovery_history(request: Request):
     return {
         "items": get_recovery_history(company_id, limit=20)
     }
+
+
+@app.get("/api/a3/scheduler-readiness")
+def api_a3_scheduler_readiness(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return a3_api_error("forbidden", 403)
+
+    governance = get_governance_settings(company_id)
+
+    return get_a3_scheduler_readiness(
+        company_id=company_id,
+        cron_configured=bool(
+            (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+        ),
+        automation_enabled=has_feature(company_id, "automation"),
+        autonomous_enabled=bool(governance.get("autonomous_enabled", 1)),
+    )
 
 
 @app.get("/api/a3/autonomous-cycle-history")

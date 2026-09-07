@@ -738,6 +738,12 @@ async def assert_automation_page():
     assert "Ошибок подряд:" in html
     assert "Запусков с проблемами подряд:" in html
     assert "Сбои и восстановление: центр уведомлений + Telegram" in html
+    assert "A3 Готовность фонового режима" in html
+    assert "Проверка запуска, автономного управления" in html
+    assert "/api/a3/scheduler-readiness" in html
+    assert "loadA3SchedulerReadiness" in html
+    assert "Фоновый маршрут:" in html
+    assert "Фоновый режим готов к работе" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -24721,6 +24727,10 @@ async def assert_a3_api_layer():
             (companyless_request,),
         ),
         (
+            crm.api_a3_scheduler_readiness,
+            (companyless_request,),
+        ),
+        (
             crm.api_a3_autonomous_cycle_history,
             (companyless_request,),
         ),
@@ -24871,6 +24881,69 @@ async def assert_a3_api_layer():
     assert "score" in data
     assert 0 <= data["score"] <= 100
     assert data["status"] in {"healthy", "warning", "degraded", "critical"}
+
+    old_a3_cron_secret = os.environ.get("AUTOMATION_CRON_SECRET")
+    os.environ["AUTOMATION_CRON_SECRET"] = "a3-readiness-smoke-secret"
+    try:
+        scheduler_readiness = crm.api_a3_scheduler_readiness(request)
+        manager_scheduler_readiness = crm.api_a3_scheduler_readiness(
+            manager_request
+        )
+    finally:
+        if old_a3_cron_secret is None:
+            os.environ.pop("AUTOMATION_CRON_SECRET", None)
+        else:
+            os.environ["AUTOMATION_CRON_SECRET"] = old_a3_cron_secret
+
+    assert scheduler_readiness["cron_configured"] is True
+    assert scheduler_readiness["automation_enabled"] is True
+    assert scheduler_readiness["cron_path"] == (
+        "/automation/cron/a3-autonomous"
+    )
+    assert scheduler_readiness["cron_method"] == "POST"
+    assert scheduler_readiness["cron_header"] == "x-automation-secret"
+    assert 0 <= scheduler_readiness["score"] <= 100
+    assert scheduler_readiness["status"] in {"ok", "warning", "critical"}
+    assert len(scheduler_readiness["checks"]) == 5
+    assert {
+        "automation_module",
+        "autonomous_mode",
+        "cron_secret",
+        "scheduler_runtime",
+        "owner_telegram",
+    } == {item["key"] for item in scheduler_readiness["checks"]}
+    assert manager_scheduler_readiness["cron_configured"] is True
+
+    missing_cron_readiness = crm.get_a3_scheduler_readiness(
+        company_id=2,
+        cron_configured=False,
+        automation_enabled=True,
+        autonomous_enabled=True,
+    )
+    missing_cron_check = next(
+        item
+        for item in missing_cron_readiness["checks"]
+        if item["key"] == "cron_secret"
+    )
+    assert missing_cron_readiness["ready"] is False
+    assert missing_cron_readiness["status"] == "critical"
+    assert missing_cron_check["status"] == "critical"
+    assert "AUTOMATION_CRON_SECRET" in missing_cron_check["message"]
+    assert any(
+        "Добавьте AUTOMATION_CRON_SECRET" in action
+        for action in missing_cron_readiness["next_actions"]
+    )
+
+    try:
+        crm.get_a3_scheduler_readiness(
+            company_id=None,
+            cron_configured=True,
+            automation_enabled=True,
+            autonomous_enabled=True,
+        )
+        assert False, "get_a3_scheduler_readiness must require company_id"
+    except ValueError as exc:
+        assert "company_id is required" in str(exc)
 
     manager_health = crm.api_a3_system_health(manager_request)
     assert "score" in manager_health

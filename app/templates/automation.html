@@ -47,9 +47,10 @@ button:disabled{cursor:not-allowed;opacity:.55}
 .approval-history-filters input[type="number"]{max-width:120px}
 .cycle-history-filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
 .cycle-history-filters button{width:auto}
+.scheduler-readiness-layout{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:18px;margin-top:18px;align-items:start}
 .event{display:grid;grid-template-columns:150px 1fr 120px;gap:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin-bottom:10px}
 .empty{font-weight:900;color:#6b7280;text-align:center;padding:20px}
-@media(max-width:760px){.container{padding:14px}.header,.grid,.rule,.event{grid-template-columns:1fr}.back{text-align:center}.approval-history-filters,.cycle-history-filters{display:grid;grid-template-columns:1fr}.approval-history-filters select,.approval-history-filters input,.approval-history-filters button,.cycle-history-filters button{width:100%;max-width:none}}
+@media(max-width:760px){.container{padding:14px}.header,.grid,.rule,.event,.scheduler-readiness-layout{grid-template-columns:1fr}.back{text-align:center}.approval-history-filters,.cycle-history-filters{display:grid;grid-template-columns:1fr}.approval-history-filters select,.approval-history-filters input,.approval-history-filters button,.cycle-history-filters button{width:100%;max-width:none}}
 </style>
 </head>
 
@@ -988,6 +989,109 @@ async function loadA3RecoveryHistory() {
 
 loadA3RecoveryHistory();
 setInterval(loadA3RecoveryHistory, 30000);
+</script>
+
+
+<div class="card" id="a3-scheduler-readiness-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+        <div>
+            <h2 style="margin-bottom:8px">A3 Готовность фонового режима</h2>
+            <div class="meta">
+                Проверка запуска, автономного управления и каналов оповещения.
+            </div>
+        </div>
+        <div id="a3-scheduler-readiness-badge" class="pill">Проверка...</div>
+    </div>
+
+    <div class="scheduler-readiness-layout">
+        <div>
+            <div id="a3-scheduler-readiness-score"
+                 style="font-size:48px;font-weight:900;line-height:1">—</div>
+            <div class="meta" style="margin-top:8px">из 100</div>
+        </div>
+        <div>
+            <div id="a3-scheduler-readiness-checks"
+                 style="display:flex;flex-direction:column;gap:8px">
+                <div class="pill">Загрузка проверок...</div>
+            </div>
+            <div id="a3-scheduler-readiness-endpoint"
+                 class="meta"
+                 style="margin-top:12px"></div>
+        </div>
+    </div>
+
+    <div id="a3-scheduler-readiness-actions"
+         style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"></div>
+</div>
+
+<script>
+async function loadA3SchedulerReadiness() {
+    const badge = document.getElementById("a3-scheduler-readiness-badge");
+    const score = document.getElementById("a3-scheduler-readiness-score");
+    const checks = document.getElementById("a3-scheduler-readiness-checks");
+    const endpoint = document.getElementById("a3-scheduler-readiness-endpoint");
+    const actions = document.getElementById("a3-scheduler-readiness-actions");
+
+    if (!badge || !score || !checks || !endpoint || !actions) {
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/a3/scheduler-readiness");
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Не удалось проверить фоновый режим A3");
+        }
+
+        badge.className = `pill ${a3StatusPillClass(data.status_tone)}`;
+        badge.textContent = data.status_label || "Нужна проверка";
+        score.textContent = data.score ?? 0;
+        checks.innerHTML = "";
+
+        for (const item of (data.checks || [])) {
+            const row = document.createElement("div");
+            row.style.padding = "12px 0";
+            row.style.borderBottom = "1px solid #e5e7eb";
+            row.innerHTML = `
+                <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+                    <strong>${a3EscapeHtml(item.label)}</strong>
+                    <span class="pill ${a3StatusPillClass(item.status_tone)}">
+                        ${a3EscapeHtml(item.status_label)}
+                    </span>
+                </div>
+                <div class="meta" style="margin-top:5px">
+                    ${a3EscapeHtml(item.message)}
+                </div>
+            `;
+            checks.appendChild(row);
+        }
+
+        endpoint.textContent =
+            `Фоновый маршрут: ${data.cron_method || "POST"} ${data.cron_path || ""}; `
+            + `заголовок: ${data.cron_header || "x-automation-secret"}`;
+        actions.innerHTML = "";
+
+        for (const action of (data.next_actions || [])) {
+            const pill = document.createElement("span");
+            pill.className = "pill warn";
+            pill.textContent = action;
+            actions.appendChild(pill);
+        }
+
+        if (!(data.next_actions || []).length) {
+            actions.innerHTML = '<span class="pill ok">Фоновый режим готов к работе</span>';
+        }
+    } catch (err) {
+        console.error("Ошибка проверки фонового режима A3", err);
+        badge.className = "pill off";
+        badge.textContent = "Ошибка проверки";
+        checks.innerHTML = `<div class="pill off">${a3EscapeHtml(err.message || "Нет данных")}</div>`;
+    }
+}
+
+loadA3SchedulerReadiness();
+setInterval(loadA3SchedulerReadiness, 60000);
 </script>
 
 
