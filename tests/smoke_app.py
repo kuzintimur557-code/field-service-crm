@@ -737,7 +737,7 @@ async def assert_automation_page():
     assert "Последний фоновый запуск:" in html
     assert "Ошибок подряд:" in html
     assert "Запусков с проблемами подряд:" in html
-    assert "Уведомления владельцу: включены" in html
+    assert "Сбои и восстановление: уведомляем владельца" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -26239,12 +26239,35 @@ async def assert_a3_api_layer():
 
     stable_scheduler_alert = crm.notify_a3_scheduler_reliability(
         2,
-        reliability={"status": "stable"},
+        reliability={
+            "status": "stable",
+            "reliability_rate": 80,
+        },
     )
-    assert stable_scheduler_alert == {
-        "created": False,
-        "reason": "status_not_alertable",
-    }
+    assert stable_scheduler_alert["created"] is True
+    assert stable_scheduler_alert["reason"] == "recovery_created"
+    assert stable_scheduler_alert["title"] == (
+        "A3: работа планировщика восстановлена"
+    )
+
+    duplicate_recovery_alert = crm.notify_a3_scheduler_reliability(
+        2,
+        reliability={
+            "status": "stable",
+            "reliability_rate": 85,
+        },
+    )
+    assert duplicate_recovery_alert["created"] is False
+    assert duplicate_recovery_alert["reason"] == "recovery_already_notified"
+
+    regression_scheduler_alert = crm.notify_a3_scheduler_reliability(
+        2,
+        reliability=warning_reliability,
+    )
+    assert regression_scheduler_alert["created"] is True
+    assert regression_scheduler_alert["title"] == (
+        "A3: проверьте фоновый планировщик"
+    )
 
     critical_scheduler_alert = crm.notify_a3_scheduler_reliability(
         2,
@@ -26272,10 +26295,15 @@ async def assert_a3_api_layer():
     ORDER BY id
     """).fetchall()
     conn.close()
-    assert len(scheduler_alerts) == 2
+    assert len(scheduler_alerts) == 4
     assert scheduler_alerts[0]["link"] == "/automation#a3-cycle-history-card"
     assert "Ошибок подряд: 0" in scheduler_alerts[0]["message"]
-    assert "Ошибок подряд: 2" in scheduler_alerts[1]["message"]
+    assert scheduler_alerts[1]["title"] == (
+        "A3: работа планировщика восстановлена"
+    )
+    assert "Надёжность последних запусков: 80%" in scheduler_alerts[1]["message"]
+    assert "Ошибок подряд: 0" in scheduler_alerts[2]["message"]
+    assert "Ошибок подряд: 2" in scheduler_alerts[3]["message"]
 
     conn = connect()
     c = conn.cursor()

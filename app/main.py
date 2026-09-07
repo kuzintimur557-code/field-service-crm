@@ -43645,6 +43645,10 @@ A3_API_ERROR_MESSAGES = {
 }
 
 A3_SCHEDULER_ALERT_COOLDOWN_HOURS = 6
+A3_SCHEDULER_RECOVERY_LOOKBACK_DAYS = 7
+A3_SCHEDULER_WARNING_TITLE = "A3: проверьте фоновый планировщик"
+A3_SCHEDULER_CRITICAL_TITLE = "A3: критическая ошибка планировщика"
+A3_SCHEDULER_RECOVERY_TITLE = "A3: работа планировщика восстановлена"
 
 
 def notify_a3_approval_required(company_id, action_count):
@@ -43696,18 +43700,22 @@ def notify_a3_scheduler_reliability(
 
     status = reliability.get("status") or "unknown"
 
-    if status not in {"warning", "critical"}:
+    if status not in {"stable", "warning", "critical"}:
         return {"created": False, "reason": "status_not_alertable"}
 
     now_value = now or datetime.now()
-    title = (
-        "A3: критическая ошибка планировщика"
-        if status == "critical"
-        else "A3: проверьте фоновый планировщик"
-    )
+    is_recovery = status == "stable"
+    title = {
+        "stable": A3_SCHEDULER_RECOVERY_TITLE,
+        "warning": A3_SCHEDULER_WARNING_TITLE,
+        "critical": A3_SCHEDULER_CRITICAL_TITLE,
+    }[status]
     link = "/automation#a3-cycle-history-card"
     cutoff = (
         now_value - timedelta(hours=A3_SCHEDULER_ALERT_COOLDOWN_HOURS)
+    ).strftime("%Y-%m-%d %H:%M")
+    recovery_lookback = (
+        now_value - timedelta(days=A3_SCHEDULER_RECOVERY_LOOKBACK_DAYS)
     ).strftime("%Y-%m-%d %H:%M")
 
     try:
@@ -43726,40 +43734,112 @@ def notify_a3_scheduler_reliability(
             if not owner_username:
                 return {"created": False, "reason": "owner_not_found"}
 
-            duplicate = c.execute("""
+            latest_recovery = c.execute("""
                 SELECT id
                 FROM notifications
                 WHERE company_id=?
                   AND username=?
                   AND title=?
                   AND link=?
-                  AND created_at>=?
                 ORDER BY id DESC
                 LIMIT 1
             """, (
                 company_id,
                 owner_username,
-                title,
+                A3_SCHEDULER_RECOVERY_TITLE,
                 link,
-                cutoff,
             )).fetchone()
+
+            if is_recovery:
+                latest_alert = c.execute("""
+                    SELECT id
+                    FROM notifications
+                    WHERE company_id=?
+                      AND username=?
+                      AND title IN (?, ?)
+                      AND link=?
+                      AND created_at>=?
+                    ORDER BY id DESC
+                    LIMIT 1
+                """, (
+                    company_id,
+                    owner_username,
+                    A3_SCHEDULER_WARNING_TITLE,
+                    A3_SCHEDULER_CRITICAL_TITLE,
+                    link,
+                    recovery_lookback,
+                )).fetchone()
+                duplicate = None
+            else:
+                latest_alert = None
+                duplicate = c.execute("""
+                    SELECT id
+                    FROM notifications
+                    WHERE company_id=?
+                      AND username=?
+                      AND title=?
+                      AND link=?
+                      AND created_at>=?
+                    ORDER BY id DESC
+                    LIMIT 1
+                """, (
+                    company_id,
+                    owner_username,
+                    title,
+                    link,
+                    cutoff,
+                )).fetchone()
         finally:
             conn.close()
 
-        if duplicate:
+        if is_recovery and not latest_alert:
+            return {"created": False, "reason": "no_active_alert"}
+
+        if (
+            is_recovery
+            and latest_recovery
+            and latest_recovery["id"] > latest_alert["id"]
+        ):
+            return {
+                "created": False,
+                "reason": "recovery_already_notified",
+                "notification_id": latest_recovery["id"],
+            }
+
+        if (
+            not is_recovery
+            and duplicate
+            and (
+                not latest_recovery
+                or latest_recovery["id"] < duplicate["id"]
+            )
+        ):
             return {
                 "created": False,
                 "reason": "cooldown_active",
                 "notification_id": duplicate["id"],
             }
 
-        message = (
-            f"{reliability.get('message') or 'Обнаружена проблема фонового запуска.'} "
-            f"Ошибок подряд: {reliability.get('consecutive_errors') or 0}. "
-            f"Последний запуск: "
-            f"{reliability.get('latest_scheduler_age_label') or 'нет данных'}. "
-            f"{reliability.get('recommendation') or 'Проверьте журнал A3.'}"
-        )
+        if is_recovery:
+            reliability_rate = reliability.get("reliability_rate")
+            rate_label = (
+                f"{reliability_rate}%"
+                if reliability_rate is not None
+                else "нет данных"
+            )
+            message = (
+                "Фоновый планировщик A3 снова работает стабильно. "
+                f"Надёжность последних запусков: {rate_label}. "
+                "Критических ошибок подряд нет."
+            )
+        else:
+            message = (
+                f"{reliability.get('message') or 'Обнаружена проблема фонового запуска.'} "
+                f"Ошибок подряд: {reliability.get('consecutive_errors') or 0}. "
+                f"Последний запуск: "
+                f"{reliability.get('latest_scheduler_age_label') or 'нет данных'}. "
+                f"{reliability.get('recommendation') or 'Проверьте журнал A3.'}"
+            )
         create_notification(
             company_id,
             owner_username,
@@ -43772,7 +43852,7 @@ def notify_a3_scheduler_reliability(
 
     return {
         "created": True,
-        "reason": "created",
+        "reason": "recovery_created" if is_recovery else "created",
         "title": title,
         "username": owner_username,
     }
