@@ -710,6 +710,20 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS a3_scheduler_watchdog_status (
+        company_id INTEGER PRIMARY KEY,
+        status TEXT NOT NULL,
+        status_label TEXT NOT NULL,
+        reason TEXT,
+        message TEXT,
+        latest_scheduler_run_at TEXT,
+        notification_created INTEGER NOT NULL DEFAULT 0,
+        telegram_sent INTEGER NOT NULL DEFAULT 0,
+        checked_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS system_health_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1076,6 +1090,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_a3_cycle_runs_company_created
     ON a3_autonomous_cycle_runs(company_id, created_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_watchdog_checked
+    ON a3_scheduler_watchdog_status(checked_at)
     """)
 
     c.execute("""

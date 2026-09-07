@@ -745,6 +745,12 @@ async def assert_automation_page():
     assert "Основной запуск:" in html
     assert "Контроль планировщика:" in html
     assert "Фоновый режим готов к работе" in html
+    assert "A3 Контроль планировщика" in html
+    assert "Независимая проверка основного фонового запуска" in html
+    assert "/api/a3/scheduler-watchdog-status" in html
+    assert "loadA3SchedulerWatchdogStatus" in html
+    assert "Последняя контрольная проверка" in html
+    assert "Последний основной запуск" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -24732,6 +24738,10 @@ async def assert_a3_api_layer():
             (companyless_request,),
         ),
         (
+            crm.api_a3_scheduler_watchdog_status,
+            (companyless_request,),
+        ),
+        (
             crm.api_a3_autonomous_cycle_history,
             (companyless_request,),
         ),
@@ -25019,6 +25029,32 @@ async def assert_a3_api_layer():
         assert watchdog_states[9803]["alertable"] is False
         assert watchdog_states[9804]["reason"] == "autonomous_disabled"
         assert watchdog_states[9804]["alertable"] is False
+
+        saved_watchdog_states = crm.save_a3_scheduler_watchdog_status(
+            watchdog_state_report,
+            checked_at=watchdog_now,
+        )
+        assert saved_watchdog_states == watchdog_state_report[
+            "companies_total"
+        ]
+        stored_watchdog_state = crm.get_a3_scheduler_watchdog_status(
+            9801,
+            now=watchdog_now,
+        )
+        assert stored_watchdog_state["company_id"] == 9801
+        assert stored_watchdog_state["status"] == "warning"
+        assert stored_watchdog_state["checked_age_minutes"] == 0
+        assert stored_watchdog_state["checked_age_label"] == "Только что"
+        assert stored_watchdog_state["latest_scheduler_age_label"] == (
+            "Основных запусков пока нет"
+        )
+        stale_watchdog_state = crm.get_a3_scheduler_watchdog_status(
+            9801,
+            now=watchdog_now + timedelta(hours=49),
+        )
+        assert stale_watchdog_state["status"] == "critical"
+        assert stale_watchdog_state["status_label"] == "Контроль остановлен"
+        assert "больше 48 часов" in stale_watchdog_state["message"]
     finally:
         conn = connect()
         c = conn.cursor()
@@ -25033,6 +25069,11 @@ async def assert_a3_api_layer():
             watchdog_company_ids,
         )
         c.execute(
+            "DELETE FROM a3_scheduler_watchdog_status "
+            f"WHERE company_id IN ({placeholders})",
+            watchdog_company_ids,
+        )
+        c.execute(
             f"DELETE FROM companies WHERE id IN ({placeholders})",
             watchdog_company_ids,
         )
@@ -25040,6 +25081,7 @@ async def assert_a3_api_layer():
         conn.close()
 
     watchdog_notifications = []
+    watchdog_heartbeats = []
 
     def fake_watchdog_notifier(company_id, reliability=None, now=None):
         status = (reliability or {}).get("status")
@@ -25064,10 +25106,15 @@ async def assert_a3_api_layer():
             "reason": "cooldown_active",
         }
 
+    def fake_watchdog_status_recorder(report, checked_at=None):
+        watchdog_heartbeats.append((len(report.get("items", [])), checked_at))
+        return len(report.get("items", []))
+
     deterministic_watchdog = (
         crm.run_a3_scheduler_watchdog_for_all_companies(
             now=watchdog_now,
             notifier=fake_watchdog_notifier,
+            status_recorder=fake_watchdog_status_recorder,
             report={
                 "companies_total": 4,
                 "eligible_companies": 3,
@@ -25115,6 +25162,24 @@ async def assert_a3_api_layer():
     assert deterministic_watchdog["telegram_sent"] == 1
     assert deterministic_watchdog["suppressed"] == 1
     assert deterministic_watchdog["notification_errors"] == 0
+    assert deterministic_watchdog["heartbeats_saved"] == 4
+    assert deterministic_watchdog["heartbeat_error"] == ""
+    assert watchdog_heartbeats == [(4, watchdog_now)]
+
+    owner_watchdog_status = crm.api_a3_scheduler_watchdog_status(request)
+    manager_watchdog_status = crm.api_a3_scheduler_watchdog_status(
+        manager_request
+    )
+    assert owner_watchdog_status["company_id"] == 2
+    assert manager_watchdog_status["company_id"] == 2
+    assert owner_watchdog_status["status"] in {
+        "stable",
+        "warning",
+        "critical",
+        "waiting",
+        "skipped",
+        "error",
+    }
 
     old_watchdog_secret = os.environ.get("AUTOMATION_CRON_SECRET")
     os.environ.pop("AUTOMATION_CRON_SECRET", None)
@@ -25169,6 +25234,12 @@ async def assert_a3_api_layer():
             autonomous_enabled=True,
         )
         assert False, "get_a3_scheduler_readiness must require company_id"
+    except ValueError as exc:
+        assert "company_id is required" in str(exc)
+
+    try:
+        crm.get_a3_scheduler_watchdog_status(company_id=None)
+        assert False, "get_a3_scheduler_watchdog_status must require company_id"
     except ValueError as exc:
         assert "company_id is required" in str(exc)
 

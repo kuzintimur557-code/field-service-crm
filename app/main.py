@@ -26,7 +26,11 @@ from app.services.a3_cycle_history import (
     record_a3_cycle_run,
 )
 from app.services.a3_scheduler_readiness import get_a3_scheduler_readiness
-from app.services.a3_scheduler_watchdog import get_a3_scheduler_watchdog_report
+from app.services.a3_scheduler_watchdog import (
+    get_a3_scheduler_watchdog_report,
+    get_a3_scheduler_watchdog_status,
+    save_a3_scheduler_watchdog_status,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -44163,6 +44167,7 @@ def run_a3_scheduler_watchdog_for_all_companies(
     now=None,
     notifier=None,
     report=None,
+    status_recorder=None,
 ):
     watchdog_report = report or get_a3_scheduler_watchdog_report(now=now)
     notify = notifier or notify_a3_scheduler_reliability
@@ -44207,6 +44212,19 @@ def run_a3_scheduler_watchdog_for_all_companies(
             watchdog_report["notification_errors"] += 1
         else:
             watchdog_report["suppressed"] += 1
+
+    recorder = status_recorder or save_a3_scheduler_watchdog_status
+    try:
+        watchdog_report["heartbeats_saved"] = recorder(
+            watchdog_report,
+            checked_at=now,
+        )
+        watchdog_report["heartbeat_error"] = ""
+    except Exception:
+        watchdog_report["heartbeats_saved"] = 0
+        watchdog_report["heartbeat_error"] = (
+            "Не удалось сохранить состояние контрольной проверки."
+        )
 
     return watchdog_report
 
@@ -44343,6 +44361,16 @@ def api_a3_scheduler_readiness(request: Request):
         automation_enabled=has_feature(company_id, "automation"),
         autonomous_enabled=bool(governance.get("autonomous_enabled", 1)),
     )
+
+
+@app.get("/api/a3/scheduler-watchdog-status")
+def api_a3_scheduler_watchdog_status(request: Request):
+    company_id = get_a3_company_id(request)
+
+    if not company_id:
+        return a3_api_error("forbidden", 403)
+
+    return get_a3_scheduler_watchdog_status(company_id)
 
 
 @app.get("/api/a3/autonomous-cycle-history")
