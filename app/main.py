@@ -11457,6 +11457,7 @@ def make_system_check(
 def get_platform_release_readiness(
     counts=None,
     calendar_health_summary=None,
+    a3_health_summary=None,
 ):
     counts = counts or {}
     conn = connect()
@@ -11496,6 +11497,8 @@ def get_platform_release_readiness(
         calendar_health_summary = get_platform_calendar_health()[
             "summary"
         ]
+    if a3_health_summary is None:
+        a3_health_summary = get_a3_platform_health()["summary"]
 
     production_config = get_production_config_status()
     env_name = production_config["environment"]
@@ -11686,6 +11689,30 @@ def get_platform_release_readiness(
             "Операции",
         ),
         make_release_readiness_check(
+            "a3_scheduler_health",
+            "Фоновые процессы A3",
+            (
+                "critical"
+                if a3_health_summary["critical"]
+                else (
+                    "warning"
+                    if a3_health_summary["problems"]
+                    else "ok"
+                )
+            ),
+            (
+                f"Компаний: {a3_health_summary['total']}. "
+                f"Стабильно: {a3_health_summary['stable']}. "
+                f"Требуют внимания: {a3_health_summary['problems']}. "
+                f"Приостановлено: {a3_health_summary['paused']}."
+            ),
+            "Проверьте основной планировщик и контрольные запуски A3.",
+            "/platform/a3-health",
+            10,
+            "operations",
+            "Операции",
+        ),
+        make_release_readiness_check(
             "backups",
             "Резервные копии",
             backup_status["status"],
@@ -11810,6 +11837,7 @@ def get_platform_release_readiness(
         "ok_count": sum(1 for item in checks if item["status"] == "ok"),
         "environment": env_name,
         "backup_status": backup_status,
+        "a3_health_summary": a3_health_summary,
         "export_url": "/platform/readiness/export",
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -11823,6 +11851,7 @@ def build_platform_readiness_links(snapshot_id=None):
         "snapshot": "/platform/readiness/snapshot",
         "signoff": "/platform/readiness/signoff",
         "export": "/platform/readiness/export",
+        "a3_health": "/platform/a3-health",
         "calendar_health": "/platform/calendar-health",
     }
 
@@ -11868,6 +11897,7 @@ def get_platform_release_launch_plan(readiness):
     critical_count = int(readiness["critical_count"] or 0)
     warning_count = int(readiness["warning_count"] or 0)
     calendar_check = checks_by_key.get("calendar_ops", {})
+    a3_check = checks_by_key.get("a3_scheduler_health", {})
     security_category = categories_by_key.get("security", {})
     blockers = sorted(
         readiness["blockers"],
@@ -11947,6 +11977,23 @@ def get_platform_release_launch_plan(readiness):
                 )
             ),
         ),
+        make_release_launch_item(
+            "Фоновые процессы A3 стабильны",
+            a3_check.get(
+                "description",
+                "Проверьте основной планировщик и контрольные запуски A3.",
+            ),
+            "/platform/a3-health",
+            (
+                "critical"
+                if a3_check.get("status") == "critical"
+                else (
+                    "warning"
+                    if a3_check.get("status") == "warning"
+                    else "ok"
+                )
+            ),
+        ),
     ]
 
     mandatory_items = [
@@ -11993,6 +12040,12 @@ def get_platform_release_launch_plan(readiness):
     ])
 
     monitoring_items = [
+        make_release_launch_item(
+            "Проверить фоновые процессы A3",
+            "Убедитесь, что основной и контрольный запуски продолжаются.",
+            "/platform/a3-health",
+            "warning",
+        ),
         make_release_launch_item(
             "Проверить инциденты календаря",
             "После запуска следите за критичными инцидентами компаний.",
@@ -12313,6 +12366,7 @@ def get_platform_release_runbook(
         "platform_billing_reminder_cron",
         {},
     )
+    a3_check = checks_by_key.get("a3_scheduler_health", {})
 
     if blocked:
         status = "critical"
@@ -12383,6 +12437,15 @@ def get_platform_release_runbook(
                         else "warning"
                     ),
                 ),
+                make_release_runbook_step(
+                    "Проверить фоновые процессы A3",
+                    a3_check.get(
+                        "description",
+                        "Проверьте основной и контрольный запуски A3.",
+                    ),
+                    "/platform/a3-health",
+                    a3_check.get("status", "warning"),
+                ),
             ],
         },
         {
@@ -12413,6 +12476,12 @@ def get_platform_release_runbook(
                     "Проверить операционный контроль",
                     "Убедитесь, что нет критичных календарных инцидентов.",
                     "/platform/calendar-health",
+                    "warning",
+                ),
+                make_release_runbook_step(
+                    "Проверить выполнение A3",
+                    "Убедитесь, что фоновые и контрольные запуски не остановились.",
+                    "/platform/a3-health",
                     "warning",
                 ),
             ],
@@ -12474,6 +12543,12 @@ def get_platform_release_runbook(
                     "warning",
                 ),
                 make_release_runbook_step(
+                    "Проверить стабильность A3",
+                    "Проверьте свежесть основного и контрольного запусков по компаниям.",
+                    "/platform/a3-health",
+                    "warning",
+                ),
+                make_release_runbook_step(
                     "Экспортировать финальный отчёт",
                     "Сохраните CSV после проверки первых клиентов.",
                     "/platform/readiness/export",
@@ -12501,6 +12576,7 @@ def get_platform_release_runbook(
         "Появился новый критичный блокер готовности.",
         "Вход суперадмина или владельца компании перестал работать.",
         "Появились критичные календарные инциденты.",
+        "Основной планировщик или контрольные запуски A3 остановились.",
         "Интеграции или загрузки файлов перестали работать после публикации.",
         "Оценка готовности упала относительно финального снимка.",
     ]
@@ -12573,8 +12649,10 @@ def get_platform_release_control_center(
     blocked = bool(launch_plan["blocked"])
     has_signoff = bool(runbook["has_signoff"])
     calendar_check = checks_by_key.get("calendar_ops", {})
+    a3_check = checks_by_key.get("a3_scheduler_health", {})
     security_category = categories_by_key.get("security", {})
     calendar_status = calendar_check.get("status", "warning")
+    a3_status = a3_check.get("status", "warning")
 
     if blocked:
         status = "critical"
@@ -12641,6 +12719,20 @@ def get_platform_release_control_center(
             "/platform/calendar-health",
         ),
         make_release_control_item(
+            "Фоновые процессы A3",
+            a3_check.get(
+                "description",
+                "Состояние основного и контрольного запусков A3.",
+            ),
+            a3_check.get("status_label", "Проверить"),
+            (
+                "critical"
+                if a3_status == "critical"
+                else ("warning" if a3_status == "warning" else "ok")
+            ),
+            "/platform/a3-health",
+        ),
+        make_release_control_item(
             "Безопасность",
             "Состояние проверок безопасности перед запуском.",
             security_category.get("status_label", "Проверить"),
@@ -12678,7 +12770,7 @@ def get_platform_release_control_center(
         ),
         make_release_control_item(
             "Первые 30 минут",
-            "Проверить авторизацию, календарь, уведомления и загрузки файлов.",
+            "Проверить авторизацию, A3, календарь, уведомления и загрузки файлов.",
             "T+30 минут",
             "warning",
             "/system",
@@ -12717,6 +12809,7 @@ def get_platform_release_control_center(
         "Появился новый критичный блокер готовности.",
         "Оценка готовности упала ниже 75%.",
         "Календарные инциденты стали критичными.",
+        "Фоновые или контрольные запуски A3 остановились.",
         "Суперадмин или владелец компании не может войти в систему.",
         "Загрузки файлов или уведомления перестали работать.",
     ]

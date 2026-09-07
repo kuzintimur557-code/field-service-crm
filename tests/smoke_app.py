@@ -13291,6 +13291,83 @@ async def assert_platform_a3_health():
     )
     invalid_health = crm.get_a3_platform_health(status_filter="broken")
     assert invalid_health["status_filter"] == "all"
+
+    calendar_ready = {
+        "overall_status_code": "stable",
+        "overall_status_label": "Стабильно",
+        "problems": 0,
+    }
+    release_counts = {
+        "companies": 1,
+        "users": 2,
+        "tasks": 0,
+        "clients": 0,
+    }
+
+    def get_a3_release_check(**summary):
+        readiness = crm.get_platform_release_readiness(
+            counts=release_counts,
+            calendar_health_summary=calendar_ready,
+            a3_health_summary={
+                "total": 3,
+                "stable": 3,
+                "warning": 0,
+                "critical": 0,
+                "waiting": 0,
+                "paused": 0,
+                "problems": 0,
+                **summary,
+            },
+        )
+        return readiness, next(
+            item
+            for item in readiness["checks"]
+            if item["key"] == "a3_scheduler_health"
+        )
+
+    ready_release, ready_check = get_a3_release_check()
+    assert ready_check["status"] == "ok"
+    assert ready_check["url"] == "/platform/a3-health"
+    assert ready_release["a3_health_summary"]["stable"] == 3
+    warning_release, warning_check = get_a3_release_check(
+        stable=2,
+        warning=1,
+        problems=1,
+    )
+    assert warning_check["status"] == "warning"
+    assert warning_check in warning_release["next_actions"]
+    critical_release, critical_check = get_a3_release_check(
+        stable=2,
+        critical=1,
+        problems=1,
+    )
+    assert critical_check["status"] == "critical"
+    assert critical_check in critical_release["blockers"]
+    critical_launch = crm.get_platform_release_launch_plan(critical_release)
+    assert any(
+        item["title"] == "Фоновые процессы A3 стабильны"
+        and item["status"] == "critical"
+        for item in critical_launch["phases"][0]["items"]
+    )
+    critical_runbook = crm.get_platform_release_runbook(
+        critical_release,
+        critical_launch,
+    )
+    assert any(
+        step["url"] == "/platform/a3-health"
+        for section in critical_runbook["sections"]
+        for step in section["steps"]
+    )
+    critical_control = crm.get_platform_release_control_center(
+        critical_release,
+        critical_launch,
+        runbook=critical_runbook,
+    )
+    assert any(
+        metric["title"] == "Фоновые процессы A3"
+        and metric["status"] == "critical"
+        for metric in critical_control["metrics"]
+    )
     assert crm.build_a3_platform_health_url() == "/platform/a3-health"
     assert crm.build_a3_platform_health_url(
         "critical",
@@ -17063,6 +17140,9 @@ async def assert_platform_calendar_health():
         assert readiness_page.context["links"]["calendar_health"] == (
             "/platform/calendar-health"
         )
+        assert readiness_page.context["links"]["a3_health"] == (
+            "/platform/a3-health"
+        )
         assert "Готовность релиза" in readiness_html
         assert 'class="platform-mobile-nav"' in readiness_html
         assert 'class="platform-mobile-nav-grid"' in readiness_html
@@ -17088,8 +17168,12 @@ async def assert_platform_calendar_health():
         assert "Cron напоминаний по счетам" in readiness_html
         assert "Подключить cron счетов" in readiness_html
         assert "Операционный контроль" in readiness_html
+        assert "Фоновые процессы A3" in readiness_html
+        assert "Фоновые процессы A3 стабильны" in readiness_html
+        assert "Проверить фоновые процессы A3" in readiness_html
         assert "/platform/readiness/export" in readiness_html
         assert "/platform/calendar-health" in readiness_html
+        assert "/platform/a3-health" in readiness_html
         anonymous_snapshot = await crm.platform_readiness_snapshot(
             make_public_asgi_request("/platform/readiness/snapshot"),
         )
@@ -17307,6 +17391,8 @@ async def assert_platform_calendar_health():
         assert "Все проверки" in readiness_csv
         assert "Cron напоминаний по счетам" in readiness_csv
         assert "Подключить cron счетов" in readiness_csv
+        assert "Фоновые процессы A3" in readiness_csv
+        assert "Проверить фоновые процессы A3" in readiness_csv
         assert "История снимков" in readiness_csv
         assert "Секрет приложения" in readiness_csv
         assert backup_admin_username in readiness_csv
@@ -17380,6 +17466,10 @@ async def assert_platform_calendar_health():
         assert readiness_api["export_url"] == "/platform/readiness/export"
         assert any(
             check["key"] == "platform_billing_reminder_cron"
+            for check in readiness_api["checks"]
+        )
+        assert any(
+            check["key"] == "a3_scheduler_health"
             for check in readiness_api["checks"]
         )
         anonymous_review_api = (
