@@ -43692,6 +43692,7 @@ def notify_a3_scheduler_reliability(
     company_id,
     reliability=None,
     now=None,
+    telegram_sender=None,
 ):
     try:
         reliability = reliability or get_a3_cycle_reliability(company_id)
@@ -43723,12 +43724,20 @@ def notify_a3_scheduler_reliability(
         try:
             c = conn.cursor()
             company = c.execute("""
-                SELECT owner_username
+                SELECT
+                    companies.owner_username,
+                    users.telegram_chat_id
                 FROM companies
-                WHERE id=?
+                LEFT JOIN users
+                  ON users.company_id=companies.id
+                 AND users.username=companies.owner_username
+                WHERE companies.id=?
             """, (company_id,)).fetchone()
             owner_username = str(
                 company["owner_username"] if company else ""
+            ).strip()
+            owner_chat_id = str(
+                company["telegram_chat_id"] if company else ""
             ).strip()
 
             if not owner_username:
@@ -43850,11 +43859,26 @@ def notify_a3_scheduler_reliability(
     except Exception:
         return {"created": False, "reason": "notification_failed"}
 
+    telegram_sent = False
+    if owner_chat_id:
+        try:
+            sender = telegram_sender or send_message_to_chat
+            telegram_sent = bool(
+                sender(
+                    owner_chat_id,
+                    f"{title}\n\n{message}",
+                )
+            )
+        except Exception:
+            telegram_sent = False
+
     return {
         "created": True,
         "reason": "recovery_created" if is_recovery else "created",
         "title": title,
         "username": owner_username,
+        "telegram_configured": bool(owner_chat_id),
+        "telegram_sent": telegram_sent,
     }
 
 

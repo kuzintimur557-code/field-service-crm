@@ -737,7 +737,7 @@ async def assert_automation_page():
     assert "Последний фоновый запуск:" in html
     assert "Ошибок подряд:" in html
     assert "Запусков с проблемами подряд:" in html
-    assert "Сбои и восстановление: уведомляем владельца" in html
+    assert "Сбои и восстановление: центр уведомлений + Telegram" in html
 
     diagnostics_response = await crm.automation_diagnostics_page(
         make_asgi_request("owner2", "/automation/diagnostics")
@@ -26211,8 +26211,20 @@ async def assert_a3_api_layer():
       AND username='owner2'
       AND title LIKE 'A3:%планировщик%'
     """)
+    c.execute("""
+    UPDATE users
+    SET telegram_chat_id='chat-owner2'
+    WHERE company_id=2
+      AND username='owner2'
+    """)
     conn.commit()
     conn.close()
+
+    scheduler_telegram_messages = []
+
+    def capture_scheduler_telegram(chat_id, text):
+        scheduler_telegram_messages.append((chat_id, text))
+        return True
 
     warning_reliability = {
         "status": "warning",
@@ -26224,18 +26236,24 @@ async def assert_a3_api_layer():
     first_scheduler_alert = crm.notify_a3_scheduler_reliability(
         2,
         reliability=warning_reliability,
+        telegram_sender=capture_scheduler_telegram,
     )
     assert first_scheduler_alert["created"] is True
     assert first_scheduler_alert["username"] == "owner2"
     assert first_scheduler_alert["title"] == "A3: проверьте фоновый планировщик"
+    assert first_scheduler_alert["telegram_configured"] is True
+    assert first_scheduler_alert["telegram_sent"] is True
+    assert len(scheduler_telegram_messages) == 1
 
     duplicate_scheduler_alert = crm.notify_a3_scheduler_reliability(
         2,
         reliability=warning_reliability,
+        telegram_sender=capture_scheduler_telegram,
     )
     assert duplicate_scheduler_alert["created"] is False
     assert duplicate_scheduler_alert["reason"] == "cooldown_active"
     assert duplicate_scheduler_alert["notification_id"] > 0
+    assert len(scheduler_telegram_messages) == 1
 
     stable_scheduler_alert = crm.notify_a3_scheduler_reliability(
         2,
@@ -26243,12 +26261,15 @@ async def assert_a3_api_layer():
             "status": "stable",
             "reliability_rate": 80,
         },
+        telegram_sender=capture_scheduler_telegram,
     )
     assert stable_scheduler_alert["created"] is True
     assert stable_scheduler_alert["reason"] == "recovery_created"
     assert stable_scheduler_alert["title"] == (
         "A3: работа планировщика восстановлена"
     )
+    assert stable_scheduler_alert["telegram_sent"] is True
+    assert len(scheduler_telegram_messages) == 2
 
     duplicate_recovery_alert = crm.notify_a3_scheduler_reliability(
         2,
@@ -26256,18 +26277,22 @@ async def assert_a3_api_layer():
             "status": "stable",
             "reliability_rate": 85,
         },
+        telegram_sender=capture_scheduler_telegram,
     )
     assert duplicate_recovery_alert["created"] is False
     assert duplicate_recovery_alert["reason"] == "recovery_already_notified"
+    assert len(scheduler_telegram_messages) == 2
 
     regression_scheduler_alert = crm.notify_a3_scheduler_reliability(
         2,
         reliability=warning_reliability,
+        telegram_sender=capture_scheduler_telegram,
     )
     assert regression_scheduler_alert["created"] is True
     assert regression_scheduler_alert["title"] == (
         "A3: проверьте фоновый планировщик"
     )
+    assert len(scheduler_telegram_messages) == 3
 
     critical_scheduler_alert = crm.notify_a3_scheduler_reliability(
         2,
@@ -26278,10 +26303,23 @@ async def assert_a3_api_layer():
             "consecutive_errors": 2,
             "latest_scheduler_age_label": "Только что",
         },
+        telegram_sender=capture_scheduler_telegram,
     )
     assert critical_scheduler_alert["created"] is True
     assert critical_scheduler_alert["title"] == (
         "A3: критическая ошибка планировщика"
+    )
+    assert critical_scheduler_alert["telegram_sent"] is True
+    assert len(scheduler_telegram_messages) == 4
+    assert all(
+        chat_id == "chat-owner2"
+        for chat_id, _ in scheduler_telegram_messages
+    )
+    assert "проверьте фоновый планировщик" in (
+        scheduler_telegram_messages[0][1].lower()
+    )
+    assert "работа планировщика восстановлена" in (
+        scheduler_telegram_messages[1][1].lower()
     )
 
     conn = connect()
