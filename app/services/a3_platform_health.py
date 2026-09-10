@@ -148,6 +148,10 @@ def get_a3_platform_health(status_filter="all", search="", now=None):
     summary["active_incidents"] = incident_summary["active"]
     summary["active_critical_incidents"] = incident_summary["critical"]
     summary["unacknowledged_incidents"] = incident_summary["unacknowledged"]
+    summary["response_overdue_incidents"] = incident_summary[
+        "response_overdue"
+    ]
+    summary["escalated_incidents"] = incident_summary["escalated"]
 
     search_lower = selected_search.lower()
     filtered_items = [

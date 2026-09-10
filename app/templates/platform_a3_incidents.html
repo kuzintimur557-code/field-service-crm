@@ -19,7 +19,7 @@ body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
 .button.warning{border-color:#92400e;background:#92400e;color:#fff}
 .notice{margin-bottom:14px;padding:12px 14px;border:1px solid #bbf7d0;border-radius:8px;background:#f0fdf4;color:#166534;font-size:12px;font-weight:900}
 .notice.error{border-color:#fecaca;background:#fff7f7;color:#991b1b}
-.stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .stat{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
 .stat-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
 .stat-value{margin-top:5px;font-size:24px;font-weight:900}
@@ -42,7 +42,7 @@ textarea{min-height:78px;resize:vertical}
 .status.success{background:#d1fae5;color:#065f46}
 .status.warning{background:#fef3c7;color:#92400e}
 .message{margin:13px 0;padding:11px 0;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;color:#374151;font-size:13px;font-weight:700;line-height:1.5}
-.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:13px}
+.facts{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:13px}
 .fact-label{color:#6b7280;font-size:9px;font-weight:900;text-transform:uppercase}
 .fact-value{margin-top:4px;font-size:12px;font-weight:900;line-height:1.35}
 .workspace{display:grid;grid-template-columns:minmax(240px,.8fr) minmax(300px,1.2fr);gap:12px;padding-top:13px;border-top:1px solid #e5e7eb}
@@ -72,7 +72,7 @@ summary{cursor:pointer;font-size:12px;font-weight:900}
     <header class="header">
         <div>
             <h1>Инциденты A3</h1>
-            <div class="subtitle">Единый журнал критических сбоев фоновых процессов по всем компаниям.<br>Обновлено: {{ center["generated_at"] }}.</div>
+            <div class="subtitle">Единый журнал критических сбоев фоновых процессов по всем компаниям.<br>Реакция: {{ center["policy"]["response_label"] }} · эскалация: {{ center["policy"]["escalation_label"] }} · обновлено: {{ center["generated_at"] }}.</div>
         </div>
         <div class="header-actions">
             <a class="button secondary" href="{{ links['a3_health'] }}">Состояние A3</a>
@@ -91,6 +91,8 @@ summary{cursor:pointer;font-size:12px;font-weight:900}
         <div class="stat"><div class="stat-label">Без реакции</div><div class="stat-value">{{ summary["unacknowledged"] }}</div></div>
         <div class="stat"><div class="stat-label">Приняты в работу</div><div class="stat-value">{{ summary["acknowledged"] }}</div></div>
         <div class="stat"><div class="stat-label">Без ответственного</div><div class="stat-value">{{ summary["unassigned"] }}</div></div>
+        <div class="stat"><div class="stat-label">Реакция просрочена</div><div class="stat-value">{{ summary["response_overdue"] }}</div></div>
+        <div class="stat"><div class="stat-label">Эскалированы</div><div class="stat-value">{{ summary["escalated"] }}</div></div>
         <div class="stat"><div class="stat-label">Закрытые</div><div class="stat-value">{{ summary["resolved"] }}</div></div>
     </section>
 
@@ -124,6 +126,8 @@ summary{cursor:pointer;font-size:12px;font-weight:900}
                 <div class="badges">
                     <span class="status {{ incident['status_tone'] }}">{{ incident["status_label"] }}</span>
                     <span class="status {{ incident['work_status_tone'] }}">{{ incident["work_status_label"] }}</span>
+                    <span class="status {{ incident['response_status_tone'] }}">{{ incident["response_status_label"] }}</span>
+                    {% if incident["is_escalated"] %}<span class="status danger">Эскалирован</span>{% endif %}
                 </div>
             </div>
 
@@ -133,6 +137,8 @@ summary{cursor:pointer;font-size:12px;font-weight:900}
                 <div><div class="fact-label">Последнее повторение</div><div class="fact-value">{{ incident["last_detected_label"] }}</div></div>
                 <div><div class="fact-label">Повторений</div><div class="fact-value">{{ incident["occurrence_count"] }}</div></div>
                 <div><div class="fact-label">Ответственный</div><div class="fact-value">{{ incident["assignee_label"] }}</div></div>
+                <div><div class="fact-label">Срок реакции</div><div class="fact-value">{{ incident["response_due_label"] }}<div class="incident-meta">{{ incident["response_progress_label"] }}</div></div></div>
+                <div><div class="fact-label">Эскалация</div><div class="fact-value">{{ incident["escalation_due_label"] }}<div class="incident-meta">{{ incident["escalation_progress_label"] }}</div></div></div>
             </div>
 
             {% if incident["status"] == "open" %}

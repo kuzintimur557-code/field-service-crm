@@ -13544,6 +13544,18 @@ async def assert_platform_a3_incidents():
     """)
     c.execute("DELETE FROM a3_platform_incident_events")
     c.execute("DELETE FROM a3_platform_incidents")
+    incident_columns = {
+        row["name"]
+        for row in c.execute(
+            "PRAGMA table_info(a3_platform_incidents)"
+        ).fetchall()
+    }
+    assert {
+        "response_due_at",
+        "escalation_due_at",
+        "escalated_at",
+        "escalation_count",
+    }.issubset(incident_columns)
     c.execute("""
         DELETE FROM notifications
         WHERE link LIKE '/platform/a3-health/incidents%'
@@ -13587,6 +13599,8 @@ async def assert_platform_a3_incidents():
             "notifications_created": platform_admin_count,
             "telegram_sent": platform_admin_chat_count,
             "items_checked": 1,
+            "escalated": 0,
+            "escalation_error": "",
         }
         active_center = crm.get_a3_platform_incidents(
             search="Company 2",
@@ -13602,6 +13616,10 @@ async def assert_platform_a3_incidents():
         assert incident["occurrence_count"] == 1
         assert incident["events"][0]["event_type"] == "opened"
         assert incident["status_label"] == "Открыт"
+        assert incident["response_due_label"] == "16.06.2026 12:30"
+        assert incident["escalation_due_label"] == "16.06.2026 13:00"
+        assert active_center["policy"]["response_minutes"] == 30
+        assert active_center["policy"]["escalation_minutes"] == 60
 
         repeated = crm.sync_a3_platform_incidents(
             critical_report,
@@ -13635,17 +13653,64 @@ async def assert_platform_a3_incidents():
         assert warning_result["resolved"] == 0
         assert crm.get_a3_platform_incidents()["summary"]["active"] == 1
 
+        overdue_center = crm.get_a3_platform_incidents(
+            status_filter="response_overdue",
+            current_username="super",
+            now=incident_now + timedelta(minutes=35),
+        )
+        assert overdue_center["summary"]["response_overdue"] == 1
+        assert [item["id"] for item in overdue_center["items"]] == [
+            incident_id
+        ]
+        assert overdue_center["items"][0]["response_status_label"] == (
+            "Реакция просрочена"
+        )
+        assert overdue_center["items"][0][
+            "response_progress_label"
+        ] == "Просрочено на 5 мин."
+
+        escalated = crm.escalate_overdue_a3_platform_incidents(
+            now=incident_now + timedelta(minutes=61),
+            telegram_sender=fake_telegram,
+        )
+        assert escalated == {
+            "checked": 1,
+            "escalated": 1,
+            "notifications_created": platform_admin_count,
+            "telegram_sent": platform_admin_chat_count,
+        }
+        duplicate_escalation = (
+            crm.escalate_overdue_a3_platform_incidents(
+                now=incident_now + timedelta(minutes=62),
+                telegram_sender=fake_telegram,
+            )
+        )
+        assert duplicate_escalation["escalated"] == 0
+        assert duplicate_escalation["notifications_created"] == 0
+        escalated_center = crm.get_a3_platform_incidents(
+            status_filter="escalated",
+            current_username="super",
+            now=incident_now + timedelta(minutes=62),
+        )
+        assert escalated_center["summary"]["escalated"] == 1
+        assert escalated_center["items"][0]["id"] == incident_id
+        assert escalated_center["items"][0]["is_escalated"] is True
+        assert escalated_center["items"][0]["events"][0][
+            "event_type"
+        ] == "escalated"
+
         acknowledged = crm.acknowledge_a3_platform_incident(
             incident_id,
             "super",
-            now=incident_now + timedelta(minutes=15),
+            now=incident_now + timedelta(minutes=65),
         )
         assert acknowledged["ok"] is True
         assert acknowledged["assigned_to"] == "super"
+        assert acknowledged["response_was_late"] is True
         duplicate_acknowledgement = crm.acknowledge_a3_platform_incident(
             incident_id,
             "super",
-            now=incident_now + timedelta(minutes=16),
+            now=incident_now + timedelta(minutes=66),
         )
         assert duplicate_acknowledgement["error"] == "already_acknowledged"
 
@@ -13653,7 +13718,7 @@ async def assert_platform_a3_incidents():
             incident_id,
             "super",
             "incident_admin",
-            now=incident_now + timedelta(minutes=20),
+            now=incident_now + timedelta(minutes=70),
             telegram_sender=fake_telegram,
         )
         assert assigned["ok"] is True
@@ -13664,7 +13729,7 @@ async def assert_platform_a3_incidents():
             incident_id,
             "super",
             "incident_admin",
-            now=incident_now + timedelta(minutes=21),
+            now=incident_now + timedelta(minutes=71),
             telegram_sender=fake_telegram,
         )
         assert duplicate_assignment["notifications_created"] == 0
@@ -13674,7 +13739,7 @@ async def assert_platform_a3_incidents():
             incident_id,
             "incident_admin",
             "Проверяю расписание и секрет фонового запуска.",
-            now=incident_now + timedelta(minutes=25),
+            now=incident_now + timedelta(minutes=75),
         )
         assert note_result["ok"] is True
         assert crm.add_a3_platform_incident_note(
@@ -13694,6 +13759,13 @@ async def assert_platform_a3_incidents():
         )
         assert [item["id"] for item in mine["items"]] == [incident_id]
         assert mine["summary"]["acknowledged"] == 1
+        assert mine["items"][0]["response_was_late"] is True
+        assert mine["items"][0]["response_status_label"] == (
+            "Реакция с опозданием"
+        )
+        assert mine["items"][0]["response_progress_label"].startswith(
+            "С опозданием на 35 мин."
+        )
         assert mine["items"][0]["events"][0]["event_type"] == "note"
 
         anonymous_page = await crm.platform_a3_incidents_page(
@@ -13723,6 +13795,9 @@ async def assert_platform_a3_incidents():
         assert "Ответственный" in html
         assert "Журнал действий" in html
         assert "Проверяю расписание" in html
+        assert "Эскалирован" in html
+        assert "Реакция просрочена" in html
+        assert "Реакция с опозданием" in html
         assert "/platform/a3-health" in html
         assert 'class="platform-mobile-nav"' in html
         assert page.context["center"]["status_filter"] == "acknowledged"
@@ -13764,6 +13839,8 @@ async def assert_platform_a3_incidents():
                 "problems": 0,
                 "active_incidents": 1,
                 "active_critical_incidents": 1,
+                "response_overdue_incidents": 1,
+                "escalated_incidents": 1,
             },
         )
         incident_release_check = next(
@@ -13775,6 +13852,10 @@ async def assert_platform_a3_incidents():
         assert incident_release_check["url"] == (
             "/platform/a3-health/incidents"
         )
+        assert "Просрочена реакция: 1" in incident_release_check[
+            "description"
+        ]
+        assert "Эскалировано: 1" in incident_release_check["description"]
 
         resolved = crm.sync_a3_platform_incidents(
             {
@@ -13785,7 +13866,7 @@ async def assert_platform_a3_incidents():
                     "message": "Фоновые процессы работают штатно.",
                 }],
             },
-            now=incident_now + timedelta(minutes=40),
+            now=incident_now + timedelta(minutes=90),
             telegram_sender=fake_telegram,
         )
         assert resolved["resolved"] == 1
@@ -13810,12 +13891,12 @@ async def assert_platform_a3_incidents():
                     "status": "stable",
                 }],
             },
-            now=incident_now + timedelta(minutes=45),
+            now=incident_now + timedelta(minutes=95),
             telegram_sender=fake_telegram,
         )
         assert no_duplicate_recovery["resolved"] == 0
         assert no_duplicate_recovery["notifications_created"] == 0
-        assert len(telegram_calls) == platform_admin_chat_count * 2 + 1
+        assert len(telegram_calls) == platform_admin_chat_count * 3 + 1
     finally:
         conn = connect()
         c = conn.cursor()

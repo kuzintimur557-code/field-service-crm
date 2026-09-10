@@ -43,6 +43,7 @@ from app.services.a3_platform_incidents import (
     add_a3_platform_incident_note,
     assign_a3_platform_incident,
     build_a3_platform_incidents_url,
+    escalate_overdue_a3_platform_incidents,
     get_a3_platform_incident_admins,
     get_a3_platform_incidents,
     sync_a3_platform_incidents,
@@ -11726,6 +11727,10 @@ def get_platform_release_readiness(
                 f"{a3_health_summary.get('problems', 0)}. "
                 "Активных инцидентов: "
                 f"{a3_health_summary.get('active_incidents', 0)}. "
+                "Просрочена реакция: "
+                f"{a3_health_summary.get('response_overdue_incidents', 0)}. "
+                "Эскалировано: "
+                f"{a3_health_summary.get('escalated_incidents', 0)}. "
                 "Приостановлено: "
                 f"{a3_health_summary.get('paused', 0)}."
             ),
@@ -44658,7 +44663,9 @@ def run_a3_scheduler_watchdog_for_all_companies(
             watchdog_report,
             now=now,
         )
-        watchdog_report["incident_error"] = ""
+        watchdog_report["incident_error"] = watchdog_report[
+            "incidents"
+        ].get("escalation_error", "")
     except Exception:
         watchdog_report["incidents"] = {
             "opened": 0,
@@ -44667,6 +44674,8 @@ def run_a3_scheduler_watchdog_for_all_companies(
             "notifications_created": 0,
             "telegram_sent": 0,
             "items_checked": 0,
+            "escalated": 0,
+            "escalation_error": "",
         }
         watchdog_report["incident_error"] = (
             "Не удалось синхронизировать инциденты A3."

@@ -758,6 +758,10 @@ def init_db():
         first_detected_at TEXT NOT NULL,
         last_detected_at TEXT NOT NULL,
         occurrence_count INTEGER NOT NULL DEFAULT 1,
+        response_due_at TEXT,
+        escalation_due_at TEXT,
+        escalated_at TEXT,
+        escalation_count INTEGER NOT NULL DEFAULT 0,
         acknowledged_at TEXT,
         acknowledged_by TEXT,
         assigned_at TEXT,
@@ -843,6 +847,15 @@ def init_db():
     add_column_if_missing(c, "automation_events", "retry_count", "INTEGER NOT NULL DEFAULT 0")
     add_column_if_missing(c, "self_healing_runs", "retry_not_ready_events", "INTEGER NOT NULL DEFAULT 0")
     add_column_if_missing(c, "self_healing_runs", "retry_failed_events", "INTEGER NOT NULL DEFAULT 0")
+    add_column_if_missing(c, "a3_platform_incidents", "response_due_at", "TEXT")
+    add_column_if_missing(c, "a3_platform_incidents", "escalation_due_at", "TEXT")
+    add_column_if_missing(c, "a3_platform_incidents", "escalated_at", "TEXT")
+    add_column_if_missing(
+        c,
+        "a3_platform_incidents",
+        "escalation_count",
+        "INTEGER NOT NULL DEFAULT 0",
+    )
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "full_name", "TEXT")
@@ -1176,6 +1189,16 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_a3_platform_incident_company_status
     ON a3_platform_incidents(company_id, status, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_platform_incident_escalation
+    ON a3_platform_incidents(
+        status,
+        acknowledged_at,
+        escalated_at,
+        escalation_due_at
+    )
     """)
 
     c.execute("""
