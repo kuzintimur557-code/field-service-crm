@@ -13377,6 +13377,70 @@ async def assert_platform_a3_health():
         "%D0%A2%D0%B5%D1%81%D1%82+%D0%9A%D0%BE%D0%BC%D0%BF%D0%B0%D0%BD%D0%B8%D1%8F"
     )
 
+    paused_history_id = crm.record_a3_scheduler_watchdog_run({
+        "companies_total": 2,
+        "eligible_companies": 0,
+        "skipped_companies": 2,
+        "stable": 0,
+        "warning": 0,
+        "critical": 0,
+        "waiting": 0,
+        "errors": 0,
+        "heartbeats_saved": 2,
+    }, checked_at=datetime(2026, 6, 15, 9, 0))
+    paused_history = crm.get_a3_scheduler_watchdog_history(limit=1)[0]
+    assert paused_history["id"] == paused_history_id
+    assert paused_history["status"] == "paused"
+    assert paused_history["status_label"] == "Приостановлено"
+
+    first_history_id = crm.record_a3_scheduler_watchdog_run({
+        "companies_total": 3,
+        "eligible_companies": 2,
+        "skipped_companies": 1,
+        "stable": 2,
+        "warning": 0,
+        "critical": 0,
+        "waiting": 0,
+        "errors": 0,
+        "heartbeats_saved": 3,
+    }, checked_at=datetime(2026, 6, 15, 10, 0))
+    second_history_id = crm.record_a3_scheduler_watchdog_run({
+        "companies_total": 3,
+        "eligible_companies": 2,
+        "skipped_companies": 1,
+        "stable": 1,
+        "warning": 1,
+        "critical": 0,
+        "waiting": 0,
+        "errors": 0,
+        "alerts_sent": 1,
+        "heartbeats_saved": 3,
+    }, checked_at=datetime(2026, 6, 15, 11, 0))
+    assert first_history_id
+    assert second_history_id > first_history_id
+    watchdog_history = crm.get_a3_scheduler_watchdog_history(limit=2)
+    assert [item["id"] for item in watchdog_history] == [
+        second_history_id,
+        first_history_id,
+    ]
+    assert watchdog_history[0]["status"] == "warning"
+    assert watchdog_history[0]["status_label"] == "Нужно внимание"
+    assert watchdog_history[0]["score"] == 75
+    assert watchdog_history[0]["problems_count"] == 1
+    assert watchdog_history[0]["notifications_count"] == 1
+    assert watchdog_history[0]["created_label"] == "15.06.2026 11:00"
+    watchdog_trend = crm.get_a3_scheduler_watchdog_trend(
+        history=watchdog_history,
+    )
+    assert watchdog_trend["has_history"] is True
+    assert watchdog_trend["latest_score"] == 75
+    assert watchdog_trend["score_delta"] == -25
+    assert watchdog_trend["critical_delta"] == 0
+    assert [item["id"] for item in watchdog_trend["items"]] == [
+        first_history_id,
+        second_history_id,
+    ]
+
     anonymous = await crm.platform_a3_health_page(
         make_public_asgi_request("/platform/a3-health"),
     )
@@ -13404,6 +13468,9 @@ async def assert_platform_a3_health():
     assert "Основной запуск" in html
     assert "Контрольная проверка" in html
     assert "Следующее действие" in html
+    assert "История контрольных запусков" in html
+    assert "Изменение оценки" in html
+    assert "15.06.2026 11:00" in html
     assert 'name="search"' in html
     assert "/platform/a3-health/export" in html
     assert "/platform/calendar-health" in html
@@ -13413,6 +13480,24 @@ async def assert_platform_a3_health():
     assert page.context["health"]["search"] == "owner"
     assert page.context["links"]["platform"] == "/platform"
     assert page.context["links"]["a3_health"] == "/platform/a3-health"
+    assert page.context["history"][0]["id"] == second_history_id
+    assert page.context["trend"]["score_delta"] == -25
+
+    anonymous_history = await crm.api_platform_a3_health_history(
+        make_public_asgi_request("/api/platform/a3-health/history"),
+    )
+    assert anonymous_history.status_code == 401
+    boss_history = await crm.api_platform_a3_health_history(
+        make_asgi_request("owner2", "/api/platform/a3-health/history"),
+    )
+    assert boss_history.status_code == 403
+    history_api = await crm.api_platform_a3_health_history(
+        make_asgi_request("super", "/api/platform/a3-health/history"),
+        limit=2,
+    )
+    assert history_api["ok"] is True
+    assert len(history_api["history"]) == 2
+    assert history_api["trend"]["score_delta"] == -25
 
     anonymous_export = await crm.platform_a3_health_export(
         make_public_asgi_request("/platform/a3-health/export"),
@@ -25295,6 +25380,7 @@ async def assert_a3_api_layer():
 
     watchdog_notifications = []
     watchdog_heartbeats = []
+    watchdog_history_runs = []
 
     def fake_watchdog_notifier(company_id, reliability=None, now=None):
         status = (reliability or {}).get("status")
@@ -25323,11 +25409,16 @@ async def assert_a3_api_layer():
         watchdog_heartbeats.append((len(report.get("items", [])), checked_at))
         return len(report.get("items", []))
 
+    def fake_watchdog_history_recorder(report, checked_at=None):
+        watchdog_history_runs.append((report.get("heartbeats_saved"), checked_at))
+        return 501
+
     deterministic_watchdog = (
         crm.run_a3_scheduler_watchdog_for_all_companies(
             now=watchdog_now,
             notifier=fake_watchdog_notifier,
             status_recorder=fake_watchdog_status_recorder,
+            history_recorder=fake_watchdog_history_recorder,
             report={
                 "companies_total": 4,
                 "eligible_companies": 3,
@@ -25377,7 +25468,10 @@ async def assert_a3_api_layer():
     assert deterministic_watchdog["notification_errors"] == 0
     assert deterministic_watchdog["heartbeats_saved"] == 4
     assert deterministic_watchdog["heartbeat_error"] == ""
+    assert deterministic_watchdog["history_run_id"] == 501
+    assert deterministic_watchdog["history_error"] == ""
     assert watchdog_heartbeats == [(4, watchdog_now)]
+    assert watchdog_history_runs == [(4, watchdog_now)]
 
     owner_watchdog_status = crm.api_a3_scheduler_watchdog_status(request)
     manager_watchdog_status = crm.api_a3_scheduler_watchdog_status(

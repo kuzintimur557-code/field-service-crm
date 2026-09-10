@@ -724,6 +724,29 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS a3_scheduler_watchdog_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status TEXT NOT NULL,
+        score INTEGER NOT NULL DEFAULT 0,
+        companies_total INTEGER NOT NULL DEFAULT 0,
+        eligible_companies INTEGER NOT NULL DEFAULT 0,
+        skipped_companies INTEGER NOT NULL DEFAULT 0,
+        stable_count INTEGER NOT NULL DEFAULT 0,
+        warning_count INTEGER NOT NULL DEFAULT 0,
+        critical_count INTEGER NOT NULL DEFAULT 0,
+        waiting_count INTEGER NOT NULL DEFAULT 0,
+        error_count INTEGER NOT NULL DEFAULT 0,
+        alerts_sent INTEGER NOT NULL DEFAULT 0,
+        recoveries_sent INTEGER NOT NULL DEFAULT 0,
+        telegram_sent INTEGER NOT NULL DEFAULT 0,
+        suppressed_count INTEGER NOT NULL DEFAULT 0,
+        notification_errors INTEGER NOT NULL DEFAULT 0,
+        heartbeats_saved INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS system_health_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1095,6 +1118,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_a3_watchdog_checked
     ON a3_scheduler_watchdog_status(checked_at)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_watchdog_runs_created
+    ON a3_scheduler_watchdog_runs(created_at, id)
     """)
 
     c.execute("""

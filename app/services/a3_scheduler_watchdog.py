@@ -8,6 +8,23 @@ from app.services.governance import get_governance_settings
 A3_WATCHDOG_NEW_COMPANY_GRACE_HOURS = 24
 A3_WATCHDOG_WARNING_HOURS = 24
 A3_WATCHDOG_CRITICAL_HOURS = 48
+A3_WATCHDOG_HISTORY_LIMIT = 50
+A3_WATCHDOG_HISTORY_KEEP = 500
+A3_WATCHDOG_HISTORY_RETENTION_DAYS = 180
+
+A3_WATCHDOG_RUN_STATUS_LABELS = {
+    "stable": "Стабильно",
+    "warning": "Нужно внимание",
+    "critical": "Критично",
+    "paused": "Приостановлено",
+}
+
+A3_WATCHDOG_RUN_STATUS_TONES = {
+    "stable": "success",
+    "warning": "warning",
+    "critical": "danger",
+    "paused": "muted",
+}
 
 
 def _parse_datetime(value):
@@ -259,6 +276,201 @@ def save_a3_scheduler_watchdog_status(report, checked_at=None):
         conn.close()
 
     return saved
+
+
+def _watchdog_run_score(report):
+    stable = max(0, int((report or {}).get("stable") or 0))
+    warning = max(0, int((report or {}).get("warning") or 0))
+    critical = max(0, int((report or {}).get("critical") or 0))
+    waiting = max(0, int((report or {}).get("waiting") or 0))
+    errors = max(0, int((report or {}).get("errors") or 0))
+    checked = stable + warning + critical + waiting + errors
+
+    if not checked:
+        return 100
+
+    points = stable * 100 + (warning + waiting) * 50
+    return max(0, min(100, round(points / checked)))
+
+
+def _watchdog_run_status(report):
+    companies_total = int((report or {}).get("companies_total") or 0)
+    skipped_companies = int((report or {}).get("skipped_companies") or 0)
+
+    if (
+        int((report or {}).get("critical") or 0)
+        or int((report or {}).get("errors") or 0)
+        or int((report or {}).get("notification_errors") or 0)
+        or (report or {}).get("heartbeat_error")
+    ):
+        return "critical"
+    if (
+        int((report or {}).get("warning") or 0)
+        or int((report or {}).get("waiting") or 0)
+    ):
+        return "warning"
+    if companies_total and skipped_companies >= companies_total:
+        return "paused"
+    return "stable"
+
+
+def record_a3_scheduler_watchdog_run(report, checked_at=None):
+    report = report or {}
+    recorded_at = checked_at or datetime.now()
+    status = _watchdog_run_status(report)
+    score = _watchdog_run_score(report)
+    conn = connect()
+
+    try:
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO a3_scheduler_watchdog_runs (
+                status,
+                score,
+                companies_total,
+                eligible_companies,
+                skipped_companies,
+                stable_count,
+                warning_count,
+                critical_count,
+                waiting_count,
+                error_count,
+                alerts_sent,
+                recoveries_sent,
+                telegram_sent,
+                suppressed_count,
+                notification_errors,
+                heartbeats_saved,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            status,
+            score,
+            max(0, int(report.get("companies_total") or 0)),
+            max(0, int(report.get("eligible_companies") or 0)),
+            max(0, int(report.get("skipped_companies") or 0)),
+            max(0, int(report.get("stable") or 0)),
+            max(0, int(report.get("warning") or 0)),
+            max(0, int(report.get("critical") or 0)),
+            max(0, int(report.get("waiting") or 0)),
+            max(0, int(report.get("errors") or 0)),
+            max(0, int(report.get("alerts_sent") or 0)),
+            max(0, int(report.get("recoveries_sent") or 0)),
+            max(0, int(report.get("telegram_sent") or 0)),
+            max(0, int(report.get("suppressed") or 0)),
+            max(0, int(report.get("notification_errors") or 0)),
+            max(0, int(report.get("heartbeats_saved") or 0)),
+            recorded_at.isoformat(timespec="seconds"),
+        ))
+        run_id = c.lastrowid
+        cutoff = (
+            recorded_at - timedelta(days=A3_WATCHDOG_HISTORY_RETENTION_DAYS)
+        ).isoformat(timespec="seconds")
+        c.execute(
+            "DELETE FROM a3_scheduler_watchdog_runs WHERE created_at < ?",
+            (cutoff,),
+        )
+        c.execute("""
+            DELETE FROM a3_scheduler_watchdog_runs
+            WHERE id NOT IN (
+                SELECT id
+                FROM a3_scheduler_watchdog_runs
+                ORDER BY id DESC
+                LIMIT ?
+            )
+        """, (A3_WATCHDOG_HISTORY_KEEP,))
+        conn.commit()
+        return run_id
+    finally:
+        conn.close()
+
+
+def get_a3_scheduler_watchdog_history(limit=12):
+    try:
+        normalized_limit = max(
+            1,
+            min(A3_WATCHDOG_HISTORY_LIMIT, int(limit or 12)),
+        )
+    except (TypeError, ValueError):
+        normalized_limit = 12
+
+    conn = connect()
+    try:
+        rows = conn.cursor().execute("""
+            SELECT *
+            FROM a3_scheduler_watchdog_runs
+            ORDER BY id DESC
+            LIMIT ?
+        """, (normalized_limit,)).fetchall()
+    finally:
+        conn.close()
+
+    history = []
+    for row in rows:
+        item = dict(row)
+        status = item.get("status") or "warning"
+        created_at = _parse_datetime(item.get("created_at"))
+        item["status_label"] = A3_WATCHDOG_RUN_STATUS_LABELS.get(
+            status,
+            "Нужно проверить",
+        )
+        item["status_tone"] = A3_WATCHDOG_RUN_STATUS_TONES.get(
+            status,
+            "warning",
+        )
+        item["problems_count"] = sum(
+            int(item.get(key) or 0)
+            for key in (
+                "warning_count",
+                "critical_count",
+                "waiting_count",
+                "error_count",
+            )
+        )
+        item["notifications_count"] = (
+            int(item.get("alerts_sent") or 0)
+            + int(item.get("recoveries_sent") or 0)
+        )
+        item["created_label"] = (
+            created_at.strftime("%d.%m.%Y %H:%M")
+            if created_at
+            else "Время неизвестно"
+        )
+        history.append(item)
+
+    return history
+
+
+def get_a3_scheduler_watchdog_trend(history=None, limit=12):
+    recent = list(
+        history
+        if history is not None
+        else get_a3_scheduler_watchdog_history(limit=limit)
+    )
+    latest = recent[0] if recent else None
+    previous = recent[1] if len(recent) > 1 else None
+
+    return {
+        "has_history": bool(recent),
+        "runs_count": len(recent),
+        "latest_score": int((latest or {}).get("score") or 0),
+        "latest_status": (latest or {}).get("status") or "waiting",
+        "latest_status_label": (
+            (latest or {}).get("status_label") or "Истории пока нет"
+        ),
+        "score_delta": (
+            int(latest.get("score") or 0) - int(previous.get("score") or 0)
+            if latest and previous
+            else 0
+        ),
+        "critical_delta": (
+            int(latest.get("critical_count") or 0)
+            - int(previous.get("critical_count") or 0)
+            if latest and previous
+            else 0
+        ),
+        "items": list(reversed(recent)),
+    }
 
 
 def get_a3_scheduler_watchdog_status(company_id, now=None):

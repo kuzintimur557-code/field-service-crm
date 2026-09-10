@@ -28,7 +28,10 @@ from app.services.a3_cycle_history import (
 from app.services.a3_scheduler_readiness import get_a3_scheduler_readiness
 from app.services.a3_scheduler_watchdog import (
     get_a3_scheduler_watchdog_report,
+    get_a3_scheduler_watchdog_history,
     get_a3_scheduler_watchdog_status,
+    get_a3_scheduler_watchdog_trend,
+    record_a3_scheduler_watchdog_run,
     save_a3_scheduler_watchdog_status,
 )
 from app.services.a3_platform_health import (
@@ -15605,6 +15608,8 @@ async def platform_a3_health_page(
         status_filter=status,
         search=search,
     )
+    history = get_a3_scheduler_watchdog_history(limit=12)
+    trend = get_a3_scheduler_watchdog_trend(history=history)
     links = get_platform_dashboard_links()
     links.update({
         "platform": links["page"],
@@ -15621,9 +15626,29 @@ async def platform_a3_health_page(
             "health": health,
             "summary": health["summary"],
             "companies": health["items"],
+            "history": history,
+            "trend": trend,
             "links": links,
         },
     )
+
+
+@app.get("/api/platform/a3-health/history")
+async def api_platform_a3_health_history(request: Request, limit: int = 12):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    history = get_a3_scheduler_watchdog_history(limit=limit)
+    return {
+        "ok": True,
+        "history": history,
+        "trend": get_a3_scheduler_watchdog_trend(history=history),
+    }
 
 
 @app.get("/platform/a3-health/export")
@@ -44365,6 +44390,7 @@ def run_a3_scheduler_watchdog_for_all_companies(
     notifier=None,
     report=None,
     status_recorder=None,
+    history_recorder=None,
 ):
     watchdog_report = report or get_a3_scheduler_watchdog_report(now=now)
     notify = notifier or notify_a3_scheduler_reliability
@@ -44421,6 +44447,19 @@ def run_a3_scheduler_watchdog_for_all_companies(
         watchdog_report["heartbeats_saved"] = 0
         watchdog_report["heartbeat_error"] = (
             "Не удалось сохранить состояние контрольной проверки."
+        )
+
+    record_history = history_recorder or record_a3_scheduler_watchdog_run
+    try:
+        watchdog_report["history_run_id"] = record_history(
+            watchdog_report,
+            checked_at=now,
+        )
+        watchdog_report["history_error"] = ""
+    except Exception:
+        watchdog_report["history_run_id"] = None
+        watchdog_report["history_error"] = (
+            "Не удалось сохранить историю контрольного запуска."
         )
 
     return watchdog_report
