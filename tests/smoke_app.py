@@ -14576,6 +14576,10 @@ async def assert_a3_incident_followups():
         "reminder_stage",
         "last_reminded_at",
         "reminder_count",
+        "verification_status",
+        "verification_note",
+        "verified_at",
+        "verified_by",
     }.issubset(columns)
     c.execute("""
         DELETE FROM a3_incident_followups
@@ -14804,6 +14808,9 @@ async def assert_a3_incident_followups():
             "cancelled": 0,
             "unassigned": 1,
             "critical": 1,
+            "verification_pending": 0,
+            "verified": 0,
+            "rejected": 0,
             "completion_percent": 0.0,
         }
         assert [item["id"] for item in center["items"]][0] == (
@@ -14883,7 +14890,7 @@ async def assert_a3_incident_followups():
         assert completed["ok"] is True
         conn = connect()
         completed_row = conn.cursor().execute("""
-            SELECT completed_at, completed_by
+            SELECT completed_at, completed_by, verification_status
             FROM a3_incident_followups WHERE id=?
         """, (assigned["followup_id"],)).fetchone()
         event = conn.cursor().execute("""
@@ -14893,9 +14900,100 @@ async def assert_a3_incident_followups():
         conn.close()
         assert completed_row["completed_by"] == "super"
         assert completed_row["completed_at"]
+        assert completed_row["verification_status"] == "pending"
         assert event["event_type"] == "followup_completed"
 
-        reopened = crm.update_a3_incident_followup(
+        invalid_decision = crm.review_a3_incident_followup(
+            assigned["followup_id"],
+            "super",
+            "unknown",
+            now=followup_now + timedelta(hours=5, minutes=35),
+        )
+        assert invalid_decision["error"] == "invalid_verification_decision"
+        not_completed = crm.review_a3_incident_followup(
+            overdue["followup_id"],
+            "super",
+            "approved",
+            now=followup_now + timedelta(hours=5, minutes=35),
+        )
+        assert not_completed["error"] == "followup_not_completed"
+        empty_rejection = crm.review_a3_incident_followup(
+            assigned["followup_id"],
+            "super",
+            "rejected",
+            rework_due_at="2026-06-27T12:00",
+            now=followup_now + timedelta(hours=5, minutes=35),
+        )
+        assert empty_rejection["error"] == "empty_verification_note"
+        invalid_rework_due = crm.review_a3_incident_followup(
+            assigned["followup_id"],
+            "super",
+            "rejected",
+            note="Нужна доработка.",
+            rework_due_at="2026-06-25T12:00",
+            now=followup_now + timedelta(hours=5, minutes=35),
+        )
+        assert invalid_rework_due["error"] == "invalid_rework_due_at"
+        forbidden_review = crm.review_a3_incident_followup(
+            assigned["followup_id"],
+            "owner2",
+            "approved",
+            note="Проверено.",
+            now=followup_now + timedelta(hours=5, minutes=35),
+        )
+        assert forbidden_review["error"] == "forbidden"
+
+        approved = crm.review_a3_incident_followup(
+            assigned["followup_id"],
+            "super",
+            "approved",
+            note="Контрольная отправка подтверждена.",
+            now=followup_now + timedelta(hours=5, minutes=35),
+        )
+        assert approved["ok"] is True
+        assert approved["decision"] == "approved"
+        verified_center = crm.get_a3_incident_followups(
+            "verified",
+            2,
+            current_username="super",
+            now=followup_now + timedelta(hours=5, minutes=35),
+        )
+        assert [item["id"] for item in verified_center["items"]] == [
+            assigned["followup_id"]
+        ]
+        assert verified_center["items"][0]["verified_by"] == "super"
+
+        rejected = crm.review_a3_incident_followup(
+            assigned["followup_id"],
+            "super",
+            "rejected",
+            note="Нужен тест после повторного запуска.",
+            rework_due_at="2026-06-27T12:00",
+            now=followup_now + timedelta(hours=5, minutes=40),
+        )
+        assert rejected["ok"] is True
+        assert rejected["decision"] == "rejected"
+        rejected_center = crm.get_a3_incident_followups(
+            "rejected",
+            2,
+            current_username="super",
+            now=followup_now + timedelta(hours=5, minutes=40),
+        )
+        assert [item["id"] for item in rejected_center["items"]] == [
+            assigned["followup_id"]
+        ]
+        assert rejected_center["items"][0]["verification_note"] == (
+            "Нужен тест после повторного запуска."
+        )
+        conn = connect()
+        rejected_event = conn.cursor().execute("""
+            SELECT event_type FROM a3_platform_incident_events
+            WHERE incident_id=? ORDER BY id DESC LIMIT 1
+        """, (ids["followup_test_resolved_one"],)).fetchone()
+        conn.close()
+        assert rejected_event["event_type"] == "followup_rejected"
+
+        rework_updated = crm.update_a3_incident_followup(
             assigned["followup_id"],
             "super",
             "Проверить повторную отправку",
@@ -14903,18 +15001,41 @@ async def assert_a3_incident_followups():
             "in_progress",
             "high",
             "super",
-            "2026-06-25T17:00",
-            now=followup_now + timedelta(hours=5, minutes=40),
+            "2026-06-27T12:00",
+            now=followup_now + timedelta(hours=5, minutes=45),
         )
-        assert reopened["status"] == "in_progress"
+        assert rework_updated["status"] == "in_progress"
         conn = connect()
         reopened_row = conn.cursor().execute("""
-            SELECT completed_at, completed_by
+            SELECT completed_at, completed_by, verification_status
             FROM a3_incident_followups WHERE id=?
         """, (assigned["followup_id"],)).fetchone()
         conn.close()
         assert reopened_row["completed_at"] is None
         assert reopened_row["completed_by"] is None
+        assert reopened_row["verification_status"] == "rejected"
+
+        recompleted = crm.update_a3_incident_followup(
+            assigned["followup_id"],
+            "super",
+            "Проверить повторную отправку",
+            "Повторный контрольный запуск прошёл успешно.",
+            "completed",
+            "high",
+            "super",
+            "2026-06-27T12:00",
+            now=followup_now + timedelta(hours=6),
+        )
+        assert recompleted["ok"] is True
+        pending_verification = crm.get_a3_incident_followups(
+            "verification_pending",
+            2,
+            current_username="super",
+            now=followup_now + timedelta(hours=6),
+        )
+        assert [item["id"] for item in pending_verification["items"]] == [
+            assigned["followup_id"]
+        ]
 
         anonymous_page = await crm.platform_a3_incident_actions_page(
             make_public_asgi_request(
@@ -14943,6 +15064,9 @@ async def assert_a3_incident_followups():
         assert "Скачать CSV" in html
         assert "Автоматический контроль сроков" in html
         assert "Проверить сроки" in html
+        assert "Проверка результата" in html
+        assert "Ожидает проверки" in html
+        assert "Сохранить решение" in html
         assert 'class="platform-mobile-nav"' in html
 
         anonymous_api = await crm.api_platform_a3_incident_actions(
@@ -14966,6 +15090,97 @@ async def assert_a3_incident_followups():
         )
         assert api["ok"] is True
         assert api["summary"]["total"] == 2
+
+        anonymous_verify_api = (
+            await crm.api_verify_platform_a3_incident_action(
+                make_json_request(
+                    None,
+                    (
+                        "/api/platform/a3-health/incidents/actions/"
+                        f"{assigned['followup_id']}/verify"
+                    ),
+                    {"decision": "approved"},
+                ),
+                assigned["followup_id"],
+            )
+        )
+        assert anonymous_verify_api.status_code == 401
+        boss_verify_api = await crm.api_verify_platform_a3_incident_action(
+            make_json_request(
+                "owner2",
+                (
+                    "/api/platform/a3-health/incidents/actions/"
+                    f"{assigned['followup_id']}/verify"
+                ),
+                {"decision": "approved"},
+            ),
+            assigned["followup_id"],
+        )
+        assert boss_verify_api.status_code == 403
+        invalid_verify_api = await crm.api_verify_platform_a3_incident_action(
+            make_json_request(
+                "super",
+                (
+                    "/api/platform/a3-health/incidents/actions/"
+                    f"{assigned['followup_id']}/verify"
+                ),
+                {"decision": "unknown"},
+            ),
+            assigned["followup_id"],
+        )
+        assert invalid_verify_api.status_code == 400
+        approved_api = await crm.api_verify_platform_a3_incident_action(
+            make_json_request(
+                "super",
+                (
+                    "/api/platform/a3-health/incidents/actions/"
+                    f"{assigned['followup_id']}/verify"
+                ),
+                {
+                    "decision": "approved",
+                    "verification_note": "Повторная проверка пройдена.",
+                },
+            ),
+            assigned["followup_id"],
+        )
+        assert approved_api["ok"] is True
+        assert approved_api["decision"] == "approved"
+
+        anonymous_verify = await crm.verify_platform_a3_incident_action(
+            make_public_asgi_request(
+                (
+                    "/platform/a3-health/incidents/actions/"
+                    f"{assigned['followup_id']}/verify"
+                )
+            ),
+            assigned["followup_id"],
+        )
+        assert anonymous_verify.status_code == 302
+        assert anonymous_verify.headers["location"] == "/login"
+        rejected_redirect = await crm.verify_platform_a3_incident_action(
+            make_form_request(
+                "super",
+                (
+                    "/platform/a3-health/incidents/actions/"
+                    f"{assigned['followup_id']}/verify"
+                ),
+                {
+                    "decision": "rejected",
+                    "verification_note": "Нужен итоговый нагрузочный тест.",
+                    "rework_due_at": "2099-06-28T12:00",
+                    "return_status": "all",
+                    "company_id": "2",
+                    "incident_id": "all",
+                    "owner": "all",
+                    "search": "",
+                },
+            ),
+            assigned["followup_id"],
+        )
+        assert rejected_redirect.status_code == 302
+        assert "notice=verification_rejected" in (
+            rejected_redirect.headers["location"]
+        )
 
         anonymous_monitor_api = (
             await crm.api_platform_a3_incident_action_monitor(
@@ -15120,6 +15335,8 @@ async def assert_a3_incident_followups():
         export_csv = export.body.decode("utf-8-sig")
         assert "ID меры" in export_csv
         assert "Исправляющая мера" in export_csv
+        assert "Проверка результата" in export_csv
+        assert "Дата проверки" in export_csv
         assert "Проверить повторную отправку" in export_csv
     finally:
         conn = connect()

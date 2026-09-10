@@ -814,6 +814,10 @@ def init_db():
         reminder_stage TEXT,
         last_reminded_at TEXT,
         reminder_count INTEGER NOT NULL DEFAULT 0,
+        verification_status TEXT NOT NULL DEFAULT 'not_ready',
+        verification_note TEXT,
+        verified_at TEXT,
+        verified_by TEXT,
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -942,6 +946,15 @@ def init_db():
         "reminder_count",
         "INTEGER NOT NULL DEFAULT 0",
     )
+    add_column_if_missing(
+        c,
+        "a3_incident_followups",
+        "verification_status",
+        "TEXT NOT NULL DEFAULT 'not_ready'",
+    )
+    add_column_if_missing(c, "a3_incident_followups", "verification_note", "TEXT")
+    add_column_if_missing(c, "a3_incident_followups", "verified_at", "TEXT")
+    add_column_if_missing(c, "a3_incident_followups", "verified_by", "TEXT")
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "full_name", "TEXT")

@@ -8,6 +8,9 @@ A3_FOLLOWUP_FILTER_LABELS = {
     "active": "Активные",
     "overdue": "Просроченные",
     "due_soon": "Срок сегодня",
+    "verification_pending": "Ждут проверки",
+    "verified": "Подтверждённые",
+    "rejected": "На доработке",
     "completed": "Выполненные",
     "cancelled": "Отменённые",
     "all": "Все",
@@ -27,6 +30,12 @@ A3_FOLLOWUP_PRIORITY_LABELS = {
     "normal": "Обычный",
     "high": "Высокий",
     "critical": "Критический",
+}
+A3_FOLLOWUP_VERIFICATION_LABELS = {
+    "not_ready": "Проверка не требуется",
+    "pending": "Ожидает проверки",
+    "approved": "Результат подтверждён",
+    "rejected": "Возвращена на доработку",
 }
 
 
@@ -153,6 +162,15 @@ def _priority(value):
     return normalized if normalized in A3_FOLLOWUP_PRIORITY_LABELS else "normal"
 
 
+def _verification_status(task_status, value):
+    normalized = str(value or "not_ready").strip().lower()
+    if task_status == "completed":
+        return normalized if normalized in {"pending", "approved"} else "pending"
+    if normalized == "rejected":
+        return "rejected"
+    return "not_ready"
+
+
 def _platform_admin_exists(cursor, username):
     return bool(cursor.execute("""
         SELECT 1
@@ -220,6 +238,10 @@ def _enrich_followup(raw_item, now_value):
     )
     priority = _priority(item.get("priority"))
     action_type = _action_type(item.get("action_type"))
+    verification_status = _verification_status(
+        status,
+        item.get("verification_status"),
+    )
     item.update({
         "status": status,
         "status_label": (
@@ -242,6 +264,21 @@ def _enrich_followup(raw_item, now_value):
         ),
         "action_type": action_type,
         "action_type_label": A3_FOLLOWUP_TYPE_LABELS[action_type],
+        "verification_status": verification_status,
+        "verification_label": A3_FOLLOWUP_VERIFICATION_LABELS[
+            verification_status
+        ],
+        "verification_tone": (
+            "success"
+            if verification_status == "approved"
+            else "danger" if verification_status == "rejected"
+            else "warning" if verification_status == "pending"
+            else "neutral"
+        ),
+        "verification_pending": verification_status == "pending",
+        "is_verified": verification_status == "approved",
+        "is_rejected": verification_status == "rejected",
+        "verified_label": _time_label(item.get("verified_at")),
         "company_name": item.get("company_name")
         or f"Компания #{item['company_id']}",
         "incident_title": item.get("incident_title") or "Инцидент A3",
@@ -391,6 +428,11 @@ def get_a3_incident_followups(
             item["is_active"] and item["priority"] == "critical"
             for item in all_items
         ),
+        "verification_pending": sum(
+            item["verification_pending"] for item in all_items
+        ),
+        "verified": sum(item["is_verified"] for item in all_items),
+        "rejected": sum(item["is_rejected"] for item in all_items),
     }
     finished = summary["completed"] + summary["cancelled"]
     summary["completion_percent"] = (
@@ -404,6 +446,12 @@ def get_a3_incident_followups(
         items = [item for item in all_items if item["is_overdue"]]
     elif selected_status == "due_soon":
         items = [item for item in all_items if item["due_soon"]]
+    elif selected_status == "verification_pending":
+        items = [item for item in all_items if item["verification_pending"]]
+    elif selected_status == "verified":
+        items = [item for item in all_items if item["is_verified"]]
+    elif selected_status == "rejected":
+        items = [item for item in all_items if item["is_rejected"]]
     elif selected_status == "completed":
         items = [item for item in all_items if item["status"] == "completed"]
     elif selected_status == "cancelled":
@@ -415,6 +463,7 @@ def get_a3_incident_followups(
     items.sort(key=lambda item: (
         not item["is_overdue"],
         not item["due_soon"],
+        not item["verification_pending"],
         priority_order[item["priority"]],
         item.get("due_at") or "9999",
         int(item["id"]),
@@ -629,6 +678,38 @@ def update_a3_incident_followup(
         if selected_status == "completed":
             completed_at = followup.get("completed_at") or now_text
             completed_by = followup.get("completed_by") or actor_username
+        previous_status = str(followup.get("status") or "open")
+        previous_verification = str(
+            followup.get("verification_status") or "not_ready"
+        )
+        if selected_status == "completed":
+            if previous_status != "completed":
+                verification_status = "pending"
+                verification_note = None
+                verified_at = None
+                verified_by = None
+            else:
+                verification_status = _verification_status(
+                    selected_status,
+                    previous_verification,
+                )
+                verification_note = followup.get("verification_note")
+                verified_at = followup.get("verified_at")
+                verified_by = followup.get("verified_by")
+        elif (
+            selected_status == "in_progress"
+            and previous_status == "in_progress"
+            and previous_verification == "rejected"
+        ):
+            verification_status = "rejected"
+            verification_note = followup.get("verification_note")
+            verified_at = followup.get("verified_at")
+            verified_by = followup.get("verified_by")
+        else:
+            verification_status = "not_ready"
+            verification_note = None
+            verified_at = None
+            verified_by = None
         due_text = _timestamp(due_value)
         reminder_changed = (
             selected_status != followup.get("status")
@@ -653,6 +734,10 @@ def update_a3_incident_followup(
                 completed_by=?,
                 reminder_stage=?,
                 last_reminded_at=?,
+                verification_status=?,
+                verification_note=?,
+                verified_at=?,
+                verified_by=?,
                 updated_at=?
             WHERE id=?
         """, (
@@ -666,6 +751,10 @@ def update_a3_incident_followup(
             completed_by,
             reminder_stage,
             last_reminded_at,
+            verification_status,
+            verification_note,
+            verified_at,
+            verified_by,
             now_text,
             followup_id,
         ))
@@ -694,6 +783,191 @@ def update_a3_incident_followup(
             "incident_id": followup["incident_id"],
             "status": selected_status,
             "message": "Контрольная мера обновлена.",
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def review_a3_incident_followup(
+    followup_id,
+    actor_username,
+    decision,
+    note="",
+    rework_due_at="",
+    now=None,
+):
+    selected_decision = str(decision or "").strip().lower()
+    note_text = str(note or "").strip()[:2000]
+    if selected_decision not in {"approved", "rejected"}:
+        return {
+            "ok": False,
+            "error": "invalid_verification_decision",
+            "message": "Выберите результат проверки.",
+        }
+    if selected_decision == "rejected" and not note_text:
+        return {
+            "ok": False,
+            "error": "empty_verification_note",
+            "message": "Укажите причину возврата на доработку.",
+        }
+
+    now_value = now or datetime.now()
+    now_text = _timestamp(now_value)
+    rework_due = _parse_datetime(rework_due_at)
+    if selected_decision == "rejected":
+        if not rework_due:
+            return {
+                "ok": False,
+                "error": "invalid_rework_due_at",
+                "message": "Укажите новый срок доработки.",
+            }
+        comparable_now = _align_datetime(now_value, rework_due)
+        if rework_due <= comparable_now:
+            return {
+                "ok": False,
+                "error": "invalid_rework_due_at",
+                "message": "Новый срок должен быть позже текущего времени.",
+            }
+
+    conn = connect()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        if not _platform_admin_exists(cursor, actor_username):
+            conn.rollback()
+            return {
+                "ok": False,
+                "error": "forbidden",
+                "message": "Недостаточно прав для проверки результата.",
+            }
+        row = cursor.execute("""
+            SELECT * FROM a3_incident_followups WHERE id=?
+        """, (followup_id,)).fetchone()
+        if not row:
+            conn.rollback()
+            return {
+                "ok": False,
+                "error": "followup_not_found",
+                "message": "Контрольная мера не найдена.",
+            }
+        followup = dict(row)
+        if followup.get("status") != "completed":
+            conn.rollback()
+            return {
+                "ok": False,
+                "error": "followup_not_completed",
+                "message": "Сначала отметьте меру выполненной.",
+            }
+
+        if selected_decision == "approved":
+            cursor.execute("""
+                UPDATE a3_incident_followups
+                SET verification_status='approved',
+                    verification_note=?,
+                    verified_at=?,
+                    verified_by=?,
+                    updated_at=?
+                WHERE id=? AND status='completed'
+            """, (
+                note_text,
+                now_text,
+                actor_username,
+                now_text,
+                followup_id,
+            ))
+            event_type = "followup_verified"
+            event_message = (
+                f"Результат контрольной меры #{followup_id} подтверждён "
+                f"администратором {actor_username}."
+            )
+        else:
+            cursor.execute("""
+                UPDATE a3_incident_followups
+                SET status='in_progress',
+                    due_at=?,
+                    completed_at=NULL,
+                    completed_by=NULL,
+                    verification_status='rejected',
+                    verification_note=?,
+                    verified_at=?,
+                    verified_by=?,
+                    reminder_stage=NULL,
+                    last_reminded_at=NULL,
+                    updated_at=?
+                WHERE id=? AND status='completed'
+            """, (
+                _timestamp(rework_due),
+                note_text,
+                now_text,
+                actor_username,
+                now_text,
+                followup_id,
+            ))
+            event_type = "followup_rejected"
+            event_message = (
+                f"Контрольная мера #{followup_id} возвращена на доработку "
+                f"до {_time_label(rework_due)}. Причина: {note_text}"
+            )
+
+        _log_incident_event(
+            cursor,
+            followup["incident_id"],
+            followup["company_id"],
+            event_type,
+            actor_username,
+            event_message,
+            now_text,
+        )
+        notification_created = 0
+        owner = str(followup.get("owner_username") or "").strip()
+        if owner and owner != actor_username and _platform_admin_exists(cursor, owner):
+            notification_title = (
+                "Результат меры A3 подтверждён"
+                if selected_decision == "approved"
+                else "Мера A3 возвращена на доработку"
+            )
+            cursor.execute("""
+                INSERT INTO notifications (
+                    company_id,
+                    username,
+                    title,
+                    message,
+                    link,
+                    is_read,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, 0, ?)
+            """, (
+                followup["company_id"],
+                owner,
+                notification_title,
+                event_message[:1000],
+                (
+                    "/platform/a3-health/incidents/actions?status=all&"
+                    f"incident_id={followup['incident_id']}#action-{followup_id}"
+                ),
+                now_text,
+            ))
+            notification_created = 1
+        conn.commit()
+        return {
+            "ok": True,
+            "followup_id": followup_id,
+            "incident_id": followup["incident_id"],
+            "decision": selected_decision,
+            "notice": (
+                "verification_approved"
+                if selected_decision == "approved"
+                else "verification_rejected"
+            ),
+            "notification_created": notification_created,
+            "message": (
+                "Результат меры подтверждён."
+                if selected_decision == "approved"
+                else "Мера возвращена на доработку."
+            ),
         }
     except Exception:
         conn.rollback()

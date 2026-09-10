@@ -69,6 +69,7 @@ from app.services.a3_incident_followups import (
     normalize_a3_followup_filter,
     normalize_a3_followup_incident,
     normalize_a3_followup_owner,
+    review_a3_incident_followup,
     update_a3_incident_followup,
 )
 from app.services.a3_incident_followup_monitor import (
@@ -16261,7 +16262,7 @@ def _a3_incident_followup_redirect(
     )
     separator = "&" if "?" in target else "?"
     flag = (
-        {"notice": "action_saved"}
+        {"notice": result.get("notice") or "action_saved"}
         if result.get("ok")
         else {"error": result.get("error") or "action_failed"}
     )
@@ -16459,6 +16460,71 @@ async def update_platform_a3_incident_action(
     )
 
 
+@app.post("/platform/a3-health/incidents/actions/{followup_id}/verify")
+async def verify_platform_a3_incident_action(
+    request: Request,
+    followup_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = review_a3_incident_followup(
+        followup_id=followup_id,
+        actor_username=username,
+        decision=form.get("decision") or "",
+        note=form.get("verification_note") or "",
+        rework_due_at=form.get("rework_due_at") or "",
+    )
+    return _a3_incident_followup_redirect(
+        result,
+        form.get("return_status") or "all",
+        form.get("company_id") or "all",
+        form.get("incident_id") or "all",
+        form.get("owner") or "all",
+        form.get("search") or "",
+    )
+
+
+@app.post(
+    "/api/platform/a3-health/incidents/actions/{followup_id}/verify"
+)
+async def api_verify_platform_a3_incident_action(
+    request: Request,
+    followup_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    result = review_a3_incident_followup(
+        followup_id=followup_id,
+        actor_username=username,
+        decision=payload.get("decision") or "",
+        note=payload.get("verification_note") or "",
+        rework_due_at=payload.get("rework_due_at") or "",
+    )
+    if not result.get("ok"):
+        status_code = (
+            404 if result.get("error") == "followup_not_found" else 400
+        )
+        return JSONResponse(result, status_code=status_code)
+    return result
+
+
 @app.post("/platform/a3-health/incidents/actions/monitor/run")
 async def run_platform_a3_incident_action_monitor(request: Request):
     username = get_user(request)
@@ -16536,6 +16602,10 @@ async def platform_a3_incident_actions_export(
         "Просрочена",
         "Выполнена",
         "Выполнил",
+        "Проверка результата",
+        "Комментарий проверки",
+        "Проверил",
+        "Дата проверки",
         "Создал",
     ])
     for action in center["items"]:
@@ -16555,6 +16625,10 @@ async def platform_a3_incident_actions_export(
             "Да" if action["is_overdue"] else "Нет",
             action["completed_at"] or "",
             action["completed_by"] or "",
+            action["verification_label"],
+            action["verification_note"] or "",
+            action["verified_by"] or "",
+            action["verified_at"] or "",
             action["created_by"],
         ])
 
