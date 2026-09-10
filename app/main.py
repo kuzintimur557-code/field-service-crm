@@ -38,6 +38,15 @@ from app.services.a3_platform_health import (
     build_a3_platform_health_url,
     get_a3_platform_health,
 )
+from app.services.a3_platform_incidents import (
+    acknowledge_a3_platform_incident,
+    add_a3_platform_incident_note,
+    assign_a3_platform_incident,
+    build_a3_platform_incidents_url,
+    get_a3_platform_incident_admins,
+    get_a3_platform_incidents,
+    sync_a3_platform_incidents,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -8283,6 +8292,7 @@ def get_platform_dashboard_links():
         "readiness": "/platform/readiness",
         "a3_health": "/platform/a3-health",
         "a3_health_problem": "/platform/a3-health?status=problem",
+        "a3_incidents": "/platform/a3-health/incidents",
         "calendar_health": "/platform/calendar-health",
         "calendar_health_critical": "/platform/calendar-health?status=critical",
         "calendar_health_unacknowledged": (
@@ -11696,21 +11706,35 @@ def get_platform_release_readiness(
             "Фоновые процессы A3",
             (
                 "critical"
-                if a3_health_summary["critical"]
+                if (
+                    a3_health_summary.get("critical", 0)
+                    or a3_health_summary.get("active_critical_incidents", 0)
+                )
                 else (
                     "warning"
-                    if a3_health_summary["problems"]
+                    if (
+                        a3_health_summary.get("problems", 0)
+                        or a3_health_summary.get("active_incidents", 0)
+                    )
                     else "ok"
                 )
             ),
             (
-                f"Компаний: {a3_health_summary['total']}. "
-                f"Стабильно: {a3_health_summary['stable']}. "
-                f"Требуют внимания: {a3_health_summary['problems']}. "
-                f"Приостановлено: {a3_health_summary['paused']}."
+                f"Компаний: {a3_health_summary.get('total', 0)}. "
+                f"Стабильно: {a3_health_summary.get('stable', 0)}. "
+                "Требуют внимания: "
+                f"{a3_health_summary.get('problems', 0)}. "
+                "Активных инцидентов: "
+                f"{a3_health_summary.get('active_incidents', 0)}. "
+                "Приостановлено: "
+                f"{a3_health_summary.get('paused', 0)}."
             ),
             "Проверьте основной планировщик и контрольные запуски A3.",
-            "/platform/a3-health",
+            (
+                "/platform/a3-health/incidents"
+                if a3_health_summary.get("active_incidents", 0)
+                else "/platform/a3-health"
+            ),
             10,
             "operations",
             "Операции",
@@ -15649,6 +15673,184 @@ async def api_platform_a3_health_history(request: Request, limit: int = 12):
         "history": history,
         "trend": get_a3_scheduler_watchdog_trend(history=history),
     }
+
+
+def _a3_platform_incident_redirect(
+    incident_id,
+    result,
+    status="active",
+    assignee="all",
+    search="",
+    success_notice="updated",
+):
+    target = build_a3_platform_incidents_url(status, assignee, search)
+    separator = "&" if "?" in target else "?"
+    flag = (
+        {"notice": success_notice}
+        if result.get("ok")
+        else {"error": result.get("error") or "action_failed"}
+    )
+    return RedirectResponse(
+        f"{target}{separator}{urlencode(flag)}#incident-{incident_id}",
+        status_code=302,
+    )
+
+
+@app.get("/platform/a3-health/incidents", response_class=HTMLResponse)
+async def platform_a3_incidents_page(
+    request: Request,
+    status: str = "active",
+    assignee: str = "all",
+    search: str = "",
+    notice: str = "",
+    error: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    center = get_a3_platform_incidents(
+        status_filter=status,
+        assignee_filter=assignee,
+        search=search,
+        current_username=username,
+    )
+    links = get_platform_dashboard_links()
+    links.update({
+        "platform": links["page"],
+        "base": center["base_url"],
+    })
+
+    return templates.TemplateResponse(
+        request,
+        "platform_a3_incidents.html",
+        {
+            "request": request,
+            "username": username,
+            "center": center,
+            "summary": center["summary"],
+            "incidents": center["items"],
+            "admins": get_a3_platform_incident_admins(),
+            "notice": notice,
+            "error": error,
+            "links": links,
+        },
+    )
+
+
+@app.get("/api/platform/a3-health/incidents")
+async def api_platform_a3_incidents(
+    request: Request,
+    status: str = "active",
+    assignee: str = "all",
+    search: str = "",
+    limit: int = 100,
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {
+        "ok": True,
+        **get_a3_platform_incidents(
+            status_filter=status,
+            assignee_filter=assignee,
+            search=search,
+            current_username=username,
+            limit=limit,
+        ),
+    }
+
+
+@app.post("/platform/a3-health/incidents/{incident_id}/acknowledge")
+async def acknowledge_platform_a3_incident(
+    request: Request,
+    incident_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = acknowledge_a3_platform_incident(incident_id, username)
+    return _a3_platform_incident_redirect(
+        incident_id,
+        result,
+        form.get("status") or "active",
+        form.get("assignee") or "all",
+        form.get("search") or "",
+        success_notice="acknowledged",
+    )
+
+
+@app.post("/platform/a3-health/incidents/{incident_id}/assign")
+async def assign_platform_a3_incident(
+    request: Request,
+    incident_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = assign_a3_platform_incident(
+        incident_id,
+        username,
+        form.get("assigned_to") or "",
+    )
+    return _a3_platform_incident_redirect(
+        incident_id,
+        result,
+        form.get("status") or "active",
+        form.get("assignee") or "all",
+        form.get("search") or "",
+        success_notice="assigned",
+    )
+
+
+@app.post("/platform/a3-health/incidents/{incident_id}/note")
+async def note_platform_a3_incident(
+    request: Request,
+    incident_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = add_a3_platform_incident_note(
+        incident_id,
+        username,
+        form.get("note") or "",
+    )
+    return _a3_platform_incident_redirect(
+        incident_id,
+        result,
+        form.get("status") or "active",
+        form.get("assignee") or "all",
+        form.get("search") or "",
+        success_notice="note_added",
+    )
 
 
 @app.get("/platform/a3-health/export")
@@ -44391,6 +44593,7 @@ def run_a3_scheduler_watchdog_for_all_companies(
     report=None,
     status_recorder=None,
     history_recorder=None,
+    incident_syncer=None,
 ):
     watchdog_report = report or get_a3_scheduler_watchdog_report(now=now)
     notify = notifier or notify_a3_scheduler_reliability
@@ -44447,6 +44650,26 @@ def run_a3_scheduler_watchdog_for_all_companies(
         watchdog_report["heartbeats_saved"] = 0
         watchdog_report["heartbeat_error"] = (
             "Не удалось сохранить состояние контрольной проверки."
+        )
+
+    sync_incidents = incident_syncer or sync_a3_platform_incidents
+    try:
+        watchdog_report["incidents"] = sync_incidents(
+            watchdog_report,
+            now=now,
+        )
+        watchdog_report["incident_error"] = ""
+    except Exception:
+        watchdog_report["incidents"] = {
+            "opened": 0,
+            "repeated": 0,
+            "resolved": 0,
+            "notifications_created": 0,
+            "telegram_sent": 0,
+            "items_checked": 0,
+        }
+        watchdog_report["incident_error"] = (
+            "Не удалось синхронизировать инциденты A3."
         )
 
     record_history = history_recorder or record_a3_scheduler_watchdog_run

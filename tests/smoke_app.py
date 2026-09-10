@@ -13525,6 +13525,314 @@ async def assert_platform_a3_health():
     assert "Рекомендация" in export_csv
 
 
+async def assert_platform_a3_incidents():
+    incident_now = datetime(2026, 6, 16, 12, 0)
+    telegram_calls = []
+    conn = connect()
+    c = conn.cursor()
+    previous_super_chat = c.execute("""
+        SELECT telegram_chat_id FROM users WHERE username='super'
+    """).fetchone()[0]
+    c.execute("""
+        UPDATE users SET telegram_chat_id='chat-super' WHERE username='super'
+    """)
+    c.execute("""
+        INSERT INTO users (
+            username, password, role, company_id,
+            telegram_chat_id, is_active
+        ) VALUES ('incident_admin', 'x', 'superadmin', 1, 'chat-incident', 1)
+    """)
+    c.execute("DELETE FROM a3_platform_incident_events")
+    c.execute("DELETE FROM a3_platform_incidents")
+    c.execute("""
+        DELETE FROM notifications
+        WHERE link LIKE '/platform/a3-health/incidents%'
+    """)
+    platform_admin_count = c.execute("""
+        SELECT COUNT(*) FROM users
+        WHERE role='superadmin' AND COALESCE(is_active, 1)=1
+    """).fetchone()[0]
+    platform_admin_chat_count = c.execute("""
+        SELECT COUNT(*) FROM users
+        WHERE role='superadmin'
+          AND COALESCE(is_active, 1)=1
+          AND COALESCE(telegram_chat_id, '')!=''
+    """).fetchone()[0]
+    conn.commit()
+    conn.close()
+
+    def fake_telegram(chat_id, text):
+        telegram_calls.append((chat_id, text))
+        return True
+
+    critical_report = {
+        "items": [{
+            "company_id": 2,
+            "company_name": "Company 2",
+            "status": "critical",
+            "message": "Основной планировщик A3 не запускался 49 часов.",
+        }],
+    }
+
+    try:
+        opened = crm.sync_a3_platform_incidents(
+            critical_report,
+            now=incident_now,
+            telegram_sender=fake_telegram,
+        )
+        assert opened == {
+            "opened": 1,
+            "repeated": 0,
+            "resolved": 0,
+            "notifications_created": platform_admin_count,
+            "telegram_sent": platform_admin_chat_count,
+            "items_checked": 1,
+        }
+        active_center = crm.get_a3_platform_incidents(
+            search="Company 2",
+            current_username="super",
+            now=incident_now,
+        )
+        assert active_center["summary"]["active"] == 1
+        assert active_center["summary"]["critical"] == 1
+        assert active_center["summary"]["unacknowledged"] == 1
+        assert len(active_center["items"]) == 1
+        incident = active_center["items"][0]
+        incident_id = incident["id"]
+        assert incident["occurrence_count"] == 1
+        assert incident["events"][0]["event_type"] == "opened"
+        assert incident["status_label"] == "Открыт"
+
+        repeated = crm.sync_a3_platform_incidents(
+            critical_report,
+            now=incident_now + timedelta(minutes=5),
+            telegram_sender=fake_telegram,
+        )
+        assert repeated["opened"] == 0
+        assert repeated["repeated"] == 1
+        assert repeated["notifications_created"] == 0
+        assert repeated["telegram_sent"] == 0
+        repeated_center = crm.get_a3_platform_incidents(
+            current_username="super",
+            now=incident_now + timedelta(minutes=5),
+        )
+        assert repeated_center["items"][0]["id"] == incident_id
+        assert repeated_center["items"][0]["occurrence_count"] == 2
+        assert len(repeated_center["items"][0]["events"]) == 1
+
+        warning_result = crm.sync_a3_platform_incidents(
+            {
+                "items": [{
+                    "company_id": 2,
+                    "company_name": "Company 2",
+                    "status": "warning",
+                    "message": "Контроль ещё требует внимания.",
+                }],
+            },
+            now=incident_now + timedelta(minutes=10),
+            telegram_sender=fake_telegram,
+        )
+        assert warning_result["resolved"] == 0
+        assert crm.get_a3_platform_incidents()["summary"]["active"] == 1
+
+        acknowledged = crm.acknowledge_a3_platform_incident(
+            incident_id,
+            "super",
+            now=incident_now + timedelta(minutes=15),
+        )
+        assert acknowledged["ok"] is True
+        assert acknowledged["assigned_to"] == "super"
+        duplicate_acknowledgement = crm.acknowledge_a3_platform_incident(
+            incident_id,
+            "super",
+            now=incident_now + timedelta(minutes=16),
+        )
+        assert duplicate_acknowledgement["error"] == "already_acknowledged"
+
+        assigned = crm.assign_a3_platform_incident(
+            incident_id,
+            "super",
+            "incident_admin",
+            now=incident_now + timedelta(minutes=20),
+            telegram_sender=fake_telegram,
+        )
+        assert assigned["ok"] is True
+        assert assigned["assigned_to"] == "incident_admin"
+        assert assigned["notifications_created"] == 1
+        assert assigned["telegram_sent"] == 1
+        duplicate_assignment = crm.assign_a3_platform_incident(
+            incident_id,
+            "super",
+            "incident_admin",
+            now=incident_now + timedelta(minutes=21),
+            telegram_sender=fake_telegram,
+        )
+        assert duplicate_assignment["notifications_created"] == 0
+        assert duplicate_assignment["telegram_sent"] == 0
+
+        note_result = crm.add_a3_platform_incident_note(
+            incident_id,
+            "incident_admin",
+            "Проверяю расписание и секрет фонового запуска.",
+            now=incident_now + timedelta(minutes=25),
+        )
+        assert note_result["ok"] is True
+        assert crm.add_a3_platform_incident_note(
+            incident_id,
+            "owner2",
+            "Недопустимый комментарий",
+        )["error"] == "forbidden"
+        assert crm.add_a3_platform_incident_note(
+            incident_id,
+            "super",
+            "",
+        )["error"] == "empty_note"
+
+        mine = crm.get_a3_platform_incidents(
+            assignee_filter="me",
+            current_username="incident_admin",
+        )
+        assert [item["id"] for item in mine["items"]] == [incident_id]
+        assert mine["summary"]["acknowledged"] == 1
+        assert mine["items"][0]["events"][0]["event_type"] == "note"
+
+        anonymous_page = await crm.platform_a3_incidents_page(
+            make_public_asgi_request("/platform/a3-health/incidents"),
+        )
+        assert anonymous_page.status_code == 302
+        assert anonymous_page.headers["location"] == "/login"
+        boss_page = await crm.platform_a3_incidents_page(
+            make_asgi_request("owner2", "/platform/a3-health/incidents"),
+        )
+        assert boss_page.status_code == 302
+        assert boss_page.headers["location"] == "/"
+        page = await crm.platform_a3_incidents_page(
+            make_asgi_request(
+                "super",
+                "/platform/a3-health/incidents",
+                "status=acknowledged&assignee=all&search=Company",
+            ),
+            status="acknowledged",
+            search="Company",
+        )
+        assert page.status_code == 200
+        html = page.body.decode("utf-8")
+        assert "Инциденты A3" in html
+        assert "Единый журнал критических сбоев" in html
+        assert "Принят в работу" in html
+        assert "Ответственный" in html
+        assert "Журнал действий" in html
+        assert "Проверяю расписание" in html
+        assert "/platform/a3-health" in html
+        assert 'class="platform-mobile-nav"' in html
+        assert page.context["center"]["status_filter"] == "acknowledged"
+
+        anonymous_api = await crm.api_platform_a3_incidents(
+            make_public_asgi_request("/api/platform/a3-health/incidents"),
+        )
+        assert anonymous_api.status_code == 401
+        boss_api = await crm.api_platform_a3_incidents(
+            make_asgi_request("owner2", "/api/platform/a3-health/incidents"),
+        )
+        assert boss_api.status_code == 403
+        incidents_api = await crm.api_platform_a3_incidents(
+            make_asgi_request("super", "/api/platform/a3-health/incidents"),
+            status="active",
+        )
+        assert incidents_api["ok"] is True
+        assert incidents_api["items"][0]["id"] == incident_id
+
+        incident_release = crm.get_platform_release_readiness(
+            counts={
+                "companies": 1,
+                "users": 2,
+                "tasks": 0,
+                "clients": 0,
+            },
+            calendar_health_summary={
+                "overall_status_code": "stable",
+                "overall_status_label": "Стабильно",
+                "problems": 0,
+            },
+            a3_health_summary={
+                "total": 3,
+                "stable": 3,
+                "warning": 0,
+                "critical": 0,
+                "waiting": 0,
+                "paused": 0,
+                "problems": 0,
+                "active_incidents": 1,
+                "active_critical_incidents": 1,
+            },
+        )
+        incident_release_check = next(
+            item
+            for item in incident_release["checks"]
+            if item["key"] == "a3_scheduler_health"
+        )
+        assert incident_release_check["status"] == "critical"
+        assert incident_release_check["url"] == (
+            "/platform/a3-health/incidents"
+        )
+
+        resolved = crm.sync_a3_platform_incidents(
+            {
+                "items": [{
+                    "company_id": 2,
+                    "company_name": "Company 2",
+                    "status": "stable",
+                    "message": "Фоновые процессы работают штатно.",
+                }],
+            },
+            now=incident_now + timedelta(minutes=40),
+            telegram_sender=fake_telegram,
+        )
+        assert resolved["resolved"] == 1
+        assert resolved["notifications_created"] == platform_admin_count
+        assert resolved["telegram_sent"] == platform_admin_chat_count
+        resolved_center = crm.get_a3_platform_incidents(
+            status_filter="resolved",
+            current_username="super",
+        )
+        assert resolved_center["summary"]["active"] == 0
+        assert resolved_center["summary"]["resolved"] == 1
+        assert resolved_center["items"][0]["id"] == incident_id
+        assert resolved_center["items"][0]["events"][0]["event_type"] == (
+            "resolved"
+        )
+
+        no_duplicate_recovery = crm.sync_a3_platform_incidents(
+            {
+                "items": [{
+                    "company_id": 2,
+                    "company_name": "Company 2",
+                    "status": "stable",
+                }],
+            },
+            now=incident_now + timedelta(minutes=45),
+            telegram_sender=fake_telegram,
+        )
+        assert no_duplicate_recovery["resolved"] == 0
+        assert no_duplicate_recovery["notifications_created"] == 0
+        assert len(telegram_calls) == platform_admin_chat_count * 2 + 1
+    finally:
+        conn = connect()
+        c = conn.cursor()
+        c.execute("DELETE FROM a3_platform_incident_events")
+        c.execute("DELETE FROM a3_platform_incidents")
+        c.execute("""
+            DELETE FROM notifications
+            WHERE link LIKE '/platform/a3-health/incidents%'
+        """)
+        c.execute("DELETE FROM users WHERE username='incident_admin'")
+        c.execute("""
+            UPDATE users SET telegram_chat_id=? WHERE username='super'
+        """, (previous_super_chat,))
+        conn.commit()
+        conn.close()
+
+
 async def assert_platform_calendar_health():
     policy_environment_names = (
         "CALENDAR_INCIDENT_RESPONSE_MINUTES",
@@ -25381,6 +25689,7 @@ async def assert_a3_api_layer():
     watchdog_notifications = []
     watchdog_heartbeats = []
     watchdog_history_runs = []
+    watchdog_incident_syncs = []
 
     def fake_watchdog_notifier(company_id, reliability=None, now=None):
         status = (reliability or {}).get("status")
@@ -25413,12 +25722,24 @@ async def assert_a3_api_layer():
         watchdog_history_runs.append((report.get("heartbeats_saved"), checked_at))
         return 501
 
+    def fake_watchdog_incident_syncer(report, now=None):
+        watchdog_incident_syncs.append((len(report.get("items", [])), now))
+        return {
+            "opened": 1,
+            "repeated": 0,
+            "resolved": 1,
+            "notifications_created": 2,
+            "telegram_sent": 1,
+            "items_checked": len(report.get("items", [])),
+        }
+
     deterministic_watchdog = (
         crm.run_a3_scheduler_watchdog_for_all_companies(
             now=watchdog_now,
             notifier=fake_watchdog_notifier,
             status_recorder=fake_watchdog_status_recorder,
             history_recorder=fake_watchdog_history_recorder,
+            incident_syncer=fake_watchdog_incident_syncer,
             report={
                 "companies_total": 4,
                 "eligible_companies": 3,
@@ -25472,6 +25793,9 @@ async def assert_a3_api_layer():
     assert deterministic_watchdog["history_error"] == ""
     assert watchdog_heartbeats == [(4, watchdog_now)]
     assert watchdog_history_runs == [(4, watchdog_now)]
+    assert watchdog_incident_syncs == [(4, watchdog_now)]
+    assert deterministic_watchdog["incidents"]["opened"] == 1
+    assert deterministic_watchdog["incident_error"] == ""
 
     owner_watchdog_status = crm.api_a3_scheduler_watchdog_status(request)
     manager_watchdog_status = crm.api_a3_scheduler_watchdog_status(
@@ -27916,6 +28240,7 @@ def main():
         asyncio.run(assert_platform_modules_page())
         asyncio.run(assert_platform_presets_page())
         asyncio.run(assert_platform_a3_health())
+        asyncio.run(assert_platform_a3_incidents())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))

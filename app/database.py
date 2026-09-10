@@ -747,6 +747,43 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS a3_platform_incidents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        incident_key TEXT NOT NULL DEFAULT 'a3_scheduler_health',
+        severity TEXT NOT NULL DEFAULT 'critical',
+        status TEXT NOT NULL DEFAULT 'open',
+        title TEXT NOT NULL,
+        message TEXT,
+        first_detected_at TEXT NOT NULL,
+        last_detected_at TEXT NOT NULL,
+        occurrence_count INTEGER NOT NULL DEFAULT 1,
+        acknowledged_at TEXT,
+        acknowledged_by TEXT,
+        assigned_at TEXT,
+        assigned_to TEXT,
+        assigned_by TEXT,
+        resolved_at TEXT,
+        resolution_message TEXT,
+        last_notified_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS a3_platform_incident_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        incident_id INTEGER NOT NULL,
+        company_id INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        actor_username TEXT,
+        message TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS system_health_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1123,6 +1160,27 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_a3_watchdog_runs_created
     ON a3_scheduler_watchdog_runs(created_at, id)
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_a3_platform_incident_active
+    ON a3_platform_incidents(company_id, incident_key)
+    WHERE status='open'
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_platform_incident_status_updated
+    ON a3_platform_incidents(status, updated_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_platform_incident_company_status
+    ON a3_platform_incidents(company_id, status, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_platform_incident_events_incident
+    ON a3_platform_incident_events(incident_id, created_at, id)
     """)
 
     c.execute("""

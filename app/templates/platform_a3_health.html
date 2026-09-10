@@ -21,7 +21,7 @@ body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
 .overview.critical{border-color:#fecaca;background:#fff7f7}
 .overview-title{font-size:18px;font-weight:900}
 .overview-meta{margin-top:5px;color:#6b7280;font-size:12px;font-weight:800}
-.stats{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(8,minmax(105px,1fr));gap:10px;margin-bottom:14px}
 .stat{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:white}
 .stat-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
 .stat-value{margin-top:5px;font-size:24px;font-weight:900}
@@ -86,6 +86,7 @@ tr:last-child td{border-bottom:0}
             </div>
         </div>
         <div class="header-actions">
+            <a class="button secondary" href="{{ links['a3_incidents'] }}">Инциденты A3{% if summary["active_incidents"] %} · {{ summary["active_incidents"] }}{% endif %}</a>
             <a class="button secondary" href="{{ links['calendar_health'] }}">Календарные процессы</a>
             <a class="button secondary" href="{{ links['export'] }}">Экспорт CSV</a>
             <a class="button" href="{{ links['platform'] }}">Панель платформы</a>
@@ -108,6 +109,7 @@ tr:last-child td{border-bottom:0}
         <div class="stat"><div class="stat-label">Ожидают</div><div class="stat-value">{{ summary["waiting"] }}</div></div>
         <div class="stat"><div class="stat-label">Приостановлены</div><div class="stat-value">{{ summary["paused"] }}</div></div>
         <div class="stat"><div class="stat-label">Всего проблем</div><div class="stat-value">{{ summary["problems"] }}</div></div>
+        <div class="stat"><div class="stat-label">Активные инциденты</div><div class="stat-value">{{ summary["active_incidents"] }}</div></div>
     </section>
 
     <section class="tools">

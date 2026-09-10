@@ -5,6 +5,7 @@ from app.services.a3_scheduler_watchdog import (
     get_a3_scheduler_watchdog_report,
     get_a3_scheduler_watchdog_status,
 )
+from app.services.a3_platform_incidents import get_a3_platform_incident_summary
 
 
 A3_PLATFORM_HEALTH_STATUS_LABELS = {
@@ -143,6 +144,10 @@ def get_a3_platform_health(status_filter="all", search="", now=None):
     summary["problems"] = (
         summary["critical"] + summary["warning"] + summary["waiting"]
     )
+    incident_summary = get_a3_platform_incident_summary()
+    summary["active_incidents"] = incident_summary["active"]
+    summary["active_critical_incidents"] = incident_summary["critical"]
+    summary["unacknowledged_incidents"] = incident_summary["unacknowledged"]
 
     search_lower = selected_search.lower()
     filtered_items = [
