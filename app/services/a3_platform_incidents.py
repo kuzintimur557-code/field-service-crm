@@ -31,6 +31,9 @@ A3_PLATFORM_INCIDENT_EVENT_LABELS = {
     "resolved": "Работа восстановлена",
     "review_updated": "Разбор инцидента обновлён",
     "review_completed": "Разбор инцидента завершён",
+    "followup_created": "Контрольная мера создана",
+    "followup_updated": "Контрольная мера обновлена",
+    "followup_completed": "Контрольная мера выполнена",
 }
 
 

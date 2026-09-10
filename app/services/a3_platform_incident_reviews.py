@@ -277,13 +277,54 @@ def get_a3_platform_incident_reviews(
             WHERE incidents.status='resolved'
             ORDER BY company_name, incidents.company_id
         """).fetchall()
+        followup_rows = cursor.execute("""
+            SELECT
+                incident_id,
+                COUNT(*) AS total,
+                SUM(
+                    CASE WHEN status IN ('open', 'in_progress')
+                    THEN 1 ELSE 0 END
+                ) AS active,
+                SUM(
+                    CASE
+                        WHEN status IN ('open', 'in_progress')
+                         AND due_at < ?
+                        THEN 1 ELSE 0
+                    END
+                ) AS overdue,
+                SUM(
+                    CASE WHEN status='completed' THEN 1 ELSE 0 END
+                ) AS completed
+            FROM a3_incident_followups
+            GROUP BY incident_id
+        """, (_timestamp(now_value),)).fetchall()
     finally:
         conn.close()
 
+    followups_by_incident = {
+        int(row["incident_id"]): {
+            "total": int(row["total"] or 0),
+            "active": int(row["active"] or 0),
+            "overdue": int(row["overdue"] or 0),
+            "completed": int(row["completed"] or 0),
+        }
+        for row in followup_rows
+    }
     all_items = [
         _enrich_review(row, now_value, policy)
         for row in rows
     ]
+    for item in all_items:
+        item["followups"] = followups_by_incident.get(int(item["id"]), {
+            "total": 0,
+            "active": 0,
+            "overdue": 0,
+            "completed": 0,
+        })
+        item["actions_url"] = (
+            "/platform/a3-health/incidents/actions?status=all&incident_id="
+            + str(item["id"])
+        )
     all_items = [
         item for item in all_items if _matches_search(item, selected_search)
     ]

@@ -61,6 +61,16 @@ from app.services.a3_platform_incident_reviews import (
     normalize_a3_incident_review_status,
     save_a3_platform_incident_review,
 )
+from app.services.a3_incident_followups import (
+    build_a3_followups_url,
+    create_a3_incident_followup,
+    get_a3_incident_followups,
+    normalize_a3_followup_company,
+    normalize_a3_followup_filter,
+    normalize_a3_followup_incident,
+    normalize_a3_followup_owner,
+    update_a3_incident_followup,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -8311,6 +8321,7 @@ def get_platform_dashboard_links():
             "/platform/a3-health/incidents/analytics"
         ),
         "a3_incident_reviews": "/platform/a3-health/incidents/reviews",
+        "a3_incident_actions": "/platform/a3-health/incidents/actions",
         "calendar_health": "/platform/calendar-health",
         "calendar_health_critical": "/platform/calendar-health?status=critical",
         "calendar_health_unacknowledged": (
@@ -16223,6 +16234,273 @@ async def platform_a3_incident_reviews_export(
         headers={
             "Content-Disposition": (
                 "attachment; filename=a3_incident_reviews.csv"
+            ),
+        },
+    )
+
+
+def _a3_incident_followup_redirect(
+    result,
+    status="active",
+    company_id="all",
+    incident_id="all",
+    owner="all",
+    search="",
+):
+    target = build_a3_followups_url(
+        status,
+        company_id,
+        incident_id,
+        owner,
+        search,
+    )
+    separator = "&" if "?" in target else "?"
+    flag = (
+        {"notice": "action_saved"}
+        if result.get("ok")
+        else {"error": result.get("error") or "action_failed"}
+    )
+    anchor = (
+        f"#action-{result['followup_id']}"
+        if result.get("followup_id") else "#create-action"
+    )
+    return RedirectResponse(
+        f"{target}{separator}{urlencode(flag)}{anchor}",
+        status_code=302,
+    )
+
+
+@app.get(
+    "/platform/a3-health/incidents/actions",
+    response_class=HTMLResponse,
+)
+async def platform_a3_incident_actions_page(
+    request: Request,
+    status: str = "active",
+    company_id: str = "all",
+    incident_id: str = "all",
+    owner: str = "all",
+    search: str = "",
+    notice: str = "",
+    error: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    center = get_a3_incident_followups(
+        status_filter=status,
+        company_id=company_id,
+        incident_id=incident_id,
+        owner_filter=owner,
+        search=search,
+        current_username=username,
+    )
+    links = get_platform_dashboard_links()
+    links["platform"] = links["page"]
+    export_params = {
+        "status": center["status_filter"],
+        "company_id": center["company_id"],
+        "incident_id": center["incident_id"],
+        "owner": center["owner_filter"],
+    }
+    if center["search"]:
+        export_params["search"] = center["search"]
+    links["a3_incident_actions_export"] = (
+        "/platform/a3-health/incidents/actions/export?"
+        + urlencode(export_params)
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_a3_incident_actions.html",
+        {
+            "request": request,
+            "username": username,
+            "center": center,
+            "summary": center["summary"],
+            "actions": center["items"],
+            "admins": center["admins"],
+            "notice": notice,
+            "error": error,
+            "links": links,
+        },
+    )
+
+
+@app.get("/api/platform/a3-health/incidents/actions")
+async def api_platform_a3_incident_actions(
+    request: Request,
+    status: str = "active",
+    company_id: str = "all",
+    incident_id: str = "all",
+    owner: str = "all",
+    search: str = "",
+    limit: int = 150,
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {
+        "ok": True,
+        **get_a3_incident_followups(
+            status_filter=status,
+            company_id=company_id,
+            incident_id=incident_id,
+            owner_filter=owner,
+            search=search,
+            current_username=username,
+            limit=limit,
+        ),
+    }
+
+
+@app.post("/platform/a3-health/incidents/actions/create")
+async def create_platform_a3_incident_action(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = create_a3_incident_followup(
+        incident_id=form.get("incident_id") or 0,
+        actor_username=username,
+        title=form.get("title") or "",
+        description=form.get("description") or "",
+        action_type=form.get("action_type") or "prevention",
+        priority=form.get("priority") or "normal",
+        owner_username=form.get("owner_username") or "",
+        due_at=form.get("due_at") or "",
+    )
+    return _a3_incident_followup_redirect(
+        result,
+        form.get("return_status") or "active",
+        form.get("company_id") or "all",
+        form.get("return_incident_id") or "all",
+        form.get("owner") or "all",
+        form.get("search") or "",
+    )
+
+
+@app.post("/platform/a3-health/incidents/actions/{followup_id}/update")
+async def update_platform_a3_incident_action(
+    request: Request,
+    followup_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = update_a3_incident_followup(
+        followup_id=followup_id,
+        actor_username=username,
+        title=form.get("title") or "",
+        description=form.get("description") or "",
+        status=form.get("action_status") or "open",
+        priority=form.get("priority") or "normal",
+        owner_username=form.get("owner_username") or "",
+        due_at=form.get("due_at") or "",
+    )
+    return _a3_incident_followup_redirect(
+        result,
+        form.get("return_status") or "active",
+        form.get("company_id") or "all",
+        form.get("incident_id") or "all",
+        form.get("owner") or "all",
+        form.get("search") or "",
+    )
+
+
+@app.get("/platform/a3-health/incidents/actions/export")
+async def platform_a3_incident_actions_export(
+    request: Request,
+    status: str = "all",
+    company_id: str = "all",
+    incident_id: str = "all",
+    owner: str = "all",
+    search: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    center = get_a3_incident_followups(
+        status_filter=status,
+        company_id=company_id,
+        incident_id=incident_id,
+        owner_filter=owner,
+        search=search,
+        current_username=username,
+        limit=500,
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID меры",
+        "ID инцидента",
+        "ID компании",
+        "Компания",
+        "Инцидент",
+        "Тип меры",
+        "Название",
+        "Описание",
+        "Состояние",
+        "Приоритет",
+        "Ответственный",
+        "Срок",
+        "Просрочена",
+        "Выполнена",
+        "Выполнил",
+        "Создал",
+    ])
+    for action in center["items"]:
+        writer.writerow([
+            action["id"],
+            action["incident_id"],
+            action["company_id"],
+            action["company_name"],
+            action["incident_title"],
+            action["action_type_label"],
+            action["title"],
+            action["description"] or "",
+            action["status_label"],
+            action["priority_label"],
+            action["owner_label"],
+            action["due_at"],
+            "Да" if action["is_overdue"] else "Нет",
+            action["completed_at"] or "",
+            action["completed_by"] or "",
+            action["created_by"],
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=a3_incident_actions.csv"
             ),
         },
     )

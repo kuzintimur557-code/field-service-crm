@@ -798,6 +798,26 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS a3_incident_followups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        incident_id INTEGER NOT NULL,
+        company_id INTEGER NOT NULL,
+        action_type TEXT NOT NULL DEFAULT 'prevention',
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'open',
+        priority TEXT NOT NULL DEFAULT 'normal',
+        owner_username TEXT,
+        due_at TEXT NOT NULL,
+        completed_at TEXT,
+        completed_by TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS system_health_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1269,6 +1289,21 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_a3_platform_incident_events_incident
     ON a3_platform_incident_events(incident_id, created_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_incident_followups_incident
+    ON a3_incident_followups(incident_id, status, due_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_incident_followups_queue
+    ON a3_incident_followups(status, due_at, priority, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_incident_followups_owner
+    ON a3_incident_followups(owner_username, status, due_at, id)
     """)
 
     c.execute("""

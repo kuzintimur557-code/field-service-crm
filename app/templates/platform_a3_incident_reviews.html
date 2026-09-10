@@ -38,7 +38,7 @@ textarea{min-height:104px;resize:vertical;line-height:1.45}
 .badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .badge{display:inline-flex;padding:5px 7px;border-radius:6px;background:#e5e7eb;color:#374151;font-size:10px;font-weight:900}
 .badge.warning{background:#fef3c7;color:#92400e}.badge.danger{background:#fee2e2;color:#991b1b}.badge.success{background:#d1fae5;color:#065f46}
-.facts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0;padding:12px 0;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
+.facts{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:14px 0;padding:12px 0;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
 .fact-label{color:#6b7280;font-size:9px;font-weight:900;text-transform:uppercase}.fact-value{margin-top:4px;font-size:12px;font-weight:900;line-height:1.35}
 .review-form{display:grid;gap:12px}.form-top{display:grid;grid-template-columns:220px 240px 1fr;gap:10px;align-items:end}.field label{display:block;margin-bottom:5px;color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}.field-note{margin-top:5px;color:#6b7280;font-size:10px;font-weight:700;line-height:1.35}
 .review-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.form-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:1px}.requirement{color:#6b7280;font-size:10px;font-weight:800}.empty{padding:42px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;color:#6b7280;text-align:center;font-weight:900}
@@ -57,6 +57,7 @@ textarea{min-height:104px;resize:vertical;line-height:1.45}
         </div>
         <div class="header-actions">
             <a class="button secondary" href="{{ links['a3_incident_reviews_export'] }}">Скачать CSV</a>
+            <a class="button secondary" href="{{ links['a3_incident_actions'] }}">Контрольные меры</a>
             <a class="button secondary" href="{{ links['a3_incident_analytics'] }}">Аналитика</a>
             <a class="button secondary" href="{{ links['a3_incidents'] }}">Центр инцидентов</a>
             <a class="button" href="{{ links['platform'] }}">Панель платформы</a>
@@ -106,6 +107,7 @@ textarea{min-height:104px;resize:vertical;line-height:1.45}
                 <div><div class="fact-label">Срок разбора</div><div class="fact-value">{{ review["review_due_label"] }}<div class="review-meta">{{ review["review_progress_label"] }}</div></div></div>
                 <div><div class="fact-label">Ответственный</div><div class="fact-value">{{ review["review_owner_label"] }}</div></div>
                 <div><div class="fact-label">Состояние</div><div class="fact-value">{{ review["review_status_label"] }}</div></div>
+                <div><div class="fact-label">Контрольные меры</div><div class="fact-value">{{ review["followups"]["completed"] }} из {{ review["followups"]["total"] }} выполнено{% if review["followups"]["overdue"] %}<div class="review-meta">Просрочено: {{ review["followups"]["overdue"] }}</div>{% endif %}</div></div>
                 <div><div class="fact-label">Завершил</div><div class="fact-value">{{ review["review_completed_by"] or "Не завершён" }}</div></div>
                 <div><div class="fact-label">Дата завершения</div><div class="fact-value">{{ review["completed_label"] }}</div></div>
             </div>
@@ -115,7 +117,7 @@ textarea{min-height:104px;resize:vertical;line-height:1.45}
                 <div class="form-top">
                     <div class="field"><label for="review-status-{{ review['id'] }}">Состояние разбора</label><select id="review-status-{{ review['id'] }}" name="review_status"><option value="pending" {% if review["review_status"] == "pending" %}selected{% endif %}>Ожидает разбора</option><option value="in_progress" {% if review["review_status"] == "in_progress" %}selected{% endif %}>В работе</option><option value="completed" {% if review["review_status"] == "completed" %}selected{% endif %}>Завершён</option></select></div>
                     <div class="field"><label for="review-owner-{{ review['id'] }}">Ответственный</label><select id="review-owner-{{ review['id'] }}" name="review_owner" required><option value="">Выберите администратора</option>{% for admin in admins %}<option value="{{ admin['username'] }}" {% if review["review_owner"] == admin["username"] %}selected{% endif %}>{{ admin["display_name"] }}</option>{% endfor %}</select></div>
-                    <div class="review-links"><a class="button secondary" href="{{ review['incident_url'] }}">Открыть инцидент</a><a class="button secondary" href="{{ review['company_url'] }}">Открыть компанию</a></div>
+                    <div class="review-links"><a class="button secondary" href="{{ review['actions_url'] }}">Открыть меры</a><a class="button secondary" href="{{ review['incident_url'] }}">Открыть инцидент</a><a class="button secondary" href="{{ review['company_url'] }}">Открыть компанию</a></div>
                 </div>
                 <div class="review-fields">
                     <div class="field"><label for="root-cause-{{ review['id'] }}">Причина сбоя</label><textarea id="root-cause-{{ review['id'] }}" name="root_cause" maxlength="2000" placeholder="Что стало основной причиной">{{ review["root_cause"] or "" }}</textarea></div>

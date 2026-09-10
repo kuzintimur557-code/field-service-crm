@@ -14552,6 +14552,468 @@ async def assert_platform_a3_incident_reviews():
         conn.close()
 
 
+async def assert_a3_incident_followups():
+    followup_now = datetime(2026, 6, 25, 12, 0)
+    conn = connect()
+    c = conn.cursor()
+    columns = {
+        row["name"]
+        for row in c.execute(
+            "PRAGMA table_info(a3_incident_followups)"
+        ).fetchall()
+    }
+    assert {
+        "incident_id",
+        "company_id",
+        "action_type",
+        "title",
+        "status",
+        "priority",
+        "owner_username",
+        "due_at",
+        "completed_at",
+        "completed_by",
+    }.issubset(columns)
+    c.execute("""
+        DELETE FROM a3_incident_followups
+        WHERE incident_id IN (
+            SELECT id FROM a3_platform_incidents
+            WHERE incident_key LIKE 'followup_test_%'
+        )
+    """)
+    c.execute("""
+        DELETE FROM a3_platform_incident_events
+        WHERE incident_id IN (
+            SELECT id FROM a3_platform_incidents
+            WHERE incident_key LIKE 'followup_test_%'
+        )
+    """)
+    c.execute("""
+        DELETE FROM a3_platform_incidents
+        WHERE incident_key LIKE 'followup_test_%'
+    """)
+    c.executemany("""
+        INSERT INTO a3_platform_incidents (
+            company_id,
+            incident_key,
+            severity,
+            status,
+            title,
+            message,
+            first_detected_at,
+            last_detected_at,
+            response_due_at,
+            escalation_due_at,
+            acknowledged_at,
+            acknowledged_by,
+            assigned_to,
+            resolved_at,
+            resolution_message,
+            review_status,
+            review_due_at,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, 'critical', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
+    """, [
+        (
+            2,
+            "followup_test_resolved_one",
+            "resolved",
+            "Сбой отправки уведомлений",
+            "Тест контрольной меры.",
+            "2026-06-25 08:00:00",
+            "2026-06-25 08:30:00",
+            "2026-06-25 08:30:00",
+            "2026-06-25 09:00:00",
+            "2026-06-25 08:10:00",
+            "super",
+            "super",
+            "2026-06-25 09:30:00",
+            "Отправка восстановлена.",
+            "2026-06-26 09:30:00",
+            "2026-06-25 08:00:00",
+            "2026-06-25 09:30:00",
+        ),
+        (
+            2,
+            "followup_test_resolved_two",
+            "resolved",
+            "Повторный сбой уведомлений",
+            "Тест просроченной меры.",
+            "2026-06-24 08:00:00",
+            "2026-06-24 08:30:00",
+            "2026-06-24 08:30:00",
+            "2026-06-24 09:00:00",
+            "2026-06-24 08:10:00",
+            "super",
+            "super",
+            "2026-06-24 09:30:00",
+            "Отправка восстановлена.",
+            "2026-06-25 09:30:00",
+            "2026-06-24 08:00:00",
+            "2026-06-24 09:30:00",
+        ),
+        (
+            2,
+            "followup_test_open",
+            "open",
+            "Активный сбой уведомлений",
+            "Для него нельзя создать меру.",
+            "2026-06-25 11:00:00",
+            "2026-06-25 11:00:00",
+            "2026-06-25 11:30:00",
+            "2026-06-25 12:00:00",
+            None,
+            None,
+            None,
+            None,
+            None,
+            "2026-06-26 11:00:00",
+            "2026-06-25 11:00:00",
+            "2026-06-25 11:00:00",
+        ),
+    ])
+    ids = {
+        row["incident_key"]: row["id"]
+        for row in c.execute("""
+            SELECT id, incident_key
+            FROM a3_platform_incidents
+            WHERE incident_key LIKE 'followup_test_%'
+        """).fetchall()
+    }
+    conn.commit()
+    conn.close()
+
+    try:
+        assert crm.normalize_a3_followup_filter("overdue") == "overdue"
+        assert crm.normalize_a3_followup_filter("bad") == "active"
+        assert crm.normalize_a3_followup_company("2") == 2
+        assert crm.normalize_a3_followup_incident("bad") == "all"
+        assert crm.normalize_a3_followup_owner("me") == "me"
+        assert crm.build_a3_followups_url(
+            "overdue",
+            2,
+            ids["followup_test_resolved_one"],
+            "me",
+            "уведомления",
+        ).startswith(
+            "/platform/a3-health/incidents/actions?status=overdue"
+        )
+
+        missing_title = crm.create_a3_incident_followup(
+            ids["followup_test_resolved_one"],
+            "super",
+            "",
+            "",
+            "corrective",
+            "high",
+            "super",
+            "2026-06-25T16:00",
+            now=followup_now,
+        )
+        assert missing_title["error"] == "empty_title"
+        invalid_due = crm.create_a3_incident_followup(
+            ids["followup_test_resolved_one"],
+            "super",
+            "Проверить отправку",
+            "",
+            "corrective",
+            "high",
+            "super",
+            "bad",
+            now=followup_now,
+        )
+        assert invalid_due["error"] == "invalid_due_at"
+        forbidden = crm.create_a3_incident_followup(
+            ids["followup_test_resolved_one"],
+            "owner2",
+            "Проверить отправку",
+            "",
+            "corrective",
+            "high",
+            "super",
+            "2026-06-25T16:00",
+            now=followup_now,
+        )
+        assert forbidden["error"] == "forbidden"
+        invalid_owner = crm.create_a3_incident_followup(
+            ids["followup_test_resolved_one"],
+            "super",
+            "Проверить отправку",
+            "",
+            "corrective",
+            "high",
+            "missing_admin",
+            "2026-06-25T16:00",
+            now=followup_now,
+        )
+        assert invalid_owner["error"] == "invalid_owner"
+        open_incident = crm.create_a3_incident_followup(
+            ids["followup_test_open"],
+            "super",
+            "Проверить отправку",
+            "",
+            "corrective",
+            "high",
+            "super",
+            "2026-06-25T16:00",
+            now=followup_now,
+        )
+        assert open_incident["error"] == "incident_not_found"
+
+        assigned = crm.create_a3_incident_followup(
+            ids["followup_test_resolved_one"],
+            "super",
+            "Проверить повторную отправку",
+            "Провести контрольный запуск и сверить доставку.",
+            "corrective",
+            "high",
+            "super",
+            "2026-06-25T16:00",
+            now=followup_now,
+        )
+        overdue = crm.create_a3_incident_followup(
+            ids["followup_test_resolved_two"],
+            "super",
+            "Добавить резервный канал",
+            "Настроить резервную доставку уведомлений.",
+            "prevention",
+            "critical",
+            "",
+            "2026-06-25T10:00",
+            now=followup_now,
+        )
+        assert assigned["ok"] is True
+        assert overdue["ok"] is True
+
+        center = crm.get_a3_incident_followups(
+            status_filter="all",
+            company_id=2,
+            current_username="super",
+            now=followup_now,
+        )
+        assert center["summary"] == {
+            "total": 2,
+            "active": 2,
+            "overdue": 1,
+            "due_soon": 1,
+            "completed": 0,
+            "cancelled": 0,
+            "unassigned": 1,
+            "critical": 1,
+            "completion_percent": 0.0,
+        }
+        assert [item["id"] for item in center["items"]][0] == (
+            overdue["followup_id"]
+        )
+        assert center["items"][0]["status_label"] == "Просрочена"
+        assert len(crm.get_a3_incident_followups(
+            "overdue", 2, current_username="super", now=followup_now,
+        )["items"]) == 1
+        assert len(crm.get_a3_incident_followups(
+            "due_soon", 2, current_username="super", now=followup_now,
+        )["items"]) == 1
+        assert len(crm.get_a3_incident_followups(
+            "all", 2, owner_filter="me", current_username="super",
+            now=followup_now,
+        )["items"]) == 1
+        assert len(crm.get_a3_incident_followups(
+            "all", 2, owner_filter="unassigned", current_username="super",
+            now=followup_now,
+        )["items"]) == 1
+
+        reviews = crm.get_a3_platform_incident_reviews(
+            status_filter="all",
+            company_id=2,
+            search="Сбой отправки",
+            now=followup_now,
+        )
+        assert reviews["items"][0]["followups"]["total"] == 1
+        assert "incident_id=" in reviews["items"][0]["actions_url"]
+
+        completed = crm.update_a3_incident_followup(
+            assigned["followup_id"],
+            "super",
+            "Проверить повторную отправку",
+            "Контрольный запуск прошёл успешно.",
+            "completed",
+            "high",
+            "super",
+            "2026-06-25T16:00",
+            now=followup_now + timedelta(minutes=30),
+        )
+        assert completed["ok"] is True
+        conn = connect()
+        completed_row = conn.cursor().execute("""
+            SELECT completed_at, completed_by
+            FROM a3_incident_followups WHERE id=?
+        """, (assigned["followup_id"],)).fetchone()
+        event = conn.cursor().execute("""
+            SELECT event_type FROM a3_platform_incident_events
+            WHERE incident_id=? ORDER BY id DESC LIMIT 1
+        """, (ids["followup_test_resolved_one"],)).fetchone()
+        conn.close()
+        assert completed_row["completed_by"] == "super"
+        assert completed_row["completed_at"]
+        assert event["event_type"] == "followup_completed"
+
+        reopened = crm.update_a3_incident_followup(
+            assigned["followup_id"],
+            "super",
+            "Проверить повторную отправку",
+            "Нужна дополнительная проверка.",
+            "in_progress",
+            "high",
+            "super",
+            "2026-06-25T17:00",
+            now=followup_now + timedelta(minutes=40),
+        )
+        assert reopened["status"] == "in_progress"
+        conn = connect()
+        reopened_row = conn.cursor().execute("""
+            SELECT completed_at, completed_by
+            FROM a3_incident_followups WHERE id=?
+        """, (assigned["followup_id"],)).fetchone()
+        conn.close()
+        assert reopened_row["completed_at"] is None
+        assert reopened_row["completed_by"] is None
+
+        anonymous_page = await crm.platform_a3_incident_actions_page(
+            make_public_asgi_request(
+                "/platform/a3-health/incidents/actions"
+            ),
+        )
+        assert anonymous_page.status_code == 302
+        boss_page = await crm.platform_a3_incident_actions_page(
+            make_asgi_request(
+                "owner2", "/platform/a3-health/incidents/actions"
+            ),
+        )
+        assert boss_page.status_code == 302
+        page = await crm.platform_a3_incident_actions_page(
+            make_asgi_request(
+                "super", "/platform/a3-health/incidents/actions"
+            ),
+            status="all",
+            company_id="2",
+        )
+        assert page.status_code == 200
+        html = page.body.decode("utf-8")
+        assert "Контрольные меры A3" in html
+        assert "Исправляющая мера" in html
+        assert "Добавить резервный канал" in html
+        assert "Скачать CSV" in html
+        assert 'class="platform-mobile-nav"' in html
+
+        anonymous_api = await crm.api_platform_a3_incident_actions(
+            make_public_asgi_request(
+                "/api/platform/a3-health/incidents/actions"
+            ),
+        )
+        assert anonymous_api.status_code == 401
+        boss_api = await crm.api_platform_a3_incident_actions(
+            make_asgi_request(
+                "owner2", "/api/platform/a3-health/incidents/actions"
+            ),
+        )
+        assert boss_api.status_code == 403
+        api = await crm.api_platform_a3_incident_actions(
+            make_asgi_request(
+                "super", "/api/platform/a3-health/incidents/actions"
+            ),
+            status="all",
+            company_id="2",
+        )
+        assert api["ok"] is True
+        assert api["summary"]["total"] == 2
+
+        create_redirect = await crm.create_platform_a3_incident_action(
+            make_form_request(
+                "super",
+                "/platform/a3-health/incidents/actions/create",
+                {
+                    "incident_id": str(ids["followup_test_resolved_one"]),
+                    "title": "Зафиксировать контроль в регламенте",
+                    "description": "Обновить регламент проверки.",
+                    "action_type": "prevention",
+                    "priority": "normal",
+                    "owner_username": "super",
+                    "due_at": "2026-06-26T12:00",
+                    "return_status": "all",
+                    "company_id": "2",
+                },
+            ),
+        )
+        assert create_redirect.status_code == 302
+        assert "notice=action_saved" in create_redirect.headers["location"]
+
+        update_redirect = await crm.update_platform_a3_incident_action(
+            make_form_request(
+                "super",
+                (
+                    "/platform/a3-health/incidents/actions/"
+                    f"{overdue['followup_id']}/update"
+                ),
+                {
+                    "title": "Добавить резервный канал",
+                    "description": "Настроить резервную доставку.",
+                    "action_status": "in_progress",
+                    "priority": "critical",
+                    "owner_username": "super",
+                    "due_at": "2026-06-26T10:00",
+                    "return_status": "all",
+                    "company_id": "2",
+                },
+            ),
+            overdue["followup_id"],
+        )
+        assert update_redirect.status_code == 302
+        assert f"#action-{overdue['followup_id']}" in (
+            update_redirect.headers["location"]
+        )
+
+        anonymous_export = await crm.platform_a3_incident_actions_export(
+            make_public_asgi_request(
+                "/platform/a3-health/incidents/actions/export"
+            ),
+        )
+        assert anonymous_export.status_code == 302
+        export = await crm.platform_a3_incident_actions_export(
+            make_asgi_request(
+                "super", "/platform/a3-health/incidents/actions/export"
+            ),
+            status="all",
+            company_id="2",
+        )
+        export_csv = export.body.decode("utf-8-sig")
+        assert "ID меры" in export_csv
+        assert "Исправляющая мера" in export_csv
+        assert "Проверить повторную отправку" in export_csv
+    finally:
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+            DELETE FROM a3_incident_followups
+            WHERE incident_id IN (
+                SELECT id FROM a3_platform_incidents
+                WHERE incident_key LIKE 'followup_test_%'
+            )
+        """)
+        c.execute("""
+            DELETE FROM a3_platform_incident_events
+            WHERE incident_id IN (
+                SELECT id FROM a3_platform_incidents
+                WHERE incident_key LIKE 'followup_test_%'
+            )
+        """)
+        c.execute("""
+            DELETE FROM a3_platform_incidents
+            WHERE incident_key LIKE 'followup_test_%'
+        """)
+        conn.commit()
+        conn.close()
+
+
 async def assert_platform_calendar_health():
     policy_environment_names = (
         "CALENDAR_INCIDENT_RESPONSE_MINUTES",
@@ -28962,6 +29424,7 @@ def main():
         asyncio.run(assert_platform_a3_incidents())
         asyncio.run(assert_platform_a3_incident_analytics())
         asyncio.run(assert_platform_a3_incident_reviews())
+        asyncio.run(assert_a3_incident_followups())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))
