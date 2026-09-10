@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Аналитика инцидентов A3</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif}
+.container{max-width:1320px;margin:auto;padding:24px}
+.header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.header h1{margin:0;font-size:30px;letter-spacing:0}
+.subtitle{margin-top:6px;color:#6b7280;font-size:13px;font-weight:800;line-height:1.45}
+.header-actions,.periods{display:flex;gap:8px;flex-wrap:wrap}
+.button,.period{display:inline-flex;align-items:center;justify-content:center;padding:10px 12px;border:1px solid #111827;border-radius:7px;background:#111827;color:#fff;text-decoration:none;font:900 12px Arial,sans-serif;cursor:pointer}
+.button.secondary,.period{border-color:#d1d5db;background:#fff;color:#374151}
+.period.active{border-color:#111827;background:#111827;color:#fff}
+.toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding:14px 0;border-top:1px solid #d1d5db;border-bottom:1px solid #d1d5db;margin-bottom:14px}
+.company-filter{display:grid;grid-template-columns:minmax(210px,280px) auto;gap:8px;align-items:end}
+.field label{display:block;margin-bottom:5px;color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
+select{width:100%;padding:9px 10px;border:1px solid #d1d5db;border-radius:7px;background:#fff;color:#111827;font:700 12px Arial,sans-serif}
+.stats{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;margin-bottom:22px}
+.stat{min-width:0;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
+.stat-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase;line-height:1.25}
+.stat-value{margin-top:7px;font-size:23px;font-weight:900;overflow-wrap:anywhere}
+.stat-note{margin-top:4px;color:#6b7280;font-size:10px;font-weight:800;line-height:1.35}
+.section{padding:20px 0;border-top:1px solid #d1d5db}
+.section:first-of-type{border-top:0}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:14px;margin-bottom:12px}
+.section h2{margin:0;font-size:19px;letter-spacing:0}
+.section-note{margin-top:4px;color:#6b7280;font-size:11px;font-weight:800}
+.recommendations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.recommendation{display:grid;grid-template-columns:5px 1fr auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
+.recommendation-mark{align-self:stretch;border-radius:3px;background:#16a34a}
+.recommendation.warning .recommendation-mark{background:#d97706}
+.recommendation.danger .recommendation-mark{background:#dc2626}
+.recommendation-title{font-size:13px;font-weight:900}
+.recommendation-text{margin-top:4px;color:#6b7280;font-size:11px;font-weight:700;line-height:1.4}
+.recommendation a{color:#1d4ed8;font-size:11px;font-weight:900;text-decoration:none;white-space:nowrap}
+.trend{display:grid;grid-template-columns:repeat(auto-fit,minmax(36px,1fr));gap:5px;min-height:190px;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;overflow:hidden}
+.trend-column{display:grid;grid-template-rows:125px auto;gap:7px;min-width:0}
+.trend-bars{display:flex;align-items:flex-end;justify-content:center;gap:2px;border-bottom:1px solid #d1d5db}
+.bar{width:min(10px,45%);min-height:2px;background:#2563eb}
+.bar.resolved{background:#16a34a}
+.trend-label{color:#6b7280;font-size:9px;font-weight:900;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend{display:flex;gap:12px;flex-wrap:wrap;color:#6b7280;font-size:10px;font-weight:900}
+.legend span::before{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:2px;background:#2563eb;content:""}
+.legend .resolved::before{background:#16a34a}
+.table-wrap{overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
+table{width:100%;border-collapse:collapse;min-width:820px}
+th,td{padding:11px 12px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:11px;line-height:1.35}
+th{background:#f9fafb;color:#6b7280;font-size:9px;font-weight:900;text-transform:uppercase}
+td{font-weight:800}
+tr:last-child td{border-bottom:0}
+.name{font-size:12px;font-weight:900}
+.muted{margin-top:3px;color:#6b7280;font-size:10px;font-weight:700}
+.badge{display:inline-flex;padding:5px 7px;border-radius:6px;background:#d1fae5;color:#065f46;font-size:10px;font-weight:900}
+.badge.warning{background:#fef3c7;color:#92400e}
+.badge.danger{background:#fee2e2;color:#991b1b}
+.link{color:#1d4ed8;font-weight:900;text-decoration:none}
+.empty{padding:34px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;color:#6b7280;text-align:center;font-size:12px;font-weight:900}
+@media(max-width:1050px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:760px){
+    .container{padding:14px 14px 86px}.header{flex-direction:column}.header h1{font-size:24px}.header-actions,.header-actions .button{width:100%}
+    .toolbar{align-items:stretch;flex-direction:column}.periods{display:grid;grid-template-columns:1fr 1fr}.company-filter{grid-template-columns:1fr}.company-filter .button{width:100%}
+    .stats{grid-template-columns:1fr 1fr}.stat{padding:12px}.stat-value{font-size:20px}.recommendations{grid-template-columns:1fr}.recommendation{grid-template-columns:5px 1fr}.recommendation a{grid-column:2;white-space:normal}
+    .section{padding:17px 0}.section-head{align-items:flex-start;flex-direction:column}.trend{grid-template-columns:repeat(7,minmax(28px,1fr));overflow-x:auto}.trend-column{min-width:28px}
+    .table-wrap{width:100%;max-width:100%;border:0;background:transparent;overflow:visible}.table-wrap table{display:block;width:100%;max-width:100%;min-width:0;table-layout:fixed}thead{display:none}tbody,tr,td{display:block;width:100%;max-width:100%}tr{margin-bottom:9px;padding:11px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}td{display:grid;grid-template-columns:minmax(105px,.8fr) minmax(0,1.2fr);gap:10px;padding:7px 0;border-bottom:1px solid #f3f4f6;text-align:right;overflow-wrap:anywhere}td::before{color:#6b7280;content:attr(data-label);font-size:9px;font-weight:900;text-align:left;text-transform:uppercase}tr td:last-child{border-bottom:0}.name,.muted{text-align:right}
+}
+</style>
+</head>
+<body>
+<main class="container">
+    <header class="header">
+        <div>
+            <h1>Аналитика инцидентов A3</h1>
+            <div class="subtitle">Соблюдение сроков реакции, скорость восстановления и нагрузка команды платформы.<br>Период: {{ analytics["date_from"] }} — {{ analytics["date_to"] }} · обновлено: {{ analytics["generated_at"] }}.</div>
+        </div>
+        <div class="header-actions">
+            <a class="button secondary" href="{{ analytics['export_url'] }}">Скачать CSV</a>
+            <a class="button secondary" href="{{ links['a3_incidents'] }}">Центр инцидентов</a>
+            <a class="button secondary" href="{{ links['a3_health'] }}">Состояние A3</a>
+            <a class="button" href="{{ links['platform'] }}">Панель платформы</a>
+        </div>
+    </header>
+
+    <section class="toolbar" aria-label="Фильтры аналитики">
+        <nav class="periods" aria-label="Период">
+            {% for option in analytics["period_options"] %}
+            <a class="period {% if analytics['period'] == option['key'] %}active{% endif %}" href="{{ option['url'] }}">{{ option["label"] }}</a>
+            {% endfor %}
+        </nav>
+        <form class="company-filter" method="get" action="{{ analytics['base_url'] }}">
+            <input type="hidden" name="period" value="{{ analytics['period'] }}">
+            <div class="field">
+                <label for="company_id">Компания</label>
+                <select id="company_id" name="company_id">
+                    <option value="all">Все компании</option>
+                    {% for option in analytics["company_options"] %}
+                    <option value="{{ option['id'] }}" {% if analytics["company_id"] == option["id"] %}selected{% endif %}>{{ option["name"] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="button" type="submit">Применить</button>
+        </form>
+    </section>
+
+    <section class="stats" aria-label="Ключевые показатели">
+        <div class="stat"><div class="stat-label">Инцидентов</div><div class="stat-value">{{ summary["total"] }}</div><div class="stat-note">за выбранный период</div></div>
+        <div class="stat"><div class="stat-label">Активные</div><div class="stat-value">{{ summary["active"] }}</div><div class="stat-note">требуют контроля</div></div>
+        <div class="stat"><div class="stat-label">Закрытые</div><div class="stat-value">{{ summary["resolved"] }}</div><div class="stat-note">{{ summary["resolution_rate"] }}% от всех</div></div>
+        <div class="stat"><div class="stat-label">SLA реакции</div><div class="stat-value">{{ summary["response_sla_percent"] }}%</div><div class="stat-note">{{ summary["on_time"] }} в срок из {{ summary["response_eligible"] }}</div></div>
+        <div class="stat"><div class="stat-label">Средняя реакция</div><div class="stat-value">{{ summary["average_response_label"] }}</div><div class="stat-note">норма {{ analytics["policy"]["response_label"] }}</div></div>
+        <div class="stat"><div class="stat-label">Среднее восстановление</div><div class="stat-value">{{ summary["average_resolution_label"] }}</div><div class="stat-note">от открытия до закрытия</div></div>
+        <div class="stat"><div class="stat-label">Эскалированы</div><div class="stat-value">{{ summary["escalated"] }}</div><div class="stat-note">{{ summary["escalation_rate"] }}% от всех</div></div>
+        <div class="stat"><div class="stat-label">Реакция просрочена</div><div class="stat-value">{{ summary["response_overdue"] }}</div><div class="stat-note">активные без реакции</div></div>
+    </section>
+
+    <section class="section">
+        <div class="section-head"><div><h2>Рекомендации</h2><div class="section-note">Следующие действия по текущим показателям.</div></div></div>
+        <div class="recommendations">
+            {% for item in recommendations %}
+            <article class="recommendation {{ item['tone'] }}">
+                <div class="recommendation-mark"></div>
+                <div><div class="recommendation-title">{{ item["title"] }}</div><div class="recommendation-text">{{ item["description"] }}</div></div>
+                <a href="{{ item['url'] }}">{{ item["action_label"] }}</a>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div><h2>Динамика</h2><div class="section-note">Открытые и закрытые инциденты по времени.</div></div>
+            <div class="legend"><span>Открыто</span><span class="resolved">Закрыто</span></div>
+        </div>
+        {% if summary["total"] %}
+        <div class="trend">
+            {% for row in trend %}
+            <div class="trend-column" title="{{ row['label'] }}: открыто {{ row['opened'] }}, закрыто {{ row['resolved'] }}, с опозданием {{ row['late'] }}, эскалировано {{ row['escalated'] }}">
+                <div class="trend-bars"><div class="bar" style="height:{{ row['opened_bar'] }}%"></div><div class="bar resolved" style="height:{{ row['resolved_bar'] }}%"></div></div>
+                <div class="trend-label">{{ row["label"] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}<div class="empty">За выбранный период инцидентов нет.</div>{% endif %}
+    </section>
+
+    <section class="section">
+        <div class="section-head"><div><h2>Компании</h2><div class="section-note">Сравнение соблюдения сроков и операционного риска.</div></div></div>
+        {% if companies %}
+        <div class="table-wrap"><table>
+            <thead><tr><th>Компания</th><th>Инциденты</th><th>Активные</th><th>SLA реакции</th><th>Опоздания</th><th>Просрочено</th><th>Эскалации</th><th>Средняя реакция</th><th>Риск</th><th></th></tr></thead>
+            <tbody>{% for company in companies %}<tr>
+                <td data-label="Компания"><div class="name">{{ company["company_name"] }}</div><div class="muted">Компания #{{ company["company_id"] }}</div></td>
+                <td data-label="Инциденты">{{ company["total"] }}</td><td data-label="Активные">{{ company["active"] }}</td><td data-label="SLA реакции">{{ company["response_sla_percent"] }}%</td><td data-label="Опоздания">{{ company["late"] }}</td><td data-label="Просрочено">{{ company["overdue"] }}</td><td data-label="Эскалации">{{ company["escalated"] }}</td><td data-label="Средняя реакция">{{ company["average_response_label"] }}</td>
+                <td data-label="Риск"><span class="badge {{ company['risk_tone'] }}">{{ company["risk_label"] }} · {{ company["risk_score"] }}/100</span></td>
+                <td data-label="Действие"><a class="link" href="{{ company['incidents_url'] }}">Инциденты</a></td>
+            </tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}<div class="empty">Нет компаний с инцидентами за выбранный период.</div>{% endif %}
+    </section>
+
+    <section class="section">
+        <div class="section-head"><div><h2>Нагрузка администраторов</h2><div class="section-note">Распределение активных и завершённых инцидентов между ответственными.</div></div></div>
+        {% if admin_workload %}
+        <div class="table-wrap"><table>
+            <thead><tr><th>Ответственный</th><th>Инциденты</th><th>Активные</th><th>Закрытые</th><th>Приняты</th><th>Опоздания</th><th>Эскалации</th><th>Средняя реакция</th><th>Нагрузка</th></tr></thead>
+            <tbody>{% for admin in admin_workload %}<tr>
+                <td data-label="Ответственный"><div class="name">{{ admin["display_name"] }}</div></td><td data-label="Инциденты">{{ admin["total"] }}</td><td data-label="Активные">{{ admin["active"] }}</td><td data-label="Закрытые">{{ admin["resolved"] }}</td><td data-label="Приняты">{{ admin["acknowledged"] }}</td><td data-label="Опоздания">{{ admin["late"] }}</td><td data-label="Эскалации">{{ admin["escalated"] }}</td><td data-label="Средняя реакция">{{ admin["average_response_label"] }}</td><td data-label="Нагрузка">{{ admin["load_label"] }} · {{ admin["load_score"] }}/100</td>
+            </tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}<div class="empty">Данных о нагрузке пока нет.</div>{% endif %}
+    </section>
+</main>
+{% include "platform_mobile_nav.html" %}
+</body>
+</html>

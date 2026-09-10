@@ -13914,6 +13914,262 @@ async def assert_platform_a3_incidents():
         conn.close()
 
 
+async def assert_platform_a3_incident_analytics():
+    analytics_now = datetime(2026, 6, 20, 12, 0)
+    conn = connect()
+    c = conn.cursor()
+    c.execute("DELETE FROM a3_platform_incident_events")
+    c.execute("DELETE FROM a3_platform_incidents")
+    c.executemany("""
+        INSERT INTO a3_platform_incidents (
+            company_id,
+            incident_key,
+            severity,
+            status,
+            title,
+            message,
+            first_detected_at,
+            last_detected_at,
+            occurrence_count,
+            response_due_at,
+            escalation_due_at,
+            escalated_at,
+            escalation_count,
+            acknowledged_at,
+            acknowledged_by,
+            assigned_at,
+            assigned_to,
+            assigned_by,
+            resolved_at,
+            resolution_message,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, [
+        (
+            2,
+            "analytics_test_on_time",
+            "critical",
+            "resolved",
+            "Тест реакции в срок",
+            "Проверка аналитики.",
+            "2026-06-19 09:00:00",
+            "2026-06-19 09:00:00",
+            1,
+            "2026-06-19 09:30:00",
+            "2026-06-19 10:00:00",
+            None,
+            0,
+            "2026-06-19 09:20:00",
+            "super",
+            "2026-06-19 09:20:00",
+            "super",
+            "super",
+            "2026-06-19 10:00:00",
+            "Работа восстановлена.",
+            "2026-06-19 09:00:00",
+            "2026-06-19 10:00:00",
+        ),
+        (
+            2,
+            "analytics_test_late",
+            "critical",
+            "resolved",
+            "Тест реакции с опозданием",
+            "Проверка аналитики.",
+            "2026-06-18 10:00:00",
+            "2026-06-18 10:00:00",
+            1,
+            "2026-06-18 10:30:00",
+            "2026-06-18 11:00:00",
+            "2026-06-18 10:45:00",
+            1,
+            "2026-06-18 11:00:00",
+            "analytics_admin",
+            "2026-06-18 11:00:00",
+            "analytics_admin",
+            "super",
+            "2026-06-18 12:00:00",
+            "Работа восстановлена.",
+            "2026-06-18 10:00:00",
+            "2026-06-18 12:00:00",
+        ),
+        (
+            2,
+            "analytics_test_overdue",
+            "critical",
+            "open",
+            "Тест просроченной реакции",
+            "Проверка аналитики.",
+            "2026-06-20 09:00:00",
+            "2026-06-20 09:00:00",
+            1,
+            "2026-06-20 09:30:00",
+            "2026-06-20 10:00:00",
+            "2026-06-20 10:00:00",
+            1,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "2026-06-20 09:00:00",
+            "2026-06-20 10:00:00",
+        ),
+    ])
+    conn.commit()
+    conn.close()
+
+    try:
+        assert crm.normalize_a3_incident_analytics_period("90") == "90"
+        assert crm.normalize_a3_incident_analytics_period("bad") == "30"
+        assert crm.normalize_a3_incident_analytics_company("2") == 2
+        assert crm.normalize_a3_incident_analytics_company("bad") == "all"
+        assert crm.build_a3_incident_analytics_url("7", 2) == (
+            "/platform/a3-health/incidents/analytics?period=7&company_id=2"
+        )
+
+        analytics = crm.get_a3_platform_incident_analytics(
+            period="7",
+            company_id=2,
+            now=analytics_now,
+        )
+        summary = analytics["summary"]
+        assert summary["total"] == 3
+        assert summary["active"] == 1
+        assert summary["resolved"] == 2
+        assert summary["acknowledged"] == 2
+        assert summary["response_eligible"] == 3
+        assert summary["on_time"] == 1
+        assert summary["late"] == 1
+        assert summary["response_overdue"] == 1
+        assert summary["escalated"] == 2
+        assert summary["response_sla_percent"] == 33.3
+        assert summary["resolution_rate"] == 66.7
+        assert summary["escalation_rate"] == 66.7
+        assert summary["average_response_minutes"] == 40
+        assert summary["average_response_label"] == "40 мин."
+        assert summary["average_resolution_minutes"] == 90
+        assert summary["average_resolution_label"] == "1 ч. 30 мин."
+        assert len(analytics["companies"]) == 1
+        assert analytics["companies"][0]["company_id"] == 2
+        assert analytics["companies"][0]["response_sla_percent"] == 33.3
+        assert len(analytics["admin_workload"]) == 3
+        assert {
+            row["display_name"] for row in analytics["admin_workload"]
+        } == {"super", "analytics_admin", "Не назначен"}
+        assert len(analytics["trend"]) == 7
+        assert sum(row["opened"] for row in analytics["trend"]) == 3
+        assert sum(row["resolved"] for row in analytics["trend"]) == 2
+        assert analytics["recommendations"][0]["tone"] == "danger"
+
+        anonymous_page = await crm.platform_a3_incident_analytics_page(
+            make_public_asgi_request(
+                "/platform/a3-health/incidents/analytics"
+            ),
+        )
+        assert anonymous_page.status_code == 302
+        assert anonymous_page.headers["location"] == "/login"
+        boss_page = await crm.platform_a3_incident_analytics_page(
+            make_asgi_request(
+                "owner2",
+                "/platform/a3-health/incidents/analytics",
+            ),
+        )
+        assert boss_page.status_code == 302
+        assert boss_page.headers["location"] == "/"
+        page = await crm.platform_a3_incident_analytics_page(
+            make_asgi_request(
+                "super",
+                "/platform/a3-health/incidents/analytics",
+                "period=all&company_id=2",
+            ),
+            period="all",
+            company_id="2",
+        )
+        assert page.status_code == 200
+        html = page.body.decode("utf-8")
+        assert "Аналитика инцидентов A3" in html
+        assert "SLA реакции" in html
+        assert "Нагрузка администраторов" in html
+        assert "Динамика" in html
+        assert "Company 2" in html
+        assert "Скачать CSV" in html
+        assert 'class="platform-mobile-nav"' in html
+        assert page.context["summary"]["total"] == 3
+
+        anonymous_api = await crm.api_platform_a3_incident_analytics(
+            make_public_asgi_request(
+                "/api/platform/a3-health/incidents/analytics"
+            ),
+        )
+        assert anonymous_api.status_code == 401
+        boss_api = await crm.api_platform_a3_incident_analytics(
+            make_asgi_request(
+                "owner2",
+                "/api/platform/a3-health/incidents/analytics",
+            ),
+        )
+        assert boss_api.status_code == 403
+        api = await crm.api_platform_a3_incident_analytics(
+            make_asgi_request(
+                "super",
+                "/api/platform/a3-health/incidents/analytics",
+            ),
+            period="all",
+            company_id="2",
+        )
+        assert api["ok"] is True
+        assert api["summary"]["total"] == 3
+
+        anonymous_export = await crm.platform_a3_incident_analytics_export(
+            make_public_asgi_request(
+                "/platform/a3-health/incidents/analytics/export"
+            ),
+        )
+        assert anonymous_export.status_code == 302
+        assert anonymous_export.headers["location"] == "/login"
+        boss_export = await crm.platform_a3_incident_analytics_export(
+            make_asgi_request(
+                "owner2",
+                "/platform/a3-health/incidents/analytics/export",
+            ),
+        )
+        assert boss_export.status_code == 302
+        assert boss_export.headers["location"] == "/"
+        export = await crm.platform_a3_incident_analytics_export(
+            make_asgi_request(
+                "super",
+                "/platform/a3-health/incidents/analytics/export",
+            ),
+            period="all",
+            company_id="2",
+        )
+        export_csv = export.body.decode("utf-8-sig")
+        assert "Сводка по инцидентам A3" in export_csv
+        assert "Нагрузка администраторов" in export_csv
+        assert "Тест реакции в срок" in export_csv
+        assert "Соблюдение реакции" in export_csv
+    finally:
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+            DELETE FROM a3_platform_incident_events
+            WHERE incident_id IN (
+                SELECT id FROM a3_platform_incidents
+                WHERE incident_key LIKE 'analytics_test_%'
+            )
+        """)
+        c.execute("""
+            DELETE FROM a3_platform_incidents
+            WHERE incident_key LIKE 'analytics_test_%'
+        """)
+        conn.commit()
+        conn.close()
+
+
 async def assert_platform_calendar_health():
     policy_environment_names = (
         "CALENDAR_INCIDENT_RESPONSE_MINUTES",
@@ -28322,6 +28578,7 @@ def main():
         asyncio.run(assert_platform_presets_page())
         asyncio.run(assert_platform_a3_health())
         asyncio.run(assert_platform_a3_incidents())
+        asyncio.run(assert_platform_a3_incident_analytics())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))

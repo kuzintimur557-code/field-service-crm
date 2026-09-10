@@ -48,6 +48,12 @@ from app.services.a3_platform_incidents import (
     get_a3_platform_incidents,
     sync_a3_platform_incidents,
 )
+from app.services.a3_platform_incident_analytics import (
+    build_a3_incident_analytics_url,
+    get_a3_platform_incident_analytics,
+    normalize_a3_incident_analytics_company,
+    normalize_a3_incident_analytics_period,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -8294,6 +8300,9 @@ def get_platform_dashboard_links():
         "a3_health": "/platform/a3-health",
         "a3_health_problem": "/platform/a3-health?status=problem",
         "a3_incidents": "/platform/a3-health/incidents",
+        "a3_incident_analytics": (
+            "/platform/a3-health/incidents/analytics"
+        ),
         "calendar_health": "/platform/calendar-health",
         "calendar_health_critical": "/platform/calendar-health?status=critical",
         "calendar_health_unacknowledged": (
@@ -15773,6 +15782,233 @@ async def api_platform_a3_incidents(
             limit=limit,
         ),
     }
+
+
+@app.get(
+    "/platform/a3-health/incidents/analytics",
+    response_class=HTMLResponse,
+)
+async def platform_a3_incident_analytics_page(
+    request: Request,
+    period: str = "30",
+    company_id: str = "all",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    analytics = get_a3_platform_incident_analytics(
+        period=period,
+        company_id=company_id,
+    )
+    links = get_platform_dashboard_links()
+    links["platform"] = links["page"]
+
+    return templates.TemplateResponse(
+        request,
+        "platform_a3_incident_analytics.html",
+        {
+            "request": request,
+            "username": username,
+            "analytics": analytics,
+            "summary": analytics["summary"],
+            "companies": analytics["companies"],
+            "admin_workload": analytics["admin_workload"],
+            "trend": analytics["trend"],
+            "recommendations": analytics["recommendations"],
+            "links": links,
+        },
+    )
+
+
+@app.get("/api/platform/a3-health/incidents/analytics")
+async def api_platform_a3_incident_analytics(
+    request: Request,
+    period: str = "30",
+    company_id: str = "all",
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {
+        "ok": True,
+        **get_a3_platform_incident_analytics(
+            period=period,
+            company_id=company_id,
+        ),
+    }
+
+
+@app.get("/platform/a3-health/incidents/analytics/export")
+async def platform_a3_incident_analytics_export(
+    request: Request,
+    period: str = "30",
+    company_id: str = "all",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    analytics = get_a3_platform_incident_analytics(
+        period=period,
+        company_id=company_id,
+    )
+    summary = analytics["summary"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["Сводка по инцидентам A3"])
+    writer.writerow(["Период", analytics["period_label"]])
+    writer.writerow(["Начало периода", analytics["date_from"]])
+    writer.writerow(["Конец периода", analytics["date_to"]])
+    writer.writerow(["Инцидентов", summary["total"]])
+    writer.writerow(["Активных", summary["active"]])
+    writer.writerow(["Закрытых", summary["resolved"]])
+    writer.writerow(["SLA реакции, %", summary["response_sla_percent"]])
+    writer.writerow(["Реакций в срок", summary["on_time"]])
+    writer.writerow(["Реакций с опозданием", summary["late"]])
+    writer.writerow(["Реакция просрочена", summary["response_overdue"]])
+    writer.writerow(["Эскалировано", summary["escalated"]])
+    writer.writerow(["Доля эскалаций, %", summary["escalation_rate"]])
+    writer.writerow(["Среднее время реакции", summary["average_response_label"]])
+    writer.writerow([
+        "Среднее время восстановления",
+        summary["average_resolution_label"],
+    ])
+    writer.writerow([])
+
+    writer.writerow(["Компании"])
+    writer.writerow([
+        "ID компании",
+        "Компания",
+        "Инцидентов",
+        "Активных",
+        "Закрытых",
+        "SLA реакции, %",
+        "Реакций с опозданием",
+        "Реакция просрочена",
+        "Эскалировано",
+        "Среднее время реакции",
+        "Риск",
+        "Оценка риска",
+    ])
+    for company in analytics["companies"]:
+        writer.writerow([
+            company["company_id"],
+            company["company_name"],
+            company["total"],
+            company["active"],
+            company["resolved"],
+            company["response_sla_percent"],
+            company["late"],
+            company["overdue"],
+            company["escalated"],
+            company["average_response_label"],
+            company["risk_label"],
+            company["risk_score"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Нагрузка администраторов"])
+    writer.writerow([
+        "Ответственный",
+        "Инцидентов",
+        "Активных",
+        "Закрытых",
+        "Принято в работу",
+        "С опозданием",
+        "Эскалировано",
+        "Среднее время реакции",
+        "Нагрузка",
+    ])
+    for admin in analytics["admin_workload"]:
+        writer.writerow([
+            admin["display_name"],
+            admin["total"],
+            admin["active"],
+            admin["resolved"],
+            admin["acknowledged"],
+            admin["late"],
+            admin["escalated"],
+            admin["average_response_label"],
+            admin["load_label"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Динамика"])
+    writer.writerow([
+        "Период",
+        "Открыто",
+        "Закрыто",
+        "Реакция с опозданием",
+        "Эскалировано",
+    ])
+    for row in analytics["trend"]:
+        writer.writerow([
+            row["label"],
+            row["opened"],
+            row["resolved"],
+            row["late"],
+            row["escalated"],
+        ])
+    writer.writerow([])
+
+    writer.writerow(["Инциденты"])
+    writer.writerow([
+        "ID",
+        "ID компании",
+        "Компания",
+        "Инцидент",
+        "Состояние",
+        "Обнаружен",
+        "Принят в работу",
+        "Закрыт",
+        "Ответственный",
+        "Время реакции",
+        "Время восстановления",
+        "Соблюдение реакции",
+        "Эскалирован",
+    ])
+    for record in analytics["records"]:
+        writer.writerow([
+            record["id"],
+            record["company_id"],
+            record["company_name"],
+            record["title"],
+            record["status_label"],
+            record["first_detected_at"],
+            record["acknowledged_at"],
+            record["resolved_at"],
+            record["assigned_to"],
+            record["response_label"],
+            record["resolution_label"],
+            record["response_status"],
+            record["escalated_label"],
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename="
+                f"a3_incident_analytics_{analytics['period']}.csv"
+            ),
+        },
+    )
 
 
 @app.post("/platform/a3-health/incidents/{incident_id}/acknowledge")
