@@ -13882,6 +13882,10 @@ async def assert_platform_a3_incidents():
         assert resolved_center["items"][0]["events"][0]["event_type"] == (
             "resolved"
         )
+        assert resolved_center["items"][0]["review_status"] == "pending"
+        assert resolved_center["items"][0]["review_due_at"] == (
+            "2026-06-17 13:30:00"
+        )
 
         no_duplicate_recovery = crm.sync_a3_platform_incidents(
             {
@@ -14053,6 +14057,11 @@ async def assert_platform_a3_incident_analytics():
         assert summary["average_response_label"] == "40 мин."
         assert summary["average_resolution_minutes"] == 90
         assert summary["average_resolution_label"] == "1 ч. 30 мин."
+        assert summary["review_required"] == 2
+        assert summary["review_pending"] == 2
+        assert summary["review_overdue"] == 2
+        assert summary["review_completed"] == 0
+        assert summary["review_completion_percent"] == 0.0
         assert len(analytics["companies"]) == 1
         assert analytics["companies"][0]["company_id"] == 2
         assert analytics["companies"][0]["response_sla_percent"] == 33.3
@@ -14095,6 +14104,7 @@ async def assert_platform_a3_incident_analytics():
         assert "SLA реакции" in html
         assert "Нагрузка администраторов" in html
         assert "Динамика" in html
+        assert "Разбор причин" in html
         assert "Company 2" in html
         assert "Скачать CSV" in html
         assert 'class="platform-mobile-nav"' in html
@@ -14150,6 +14160,7 @@ async def assert_platform_a3_incident_analytics():
         export_csv = export.body.decode("utf-8-sig")
         assert "Сводка по инцидентам A3" in export_csv
         assert "Нагрузка администраторов" in export_csv
+        assert "Разборов просрочено" in export_csv
         assert "Тест реакции в срок" in export_csv
         assert "Соблюдение реакции" in export_csv
     finally:
@@ -14165,6 +14176,377 @@ async def assert_platform_a3_incident_analytics():
         c.execute("""
             DELETE FROM a3_platform_incidents
             WHERE incident_key LIKE 'analytics_test_%'
+        """)
+        conn.commit()
+        conn.close()
+
+
+async def assert_platform_a3_incident_reviews():
+    review_now = datetime(2026, 6, 22, 12, 0)
+    conn = connect()
+    c = conn.cursor()
+    columns = {
+        row["name"]
+        for row in c.execute(
+            "PRAGMA table_info(a3_platform_incidents)"
+        ).fetchall()
+    }
+    assert {
+        "review_status",
+        "review_due_at",
+        "review_owner",
+        "root_cause",
+        "corrective_actions",
+        "prevention_actions",
+        "review_started_at",
+        "review_completed_at",
+        "review_completed_by",
+        "review_updated_at",
+    }.issubset(columns)
+    c.execute("DELETE FROM a3_platform_incident_events")
+    c.execute("DELETE FROM a3_platform_incidents")
+    c.executemany("""
+        INSERT INTO a3_platform_incidents (
+            company_id,
+            incident_key,
+            severity,
+            status,
+            title,
+            message,
+            first_detected_at,
+            last_detected_at,
+            response_due_at,
+            escalation_due_at,
+            acknowledged_at,
+            acknowledged_by,
+            assigned_to,
+            resolved_at,
+            resolution_message,
+            review_status,
+            review_due_at,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, 'critical', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+    """, [
+        (
+            2,
+            "review_test_future",
+            "resolved",
+            "Планировщик восстановлен",
+            "Тест будущего срока.",
+            "2026-06-22 09:00:00",
+            "2026-06-22 09:00:00",
+            "2026-06-22 09:30:00",
+            "2026-06-22 10:00:00",
+            "2026-06-22 09:20:00",
+            "super",
+            "super",
+            "2026-06-22 10:00:00",
+            "Работа восстановлена.",
+            "2026-06-23 10:00:00",
+            "2026-06-22 09:00:00",
+            "2026-06-22 10:00:00",
+        ),
+        (
+            2,
+            "review_test_overdue",
+            "resolved",
+            "Повторный сбой планировщика",
+            "Тест просроченного разбора.",
+            "2026-06-20 08:00:00",
+            "2026-06-20 08:00:00",
+            "2026-06-20 08:30:00",
+            "2026-06-20 09:00:00",
+            "2026-06-20 08:25:00",
+            "super",
+            "super",
+            "2026-06-20 09:30:00",
+            "Работа восстановлена.",
+            "2026-06-21 09:30:00",
+            "2026-06-20 08:00:00",
+            "2026-06-20 09:30:00",
+        ),
+        (
+            2,
+            "review_test_open",
+            "open",
+            "Активный инцидент",
+            "Не должен попасть в разборы.",
+            "2026-06-22 11:00:00",
+            "2026-06-22 11:00:00",
+            "2026-06-22 11:30:00",
+            "2026-06-22 12:00:00",
+            None,
+            None,
+            None,
+            None,
+            None,
+            "2026-06-23 11:00:00",
+            "2026-06-22 11:00:00",
+            "2026-06-22 11:00:00",
+        ),
+    ])
+    ids = {
+        row["incident_key"]: row["id"]
+        for row in c.execute("""
+            SELECT id, incident_key
+            FROM a3_platform_incidents
+            WHERE incident_key LIKE 'review_test_%'
+        """).fetchall()
+    }
+    conn.commit()
+    conn.close()
+
+    try:
+        assert crm.normalize_a3_incident_review_status("overdue") == (
+            "overdue"
+        )
+        assert crm.normalize_a3_incident_review_status("bad") == "pending"
+        assert crm.normalize_a3_incident_review_company("2") == 2
+        assert crm.normalize_a3_incident_review_company("bad") == "all"
+        assert crm.build_a3_incident_reviews_url("overdue", 2, "сбой") == (
+            "/platform/a3-health/incidents/reviews?"
+            "status=overdue&company_id=2&search=%D1%81%D0%B1%D0%BE%D0%B9"
+        )
+
+        pending = crm.get_a3_platform_incident_reviews(
+            status_filter="pending",
+            company_id=2,
+            now=review_now,
+        )
+        assert pending["summary"] == {
+            "total": 2,
+            "pending": 2,
+            "in_progress": 0,
+            "overdue": 1,
+            "completed": 0,
+            "completion_percent": 0.0,
+        }
+        assert {item["id"] for item in pending["items"]} == {
+            ids["review_test_future"],
+            ids["review_test_overdue"],
+        }
+        overdue = crm.get_a3_platform_incident_reviews(
+            status_filter="overdue",
+            company_id=2,
+            now=review_now,
+        )
+        assert [item["id"] for item in overdue["items"]] == [
+            ids["review_test_overdue"]
+        ]
+        assert overdue["items"][0]["review_status_label"] == (
+            "Разбор просрочен"
+        )
+
+        started = crm.save_a3_platform_incident_review(
+            ids["review_test_future"],
+            "super",
+            "in_progress",
+            "super",
+            "Истёк срок контрольного запуска.",
+            "Перезапущен фоновый процесс.",
+            "",
+            now=review_now,
+        )
+        assert started["ok"] is True
+        assert started["review_status"] == "in_progress"
+        incomplete = crm.save_a3_platform_incident_review(
+            ids["review_test_future"],
+            "super",
+            "completed",
+            "super",
+            "Истёк срок контрольного запуска.",
+            "Перезапущен фоновый процесс.",
+            "",
+            now=review_now + timedelta(minutes=5),
+        )
+        assert incomplete["error"] == "incomplete_review"
+        invalid_owner = crm.save_a3_platform_incident_review(
+            ids["review_test_future"],
+            "super",
+            "in_progress",
+            "missing_admin",
+            "Причина",
+            "Действия",
+            "Профилактика",
+            now=review_now,
+        )
+        assert invalid_owner["error"] == "invalid_owner"
+        forbidden = crm.save_a3_platform_incident_review(
+            ids["review_test_future"],
+            "owner2",
+            "in_progress",
+            "super",
+            "Причина",
+            "Действия",
+            "Профилактика",
+            now=review_now,
+        )
+        assert forbidden["error"] == "forbidden"
+        open_incident = crm.save_a3_platform_incident_review(
+            ids["review_test_open"],
+            "super",
+            "in_progress",
+            "super",
+            "Причина",
+            "Действия",
+            "Профилактика",
+            now=review_now,
+        )
+        assert open_incident["error"] == "incident_not_found"
+
+        completed = crm.save_a3_platform_incident_review(
+            ids["review_test_future"],
+            "super",
+            "completed",
+            "super",
+            "Истёк срок контрольного запуска.",
+            "Перезапущен фоновый процесс.",
+            "Добавлен отдельный контроль запуска.",
+            now=review_now + timedelta(minutes=10),
+        )
+        assert completed["ok"] is True
+        assert completed["review_status"] == "completed"
+        all_reviews = crm.get_a3_platform_incident_reviews(
+            status_filter="all",
+            company_id=2,
+            now=review_now + timedelta(minutes=10),
+        )
+        assert all_reviews["summary"]["completed"] == 1
+        assert all_reviews["summary"]["overdue"] == 1
+        assert all_reviews["summary"]["completion_percent"] == 50.0
+        completed_review = next(
+            item
+            for item in all_reviews["items"]
+            if item["id"] == ids["review_test_future"]
+        )
+        assert completed_review["completeness_percent"] == 100
+        assert completed_review["review_completed_by"] == "super"
+        conn = connect()
+        last_event = conn.cursor().execute("""
+            SELECT event_type
+            FROM a3_platform_incident_events
+            WHERE incident_id=?
+            ORDER BY id DESC
+            LIMIT 1
+        """, (ids["review_test_future"],)).fetchone()
+        conn.close()
+        assert last_event["event_type"] == "review_completed"
+
+        anonymous_page = await crm.platform_a3_incident_reviews_page(
+            make_public_asgi_request(
+                "/platform/a3-health/incidents/reviews"
+            ),
+        )
+        assert anonymous_page.status_code == 302
+        assert anonymous_page.headers["location"] == "/login"
+        boss_page = await crm.platform_a3_incident_reviews_page(
+            make_asgi_request(
+                "owner2",
+                "/platform/a3-health/incidents/reviews",
+            ),
+        )
+        assert boss_page.status_code == 302
+        assert boss_page.headers["location"] == "/"
+        page = await crm.platform_a3_incident_reviews_page(
+            make_asgi_request(
+                "super",
+                "/platform/a3-health/incidents/reviews",
+                "status=all&company_id=2",
+            ),
+            status="all",
+            company_id="2",
+        )
+        assert page.status_code == 200
+        html = page.body.decode("utf-8")
+        assert "Разборы инцидентов A3" in html
+        assert "Причина сбоя" in html
+        assert "Профилактика повторения" in html
+        assert "Разбор просрочен" in html
+        assert "Скачать CSV" in html
+        assert 'class="platform-mobile-nav"' in html
+
+        anonymous_api = await crm.api_platform_a3_incident_reviews(
+            make_public_asgi_request(
+                "/api/platform/a3-health/incidents/reviews"
+            ),
+        )
+        assert anonymous_api.status_code == 401
+        boss_api = await crm.api_platform_a3_incident_reviews(
+            make_asgi_request(
+                "owner2",
+                "/api/platform/a3-health/incidents/reviews",
+            ),
+        )
+        assert boss_api.status_code == 403
+        api = await crm.api_platform_a3_incident_reviews(
+            make_asgi_request(
+                "super",
+                "/api/platform/a3-health/incidents/reviews",
+            ),
+            status="all",
+            company_id="2",
+        )
+        assert api["ok"] is True
+        assert api["summary"]["total"] == 2
+
+        update_redirect = await crm.update_platform_a3_incident_review(
+            make_form_request(
+                "super",
+                (
+                    "/platform/a3-health/incidents/"
+                    f"{ids['review_test_overdue']}/review"
+                ),
+                {
+                    "review_status": "in_progress",
+                    "review_owner": "super",
+                    "root_cause": "Повторная причина",
+                    "corrective_actions": "Повторные действия",
+                    "prevention_actions": "",
+                    "return_status": "all",
+                    "company_id": "2",
+                    "search": "",
+                },
+            ),
+            ids["review_test_overdue"],
+        )
+        assert update_redirect.status_code == 302
+        assert "notice=review_saved" in update_redirect.headers["location"]
+        assert f"#review-{ids['review_test_overdue']}" in (
+            update_redirect.headers["location"]
+        )
+
+        anonymous_export = await crm.platform_a3_incident_reviews_export(
+            make_public_asgi_request(
+                "/platform/a3-health/incidents/reviews/export"
+            ),
+        )
+        assert anonymous_export.status_code == 302
+        export = await crm.platform_a3_incident_reviews_export(
+            make_asgi_request(
+                "super",
+                "/platform/a3-health/incidents/reviews/export",
+            ),
+            status="all",
+            company_id="2",
+        )
+        export_csv = export.body.decode("utf-8-sig")
+        assert "Причина" in export_csv
+        assert "Профилактика повторения" in export_csv
+        assert "Планировщик восстановлен" in export_csv
+    finally:
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+            DELETE FROM a3_platform_incident_events
+            WHERE incident_id IN (
+                SELECT id FROM a3_platform_incidents
+                WHERE incident_key LIKE 'review_test_%'
+            )
+        """)
+        c.execute("""
+            DELETE FROM a3_platform_incidents
+            WHERE incident_key LIKE 'review_test_%'
         """)
         conn.commit()
         conn.close()
@@ -28579,6 +28961,7 @@ def main():
         asyncio.run(assert_platform_a3_health())
         asyncio.run(assert_platform_a3_incidents())
         asyncio.run(assert_platform_a3_incident_analytics())
+        asyncio.run(assert_platform_a3_incident_reviews())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))

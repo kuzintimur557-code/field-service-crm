@@ -61,11 +61,12 @@ tr:last-child td{border-bottom:0}
 .badge.danger{background:#fee2e2;color:#991b1b}
 .link{color:#1d4ed8;font-weight:900;text-decoration:none}
 .empty{padding:34px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;color:#6b7280;text-align:center;font-size:12px;font-weight:900}
+.review-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:10px;padding:15px;border:1px solid #e5e7eb;border-left:4px solid #2563eb;border-radius:8px;background:#fff}.review-summary strong{display:block;margin-top:4px;font-size:20px}.review-summary-label{color:#6b7280;font-size:9px;font-weight:900;text-transform:uppercase}.review-summary .button{align-self:center}
 @media(max-width:1050px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:760px){
     .container{padding:14px 14px 86px}.header{flex-direction:column}.header h1{font-size:24px}.header-actions,.header-actions .button{width:100%}
     .toolbar{align-items:stretch;flex-direction:column}.periods{display:grid;grid-template-columns:1fr 1fr}.company-filter{grid-template-columns:1fr}.company-filter .button{width:100%}
-    .stats{grid-template-columns:1fr 1fr}.stat{padding:12px}.stat-value{font-size:20px}.recommendations{grid-template-columns:1fr}.recommendation{grid-template-columns:5px 1fr}.recommendation a{grid-column:2;white-space:normal}
+    .stats{grid-template-columns:1fr 1fr}.stat{padding:12px}.stat-value{font-size:20px}.recommendations{grid-template-columns:1fr}.recommendation{grid-template-columns:5px 1fr}.recommendation a{grid-column:2;white-space:normal}.review-summary{grid-template-columns:1fr 1fr}.review-summary .button{grid-column:1/-1;width:100%}
     .section{padding:17px 0}.section-head{align-items:flex-start;flex-direction:column}.trend{grid-template-columns:repeat(7,minmax(28px,1fr));overflow-x:auto}.trend-column{min-width:28px}
     .table-wrap{width:100%;max-width:100%;border:0;background:transparent;overflow:visible}.table-wrap table{display:block;width:100%;max-width:100%;min-width:0;table-layout:fixed}thead{display:none}tbody,tr,td{display:block;width:100%;max-width:100%}tr{margin-bottom:9px;padding:11px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}td{display:grid;grid-template-columns:minmax(105px,.8fr) minmax(0,1.2fr);gap:10px;padding:7px 0;border-bottom:1px solid #f3f4f6;text-align:right;overflow-wrap:anywhere}td::before{color:#6b7280;content:attr(data-label);font-size:9px;font-weight:900;text-align:left;text-transform:uppercase}tr td:last-child{border-bottom:0}.name,.muted{text-align:right}
 }
@@ -80,6 +81,7 @@ tr:last-child td{border-bottom:0}
         </div>
         <div class="header-actions">
             <a class="button secondary" href="{{ analytics['export_url'] }}">Скачать CSV</a>
+            <a class="button secondary" href="{{ links['a3_incident_reviews'] }}">Разборы причин</a>
             <a class="button secondary" href="{{ links['a3_incidents'] }}">Центр инцидентов</a>
             <a class="button secondary" href="{{ links['a3_health'] }}">Состояние A3</a>
             <a class="button" href="{{ links['platform'] }}">Панель платформы</a>
@@ -116,6 +118,17 @@ tr:last-child td{border-bottom:0}
         <div class="stat"><div class="stat-label">Среднее восстановление</div><div class="stat-value">{{ summary["average_resolution_label"] }}</div><div class="stat-note">от открытия до закрытия</div></div>
         <div class="stat"><div class="stat-label">Эскалированы</div><div class="stat-value">{{ summary["escalated"] }}</div><div class="stat-note">{{ summary["escalation_rate"] }}% от всех</div></div>
         <div class="stat"><div class="stat-label">Реакция просрочена</div><div class="stat-value">{{ summary["response_overdue"] }}</div><div class="stat-note">активные без реакции</div></div>
+    </section>
+
+    <section class="section">
+        <div class="section-head"><div><h2>Разбор причин</h2><div class="section-note">Контроль документирования причин и мер после восстановления.</div></div></div>
+        <div class="review-summary">
+            <div><div class="review-summary-label">Требуют разбора</div><strong>{{ summary["review_required"] }}</strong></div>
+            <div><div class="review-summary-label">Ожидают завершения</div><strong>{{ summary["review_pending"] }}</strong></div>
+            <div><div class="review-summary-label">Просрочены</div><strong>{{ summary["review_overdue"] }}</strong></div>
+            <div><div class="review-summary-label">Завершено</div><strong>{{ summary["review_completion_percent"] }}%</strong></div>
+            <a class="button" href="{{ links['a3_incident_reviews'] }}">Открыть разборы</a>
+        </div>
     </section>
 
     <section class="section">

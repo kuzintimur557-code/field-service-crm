@@ -54,6 +54,13 @@ from app.services.a3_platform_incident_analytics import (
     normalize_a3_incident_analytics_company,
     normalize_a3_incident_analytics_period,
 )
+from app.services.a3_platform_incident_reviews import (
+    build_a3_incident_reviews_url,
+    get_a3_platform_incident_reviews,
+    normalize_a3_incident_review_company,
+    normalize_a3_incident_review_status,
+    save_a3_platform_incident_review,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -8303,6 +8310,7 @@ def get_platform_dashboard_links():
         "a3_incident_analytics": (
             "/platform/a3-health/incidents/analytics"
         ),
+        "a3_incident_reviews": "/platform/a3-health/incidents/reviews",
         "calendar_health": "/platform/calendar-health",
         "calendar_health_critical": "/platform/calendar-health?status=critical",
         "calendar_health_unacknowledged": (
@@ -15883,6 +15891,13 @@ async def platform_a3_incident_analytics_export(
     writer.writerow(["Реакция просрочена", summary["response_overdue"]])
     writer.writerow(["Эскалировано", summary["escalated"]])
     writer.writerow(["Доля эскалаций, %", summary["escalation_rate"]])
+    writer.writerow(["Разборов ожидают", summary["review_pending"]])
+    writer.writerow(["Разборов просрочено", summary["review_overdue"]])
+    writer.writerow(["Разборов завершено", summary["review_completed"]])
+    writer.writerow([
+        "Разборы завершены, %",
+        summary["review_completion_percent"],
+    ])
     writer.writerow(["Среднее время реакции", summary["average_response_label"]])
     writer.writerow([
         "Среднее время восстановления",
@@ -15981,6 +15996,7 @@ async def platform_a3_incident_analytics_export(
         "Время восстановления",
         "Соблюдение реакции",
         "Эскалирован",
+        "Разбор причин",
     ])
     for record in analytics["records"]:
         writer.writerow([
@@ -15997,6 +16013,7 @@ async def platform_a3_incident_analytics_export(
             record["resolution_label"],
             record["response_status"],
             record["escalated_label"],
+            record["review_status_label"],
         ])
 
     return Response(
@@ -16006,6 +16023,206 @@ async def platform_a3_incident_analytics_export(
             "Content-Disposition": (
                 "attachment; filename="
                 f"a3_incident_analytics_{analytics['period']}.csv"
+            ),
+        },
+    )
+
+
+def _a3_platform_incident_review_redirect(
+    incident_id,
+    result,
+    status="pending",
+    company_id="all",
+    search="",
+):
+    target = build_a3_incident_reviews_url(status, company_id, search)
+    separator = "&" if "?" in target else "?"
+    flag = (
+        {"notice": "review_saved"}
+        if result.get("ok")
+        else {"error": result.get("error") or "action_failed"}
+    )
+    return RedirectResponse(
+        f"{target}{separator}{urlencode(flag)}#review-{incident_id}",
+        status_code=302,
+    )
+
+
+@app.get(
+    "/platform/a3-health/incidents/reviews",
+    response_class=HTMLResponse,
+)
+async def platform_a3_incident_reviews_page(
+    request: Request,
+    status: str = "pending",
+    company_id: str = "all",
+    search: str = "",
+    notice: str = "",
+    error: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    center = get_a3_platform_incident_reviews(
+        status_filter=status,
+        company_id=company_id,
+        search=search,
+    )
+    links = get_platform_dashboard_links()
+    links["platform"] = links["page"]
+    export_params = {
+        "status": center["status_filter"],
+        "company_id": center["company_id"],
+    }
+    if center["search"]:
+        export_params["search"] = center["search"]
+    links["a3_incident_reviews_export"] = (
+        "/platform/a3-health/incidents/reviews/export?"
+        + urlencode(export_params)
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "platform_a3_incident_reviews.html",
+        {
+            "request": request,
+            "username": username,
+            "center": center,
+            "summary": center["summary"],
+            "reviews": center["items"],
+            "admins": center["admins"],
+            "notice": notice,
+            "error": error,
+            "links": links,
+        },
+    )
+
+
+@app.get("/api/platform/a3-health/incidents/reviews")
+async def api_platform_a3_incident_reviews(
+    request: Request,
+    status: str = "pending",
+    company_id: str = "all",
+    search: str = "",
+    limit: int = 100,
+):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {
+        "ok": True,
+        **get_a3_platform_incident_reviews(
+            status_filter=status,
+            company_id=company_id,
+            search=search,
+            limit=limit,
+        ),
+    }
+
+
+@app.post("/platform/a3-health/incidents/{incident_id}/review")
+async def update_platform_a3_incident_review(
+    request: Request,
+    incident_id: int,
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = save_a3_platform_incident_review(
+        incident_id=incident_id,
+        actor_username=username,
+        review_status=form.get("review_status") or "in_progress",
+        review_owner=form.get("review_owner") or username,
+        root_cause=form.get("root_cause") or "",
+        corrective_actions=form.get("corrective_actions") or "",
+        prevention_actions=form.get("prevention_actions") or "",
+    )
+    return _a3_platform_incident_review_redirect(
+        incident_id,
+        result,
+        form.get("return_status") or "pending",
+        form.get("company_id") or "all",
+        form.get("search") or "",
+    )
+
+
+@app.get("/platform/a3-health/incidents/reviews/export")
+async def platform_a3_incident_reviews_export(
+    request: Request,
+    status: str = "all",
+    company_id: str = "all",
+    search: str = "",
+):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    center = get_a3_platform_incident_reviews(
+        status_filter=status,
+        company_id=company_id,
+        search=search,
+        limit=300,
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID инцидента",
+        "ID компании",
+        "Компания",
+        "Инцидент",
+        "Закрыт",
+        "Состояние разбора",
+        "Срок разбора",
+        "Ответственный",
+        "Причина",
+        "Выполненные действия",
+        "Профилактика повторения",
+        "Разбор завершён",
+        "Завершил",
+    ])
+    for review in center["items"]:
+        writer.writerow([
+            review["id"],
+            review["company_id"],
+            review["company_name"],
+            review["title"],
+            review["resolved_at"] or "",
+            review["review_status_label"],
+            review["review_due_at"] or review["review_due_label"],
+            review["review_owner_label"],
+            review["root_cause"] or "",
+            review["corrective_actions"] or "",
+            review["prevention_actions"] or "",
+            review["review_completed_at"] or "",
+            review["review_completed_by"] or "",
+        ])
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=a3_incident_reviews.csv"
             ),
         },
     )

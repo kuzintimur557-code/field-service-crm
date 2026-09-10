@@ -188,6 +188,8 @@ def _company_row(item):
         "late": 0,
         "overdue": 0,
         "escalated": 0,
+        "review_pending": 0,
+        "review_overdue": 0,
         "response_values": [],
     }
 
@@ -208,6 +210,17 @@ def _admin_row(item):
 
 def _build_recommendations(summary, companies, analytics_url):
     recommendations = []
+    if summary["review_overdue"]:
+        recommendations.append({
+            "tone": "danger",
+            "title": "Просрочены разборы причин",
+            "description": (
+                f"Не завершено в срок: {summary['review_overdue']}. "
+                "Зафиксируйте причины и меры против повторения сбоев."
+            ),
+            "url": "/platform/a3-health/incidents/reviews?status=overdue",
+            "action_label": "Открыть разборы",
+        })
     if summary["response_overdue"]:
         recommendations.append({
             "tone": "danger",
@@ -324,6 +337,10 @@ def get_a3_platform_incident_analytics(
             response_due = first_at + timedelta(minutes=policy["response_minutes"])
         acknowledged_at = _parse_datetime(row.get("acknowledged_at"))
         resolved_at = _parse_datetime(row.get("resolved_at"))
+        review_status = str(row.get("review_status") or "pending").lower()
+        review_due = _parse_datetime(row.get("review_due_at"))
+        if not review_due and resolved_at:
+            review_due = resolved_at + timedelta(hours=policy["review_hours"])
         response_minutes = _minutes_between(first_at, acknowledged_at)
         resolution_minutes = _minutes_between(first_at, resolved_at)
         response_was_late = bool(
@@ -343,6 +360,14 @@ def get_a3_platform_incident_analytics(
         is_escalated = bool(
             row.get("escalated_at") or int(row.get("escalation_count") or 0)
         )
+        review_completed = bool(
+            row.get("status") == "resolved" and review_status == "completed"
+        )
+        review_overdue = bool(
+            row.get("status") == "resolved"
+            and not review_completed
+            and _deadline_has_arrived(review_due, now_value)
+        )
         item = {
             **row,
             "first_at": first_at,
@@ -359,6 +384,9 @@ def get_a3_platform_incident_analytics(
             "is_active": is_active,
             "is_resolved": row.get("status") == "resolved",
             "is_escalated": is_escalated,
+            "review_status": review_status,
+            "review_completed": review_completed,
+            "review_overdue": review_overdue,
             "company_name": row.get("company_name")
             or f"Компания #{row['company_id']}",
         }
@@ -375,6 +403,10 @@ def get_a3_platform_incident_analytics(
     late = sum(item["response_was_late"] for item in items)
     response_overdue = sum(item["response_overdue"] for item in items)
     escalated = sum(item["is_escalated"] for item in items)
+    review_required = resolved
+    review_completed = sum(item["review_completed"] for item in items)
+    review_overdue = sum(item["review_overdue"] for item in items)
+    review_pending = review_required - review_completed
     response_values = [
         item["response_minutes"]
         for item in items
@@ -403,6 +435,14 @@ def get_a3_platform_incident_analytics(
         "late": late,
         "response_overdue": response_overdue,
         "escalated": escalated,
+        "review_required": review_required,
+        "review_completed": review_completed,
+        "review_pending": review_pending,
+        "review_overdue": review_overdue,
+        "review_completion_percent": _percent(
+            review_completed,
+            review_required,
+        ),
         "response_sla_percent": _percent(on_time, response_eligible),
         "resolution_rate": _percent(resolved, total),
         "escalation_rate": _percent(escalated, total, empty=0),
@@ -427,6 +467,10 @@ def get_a3_platform_incident_analytics(
         company["late"] += int(item["response_was_late"])
         company["overdue"] += int(item["response_overdue"])
         company["escalated"] += int(item["is_escalated"])
+        company["review_pending"] += int(
+            item["is_resolved"] and not item["review_completed"]
+        )
+        company["review_overdue"] += int(item["review_overdue"])
         if item["response_minutes"] is not None:
             company["response_values"].append(item["response_minutes"])
 
@@ -538,6 +582,11 @@ def get_a3_platform_incident_analytics(
                 else "Срок не наступил"
             ),
             "escalated_label": "Да" if item["is_escalated"] else "Нет",
+            "review_status_label": (
+                "Завершён"
+                if item["review_completed"]
+                else "Просрочен" if item["review_overdue"] else "Ожидает"
+            ),
         })
 
     return {

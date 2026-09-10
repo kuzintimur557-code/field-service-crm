@@ -75,6 +75,7 @@ summary{cursor:pointer;font-size:12px;font-weight:900}
             <div class="subtitle">Единый журнал критических сбоев фоновых процессов по всем компаниям.<br>Реакция: {{ center["policy"]["response_label"] }} · эскалация: {{ center["policy"]["escalation_label"] }} · обновлено: {{ center["generated_at"] }}.</div>
         </div>
         <div class="header-actions">
+            <a class="button secondary" href="{{ links['a3_incident_reviews'] }}">Разборы</a>
             <a class="button secondary" href="{{ links['a3_incident_analytics'] }}">Аналитика</a>
             <a class="button secondary" href="{{ links['a3_health'] }}">Состояние A3</a>
             <a class="button" href="{{ links['platform'] }}">Панель платформы</a>
@@ -175,6 +176,7 @@ summary{cursor:pointer;font-size:12px;font-weight:900}
             </div>
             {% else %}
             <div class="resolution"><strong>Результат:</strong> {{ incident["resolution_message"] or "Работа восстановлена." }}<br>Закрыт: {{ incident["resolved_label"] }}.</div>
+            <div class="incident-actions" style="margin-top:10px"><a class="button secondary" href="{{ incident['review_url'] }}">Открыть разбор причин</a><a class="button secondary" href="{{ incident['company_url'] }}">Открыть компанию</a></div>
             {% endif %}
 
             <details>

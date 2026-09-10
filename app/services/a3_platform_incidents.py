@@ -9,6 +9,7 @@ A3_PLATFORM_INCIDENT_KEY = "a3_scheduler_health"
 A3_PLATFORM_INCIDENT_EVENT_LIMIT = 200
 A3_PLATFORM_INCIDENT_RESPONSE_MINUTES = 30
 A3_PLATFORM_INCIDENT_ESCALATION_MINUTES = 60
+A3_PLATFORM_INCIDENT_REVIEW_HOURS = 24
 
 A3_PLATFORM_INCIDENT_STATUS_LABELS = {
     "active": "Активные",
@@ -28,6 +29,8 @@ A3_PLATFORM_INCIDENT_EVENT_LABELS = {
     "escalated": "Инцидент эскалирован",
     "note": "Добавлен комментарий",
     "resolved": "Работа восстановлена",
+    "review_updated": "Разбор инцидента обновлён",
+    "review_completed": "Разбор инцидента завершён",
 }
 
 
@@ -51,11 +54,19 @@ def get_a3_platform_incident_policy():
             A3_PLATFORM_INCIDENT_ESCALATION_MINUTES,
         ),
     )
+    review_hours = _environment_minutes(
+        "A3_INCIDENT_REVIEW_HOURS",
+        A3_PLATFORM_INCIDENT_REVIEW_HOURS,
+        minimum=1,
+        maximum=720,
+    )
     return {
         "response_minutes": response_minutes,
         "escalation_minutes": escalation_minutes,
         "response_label": f"{response_minutes} мин.",
         "escalation_label": f"{escalation_minutes} мин.",
+        "review_hours": review_hours,
+        "review_label": f"{review_hours} ч.",
     }
 
 
@@ -600,12 +611,17 @@ def sync_a3_platform_incidents(report, now=None, telegram_sender=None):
                 SET status='resolved',
                     resolved_at=?,
                     resolution_message=?,
+                    review_status='pending',
+                    review_due_at=COALESCE(review_due_at, ?),
                     last_notified_at=?,
                     updated_at=?
                 WHERE id=? AND status='open'
             """, (
                 now_text,
                 resolution_message,
+                _timestamp(
+                    now_value + timedelta(hours=policy["review_hours"])
+                ),
                 now_text,
                 now_text,
                 active["id"],
@@ -984,6 +1000,11 @@ def get_a3_platform_incidents(
             "resolved_label": _time_label(incident.get("resolved_at")),
             "events": events_by_incident.get(incident["id"], []),
             "company_url": f"/platform/companies/{incident['company_id']}",
+            "review_url": (
+                "/platform/a3-health/incidents/reviews?status=all&search="
+                + str(incident["id"])
+                + f"#review-{incident['id']}"
+            ),
         })
 
     summary = get_a3_platform_incident_summary(now=now_value)

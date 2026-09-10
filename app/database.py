@@ -769,6 +769,16 @@ def init_db():
         assigned_by TEXT,
         resolved_at TEXT,
         resolution_message TEXT,
+        review_status TEXT NOT NULL DEFAULT 'pending',
+        review_due_at TEXT,
+        review_owner TEXT,
+        root_cause TEXT,
+        corrective_actions TEXT,
+        prevention_actions TEXT,
+        review_started_at TEXT,
+        review_completed_at TEXT,
+        review_completed_by TEXT,
+        review_updated_at TEXT,
         last_notified_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -855,6 +865,51 @@ def init_db():
         "a3_platform_incidents",
         "escalation_count",
         "INTEGER NOT NULL DEFAULT 0",
+    )
+    add_column_if_missing(
+        c,
+        "a3_platform_incidents",
+        "review_status",
+        "TEXT NOT NULL DEFAULT 'pending'",
+    )
+    add_column_if_missing(c, "a3_platform_incidents", "review_due_at", "TEXT")
+    add_column_if_missing(c, "a3_platform_incidents", "review_owner", "TEXT")
+    add_column_if_missing(c, "a3_platform_incidents", "root_cause", "TEXT")
+    add_column_if_missing(
+        c,
+        "a3_platform_incidents",
+        "corrective_actions",
+        "TEXT",
+    )
+    add_column_if_missing(
+        c,
+        "a3_platform_incidents",
+        "prevention_actions",
+        "TEXT",
+    )
+    add_column_if_missing(
+        c,
+        "a3_platform_incidents",
+        "review_started_at",
+        "TEXT",
+    )
+    add_column_if_missing(
+        c,
+        "a3_platform_incidents",
+        "review_completed_at",
+        "TEXT",
+    )
+    add_column_if_missing(
+        c,
+        "a3_platform_incidents",
+        "review_completed_by",
+        "TEXT",
+    )
+    add_column_if_missing(
+        c,
+        "a3_platform_incidents",
+        "review_updated_at",
+        "TEXT",
     )
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
@@ -1198,6 +1253,16 @@ def init_db():
         acknowledged_at,
         escalated_at,
         escalation_due_at
+    )
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_platform_incident_review
+    ON a3_platform_incidents(
+        status,
+        review_status,
+        review_due_at,
+        resolved_at
     )
     """)
 
