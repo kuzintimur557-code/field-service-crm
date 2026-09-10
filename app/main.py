@@ -71,6 +71,11 @@ from app.services.a3_incident_followups import (
     normalize_a3_followup_owner,
     update_a3_incident_followup,
 )
+from app.services.a3_incident_followup_monitor import (
+    get_a3_followup_monitor_policy,
+    get_a3_followup_monitor_overview,
+    run_a3_incident_followup_monitor,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -16283,6 +16288,10 @@ async def platform_a3_incident_actions_page(
     search: str = "",
     notice: str = "",
     error: str = "",
+    monitor_checked: int = 0,
+    monitor_notified: int = 0,
+    monitor_due_soon: int = 0,
+    monitor_overdue: int = 0,
 ):
     username = get_user(request)
 
@@ -16300,6 +16309,13 @@ async def platform_a3_incident_actions_page(
         search=search,
         current_username=username,
     )
+    monitor = get_a3_followup_monitor_overview()
+    monitor["last_run"] = {
+        "checked": max(0, int(monitor_checked or 0)),
+        "notified": max(0, int(monitor_notified or 0)),
+        "due_soon": max(0, int(monitor_due_soon or 0)),
+        "overdue": max(0, int(monitor_overdue or 0)),
+    }
     links = get_platform_dashboard_links()
     links["platform"] = links["page"]
     export_params = {
@@ -16325,6 +16341,7 @@ async def platform_a3_incident_actions_page(
             "summary": center["summary"],
             "actions": center["items"],
             "admins": center["admins"],
+            "monitor": monitor,
             "notice": notice,
             "error": error,
             "links": links,
@@ -16362,6 +16379,19 @@ async def api_platform_a3_incident_actions(
             limit=limit,
         ),
     }
+
+
+@app.get("/api/platform/a3-health/incidents/actions/monitor")
+async def api_platform_a3_incident_action_monitor(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {"ok": True, **get_a3_followup_monitor_overview()}
 
 
 @app.post("/platform/a3-health/incidents/actions/create")
@@ -16426,6 +16456,39 @@ async def update_platform_a3_incident_action(
         form.get("incident_id") or "all",
         form.get("owner") or "all",
         form.get("search") or "",
+    )
+
+
+@app.post("/platform/a3-health/incidents/actions/monitor/run")
+async def run_platform_a3_incident_action_monitor(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    result = run_a3_incident_followup_monitor()
+    target = build_a3_followups_url(
+        form.get("return_status") or "active",
+        form.get("company_id") or "all",
+        form.get("incident_id") or "all",
+        form.get("owner") or "all",
+        form.get("search") or "",
+    )
+    separator = "&" if "?" in target else "?"
+    params = {
+        "notice": "monitor_complete",
+        "monitor_checked": result["checked"],
+        "monitor_notified": result["notified_actions"],
+        "monitor_due_soon": result["due_soon"],
+        "monitor_overdue": result["overdue"],
+    }
+    return RedirectResponse(
+        f"{target}{separator}{urlencode(params)}#deadline-monitor",
+        status_code=302,
     )
 
 
@@ -45330,6 +45393,7 @@ def run_a3_scheduler_watchdog_for_all_companies(
     status_recorder=None,
     history_recorder=None,
     incident_syncer=None,
+    followup_monitor_runner=None,
 ):
     watchdog_report = report or get_a3_scheduler_watchdog_report(now=now)
     notify = notifier or notify_a3_scheduler_reliability
@@ -45410,6 +45474,26 @@ def run_a3_scheduler_watchdog_for_all_companies(
         }
         watchdog_report["incident_error"] = (
             "Не удалось синхронизировать инциденты A3."
+        )
+
+    monitor_followups = (
+        followup_monitor_runner or run_a3_incident_followup_monitor
+    )
+    try:
+        watchdog_report["followup_monitor"] = monitor_followups(now=now)
+        watchdog_report["followup_monitor_error"] = ""
+    except Exception:
+        watchdog_report["followup_monitor"] = {
+            "checked": 0,
+            "due_soon": 0,
+            "overdue": 0,
+            "notified_actions": 0,
+            "notifications_created": 0,
+            "telegram_sent": 0,
+            "suppressed": 0,
+        }
+        watchdog_report["followup_monitor_error"] = (
+            "Не удалось проверить сроки контрольных мер A3."
         )
 
     record_history = history_recorder or record_a3_scheduler_watchdog_run
@@ -45878,6 +45962,34 @@ async def run_a3_scheduler_watchdog_cron(request: Request):
     return {
         "ok": True,
         "summary": run_a3_scheduler_watchdog_for_all_companies(),
+    }
+
+
+@app.post("/automation/cron/a3-incident-actions")
+async def run_a3_incident_action_monitor_cron(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
+            status_code=503,
+        )
+
+    token = (
+        request.headers.get("x-automation-secret")
+        or request.query_params.get("token")
+        or ""
+    ).strip()
+
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    return {
+        "ok": True,
+        "summary": run_a3_incident_followup_monitor(),
     }
 
 

@@ -811,6 +811,9 @@ def init_db():
         due_at TEXT NOT NULL,
         completed_at TEXT,
         completed_by TEXT,
+        reminder_stage TEXT,
+        last_reminded_at TEXT,
+        reminder_count INTEGER NOT NULL DEFAULT 0,
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -930,6 +933,14 @@ def init_db():
         "a3_platform_incidents",
         "review_updated_at",
         "TEXT",
+    )
+    add_column_if_missing(c, "a3_incident_followups", "reminder_stage", "TEXT")
+    add_column_if_missing(c, "a3_incident_followups", "last_reminded_at", "TEXT")
+    add_column_if_missing(
+        c,
+        "a3_incident_followups",
+        "reminder_count",
+        "INTEGER NOT NULL DEFAULT 0",
     )
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")

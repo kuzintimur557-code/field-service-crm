@@ -629,6 +629,18 @@ def update_a3_incident_followup(
         if selected_status == "completed":
             completed_at = followup.get("completed_at") or now_text
             completed_by = followup.get("completed_by") or actor_username
+        due_text = _timestamp(due_value)
+        reminder_changed = (
+            selected_status != followup.get("status")
+            or selected_owner != str(followup.get("owner_username") or "")
+            or due_text != str(followup.get("due_at") or "")
+        )
+        reminder_stage = (
+            None if reminder_changed else followup.get("reminder_stage")
+        )
+        last_reminded_at = (
+            None if reminder_changed else followup.get("last_reminded_at")
+        )
         cursor.execute("""
             UPDATE a3_incident_followups
             SET title=?,
@@ -639,6 +651,8 @@ def update_a3_incident_followup(
                 due_at=?,
                 completed_at=?,
                 completed_by=?,
+                reminder_stage=?,
+                last_reminded_at=?,
                 updated_at=?
             WHERE id=?
         """, (
@@ -647,9 +661,11 @@ def update_a3_incident_followup(
             selected_status,
             selected_priority,
             selected_owner or None,
-            _timestamp(due_value),
+            due_text,
             completed_at,
             completed_by,
+            reminder_stage,
+            last_reminded_at,
             now_text,
             followup_id,
         ))

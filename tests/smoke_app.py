@@ -14573,6 +14573,9 @@ async def assert_a3_incident_followups():
         "due_at",
         "completed_at",
         "completed_by",
+        "reminder_stage",
+        "last_reminded_at",
+        "reminder_count",
     }.issubset(columns)
     c.execute("""
         DELETE FROM a3_incident_followups
@@ -14822,6 +14825,41 @@ async def assert_a3_incident_followups():
             now=followup_now,
         )["items"]) == 1
 
+        monitor_policy = crm.get_a3_followup_monitor_policy()
+        assert monitor_policy["due_soon_hours"] == 24
+        assert monitor_policy["cooldown_hours"] == 24
+        first_monitor = crm.run_a3_incident_followup_monitor(
+            now=followup_now,
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert first_monitor["checked"] == 2
+        assert first_monitor["due_soon"] == 1
+        assert first_monitor["overdue"] == 1
+        assert first_monitor["notified_actions"] == 2
+        assert first_monitor["notifications_created"] >= 2
+        assert first_monitor["suppressed"] == 0
+        overview = crm.get_a3_followup_monitor_overview(now=followup_now)
+        assert overview["ready"] == 0
+        assert overview["reminders_sent"] == 2
+        assert overview["status"] == "critical"
+
+        repeated_monitor = crm.run_a3_incident_followup_monitor(
+            now=followup_now + timedelta(minutes=10),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert repeated_monitor["notified_actions"] == 0
+        assert repeated_monitor["notifications_created"] == 0
+        assert repeated_monitor["suppressed"] == 2
+
+        stage_changed = crm.run_a3_incident_followup_monitor(
+            now=followup_now + timedelta(hours=5),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert stage_changed["overdue"] == 2
+        assert stage_changed["notified_actions"] == 1
+        assert stage_changed["suppressed"] == 1
+        assert stage_changed["items"][0]["id"] == assigned["followup_id"]
+
         reviews = crm.get_a3_platform_incident_reviews(
             status_filter="all",
             company_id=2,
@@ -14840,7 +14878,7 @@ async def assert_a3_incident_followups():
             "high",
             "super",
             "2026-06-25T16:00",
-            now=followup_now + timedelta(minutes=30),
+            now=followup_now + timedelta(hours=5, minutes=30),
         )
         assert completed["ok"] is True
         conn = connect()
@@ -14866,7 +14904,7 @@ async def assert_a3_incident_followups():
             "high",
             "super",
             "2026-06-25T17:00",
-            now=followup_now + timedelta(minutes=40),
+            now=followup_now + timedelta(hours=5, minutes=40),
         )
         assert reopened["status"] == "in_progress"
         conn = connect()
@@ -14903,6 +14941,8 @@ async def assert_a3_incident_followups():
         assert "Исправляющая мера" in html
         assert "Добавить резервный канал" in html
         assert "Скачать CSV" in html
+        assert "Автоматический контроль сроков" in html
+        assert "Проверить сроки" in html
         assert 'class="platform-mobile-nav"' in html
 
         anonymous_api = await crm.api_platform_a3_incident_actions(
@@ -14926,6 +14966,30 @@ async def assert_a3_incident_followups():
         )
         assert api["ok"] is True
         assert api["summary"]["total"] == 2
+
+        anonymous_monitor_api = (
+            await crm.api_platform_a3_incident_action_monitor(
+                make_public_asgi_request(
+                    "/api/platform/a3-health/incidents/actions/monitor"
+                ),
+            )
+        )
+        assert anonymous_monitor_api.status_code == 401
+        boss_monitor_api = await crm.api_platform_a3_incident_action_monitor(
+            make_asgi_request(
+                "owner2",
+                "/api/platform/a3-health/incidents/actions/monitor",
+            ),
+        )
+        assert boss_monitor_api.status_code == 403
+        monitor_api = await crm.api_platform_a3_incident_action_monitor(
+            make_asgi_request(
+                "super",
+                "/api/platform/a3-health/incidents/actions/monitor",
+            ),
+        )
+        assert monitor_api["ok"] is True
+        assert monitor_api["active"] == 2
 
         create_redirect = await crm.create_platform_a3_incident_action(
             make_form_request(
@@ -14972,6 +15036,74 @@ async def assert_a3_incident_followups():
             update_redirect.headers["location"]
         )
 
+        anonymous_monitor_run = (
+            await crm.run_platform_a3_incident_action_monitor(
+                make_public_asgi_request(
+                    "/platform/a3-health/incidents/actions/monitor/run"
+                ),
+            )
+        )
+        assert anonymous_monitor_run.status_code == 302
+        assert anonymous_monitor_run.headers["location"] == "/login"
+        monitor_redirect = await crm.run_platform_a3_incident_action_monitor(
+            make_form_request(
+                "super",
+                "/platform/a3-health/incidents/actions/monitor/run",
+                {
+                    "return_status": "all",
+                    "company_id": "2",
+                    "incident_id": "all",
+                    "owner": "all",
+                    "search": "",
+                },
+            ),
+        )
+        assert monitor_redirect.status_code == 302
+        assert "notice=monitor_complete" in monitor_redirect.headers["location"]
+        assert "monitor_checked=" in monitor_redirect.headers["location"]
+        assert "#deadline-monitor" in monitor_redirect.headers["location"]
+
+        previous_cron_secret = os.environ.pop(
+            "AUTOMATION_CRON_SECRET",
+            None,
+        )
+        try:
+            no_secret_cron = (
+                await crm.run_a3_incident_action_monitor_cron(
+                    make_public_asgi_request(
+                        "/automation/cron/a3-incident-actions"
+                    ),
+                )
+            )
+            assert no_secret_cron.status_code == 503
+            os.environ["AUTOMATION_CRON_SECRET"] = "followup-cron-secret"
+            forbidden_cron = (
+                await crm.run_a3_incident_action_monitor_cron(
+                    make_public_asgi_request(
+                        "/automation/cron/a3-incident-actions"
+                    ),
+                )
+            )
+            assert forbidden_cron.status_code == 403
+            cron_result = await crm.run_a3_incident_action_monitor_cron(
+                make_public_asgi_request(
+                    "/automation/cron/a3-incident-actions",
+                    headers=[
+                        (
+                            b"x-automation-secret",
+                            b"followup-cron-secret",
+                        ),
+                    ],
+                ),
+            )
+            assert cron_result["ok"] is True
+            assert cron_result["summary"]["checked"] == 3
+        finally:
+            if previous_cron_secret is None:
+                os.environ.pop("AUTOMATION_CRON_SECRET", None)
+            else:
+                os.environ["AUTOMATION_CRON_SECRET"] = previous_cron_secret
+
         anonymous_export = await crm.platform_a3_incident_actions_export(
             make_public_asgi_request(
                 "/platform/a3-health/incidents/actions/export"
@@ -14992,6 +15124,11 @@ async def assert_a3_incident_followups():
     finally:
         conn = connect()
         c = conn.cursor()
+        for incident_id in ids.values():
+            c.execute(
+                "DELETE FROM notifications WHERE link LIKE ?",
+                (f"%incident_id={incident_id}%",),
+            )
         c.execute("""
             DELETE FROM a3_incident_followups
             WHERE incident_id IN (
