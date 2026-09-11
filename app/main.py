@@ -16629,6 +16629,8 @@ async def platform_a3_incident_actions_export(
         "Комментарий проверки",
         "Проверил",
         "Дата проверки",
+        "Попыток проверки",
+        "Возвратов на доработку",
         "Создал",
     ])
     for action in center["items"]:
@@ -16652,6 +16654,8 @@ async def platform_a3_incident_actions_export(
             action["verification_note"] or "",
             action["verified_by"] or "",
             action["verified_at"] or "",
+            action["verification_attempts"],
+            action["rework_count"],
             action["created_by"],
         ])
 

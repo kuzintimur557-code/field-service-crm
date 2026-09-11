@@ -14580,6 +14580,8 @@ async def assert_a3_incident_followups():
         "verification_note",
         "verified_at",
         "verified_by",
+        "verification_attempts",
+        "rework_count",
     }.issubset(columns)
     c.execute("""
         DELETE FROM a3_incident_followups
@@ -15006,6 +15008,8 @@ async def assert_a3_incident_followups():
             assigned["followup_id"]
         ]
         assert verified_center["items"][0]["verified_by"] == "super"
+        assert verified_center["items"][0]["verification_attempts"] == 1
+        assert verified_center["items"][0]["rework_count"] == 0
 
         approved_monitor = crm.run_a3_incident_followup_monitor(
             now=followup_now + timedelta(hours=10),
@@ -15090,6 +15094,8 @@ async def assert_a3_incident_followups():
         assert rejected_center["items"][0]["verification_note"] == (
             "Нужен тест после повторного запуска."
         )
+        assert rejected_center["items"][0]["verification_attempts"] == 2
+        assert rejected_center["items"][0]["rework_count"] == 1
         conn = connect()
         rejected_event = conn.cursor().execute("""
             SELECT event_type FROM a3_platform_incident_events
@@ -15174,6 +15180,8 @@ async def assert_a3_incident_followups():
         assert "Проверка результата" in html
         assert "Ожидает проверки" in html
         assert "Сохранить решение" in html
+        assert "Попыток проверки" in html
+        assert "Возвратов" in html
         assert 'class="platform-mobile-nav"' in html
 
         anonymous_api = await crm.api_platform_a3_incident_actions(
@@ -15252,6 +15260,11 @@ async def assert_a3_incident_followups():
         )
         assert approved_api["ok"] is True
         assert approved_api["decision"] == "approved"
+        approved_api_item = crm.get_a3_incident_followups(
+            "verified", 2, current_username="super",
+        )["items"][0]
+        assert approved_api_item["verification_attempts"] == 3
+        assert approved_api_item["rework_count"] == 1
 
         anonymous_verify = await crm.verify_platform_a3_incident_action(
             make_public_asgi_request(
@@ -15444,6 +15457,8 @@ async def assert_a3_incident_followups():
         assert "Исправляющая мера" in export_csv
         assert "Проверка результата" in export_csv
         assert "Дата проверки" in export_csv
+        assert "Попыток проверки" in export_csv
+        assert "Возвратов на доработку" in export_csv
         assert "Проверить повторную отправку" in export_csv
     finally:
         conn = connect()
@@ -15529,6 +15544,16 @@ async def assert_a3_followup_analytics():
                   CASE WHEN ? IS NULL THEN NULL ELSE 'super' END,
                   'super', ?, ?)
     """, [row[:9] + (row[8], row[9], row[9]) for row in rows])
+    cursor.execute("""
+        UPDATE a3_incident_followups
+        SET verification_attempts=1
+        WHERE incident_id=?
+    """, (incident_ids[2],))
+    cursor.execute("""
+        UPDATE a3_incident_followups
+        SET verification_attempts=1, rework_count=1
+        WHERE incident_id=?
+    """, (incident_ids[4],))
     conn.commit()
     conn.close()
 
@@ -15545,6 +15570,12 @@ async def assert_a3_followup_analytics():
         assert report["summary"]["on_time_percent"] == 50.0
         assert report["summary"]["verified_percent"] == 50.0
         assert report["summary"]["average_verification_hours"] == 6.0
+        assert report["summary"]["verification_attempts"] == 2
+        assert report["summary"]["returns_total"] == 1
+        assert report["summary"]["returned_actions"] == 1
+        assert report["summary"]["rework_rate"] == 50.0
+        assert report["summary"]["first_pass_verified"] == 1
+        assert report["summary"]["first_pass_percent"] == 100.0
         assert report["backlog"]["total"] == 4
         assert report["backlog"]["overdue"] == 2
         assert report["backlog"]["pending"] == 1
@@ -15575,6 +15606,8 @@ async def assert_a3_followup_analytics():
         assert "Текущий остаток" in html
         assert "Требуют внимания" in html
         assert "Динамика контрольных мер" in html
+        assert "С первого раза" in html
+        assert "Возвраты" in html
         assert "Старая просроченная мера" in html
 
         api = await crm.api_platform_a3_incident_analytics(
@@ -15592,6 +15625,8 @@ async def assert_a3_followup_analytics():
         assert "Контрольные меры A3: по дате создания" in export_csv
         assert "Меры по ответственным" in export_csv
         assert "Средняя проверка результата, ч." in export_csv
+        assert "Принято с первого раза, %" in export_csv
+        assert "Возвратов на доработку" in export_csv
     finally:
         conn = connect()
         cursor = conn.cursor()

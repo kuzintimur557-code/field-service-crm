@@ -35,6 +35,13 @@ def _summary(items):
         and item["verified"] >= item["completed"]
     ]
     verified = sum(item["approved"] for item in items)
+    verification_attempts = sum(item["verification_attempts"] for item in items)
+    returns_total = sum(item["rework_count"] for item in items)
+    reviewed_actions = sum(item["verification_attempts"] > 0 for item in items)
+    returned_actions = sum(item["rework_count"] > 0 for item in items)
+    first_pass_verified = sum(
+        item["approved"] and item["rework_count"] == 0 for item in items
+    )
     on_time = sum(item["completed"] <= item["due"] for item in timed)
     return {
         "total": len(items),
@@ -47,6 +54,12 @@ def _summary(items):
         "overdue": sum(item["overdue"] for item in items),
         "unassigned": sum(item["active"] and not item["owner_username"] for item in items),
         "verified_percent": _ratio(verified, len(completed)),
+        "verification_attempts": verification_attempts,
+        "returns_total": returns_total,
+        "returned_actions": returned_actions,
+        "rework_rate": _ratio(returned_actions, reviewed_actions),
+        "first_pass_verified": first_pass_verified,
+        "first_pass_percent": _ratio(first_pass_verified, verified),
         "on_time": on_time,
         "timed_completions": len(timed),
         "on_time_percent": _ratio(on_time, len(timed)),
@@ -85,6 +98,10 @@ def get_a3_followup_analytics(period="30", company_id="all", now=None):
     for row in rows:
         item = dict(row)
         item["owner_username"] = str(item.get("owner_username") or "").strip()
+        item["verification_attempts"] = max(
+            0, int(item.get("verification_attempts") or 0),
+        )
+        item["rework_count"] = max(0, int(item.get("rework_count") or 0))
         for name, column in (
             ("created", "created_at"), ("completed", "completed_at"),
             ("verified", "verified_at"), ("due", "due_at"),
@@ -180,6 +197,10 @@ def a3_followup_analytics_csv_rows(report):
         ["Подтверждено", summary["verified"]], ["Ждут проверки", summary["pending"]],
         ["Выполнено в срок, %", summary["on_time_percent"]],
         ["Средняя проверка результата, ч.", summary["average_verification_hours"]],
+        ["Попыток проверки", summary["verification_attempts"]],
+        ["Возвратов на доработку", summary["returns_total"]],
+        ["Принято с первого раза, %", summary["first_pass_percent"]],
+        ["Доля мер с возвратом, %", summary["rework_rate"]],
         ["Текущий остаток за всё время", report["backlog"]["total"]],
         ["Просрочено за всё время", report["backlog"]["overdue"]],
         ["Ждут проверки за всё время", report["backlog"]["pending"]],
@@ -192,12 +213,16 @@ def a3_followup_analytics_csv_rows(report):
         rows.extend([[], [title], [
             "Группа", "Всего", "Активные", "Просрочены", "Выполнены",
             "Подтверждены", "Ждут проверки", "На доработке", "Отменены",
-            "Выполнено в срок, %", "Средняя проверка, ч.",
+            "Попытки проверки", "Возвраты", "Принято с первого раза, %",
+            "Доля мер с возвратом, %", "Выполнено в срок, %",
+            "Средняя проверка, ч.",
         ]])
         for item in report[key]:
             rows.append([item[label]] + [item[name] for name in (
                 "total", "active", "overdue", "completed", "verified", "pending",
-                "rework", "cancelled", "on_time_percent", "average_verification_hours",
+                "rework", "cancelled", "verification_attempts", "returns_total",
+                "first_pass_percent", "rework_rate", "on_time_percent",
+                "average_verification_hours",
             )])
     # Spreadsheet applications must treat user-controlled names as text.
     return [[

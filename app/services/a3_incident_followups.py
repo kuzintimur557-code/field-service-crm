@@ -242,6 +242,10 @@ def _enrich_followup(raw_item, now_value):
         status,
         item.get("verification_status"),
     )
+    item["verification_attempts"] = max(
+        0, int(item.get("verification_attempts") or 0),
+    )
+    item["rework_count"] = max(0, int(item.get("rework_count") or 0))
     item.update({
         "status": status,
         "status_label": (
@@ -887,6 +891,7 @@ def review_a3_incident_followup(
                     verification_note=?,
                     verified_at=?,
                     verified_by=?,
+                    verification_attempts=verification_attempts + 1,
                     updated_at=?
                 WHERE id=? AND status='completed'
             """, (
@@ -912,6 +917,8 @@ def review_a3_incident_followup(
                     verification_note=?,
                     verified_at=?,
                     verified_by=?,
+                    verification_attempts=verification_attempts + 1,
+                    rework_count=rework_count + 1,
                     reminder_stage=NULL,
                     last_reminded_at=NULL,
                     updated_at=?

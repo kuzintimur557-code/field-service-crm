@@ -818,6 +818,8 @@ def init_db():
         verification_note TEXT,
         verified_at TEXT,
         verified_by TEXT,
+        verification_attempts INTEGER NOT NULL DEFAULT 0,
+        rework_count INTEGER NOT NULL DEFAULT 0,
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -955,6 +957,18 @@ def init_db():
     add_column_if_missing(c, "a3_incident_followups", "verification_note", "TEXT")
     add_column_if_missing(c, "a3_incident_followups", "verified_at", "TEXT")
     add_column_if_missing(c, "a3_incident_followups", "verified_by", "TEXT")
+    add_column_if_missing(
+        c,
+        "a3_incident_followups",
+        "verification_attempts",
+        "INTEGER NOT NULL DEFAULT 0",
+    )
+    add_column_if_missing(
+        c,
+        "a3_incident_followups",
+        "rework_count",
+        "INTEGER NOT NULL DEFAULT 0",
+    )
 
     add_column_if_missing(c, "users", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "users", "full_name", "TEXT")
