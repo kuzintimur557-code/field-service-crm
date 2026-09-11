@@ -14835,6 +14835,7 @@ async def assert_a3_incident_followups():
         monitor_policy = crm.get_a3_followup_monitor_policy()
         assert monitor_policy["due_soon_hours"] == 24
         assert monitor_policy["cooldown_hours"] == 24
+        assert monitor_policy["verification_hours"] == 4
         first_monitor = crm.run_a3_incident_followup_monitor(
             now=followup_now,
             telegram_sender=lambda chat_id, message: True,
@@ -14903,6 +14904,49 @@ async def assert_a3_incident_followups():
         assert completed_row["verification_status"] == "pending"
         assert event["event_type"] == "followup_completed"
 
+        early_verification = crm.run_a3_incident_followup_monitor(
+            now=followup_now + timedelta(hours=9, minutes=29),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert early_verification["verification_pending"] == 1
+        assert early_verification["notified_actions"] == 0
+        assert early_verification["notifications_created"] == 0
+
+        verification_overview = crm.get_a3_followup_monitor_overview(
+            now=followup_now + timedelta(hours=9, minutes=30),
+        )
+        assert verification_overview["active"] == 1
+        assert verification_overview["verification_pending"] == 1
+        assert verification_overview["ready"] == 1
+        verification_monitor = crm.run_a3_incident_followup_monitor(
+            now=followup_now + timedelta(hours=9, minutes=30),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert verification_monitor["checked"] == 2
+        assert verification_monitor["verification_pending"] == 1
+        assert verification_monitor["notified_actions"] == 1
+        assert verification_monitor["items"][0]["id"] == (
+            assigned["followup_id"]
+        )
+        assert verification_monitor["items"][0]["stage"] == (
+            "verification_pending"
+        )
+        conn = connect()
+        verification_event = conn.cursor().execute("""
+            SELECT event_type FROM a3_platform_incident_events
+            WHERE incident_id=? ORDER BY id DESC LIMIT 1
+        """, (ids["followup_test_resolved_one"],)).fetchone()
+        conn.close()
+        assert verification_event["event_type"] == (
+            "followup_verification_reminder"
+        )
+        repeated_verification = crm.run_a3_incident_followup_monitor(
+            now=followup_now + timedelta(hours=9, minutes=40),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert repeated_verification["notified_actions"] == 0
+        assert repeated_verification["suppressed"] == 2
+
         invalid_decision = crm.review_a3_incident_followup(
             assigned["followup_id"],
             "super",
@@ -14962,6 +15006,14 @@ async def assert_a3_incident_followups():
             assigned["followup_id"]
         ]
         assert verified_center["items"][0]["verified_by"] == "super"
+
+        approved_monitor = crm.run_a3_incident_followup_monitor(
+            now=followup_now + timedelta(hours=10),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert approved_monitor["verification_pending"] == 0
+        assert approved_monitor["checked"] == 1
+        assert approved_monitor["notifications_created"] == 0
 
         rejected = crm.review_a3_incident_followup(
             assigned["followup_id"],
@@ -15064,6 +15116,8 @@ async def assert_a3_incident_followups():
         assert "Скачать CSV" in html
         assert "Автоматический контроль сроков" in html
         assert "Проверить сроки" in html
+        assert "проверка результата через 4 ч." in html
+        assert "Ждут проверки" in html
         assert "Проверка результата" in html
         assert "Ожидает проверки" in html
         assert "Сохранить решение" in html

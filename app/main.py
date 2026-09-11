@@ -16293,6 +16293,7 @@ async def platform_a3_incident_actions_page(
     monitor_notified: int = 0,
     monitor_due_soon: int = 0,
     monitor_overdue: int = 0,
+    monitor_verification: int = 0,
 ):
     username = get_user(request)
 
@@ -16316,6 +16317,7 @@ async def platform_a3_incident_actions_page(
         "notified": max(0, int(monitor_notified or 0)),
         "due_soon": max(0, int(monitor_due_soon or 0)),
         "overdue": max(0, int(monitor_overdue or 0)),
+        "verification": max(0, int(monitor_verification or 0)),
     }
     links = get_platform_dashboard_links()
     links["platform"] = links["page"]
@@ -16551,6 +16553,7 @@ async def run_platform_a3_incident_action_monitor(request: Request):
         "monitor_notified": result["notified_actions"],
         "monitor_due_soon": result["due_soon"],
         "monitor_overdue": result["overdue"],
+        "monitor_verification": result["verification_pending"],
     }
     return RedirectResponse(
         f"{target}{separator}{urlencode(params)}#deadline-monitor",

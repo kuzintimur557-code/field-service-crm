@@ -35,6 +35,7 @@ A3_PLATFORM_INCIDENT_EVENT_LABELS = {
     "followup_updated": "Контрольная мера обновлена",
     "followup_completed": "Контрольная мера выполнена",
     "followup_reminder": "Напоминание о контрольной мере",
+    "followup_verification_reminder": "Напоминание о проверке меры",
     "followup_verified": "Результат меры подтверждён",
     "followup_rejected": "Мера возвращена на доработку",
 }
