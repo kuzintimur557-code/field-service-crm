@@ -15015,6 +15015,59 @@ async def assert_a3_incident_followups():
         assert approved_monitor["checked"] == 1
         assert approved_monitor["notifications_created"] == 0
 
+        unchanged = crm.update_a3_incident_followup(
+            assigned["followup_id"], "super",
+            "Проверить повторную отправку", "Контрольный запуск прошёл успешно.",
+            "completed", "high", "super", "2026-06-25T16:00",
+            now=followup_now + timedelta(hours=10),
+        )
+        assert unchanged["ok"] is True
+        unchanged_item = crm.get_a3_incident_followups(
+            "verified", 2, now=followup_now + timedelta(hours=10),
+        )["items"][0]
+        assert unchanged_item["verified_at"] == (
+            verified_center["items"][0]["verified_at"]
+        )
+        assert unchanged_item["completed_at"] == completed_row["completed_at"]
+
+        for hour, changed_title in (
+            (10, "Проверить повторную отправку"),
+            (11, "Повторно проверить доставку"),
+        ):
+            changed_at = followup_now + timedelta(hours=hour)
+            edited = crm.update_a3_incident_followup(
+                assigned["followup_id"], "super", changed_title,
+                "Результат уточнён после дополнительного запуска.",
+                "completed", "high", "super", "2026-06-25T16:00",
+                now=changed_at,
+            )
+            assert edited["ok"] is True
+            pending_item = crm.get_a3_incident_followups(
+                "verification_pending", 2, now=changed_at,
+            )["items"][0]
+            assert pending_item["id"] == assigned["followup_id"]
+            assert pending_item["verified_at"] is None
+            assert pending_item["verified_by"] is None
+            assert pending_item["verification_note"] is None
+            assert pending_item["completed_at"] == changed_at.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            assert pending_item["reminder_stage"] is None
+            assert pending_item["last_reminded_at"] is None
+            assert crm.get_a3_followup_monitor_overview(
+                now=changed_at + timedelta(hours=3, minutes=59),
+            )["ready"] == 0
+            assert crm.get_a3_followup_monitor_overview(
+                now=changed_at + timedelta(hours=4),
+            )["ready"] == 1
+        conn = connect()
+        reset_event = conn.cursor().execute("""
+            SELECT event_type FROM a3_platform_incident_events
+            WHERE incident_id=? ORDER BY id DESC LIMIT 1
+        """, (ids["followup_test_resolved_one"],)).fetchone()
+        conn.close()
+        assert reset_event["event_type"] == "followup_verification_reset"
+
         rejected = crm.review_a3_incident_followup(
             assigned["followup_id"],
             "super",

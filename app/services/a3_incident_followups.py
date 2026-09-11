@@ -682,8 +682,19 @@ def update_a3_incident_followup(
         previous_verification = str(
             followup.get("verification_status") or "not_ready"
         )
+        result_changed = (
+            selected_status == "completed"
+            and previous_status == "completed"
+            and (
+                title_text != str(followup.get("title") or "")
+                or description_text != str(followup.get("description") or "")
+            )
+        )
+        if result_changed:
+            completed_at = now_text
+            completed_by = actor_username
         if selected_status == "completed":
-            if previous_status != "completed":
+            if previous_status != "completed" or result_changed:
                 verification_status = "pending"
                 verification_note = None
                 verified_at = None
@@ -712,7 +723,8 @@ def update_a3_incident_followup(
             verified_by = None
         due_text = _timestamp(due_value)
         reminder_changed = (
-            selected_status != followup.get("status")
+            result_changed
+            or selected_status != followup.get("status")
             or selected_owner != str(followup.get("owner_username") or "")
             or due_text != str(followup.get("due_at") or "")
         )
@@ -759,7 +771,9 @@ def update_a3_incident_followup(
             followup_id,
         ))
         event_type = (
-            "followup_completed"
+            "followup_verification_reset"
+            if result_changed
+            else "followup_completed"
             if selected_status == "completed"
             and followup.get("status") != "completed"
             else "followup_updated"
@@ -773,6 +787,10 @@ def update_a3_incident_followup(
             (
                 f"Контрольная мера #{followup_id}: "
                 f"{A3_FOLLOWUP_STATUS_LABELS[selected_status].lower()}."
+                + (
+                    " Результат изменён и отправлен на повторную проверку."
+                    if result_changed else ""
+                )
             ),
             now_text,
         )
