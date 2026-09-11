@@ -15475,6 +15475,140 @@ async def assert_a3_incident_followups():
         conn.close()
 
 
+async def assert_a3_followup_analytics():
+    now = datetime(2026, 7, 15, 12, 0)
+    conn = connect()
+    cursor = conn.cursor()
+    cursor.executemany("""
+        INSERT INTO a3_platform_incidents (
+            company_id, incident_key, status, title, message,
+            first_detected_at, last_detected_at, created_at, updated_at
+        ) VALUES (2, ?, 'resolved', ?, 'Тест аналитики мер.', ?, ?, ?, ?)
+    """, [
+        (
+            f"followup_analytics_{index}", f"Инцидент аналитики {index}",
+            created, created, created, created,
+        )
+        for index, created in enumerate((
+            "2026-05-01 09:00:00", "2026-07-10 09:00:00",
+            "2026-07-05 09:00:00", "2026-07-06 09:00:00",
+            "2026-07-07 09:00:00",
+        ), 1)
+    ])
+    incident_ids = [
+        row["id"] for row in cursor.execute("""
+            SELECT id FROM a3_platform_incidents
+            WHERE incident_key LIKE 'followup_analytics_%' ORDER BY incident_key
+        """).fetchall()
+    ]
+    rows = [
+        (incident_ids[0], "Старая просроченная мера", "open", None,
+         "2026-06-01 12:00:00", None, None, "not_ready", None,
+         "2026-05-01 10:00:00"),
+        (incident_ids[1], "Текущая активная мера", "in_progress", "super",
+         "2026-07-20 12:00:00", None, None, "not_ready", None,
+         "2026-07-10 10:00:00"),
+        (incident_ids[2], "Подтверждённая мера", "completed", "super",
+         "2026-07-08 12:00:00", "2026-07-07 12:00:00", "super",
+         "approved", "2026-07-07 18:00:00", "2026-07-05 10:00:00"),
+        (incident_ids[3], "Мера ждёт проверки", "completed", "super",
+         "2026-07-09 12:00:00", "2026-07-10 12:00:00", "super",
+         "pending", None, "2026-07-06 10:00:00"),
+        (incident_ids[4], "Мера на доработке", "in_progress", "super",
+         "2026-07-14 12:00:00", None, None, "rejected", None,
+         "2026-07-07 10:00:00"),
+    ]
+    cursor.executemany("""
+        INSERT INTO a3_incident_followups (
+            incident_id, company_id, action_type, title, description,
+            status, priority, owner_username, due_at, completed_at,
+            completed_by, verification_status, verified_at, verified_by,
+            created_by, created_at, updated_at
+        ) VALUES (?, 2, 'corrective', ?, 'Результат контрольной меры.',
+                  ?, 'high', ?, ?, ?, ?, ?, ?,
+                  CASE WHEN ? IS NULL THEN NULL ELSE 'super' END,
+                  'super', ?, ?)
+    """, [row[:9] + (row[8], row[9], row[9]) for row in rows])
+    conn.commit()
+    conn.close()
+
+    try:
+        report = crm.get_a3_followup_analytics("30", 2, now=now)
+        assert report["date_from"] == "16.06.2026"
+        assert report["summary"]["total"] == 4
+        assert report["summary"]["active"] == 2
+        assert report["summary"]["completed"] == 2
+        assert report["summary"]["verified"] == 1
+        assert report["summary"]["pending"] == 1
+        assert report["summary"]["rework"] == 1
+        assert report["summary"]["overdue"] == 1
+        assert report["summary"]["on_time_percent"] == 50.0
+        assert report["summary"]["verified_percent"] == 50.0
+        assert report["summary"]["average_verification_hours"] == 6.0
+        assert report["backlog"]["total"] == 4
+        assert report["backlog"]["overdue"] == 2
+        assert report["backlog"]["pending"] == 1
+        assert len(report["companies"]) == 1
+        assert len(report["owners"]) == 1
+        assert report["owners"][0]["label"] == "super"
+        assert [item["reason"] for item in report["problems"][:2]] == [
+            "Просрочена", "Просрочена",
+        ]
+        assert len(report["problems"]) == 3
+        assert report["months"][0]["month"] == "07.2026"
+        unsafe_csv_report = {**report, "companies": [
+            {**report["companies"][0], "label": "=2+2"},
+        ]}
+        assert "'=2+2" in str(
+            crm.a3_followup_analytics_csv_rows(unsafe_csv_report)
+        )
+
+        page = await crm.platform_a3_incident_analytics_page(
+            make_asgi_request(
+                "super", "/platform/a3-health/incidents/analytics",
+                "period=all&company_id=2",
+            ), period="all", company_id="2",
+        )
+        html = page.body.decode("utf-8")
+        assert page.status_code == 200
+        assert "Контрольные меры" in html
+        assert "Текущий остаток" in html
+        assert "Требуют внимания" in html
+        assert "Динамика контрольных мер" in html
+        assert "Старая просроченная мера" in html
+
+        api = await crm.api_platform_a3_incident_analytics(
+            make_asgi_request(
+                "super", "/api/platform/a3-health/incidents/analytics",
+            ), period="all", company_id="2",
+        )
+        assert api["followup_analytics"]["summary"]["total"] == 5
+        export = await crm.platform_a3_incident_analytics_export(
+            make_asgi_request(
+                "super", "/platform/a3-health/incidents/analytics/export",
+            ), period="all", company_id="2",
+        )
+        export_csv = export.body.decode("utf-8-sig")
+        assert "Контрольные меры A3: по дате создания" in export_csv
+        assert "Меры по ответственным" in export_csv
+        assert "Средняя проверка результата, ч." in export_csv
+    finally:
+        conn = connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM a3_incident_followups WHERE incident_id IN (
+                SELECT id FROM a3_platform_incidents
+                WHERE incident_key LIKE 'followup_analytics_%'
+            )
+        """)
+        cursor.execute("""
+            DELETE FROM a3_platform_incidents
+            WHERE incident_key LIKE 'followup_analytics_%'
+        """)
+        conn.commit()
+        conn.close()
+
+
 async def assert_platform_calendar_health():
     policy_environment_names = (
         "CALENDAR_INCIDENT_RESPONSE_MINUTES",
@@ -29886,6 +30020,7 @@ def main():
         asyncio.run(assert_platform_a3_incident_analytics())
         asyncio.run(assert_platform_a3_incident_reviews())
         asyncio.run(assert_a3_incident_followups())
+        asyncio.run(assert_a3_followup_analytics())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))

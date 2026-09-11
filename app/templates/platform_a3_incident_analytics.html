@@ -62,11 +62,12 @@ tr:last-child td{border-bottom:0}
 .link{color:#1d4ed8;font-weight:900;text-decoration:none}
 .empty{padding:34px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;color:#6b7280;text-align:center;font-size:12px;font-weight:900}
 .review-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:10px;padding:15px;border:1px solid #e5e7eb;border-left:4px solid #2563eb;border-radius:8px;background:#fff}.review-summary strong{display:block;margin-top:4px;font-size:20px}.review-summary-label{color:#6b7280;font-size:9px;font-weight:900;text-transform:uppercase}.review-summary .button{align-self:center}
+.action-stats{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;margin-bottom:14px}.action-stat{padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}.action-stat strong{display:block;margin-top:6px;font-size:21px}.action-stat span{color:#6b7280;font-size:9px;font-weight:900;text-transform:uppercase;line-height:1.3}.action-stat small{display:block;margin-top:4px;color:#6b7280;font-size:9px;font-weight:800;line-height:1.35}.followup-tables{display:grid;grid-template-columns:1fr 1fr;gap:12px}.compact-table table{min-width:560px}.problem-link{display:block;color:#111827;font-weight:900;text-decoration:none}.problem-link:hover{color:#1d4ed8}
 @media(max-width:1050px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:760px){
     .container{padding:14px 14px 86px}.header{flex-direction:column}.header h1{font-size:24px}.header-actions,.header-actions .button{width:100%}
     .toolbar{align-items:stretch;flex-direction:column}.periods{display:grid;grid-template-columns:1fr 1fr}.company-filter{grid-template-columns:1fr}.company-filter .button{width:100%}
-    .stats{grid-template-columns:1fr 1fr}.stat{padding:12px}.stat-value{font-size:20px}.recommendations{grid-template-columns:1fr}.recommendation{grid-template-columns:5px 1fr}.recommendation a{grid-column:2;white-space:normal}.review-summary{grid-template-columns:1fr 1fr}.review-summary .button{grid-column:1/-1;width:100%}
+    .stats,.action-stats{grid-template-columns:1fr 1fr}.stat{padding:12px}.stat-value{font-size:20px}.recommendations{grid-template-columns:1fr}.recommendation{grid-template-columns:5px 1fr}.recommendation a{grid-column:2;white-space:normal}.review-summary{grid-template-columns:1fr 1fr}.review-summary .button{grid-column:1/-1;width:100%}.followup-tables{grid-template-columns:1fr}
     .section{padding:17px 0}.section-head{align-items:flex-start;flex-direction:column}.trend{grid-template-columns:repeat(7,minmax(28px,1fr));overflow-x:auto}.trend-column{min-width:28px}
     .table-wrap{width:100%;max-width:100%;border:0;background:transparent;overflow:visible}.table-wrap table{display:block;width:100%;max-width:100%;min-width:0;table-layout:fixed}thead{display:none}tbody,tr,td{display:block;width:100%;max-width:100%}tr{margin-bottom:9px;padding:11px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}td{display:grid;grid-template-columns:minmax(105px,.8fr) minmax(0,1.2fr);gap:10px;padding:7px 0;border-bottom:1px solid #f3f4f6;text-align:right;overflow-wrap:anywhere}td::before{color:#6b7280;content:attr(data-label);font-size:9px;font-weight:900;text-align:left;text-transform:uppercase}tr td:last-child{border-bottom:0}.name,.muted{text-align:right}
 }
@@ -119,6 +120,48 @@ tr:last-child td{border-bottom:0}
         <div class="stat"><div class="stat-label">Среднее восстановление</div><div class="stat-value">{{ summary["average_resolution_label"] }}</div><div class="stat-note">от открытия до закрытия</div></div>
         <div class="stat"><div class="stat-label">Эскалированы</div><div class="stat-value">{{ summary["escalated"] }}</div><div class="stat-note">{{ summary["escalation_rate"] }}% от всех</div></div>
         <div class="stat"><div class="stat-label">Реакция просрочена</div><div class="stat-value">{{ summary["response_overdue"] }}</div><div class="stat-note">активные без реакции</div></div>
+    </section>
+
+    {% set fs = followup_analytics["summary"] %}
+    {% set fb = followup_analytics["backlog"] %}
+    <section class="section" id="followup-analytics">
+        <div class="section-head"><div><h2>Контрольные меры</h2><div class="section-note">Результаты мер, созданных за выбранный период. Текущий остаток учитывает все годы.</div></div><a class="button" href="{{ followup_analytics['actions_url'] }}">Открыть меры</a></div>
+        <div class="action-stats" aria-label="Показатели контрольных мер">
+            <div class="action-stat"><span>Создано</span><strong>{{ fs["total"] }}</strong><small>за выбранный период</small></div>
+            <div class="action-stat"><span>Выполнено</span><strong>{{ fs["completed"] }}</strong><small>{{ fs["on_time"] }} в срок из {{ fs["timed_completions"] }}</small></div>
+            <div class="action-stat"><span>В срок</span><strong>{% if fs["on_time_percent"] is not none %}{{ fs["on_time_percent"] }}%{% else %}—{% endif %}</strong><small>по завершённым мерам</small></div>
+            <div class="action-stat"><span>Подтверждено</span><strong>{{ fs["verified"] }}</strong><small>{% if fs["verified_percent"] is not none %}{{ fs["verified_percent"] }}% выполненных{% else %}нет выполненных{% endif %}</small></div>
+            <div class="action-stat"><span>Средняя проверка</span><strong>{% if fs["average_verification_hours"] is not none %}{{ fs["average_verification_hours"] }} ч.{% else %}—{% endif %}</strong><small>{{ fs["verification_samples"] }} проверок с замером</small></div>
+            <div class="action-stat"><span>Текущий остаток</span><strong>{{ fb["total"] }}</strong><small>активные и ждут проверки</small></div>
+            <div class="action-stat"><span>Просрочено</span><strong>{{ fb["overdue"] }}</strong><small>за всё время</small></div>
+            <div class="action-stat"><span>Ждут проверки</span><strong>{{ fb["pending"] }}</strong><small>за всё время</small></div>
+        </div>
+
+        <div class="section-head"><div><h2>Требуют внимания</h2><div class="section-note">Сначала просроченные меры, затем результаты без проверки и возвраты на доработку.</div></div></div>
+        {% if followup_analytics["problems"] %}
+        <div class="table-wrap"><table><thead><tr><th>Мера</th><th>Компания</th><th>Ответственный</th><th>Причина</th><th>Ожидание</th></tr></thead><tbody>
+        {% for item in followup_analytics["problems"] %}<tr><td data-label="Мера"><a class="problem-link" href="{{ item['url'] }}">#{{ item["id"] }} · {{ item["title"] }}</a></td><td data-label="Компания">{{ item["company_name"] }}</td><td data-label="Ответственный">{{ item["owner"] }}</td><td data-label="Причина"><span class="badge {{ item['tone'] }}">{{ item["reason"] }}</span></td><td data-label="Ожидание">{% if item["waiting_hours"] is not none %}{{ item["waiting_hours"] }} ч.{% else %}—{% endif %}</td></tr>{% endfor %}
+        </tbody></table></div>{% if followup_analytics["unshown_backlog"] %}<div class="section-note">Ещё мер в текущем остатке: {{ followup_analytics["unshown_backlog"] }}.</div>{% endif %}
+        {% else %}<div class="empty">Контрольных мер, требующих внимания, нет.</div>{% endif %}
+    </section>
+
+    <section class="section">
+        <div class="section-head"><div><h2>Исполнение мер</h2><div class="section-note">Сравнение компаний и нагрузки ответственных за выбранный период.</div></div></div>
+        <div class="followup-tables">
+            <div class="table-wrap compact-table"><table><thead><tr><th>Компания</th><th>Всего</th><th>Просрочено</th><th>Подтверждено</th><th>Ждут проверки</th></tr></thead><tbody>
+            {% for item in followup_analytics["companies"] %}<tr><td data-label="Компания">{{ item["label"] }}</td><td data-label="Всего">{{ item["total"] }}</td><td data-label="Просрочено">{{ item["overdue"] }}</td><td data-label="Подтверждено">{{ item["verified"] }}</td><td data-label="Ждут проверки">{{ item["pending"] }}</td></tr>{% else %}<tr><td colspan="5">Данных пока нет.</td></tr>{% endfor %}
+            </tbody></table></div>
+            <div class="table-wrap compact-table"><table><thead><tr><th>Ответственный</th><th>Всего</th><th>Активные</th><th>Просрочено</th><th>На доработке</th></tr></thead><tbody>
+            {% for item in followup_analytics["owners"] %}<tr><td data-label="Ответственный">{{ item["label"] }}</td><td data-label="Всего">{{ item["total"] }}</td><td data-label="Активные">{{ item["active"] }}</td><td data-label="Просрочено">{{ item["overdue"] }}</td><td data-label="На доработке">{{ item["rework"] }}</td></tr>{% else %}<tr><td colspan="5">Данных пока нет.</td></tr>{% endfor %}
+            </tbody></table></div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head"><div><h2>Динамика контрольных мер</h2><div class="section-note">Группировка по месяцу создания меры.</div></div></div>
+        {% if followup_analytics["months"] %}<div class="table-wrap"><table><thead><tr><th>Месяц</th><th>Создано</th><th>Активные</th><th>Выполнено</th><th>Подтверждено</th><th>Ждут проверки</th><th>В срок</th><th>Средняя проверка</th></tr></thead><tbody>
+        {% for item in followup_analytics["months"] %}<tr><td data-label="Месяц">{{ item["month"] }}</td><td data-label="Создано">{{ item["total"] }}</td><td data-label="Активные">{{ item["active"] }}</td><td data-label="Выполнено">{{ item["completed"] }}</td><td data-label="Подтверждено">{{ item["verified"] }}</td><td data-label="Ждут проверки">{{ item["pending"] }}</td><td data-label="В срок">{% if item["on_time_percent"] is not none %}{{ item["on_time_percent"] }}%{% else %}—{% endif %}</td><td data-label="Средняя проверка">{% if item["average_verification_hours"] is not none %}{{ item["average_verification_hours"] }} ч.{% else %}—{% endif %}</td></tr>{% endfor %}
+        </tbody></table></div>{% else %}<div class="empty">За выбранный период контрольных мер нет.</div>{% endif %}
     </section>
 
     <section class="section">

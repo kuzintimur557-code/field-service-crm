@@ -77,6 +77,10 @@ from app.services.a3_incident_followup_monitor import (
     get_a3_followup_monitor_overview,
     run_a3_incident_followup_monitor,
 )
+from app.services.a3_followup_analytics import (
+    a3_followup_analytics_csv_rows,
+    get_a3_followup_analytics,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -15830,6 +15834,10 @@ async def platform_a3_incident_analytics_page(
         period=period,
         company_id=company_id,
     )
+    followup_analytics = get_a3_followup_analytics(
+        period=period,
+        company_id=company_id,
+    )
     links = get_platform_dashboard_links()
     links["platform"] = links["page"]
 
@@ -15845,6 +15853,7 @@ async def platform_a3_incident_analytics_page(
             "admin_workload": analytics["admin_workload"],
             "trend": analytics["trend"],
             "recommendations": analytics["recommendations"],
+            "followup_analytics": followup_analytics,
             "links": links,
         },
     )
@@ -15864,9 +15873,14 @@ async def api_platform_a3_incident_analytics(
     if get_role(username) != "superadmin":
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
+    analytics = get_a3_platform_incident_analytics(
+        period=period,
+        company_id=company_id,
+    )
     return {
         "ok": True,
-        **get_a3_platform_incident_analytics(
+        **analytics,
+        "followup_analytics": get_a3_followup_analytics(
             period=period,
             company_id=company_id,
         ),
@@ -16032,6 +16046,12 @@ async def platform_a3_incident_analytics_export(
             record["escalated_label"],
             record["review_status_label"],
         ])
+
+    followup_analytics = get_a3_followup_analytics(
+        period=period,
+        company_id=company_id,
+    )
+    writer.writerows(a3_followup_analytics_csv_rows(followup_analytics))
 
     return Response(
         "\ufeff" + output.getvalue(),
