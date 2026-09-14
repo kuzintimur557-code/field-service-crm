@@ -55,6 +55,7 @@ def _summary(items):
         "unassigned": sum(item["active"] and not item["owner_username"] for item in items),
         "verified_percent": _ratio(verified, len(completed)),
         "verification_attempts": verification_attempts,
+        "reviewed_actions": reviewed_actions,
         "returns_total": returns_total,
         "returned_actions": returned_actions,
         "rework_rate": _ratio(returned_actions, reviewed_actions),
@@ -67,6 +68,36 @@ def _summary(items):
         "average_verification_hours": (
             round(sum(durations) / len(durations), 1) if durations else None
         ),
+    }
+
+
+def _quality_rating(summary):
+    components = [
+        (summary["first_pass_percent"], 0.5),
+        (summary["on_time_percent"], 0.3),
+        (summary["verified_percent"], 0.2),
+    ]
+    available = [(value, weight) for value, weight in components if value is not None]
+    if not available:
+        return {
+            "quality_score": None,
+            "quality_label": "Недостаточно данных",
+            "quality_tone": "neutral",
+        }
+    weight_total = sum(weight for _, weight in available)
+    score = round(sum(value * weight for value, weight in available) / weight_total, 1)
+    if score >= 85:
+        label, tone = "Отлично", "success"
+    elif score >= 70:
+        label, tone = "Стабильно", "info"
+    elif score >= 50:
+        label, tone = "Внимание", "warning"
+    else:
+        label, tone = "Требует улучшения", "danger"
+    return {
+        "quality_score": score,
+        "quality_label": label,
+        "quality_tone": tone,
     }
 
 
@@ -136,6 +167,23 @@ def get_a3_followup_analytics(period="30", company_id="all", now=None):
             -item["overdue"], -item["pending"], -item["active"], str(item["key"]),
         ))
 
+    companies = grouped("company_id", lambda item: item["company_name"])
+    owners = grouped(
+        "owner_username", lambda item: item["owner_username"] or "Не назначен",
+    )
+    owner_quality = [
+        {**owner, **_quality_rating(owner)}
+        for owner in owners
+        if owner["key"]
+    ]
+    owner_quality.sort(key=lambda item: (
+        item["quality_score"] is None,
+        -(item["quality_score"] or 0),
+        item["returns_total"],
+        item["overdue"],
+        item["label"].lower(),
+    ))
+
     months = {}
     for item in cohort:
         key = item["created"].strftime("%Y-%m") if item["created"] else "Без даты"
@@ -168,13 +216,37 @@ def get_a3_followup_analytics(period="30", company_id="all", now=None):
                 "all", item["company_id"], item["incident_id"],
             ) + f"#action-{item['id']}",
         })
+    repeat_returns = []
+    for item in sorted(
+        (item for item in cohort if item["rework_count"] >= 2),
+        key=lambda item: (-item["rework_count"], -item["verification_attempts"], item["id"]),
+    )[:20]:
+        repeat_returns.append({
+            "id": item["id"],
+            "title": item["title"],
+            "company_name": item["company_name"],
+            "owner": item["owner_username"] or "Не назначен",
+            "verification_attempts": item["verification_attempts"],
+            "rework_count": item["rework_count"],
+            "status_label": (
+                "Просрочена" if item["overdue"] else "На доработке"
+                if item["rework"] else "Ждёт проверки" if item["pending"]
+                else "Подтверждена" if item["approved"] else "Активна"
+            ),
+            "tone": "danger" if item["rework_count"] >= 3 else "warning",
+            "url": build_a3_followups_url(
+                "all", item["company_id"], item["incident_id"],
+            ) + f"#action-{item['id']}",
+        })
     return {
         "period": selected_period, "company_id": selected_company,
         "date_from": start.strftime("%d.%m.%Y") if start else "Всё время",
         "date_to": now_value.strftime("%d.%m.%Y"),
         "summary": _summary(cohort), "backlog": _summary(backlog),
-        "companies": grouped("company_id", lambda item: item["company_name"]),
-        "owners": grouped("owner_username", lambda item: item["owner_username"] or "Не назначен"),
+        "companies": companies,
+        "owners": owners,
+        "owner_quality": owner_quality,
+        "repeat_returns": repeat_returns,
         "months": [{
             "month": (
                 datetime.strptime(key, "%Y-%m").strftime("%m.%Y")
@@ -224,6 +296,27 @@ def a3_followup_analytics_csv_rows(report):
                 "first_pass_percent", "rework_rate", "on_time_percent",
                 "average_verification_hours",
             )])
+    rows.extend([[], ["Рейтинг качества ответственных"], [
+        "Ответственный", "Оценка качества", "Уровень", "Всего мер",
+        "Проверено мер", "Принято с первого раза, %", "Возвраты",
+        "Выполнено в срок, %", "Просрочено",
+    ]])
+    for item in report["owner_quality"]:
+        rows.append([
+            item["label"], item["quality_score"], item["quality_label"],
+            item["total"], item["reviewed_actions"], item["first_pass_percent"],
+            item["returns_total"], item["on_time_percent"], item["overdue"],
+        ])
+    rows.extend([[], ["Меры с повторными возвратами"], [
+        "ID меры", "Мера", "Компания", "Ответственный", "Состояние",
+        "Попытки проверки", "Возвраты",
+    ]])
+    for item in report["repeat_returns"]:
+        rows.append([
+            item["id"], item["title"], item["company_name"], item["owner"],
+            item["status_label"], item["verification_attempts"],
+            item["rework_count"],
+        ])
     # Spreadsheet applications must treat user-controlled names as text.
     return [[
         "'" + value if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@"))

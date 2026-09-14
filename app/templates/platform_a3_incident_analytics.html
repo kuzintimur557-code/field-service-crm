@@ -159,6 +159,18 @@ tr:last-child td{border-bottom:0}
         </div>
     </section>
 
+    <section class="section" id="followup-quality">
+        <div class="section-head"><div><h2>Качество исполнения</h2><div class="section-note">Оценка учитывает принятие с первого раза, соблюдение срока и подтверждение результата.</div></div></div>
+        <div class="followup-tables">
+            <div class="table-wrap compact-table"><table><thead><tr><th>Ответственный</th><th>Оценка</th><th>Уровень</th><th>С первого раза</th><th>Возвраты</th></tr></thead><tbody>
+            {% for item in followup_analytics["owner_quality"] %}<tr><td data-label="Ответственный">{{ item["label"] }}</td><td data-label="Оценка">{% if item["quality_score"] is not none %}{{ item["quality_score"] }} из 100{% else %}—{% endif %}</td><td data-label="Уровень"><span class="badge {{ item['quality_tone'] }}">{{ item["quality_label"] }}</span></td><td data-label="С первого раза">{% if item["first_pass_percent"] is not none %}{{ item["first_pass_percent"] }}%{% else %}—{% endif %}</td><td data-label="Возвраты">{{ item["returns_total"] }}</td></tr>{% else %}<tr><td colspan="5">Для рейтинга пока недостаточно данных.</td></tr>{% endfor %}
+            </tbody></table></div>
+            <div class="table-wrap compact-table"><table><thead><tr><th>Повторно возвращённая мера</th><th>Компания</th><th>Ответственный</th><th>Проверки</th><th>Возвраты</th></tr></thead><tbody>
+            {% for item in followup_analytics["repeat_returns"] %}<tr><td data-label="Мера"><a class="problem-link" href="{{ item['url'] }}">#{{ item["id"] }} · {{ item["title"] }}</a><div class="muted"><span class="badge {{ item['tone'] }}">{{ item["status_label"] }}</span></div></td><td data-label="Компания">{{ item["company_name"] }}</td><td data-label="Ответственный">{{ item["owner"] }}</td><td data-label="Проверки">{{ item["verification_attempts"] }}</td><td data-label="Возвраты">{{ item["rework_count"] }}</td></tr>{% else %}<tr><td colspan="5">Мер с повторными возвратами нет.</td></tr>{% endfor %}
+            </tbody></table></div>
+        </div>
+    </section>
+
     <section class="section">
         <div class="section-head"><div><h2>Динамика контрольных мер</h2><div class="section-note">Группировка по месяцу создания меры.</div></div></div>
         {% if followup_analytics["months"] %}<div class="table-wrap"><table><thead><tr><th>Месяц</th><th>Создано</th><th>Активные</th><th>Выполнено</th><th>Подтверждено</th><th>Ждут проверки</th><th>В срок</th><th>Средняя проверка</th></tr></thead><tbody>

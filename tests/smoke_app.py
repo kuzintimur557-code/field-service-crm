@@ -15551,7 +15551,7 @@ async def assert_a3_followup_analytics():
     """, (incident_ids[2],))
     cursor.execute("""
         UPDATE a3_incident_followups
-        SET verification_attempts=1, rework_count=1
+        SET verification_attempts=2, rework_count=2
         WHERE incident_id=?
     """, (incident_ids[4],))
     conn.commit()
@@ -15570,12 +15570,19 @@ async def assert_a3_followup_analytics():
         assert report["summary"]["on_time_percent"] == 50.0
         assert report["summary"]["verified_percent"] == 50.0
         assert report["summary"]["average_verification_hours"] == 6.0
-        assert report["summary"]["verification_attempts"] == 2
-        assert report["summary"]["returns_total"] == 1
+        assert report["summary"]["verification_attempts"] == 3
+        assert report["summary"]["returns_total"] == 2
         assert report["summary"]["returned_actions"] == 1
         assert report["summary"]["rework_rate"] == 50.0
         assert report["summary"]["first_pass_verified"] == 1
         assert report["summary"]["first_pass_percent"] == 100.0
+        assert report["owner_quality"][0]["label"] == "super"
+        assert report["owner_quality"][0]["quality_score"] == 75.0
+        assert report["owner_quality"][0]["quality_label"] == "Стабильно"
+        assert report["owner_quality"][0]["reviewed_actions"] == 2
+        assert len(report["repeat_returns"]) == 1
+        assert report["repeat_returns"][0]["title"] == "Мера на доработке"
+        assert report["repeat_returns"][0]["rework_count"] == 2
         assert report["backlog"]["total"] == 4
         assert report["backlog"]["overdue"] == 2
         assert report["backlog"]["pending"] == 1
@@ -15608,6 +15615,10 @@ async def assert_a3_followup_analytics():
         assert "Динамика контрольных мер" in html
         assert "С первого раза" in html
         assert "Возвраты" in html
+        assert "Качество исполнения" in html
+        assert "75.0 из 100" in html
+        assert "Повторно возвращённая мера" in html
+        assert "Мера на доработке" in html
         assert "Старая просроченная мера" in html
 
         api = await crm.api_platform_a3_incident_analytics(
@@ -15627,6 +15638,8 @@ async def assert_a3_followup_analytics():
         assert "Средняя проверка результата, ч." in export_csv
         assert "Принято с первого раза, %" in export_csv
         assert "Возвратов на доработку" in export_csv
+        assert "Рейтинг качества ответственных" in export_csv
+        assert "Меры с повторными возвратами" in export_csv
     finally:
         conn = connect()
         cursor = conn.cursor()
