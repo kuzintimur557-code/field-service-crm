@@ -15174,7 +15174,9 @@ async def assert_a3_incident_followups():
         assert "Добавить резервный канал" in html
         assert "Скачать CSV" in html
         assert "Автоматический контроль сроков" in html
+        assert "Автоматический контроль качества" in html
         assert "Проверить сроки" in html
+        assert "Проверить качество" in html
         assert "проверка результата через 4 ч." in html
         assert "Ждут проверки" in html
         assert "Проверка результата" in html
@@ -15433,6 +15435,7 @@ async def assert_a3_incident_followups():
             )
             assert cron_result["ok"] is True
             assert cron_result["summary"]["checked"] == 3
+            assert "quality_summary" in cron_result
         finally:
             if previous_cron_secret is None:
                 os.environ.pop("AUTOMATION_CRON_SECRET", None)
@@ -15546,7 +15549,7 @@ async def assert_a3_followup_analytics():
     """, [row[:9] + (row[8], row[9], row[9]) for row in rows])
     cursor.execute("""
         UPDATE a3_incident_followups
-        SET verification_attempts=1
+        SET verification_attempts=2, rework_count=1
         WHERE incident_id=?
     """, (incident_ids[2],))
     cursor.execute("""
@@ -15570,15 +15573,15 @@ async def assert_a3_followup_analytics():
         assert report["summary"]["on_time_percent"] == 50.0
         assert report["summary"]["verified_percent"] == 50.0
         assert report["summary"]["average_verification_hours"] == 6.0
-        assert report["summary"]["verification_attempts"] == 3
-        assert report["summary"]["returns_total"] == 2
-        assert report["summary"]["returned_actions"] == 1
-        assert report["summary"]["rework_rate"] == 50.0
-        assert report["summary"]["first_pass_verified"] == 1
-        assert report["summary"]["first_pass_percent"] == 100.0
+        assert report["summary"]["verification_attempts"] == 4
+        assert report["summary"]["returns_total"] == 3
+        assert report["summary"]["returned_actions"] == 2
+        assert report["summary"]["rework_rate"] == 100.0
+        assert report["summary"]["first_pass_verified"] == 0
+        assert report["summary"]["first_pass_percent"] == 0.0
         assert report["owner_quality"][0]["label"] == "super"
-        assert report["owner_quality"][0]["quality_score"] == 75.0
-        assert report["owner_quality"][0]["quality_label"] == "Стабильно"
+        assert report["owner_quality"][0]["quality_score"] == 25.0
+        assert report["owner_quality"][0]["quality_label"] == "Требует улучшения"
         assert report["owner_quality"][0]["reviewed_actions"] == 2
         assert len(report["repeat_returns"]) == 1
         assert report["repeat_returns"][0]["title"] == "Мера на доработке"
@@ -15616,9 +15619,117 @@ async def assert_a3_followup_analytics():
         assert "С первого раза" in html
         assert "Возвраты" in html
         assert "Качество исполнения" in html
-        assert "75.0 из 100" in html
+        assert "25.0 из 100" in html
         assert "Повторно возвращённая мера" in html
         assert "Мера на доработке" in html
+
+        quality_policy = crm.get_a3_followup_quality_policy()
+        assert quality_policy == {
+            "repeat_return_threshold": 2,
+            "low_quality_score": 70,
+            "minimum_reviews": 2,
+            "cooldown_hours": 24,
+            "lookback_days": 30,
+        }
+        quality_overview = crm.get_a3_followup_quality_monitor_overview(now=now)
+        assert quality_overview["summary"] == {
+            "total": 2,
+            "critical": 1,
+            "repeat_returns": 1,
+            "low_quality": 1,
+            "ready": 2,
+        }
+        assert {item["type"] for item in quality_overview["signals"]} == {
+            "repeat_return", "low_quality",
+        }
+        quality_run = crm.run_a3_followup_quality_monitor(
+            now=now,
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert quality_run["checked"] == 2
+        assert quality_run["notified_signals"] == 2
+        assert quality_run["notifications_created"] == 2
+        conn = connect()
+        quality_event = conn.execute("""
+            SELECT event_type, actor_username
+            FROM a3_platform_incident_events
+            WHERE incident_id=? ORDER BY id DESC LIMIT 1
+        """, (incident_ids[4],)).fetchone()
+        conn.close()
+        assert quality_event["event_type"] == "followup_quality_alert"
+        assert quality_event["actor_username"] == "a3_quality_monitor"
+        repeated_quality_run = crm.run_a3_followup_quality_monitor(
+            now=now + timedelta(minutes=10),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert repeated_quality_run["notifications_created"] == 0
+        assert repeated_quality_run["suppressed"] == 2
+
+        anonymous_quality_api = (
+            await crm.api_platform_a3_incident_action_quality_monitor(
+                make_public_asgi_request(
+                    "/api/platform/a3-health/incidents/actions/quality-monitor"
+                )
+            )
+        )
+        assert anonymous_quality_api.status_code == 401
+        boss_quality_api = (
+            await crm.api_platform_a3_incident_action_quality_monitor(
+                make_asgi_request(
+                    "owner2",
+                    "/api/platform/a3-health/incidents/actions/quality-monitor",
+                )
+            )
+        )
+        assert boss_quality_api.status_code == 403
+        quality_api = await crm.api_platform_a3_incident_action_quality_monitor(
+            make_asgi_request(
+                "super",
+                "/api/platform/a3-health/incidents/actions/quality-monitor",
+            )
+        )
+        assert quality_api["ok"] is True
+        quality_api_run = (
+            await crm.api_run_platform_a3_incident_action_quality_monitor(
+                make_json_request(
+                    "super",
+                    "/api/platform/a3-health/incidents/actions/quality-monitor/run",
+                    {},
+                )
+            )
+        )
+        assert quality_api_run["ok"] is True
+        assert "notifications_created" in quality_api_run
+
+        anonymous_quality_run = (
+            await crm.api_run_platform_a3_incident_action_quality_monitor(
+                make_json_request(
+                    None,
+                    "/api/platform/a3-health/incidents/actions/quality-monitor/run",
+                    {},
+                )
+            )
+        )
+        assert anonymous_quality_run.status_code == 401
+        quality_redirect = (
+            await crm.run_platform_a3_incident_action_quality_monitor(
+                make_form_request(
+                    "super",
+                    "/platform/a3-health/incidents/actions/quality-monitor/run",
+                    {
+                        "return_status": "all",
+                        "company_id": "2",
+                        "incident_id": "all",
+                        "owner": "all",
+                        "search": "",
+                    },
+                )
+            )
+        )
+        assert quality_redirect.status_code == 302
+        assert "notice=quality_monitor_complete" in quality_redirect.headers[
+            "location"
+        ]
         assert "Старая просроченная мера" in html
 
         api = await crm.api_platform_a3_incident_analytics(
@@ -15643,6 +15754,17 @@ async def assert_a3_followup_analytics():
     finally:
         conn = connect()
         cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM notifications
+            WHERE title LIKE 'Повторные возвраты меры A3 #%'
+               OR title LIKE 'Снизилось качество мер A3:%'
+        """)
+        cursor.execute("""
+            DELETE FROM a3_platform_incident_events WHERE incident_id IN (
+                SELECT id FROM a3_platform_incidents
+                WHERE incident_key LIKE 'followup_analytics_%'
+            )
+        """)
         cursor.execute("""
             DELETE FROM a3_incident_followups WHERE incident_id IN (
                 SELECT id FROM a3_platform_incidents

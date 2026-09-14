@@ -81,6 +81,11 @@ from app.services.a3_followup_analytics import (
     a3_followup_analytics_csv_rows,
     get_a3_followup_analytics,
 )
+from app.services.a3_followup_quality_monitor import (
+    get_a3_followup_quality_policy,
+    get_a3_followup_quality_monitor_overview,
+    run_a3_followup_quality_monitor,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -16332,6 +16337,7 @@ async def platform_a3_incident_actions_page(
         current_username=username,
     )
     monitor = get_a3_followup_monitor_overview()
+    quality_monitor = get_a3_followup_quality_monitor_overview()
     monitor["last_run"] = {
         "checked": max(0, int(monitor_checked or 0)),
         "notified": max(0, int(monitor_notified or 0)),
@@ -16365,6 +16371,7 @@ async def platform_a3_incident_actions_page(
             "actions": center["items"],
             "admins": center["admins"],
             "monitor": monitor,
+            "quality_monitor": quality_monitor,
             "notice": notice,
             "error": error,
             "links": links,
@@ -16415,6 +16422,19 @@ async def api_platform_a3_incident_action_monitor(request: Request):
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
     return {"ok": True, **get_a3_followup_monitor_overview()}
+
+
+@app.get("/api/platform/a3-health/incidents/actions/quality-monitor")
+async def api_platform_a3_incident_action_quality_monitor(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {"ok": True, **get_a3_followup_quality_monitor_overview()}
 
 
 @app.post("/platform/a3-health/incidents/actions/create")
@@ -16579,6 +16599,45 @@ async def run_platform_a3_incident_action_monitor(request: Request):
         f"{target}{separator}{urlencode(params)}#deadline-monitor",
         status_code=302,
     )
+
+
+@app.post("/platform/a3-health/incidents/actions/quality-monitor/run")
+async def run_platform_a3_incident_action_quality_monitor(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    form = await request.form()
+    run_a3_followup_quality_monitor()
+    target = build_a3_followups_url(
+        form.get("return_status") or "active",
+        form.get("company_id") or "all",
+        form.get("incident_id") or "all",
+        form.get("owner") or "all",
+        form.get("search") or "",
+    )
+    separator = "&" if "?" in target else "?"
+    return RedirectResponse(
+        f"{target}{separator}notice=quality_monitor_complete#quality-monitor",
+        status_code=302,
+    )
+
+
+@app.post("/api/platform/a3-health/incidents/actions/quality-monitor/run")
+async def api_run_platform_a3_incident_action_quality_monitor(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {"ok": True, **run_a3_followup_quality_monitor()}
 
 
 @app.get("/platform/a3-health/incidents/actions/export")
@@ -46091,6 +46150,7 @@ async def run_a3_incident_action_monitor_cron(request: Request):
     return {
         "ok": True,
         "summary": run_a3_incident_followup_monitor(),
+        "quality_summary": run_a3_followup_quality_monitor(),
     }
 
 

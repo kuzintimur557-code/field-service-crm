@@ -223,8 +223,11 @@ def get_a3_followup_analytics(period="30", company_id="all", now=None):
     )[:20]:
         repeat_returns.append({
             "id": item["id"],
+            "incident_id": item["incident_id"],
+            "company_id": item["company_id"],
             "title": item["title"],
             "company_name": item["company_name"],
+            "owner_username": item["owner_username"],
             "owner": item["owner_username"] or "Не назначен",
             "verification_attempts": item["verification_attempts"],
             "rework_count": item["rework_count"],
