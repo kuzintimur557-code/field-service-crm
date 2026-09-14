@@ -82,8 +82,14 @@ from app.services.a3_followup_analytics import (
     get_a3_followup_analytics,
 )
 from app.services.a3_followup_quality_monitor import (
+    a3_followup_quality_alert_csv_rows,
+    acknowledge_a3_followup_quality_alert,
+    build_a3_followup_quality_alerts_url,
     get_a3_followup_quality_policy,
+    get_a3_followup_quality_alerts,
     get_a3_followup_quality_monitor_overview,
+    reopen_a3_followup_quality_alert,
+    resolve_a3_followup_quality_alert,
     run_a3_followup_quality_monitor,
 )
 from app.services.decision_engine import get_decision_engine
@@ -16435,6 +16441,159 @@ async def api_platform_a3_incident_action_quality_monitor(request: Request):
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
     return {"ok": True, **get_a3_followup_quality_monitor_overview()}
+
+
+@app.get(
+    "/platform/a3-health/incidents/actions/quality-alerts",
+    response_class=HTMLResponse,
+)
+async def platform_a3_followup_quality_alerts_page(
+    request: Request,
+    status: str = "active",
+    search: str = "",
+    notice: str = "",
+    error: str = "",
+):
+    username = get_user(request)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+    center = get_a3_followup_quality_alerts(status, search)
+    return templates.TemplateResponse(
+        request,
+        "platform_a3_followup_quality_alerts.html",
+        {
+            "request": request,
+            "username": username,
+            "center": center,
+            "alerts": center["items"],
+            "notice": notice,
+            "error": error,
+            "links": get_platform_dashboard_links(),
+        },
+    )
+
+
+@app.get("/api/platform/a3-health/incidents/actions/quality-alerts")
+async def api_platform_a3_followup_quality_alerts(
+    request: Request,
+    status: str = "active",
+    search: str = "",
+    limit: int = 200,
+):
+    username = get_user(request)
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    return {
+        "ok": True,
+        **get_a3_followup_quality_alerts(status, search, limit),
+    }
+
+
+def _change_a3_followup_quality_alert(alert_id, username, action, note=""):
+    action_name = str(action or "").strip().lower()
+    handlers = {
+        "acknowledge": acknowledge_a3_followup_quality_alert,
+        "resolve": resolve_a3_followup_quality_alert,
+        "reopen": reopen_a3_followup_quality_alert,
+    }
+    handler = handlers.get(action_name)
+    if not handler:
+        return {"ok": False, "error": "invalid_action"}
+    if action_name == "reopen":
+        return handler(alert_id, username)
+    return handler(alert_id, username, note)
+
+
+@app.post(
+    "/platform/a3-health/incidents/actions/quality-alerts/{alert_id}/{action}"
+)
+async def change_platform_a3_followup_quality_alert(
+    request: Request,
+    alert_id: int,
+    action: str,
+):
+    username = get_user(request)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+    form = await request.form()
+    result = _change_a3_followup_quality_alert(
+        alert_id,
+        username,
+        action,
+        form.get("note") or "",
+    )
+    target = build_a3_followup_quality_alerts_url(
+        form.get("return_status") or "active",
+        form.get("search") or "",
+    )
+    separator = "&" if "?" in target else "?"
+    flag = (
+        {"notice": result.get("notice") or "quality_alert_saved"}
+        if result.get("ok")
+        else {"error": result.get("error") or "action_failed"}
+    )
+    return RedirectResponse(
+        f"{target}{separator}{urlencode(flag)}#alert-{alert_id}",
+        status_code=302,
+    )
+
+
+@app.post(
+    "/api/platform/a3-health/incidents/actions/quality-alerts/{alert_id}/{action}"
+)
+async def api_change_platform_a3_followup_quality_alert(
+    request: Request,
+    alert_id: int,
+    action: str,
+):
+    username = get_user(request)
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    result = _change_a3_followup_quality_alert(
+        alert_id, username, action, payload.get("note") or "",
+    )
+    if not result.get("ok"):
+        code = 404 if result.get("error") == "alert_not_found" else 400
+        return JSONResponse(result, status_code=code)
+    return result
+
+
+@app.get("/platform/a3-health/incidents/actions/quality-alerts/export")
+async def platform_a3_followup_quality_alerts_export(
+    request: Request,
+    status: str = "all",
+    search: str = "",
+):
+    username = get_user(request)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+    center = get_a3_followup_quality_alerts(status, search, 500)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerows(a3_followup_quality_alert_csv_rows(center))
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=a3_quality_alerts.csv",
+        },
+    )
 
 
 @app.post("/platform/a3-health/incidents/actions/create")

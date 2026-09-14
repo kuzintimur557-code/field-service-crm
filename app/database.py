@@ -827,6 +827,36 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS a3_followup_quality_alerts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        alert_key TEXT NOT NULL,
+        alert_type TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'warning',
+        company_id INTEGER NOT NULL DEFAULT 1,
+        incident_id INTEGER,
+        owner_username TEXT,
+        title TEXT NOT NULL,
+        message TEXT,
+        link TEXT,
+        metric_value REAL,
+        status TEXT NOT NULL DEFAULT 'active',
+        first_detected_at TEXT NOT NULL,
+        last_detected_at TEXT NOT NULL,
+        last_notified_at TEXT,
+        notification_count INTEGER NOT NULL DEFAULT 0,
+        acknowledged_at TEXT,
+        acknowledged_by TEXT,
+        acknowledged_note TEXT,
+        resolved_at TEXT,
+        resolved_by TEXT,
+        resolution_note TEXT,
+        resolution_kind TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS system_health_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1342,6 +1372,22 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_a3_incident_followups_owner
     ON a3_incident_followups(owner_username, status, due_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_followup_quality_alerts_queue
+    ON a3_followup_quality_alerts(status, severity, updated_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_followup_quality_alerts_key
+    ON a3_followup_quality_alerts(alert_key, id)
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_a3_followup_quality_alerts_open_key
+    ON a3_followup_quality_alerts(alert_key)
+    WHERE status IN ('active', 'acknowledged')
     """)
 
     c.execute("""

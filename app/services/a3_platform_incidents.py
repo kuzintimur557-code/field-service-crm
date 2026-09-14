@@ -39,6 +39,10 @@ A3_PLATFORM_INCIDENT_EVENT_LABELS = {
     "followup_verified": "Результат меры подтверждён",
     "followup_verification_reset": "Результат меры отправлен на повторную проверку",
     "followup_rejected": "Мера возвращена на доработку",
+    "followup_quality_alert": "Сигнал качества создан",
+    "followup_quality_acknowledged": "Сигнал качества принят в работу",
+    "followup_quality_resolved": "Сигнал качества закрыт",
+    "followup_quality_reopened": "Сигнал качества открыт повторно",
 }
 
 

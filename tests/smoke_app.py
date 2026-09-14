@@ -15497,6 +15497,19 @@ async def assert_a3_followup_analytics():
     now = datetime(2026, 7, 15, 12, 0)
     conn = connect()
     cursor = conn.cursor()
+    quality_alert_columns = {
+        row["name"]
+        for row in cursor.execute(
+            "PRAGMA table_info(a3_followup_quality_alerts)"
+        ).fetchall()
+    }
+    assert {
+        "alert_key", "alert_type", "severity", "company_id", "incident_id",
+        "owner_username", "metric_value", "status", "first_detected_at",
+        "last_detected_at", "last_notified_at", "notification_count",
+        "acknowledged_at", "acknowledged_by", "acknowledged_note",
+        "resolved_at", "resolved_by", "resolution_note", "resolution_kind",
+    }.issubset(quality_alert_columns)
     cursor.executemany("""
         INSERT INTO a3_platform_incidents (
             company_id, incident_key, status, title, message,
@@ -15649,6 +15662,38 @@ async def assert_a3_followup_analytics():
         assert quality_run["checked"] == 2
         assert quality_run["notified_signals"] == 2
         assert quality_run["notifications_created"] == 2
+        assert quality_run["alerts_created"] == 2
+        assert quality_run["alerts_reopened"] == 0
+        assert quality_run["alerts_auto_resolved"] == 0
+        alert_center = crm.get_a3_followup_quality_alerts("all", now=now)
+        assert alert_center["summary"] == {
+            "total": 2,
+            "active": 2,
+            "acknowledged": 0,
+            "resolved": 0,
+            "critical": 1,
+        }
+        assert alert_center["visible"] == 2
+        repeat_alert = next(
+            item for item in alert_center["items"]
+            if item["alert_type"] == "repeat_return"
+        )
+        low_quality_alert = next(
+            item for item in alert_center["items"]
+            if item["alert_type"] == "low_quality"
+        )
+        assert repeat_alert["notification_count"] == 1
+        assert low_quality_alert["notification_count"] == 1
+        assert crm.get_a3_followup_quality_alerts(
+            "all", "Повторные возвраты меры", now=now,
+        )["visible"] == 1
+        unsafe_alert_center = {
+            **alert_center,
+            "items": [{**repeat_alert, "title": "=2+2"}],
+        }
+        assert "'=2+2" in str(
+            crm.a3_followup_quality_alert_csv_rows(unsafe_alert_center)
+        )
         conn = connect()
         quality_event = conn.execute("""
             SELECT event_type, actor_username
@@ -15664,6 +15709,170 @@ async def assert_a3_followup_analytics():
         )
         assert repeated_quality_run["notifications_created"] == 0
         assert repeated_quality_run["suppressed"] == 2
+
+        anonymous_alert_page = await crm.platform_a3_followup_quality_alerts_page(
+            make_public_asgi_request(
+                "/platform/a3-health/incidents/actions/quality-alerts"
+            )
+        )
+        assert anonymous_alert_page.status_code == 302
+        boss_alert_page = await crm.platform_a3_followup_quality_alerts_page(
+            make_asgi_request(
+                "owner2",
+                "/platform/a3-health/incidents/actions/quality-alerts",
+            )
+        )
+        assert boss_alert_page.status_code == 302
+        alert_page = await crm.platform_a3_followup_quality_alerts_page(
+            make_asgi_request(
+                "super",
+                "/platform/a3-health/incidents/actions/quality-alerts",
+            ),
+            status="all",
+        )
+        alert_html = alert_page.body.decode("utf-8")
+        assert alert_page.status_code == 200
+        assert "Сигналы качества A3" in alert_html
+        assert "Принять в работу" in alert_html
+        assert "Результат устранения" in alert_html
+        assert "Скачать CSV" in alert_html
+
+        acknowledged = crm.acknowledge_a3_followup_quality_alert(
+            repeat_alert["id"], "super", "Проверяю причину возвратов.",
+            now=now + timedelta(minutes=15),
+        )
+        assert acknowledged["ok"] is True
+        empty_resolution = crm.resolve_a3_followup_quality_alert(
+            low_quality_alert["id"], "super", "",
+            now=now + timedelta(minutes=15),
+        )
+        assert empty_resolution["error"] == "empty_resolution_note"
+        resolved = crm.resolve_a3_followup_quality_alert(
+            low_quality_alert["id"], "super",
+            "Проведён разбор и скорректирован процесс проверки.",
+            now=now + timedelta(minutes=16),
+        )
+        assert resolved["ok"] is True
+        lifecycle_center = crm.get_a3_followup_quality_alerts(
+            "all", now=now + timedelta(minutes=16),
+        )
+        assert lifecycle_center["summary"]["active"] == 1
+        assert lifecycle_center["summary"]["acknowledged"] == 1
+        assert lifecycle_center["summary"]["resolved"] == 1
+
+        manual_suppression = crm.run_a3_followup_quality_monitor(
+            now=now + timedelta(minutes=20),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert manual_suppression["notifications_created"] == 0
+        assert manual_suppression["suppressed"] == 2
+        after_manual_resolution = (
+            crm.get_a3_followup_quality_monitor_overview(
+                now=now + timedelta(minutes=20),
+            )
+        )
+        assert after_manual_resolution["summary"]["total"] == 1
+        assert after_manual_resolution["status"] == "warning"
+
+        reopened = crm.reopen_a3_followup_quality_alert(
+            low_quality_alert["id"], "super",
+            now=now + timedelta(minutes=21),
+        )
+        assert reopened["ok"] is True
+
+        anonymous_alert_api = await crm.api_platform_a3_followup_quality_alerts(
+            make_public_asgi_request(
+                "/api/platform/a3-health/incidents/actions/quality-alerts"
+            )
+        )
+        assert anonymous_alert_api.status_code == 401
+        boss_alert_api = await crm.api_platform_a3_followup_quality_alerts(
+            make_asgi_request(
+                "owner2",
+                "/api/platform/a3-health/incidents/actions/quality-alerts",
+            )
+        )
+        assert boss_alert_api.status_code == 403
+        alert_api = await crm.api_platform_a3_followup_quality_alerts(
+            make_asgi_request(
+                "super",
+                "/api/platform/a3-health/incidents/actions/quality-alerts",
+            ),
+            status="all",
+        )
+        assert alert_api["ok"] is True
+        assert alert_api["summary"]["total"] == 2
+        invalid_alert_action = (
+            await crm.api_change_platform_a3_followup_quality_alert(
+                make_json_request(
+                    "super",
+                    "/api/platform/a3-health/incidents/actions/"
+                    f"quality-alerts/{repeat_alert['id']}/archive",
+                    {},
+                ),
+                repeat_alert["id"],
+                "archive",
+            )
+        )
+        assert invalid_alert_action.status_code == 400
+
+        conn = connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE a3_incident_followups
+            SET rework_count=0
+            WHERE incident_id IN (?, ?, ?)
+        """, (incident_ids[2], incident_ids[3], incident_ids[4]))
+        cursor.execute("""
+            UPDATE a3_incident_followups
+            SET verification_attempts=1
+            WHERE incident_id=?
+        """, (incident_ids[2],))
+        cursor.execute("""
+            UPDATE a3_incident_followups
+            SET verification_status='approved', verification_attempts=1,
+                verified_at='2026-07-10 18:00:00', verified_by='super'
+            WHERE incident_id=?
+        """, (incident_ids[3],))
+        conn.commit()
+        conn.close()
+        automatic_resolution = crm.run_a3_followup_quality_monitor(
+            now=now + timedelta(hours=25),
+            telegram_sender=lambda chat_id, message: True,
+        )
+        assert automatic_resolution["checked"] == 0
+        assert automatic_resolution["alerts_auto_resolved"] == 2
+        resolved_center = crm.get_a3_followup_quality_alerts(
+            "resolved", now=now + timedelta(hours=25),
+        )
+        assert resolved_center["summary"]["active"] == 0
+        assert resolved_center["summary"]["resolved"] == 2
+        assert resolved_center["visible"] == 2
+        stable_overview = crm.get_a3_followup_quality_monitor_overview(
+            now=now + timedelta(hours=25),
+        )
+        assert stable_overview["summary"]["total"] == 0
+        assert stable_overview["status"] == "stable"
+        export_alerts = await crm.platform_a3_followup_quality_alerts_export(
+            make_asgi_request(
+                "super",
+                "/platform/a3-health/incidents/actions/quality-alerts/export",
+            ),
+            status="all",
+        )
+        alert_csv = export_alerts.body.decode("utf-8-sig")
+        assert "Результат закрытия" in alert_csv
+        assert "Повторный возврат" in alert_csv
+        conn = connect()
+        quality_event_types = {
+            row["event_type"] for row in conn.execute("""
+                SELECT event_type FROM a3_platform_incident_events
+                WHERE incident_id=?
+            """, (incident_ids[4],)).fetchall()
+        }
+        conn.close()
+        assert "followup_quality_acknowledged" in quality_event_types
+        assert "followup_quality_resolved" in quality_event_types
 
         anonymous_quality_api = (
             await crm.api_platform_a3_incident_action_quality_monitor(
@@ -15754,6 +15963,16 @@ async def assert_a3_followup_analytics():
     finally:
         conn = connect()
         cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM a3_followup_quality_alerts
+            WHERE incident_id IN (
+                SELECT id FROM a3_platform_incidents
+                WHERE incident_key LIKE 'followup_analytics_%'
+            ) OR (
+                alert_key='low_quality:super'
+                AND first_detected_at LIKE '2026-07-15%'
+            )
+        """)
         cursor.execute("""
             DELETE FROM notifications
             WHERE title LIKE 'Повторные возвраты меры A3 #%'
