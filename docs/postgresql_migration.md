@@ -15,6 +15,7 @@ SQLite remains the default runtime. The PostgreSQL foundation now includes:
 - translation for the SQLite SQL forms used by schema initialization;
 - idempotent schema creation and sequence synchronization on PostgreSQL;
 - a PostgreSQL 16 schema smoke job in CI;
+- backend-aware `/health` and `/ready` database checks;
 - `POSTGRESQL_EXPERIMENTAL=1` as an explicit non-production opt-in;
 - unsupported, conflicting or incomplete PostgreSQL settings stop startup;
 - diagnostics expose only the backend name and never the URL, host, user or
@@ -63,8 +64,10 @@ python3 tests/smoke_postgresql.py
 ```
 
 It initializes the schema twice, verifies core tables and A3 quality SLA
-columns, checks idempotent development seeds, and verifies generated IDs and
-row access. It does not certify production cutover readiness.
+columns, checks idempotent development seeds, verifies generated IDs and row
+access, then checks PostgreSQL health and readiness responses. `/health` must
+pass, while `/ready` remains blocked by `database_release_support` until the
+full application smoke and data migration are complete.
 
 ## Exit criteria
 

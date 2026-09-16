@@ -162,8 +162,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.database import (
-    DatabaseConfigurationError,
     connect,
+    get_database_error_types,
     get_database_runtime_config,
     init_db,
 )
@@ -40559,7 +40559,7 @@ def get_public_health_status():
         conn = connect()
         conn.execute("SELECT 1").fetchone()
         database_ok = True
-    except (OSError, sqlite3.Error, DatabaseConfigurationError) as error:
+    except get_database_error_types() as error:
         database_error = error.__class__.__name__
     finally:
         if conn:
@@ -40591,6 +40591,8 @@ def get_public_readiness_status():
     database_ok = False
     quick_check_ok = False
     quick_check = ""
+    backend_check_key = "sqlite_quick_check"
+    backend_check_label = "Проверка не пройдена"
     database_error = ""
     missing_tables = list(BACKUP_REQUIRED_TABLES)
     uploads_ok = UPLOAD_DIR.exists() and os.access(UPLOAD_DIR, os.W_OK)
@@ -40599,30 +40601,51 @@ def get_public_readiness_status():
         conn = connect()
         conn.execute("SELECT 1").fetchone()
         database_ok = True
-        quick_check_row = conn.execute("PRAGMA quick_check").fetchone()
-        quick_check = quick_check_row[0] if quick_check_row else ""
-        quick_check_ok = quick_check == "ok"
-        table_rows = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table'"
-        ).fetchall()
+        if database_runtime["active_backend"] == "postgresql":
+            quick_check = "connected"
+            quick_check_ok = True
+            backend_check_key = "postgresql_connection_check"
+            backend_check_label = "Подключение работает"
+            table_rows = conn.execute("""
+                SELECT table_name AS name
+                FROM information_schema.tables
+                WHERE table_schema=CURRENT_SCHEMA()
+            """).fetchall()
+        else:
+            quick_check_row = conn.execute("PRAGMA quick_check").fetchone()
+            quick_check = quick_check_row[0] if quick_check_row else ""
+            quick_check_ok = quick_check == "ok"
+            backend_check_label = (
+                "Проверка пройдена"
+                if quick_check_ok
+                else "Проверка не пройдена"
+            )
+            table_rows = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
         tables = {row["name"] for row in table_rows}
         missing_tables = [
             table
             for table in BACKUP_REQUIRED_TABLES
             if table not in tables
         ]
-    except (OSError, sqlite3.Error, DatabaseConfigurationError) as error:
+    except get_database_error_types() as error:
         database_error = error.__class__.__name__
     finally:
         if conn:
             conn.close()
 
     tables_ok = database_ok and not missing_tables
+    backend_release_supported = (
+        database_runtime["active_backend"] != "postgresql"
+        or database_runtime["postgresql_ready"]
+    )
     ready = (
         database_runtime["configuration_valid"]
         and database_ok
         and quick_check_ok
         and tables_ok
+        and backend_release_supported
         and uploads_ok
     )
     checks = [
@@ -40649,14 +40672,10 @@ def get_public_readiness_status():
             "backend": database_runtime["active_backend"],
         },
         {
-            "key": "sqlite_quick_check",
+            "key": backend_check_key,
             "ok": quick_check_ok,
             "status": "ok" if quick_check_ok else "critical",
-            "status_label": (
-                "Проверка пройдена"
-                if quick_check_ok
-                else "Проверка не пройдена"
-            ),
+            "status_label": backend_check_label,
             "value": quick_check,
         },
         {
@@ -40670,6 +40689,16 @@ def get_public_readiness_status():
             ),
             "required": list(BACKUP_REQUIRED_TABLES),
             "missing": missing_tables,
+        },
+        {
+            "key": "database_release_support",
+            "ok": backend_release_supported,
+            "status": "ok" if backend_release_supported else "critical",
+            "status_label": (
+                "Поддерживается для релиза"
+                if backend_release_supported
+                else "Экспериментальный режим"
+            ),
         },
         {
             "key": "uploads",

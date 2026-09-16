@@ -25,6 +25,19 @@ class DatabaseConfigurationError(RuntimeError):
     pass
 
 
+def get_database_error_types():
+    """Return backend errors that are safe for health checks to summarize."""
+    error_types = [OSError, sqlite3.Error, DatabaseConfigurationError]
+    if importlib.util.find_spec("psycopg"):
+        try:
+            import psycopg
+        except ImportError:
+            pass
+        else:
+            error_types.append(psycopg.Error)
+    return tuple(error_types)
+
+
 def _database_url_backend(database_url):
     try:
         scheme = urlsplit(str(database_url or "").strip()).scheme.lower()

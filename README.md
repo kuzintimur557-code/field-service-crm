@@ -153,7 +153,10 @@ python3 tests/smoke_security.py
 Публичные:
 
 - `GET /health` - приложение и база отвечают
-- `GET /ready` - конфигурация backend, SQLite quick check, ключевые таблицы, uploads
+- `GET /ready` - конфигурация backend, проверка базы, ключевые таблицы, uploads
+
+В экспериментальном PostgreSQL-режиме `/health` проверяет подключение, а
+`/ready` остаётся красным до завершения полного smoke и миграции данных.
 
 Админские:
 

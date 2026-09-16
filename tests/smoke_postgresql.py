@@ -1,6 +1,9 @@
 import os
 import sys
+import asyncio
+import json
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 
@@ -93,6 +96,41 @@ def main():
         ).fetchone()
         assert company[0] == company["id"] == company_id
         assert company["name"] == marker
+
+        from app import main as crm
+
+        health = crm.get_public_health_status()
+        assert health["ok"] is True
+        assert health["database"]["backend"] == "postgresql"
+        assert health["database"]["error"] == ""
+
+        readiness = crm.get_public_readiness_status()
+        readiness_checks = {
+            item["key"]: item for item in readiness["checks"]
+        }
+        assert readiness["ok"] is False
+        assert readiness_checks["database"]["ok"] is True
+        assert readiness_checks["postgresql_connection_check"]["ok"] is True
+        assert readiness_checks["required_tables"]["ok"] is True
+        assert readiness_checks["database_release_support"]["ok"] is False
+        response = asyncio.run(crm.public_ready())
+        assert response.status_code == 503
+        payload = json.loads(response.body)
+        serialized = json.dumps(payload)
+        assert payload["checks"] == readiness["checks"]
+        assert os.environ["DATABASE_URL"] not in serialized
+
+        import psycopg
+
+        with patch.object(
+            crm,
+            "connect",
+            side_effect=psycopg.OperationalError("private connection detail"),
+        ):
+            unavailable = crm.get_public_health_status()
+        assert unavailable["ok"] is False
+        assert unavailable["database"]["error"] == "OperationalError"
+        assert "private connection detail" not in json.dumps(unavailable)
 
         print(
             "PostgreSQL schema smoke passed: "

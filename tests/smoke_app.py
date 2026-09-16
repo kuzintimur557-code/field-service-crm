@@ -19392,6 +19392,7 @@ async def assert_platform_calendar_health():
             "database",
             "sqlite_quick_check",
             "required_tables",
+            "database_release_support",
             "uploads",
         }.issubset({item["key"] for item in readiness_status["checks"]})
         readiness_response = await crm.public_ready()
