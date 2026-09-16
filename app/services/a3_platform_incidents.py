@@ -43,6 +43,7 @@ A3_PLATFORM_INCIDENT_EVENT_LABELS = {
     "followup_quality_acknowledged": "Сигнал качества принят в работу",
     "followup_quality_resolved": "Сигнал качества закрыт",
     "followup_quality_reopened": "Сигнал качества открыт повторно",
+    "followup_quality_escalated": "Нарушение SLA сигнала качества",
 }
 
 

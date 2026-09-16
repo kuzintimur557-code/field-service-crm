@@ -851,6 +851,11 @@ def init_db():
         resolved_by TEXT,
         resolution_note TEXT,
         resolution_kind TEXT,
+        response_due_at TEXT,
+        resolution_due_at TEXT,
+        escalated_at TEXT,
+        last_escalated_at TEXT,
+        escalation_count INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -997,6 +1002,24 @@ def init_db():
         c,
         "a3_incident_followups",
         "rework_count",
+        "INTEGER NOT NULL DEFAULT 0",
+    )
+    add_column_if_missing(
+        c, "a3_followup_quality_alerts", "response_due_at", "TEXT",
+    )
+    add_column_if_missing(
+        c, "a3_followup_quality_alerts", "resolution_due_at", "TEXT",
+    )
+    add_column_if_missing(
+        c, "a3_followup_quality_alerts", "escalated_at", "TEXT",
+    )
+    add_column_if_missing(
+        c, "a3_followup_quality_alerts", "last_escalated_at", "TEXT",
+    )
+    add_column_if_missing(
+        c,
+        "a3_followup_quality_alerts",
+        "escalation_count",
         "INTEGER NOT NULL DEFAULT 0",
     )
 
@@ -1388,6 +1411,13 @@ def init_db():
     CREATE UNIQUE INDEX IF NOT EXISTS idx_a3_followup_quality_alerts_open_key
     ON a3_followup_quality_alerts(alert_key)
     WHERE status IN ('active', 'acknowledged')
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_a3_followup_quality_alerts_sla
+    ON a3_followup_quality_alerts(
+        status, response_due_at, resolution_due_at, last_escalated_at
+    )
     """)
 
     c.execute("""

@@ -15493,6 +15493,316 @@ async def assert_a3_incident_followups():
         conn.close()
 
 
+async def assert_a3_followup_quality_sla():
+    from datetime import timezone
+    from unittest.mock import patch
+    from app.services import a3_followup_quality_sla as sla
+    from app.services import a3_followup_quality_monitor as quality
+    from app import telegram_utils
+
+    now = datetime(2026, 7, 16, 12, 0)
+    env = {
+        "A3_QUALITY_ALERT_RESPONSE_HOURS": "4",
+        "A3_QUALITY_ALERT_RESOLUTION_HOURS": "24",
+        "A3_QUALITY_ALERT_ESCALATION_COOLDOWN_HOURS": "12",
+    }
+    base = "/platform/a3-health/incidents/actions/quality-alerts"
+    api_base = "/api" + base
+
+    def stamp(moment):
+        return moment.strftime("%Y-%m-%d %H:%M:%S")
+
+    def read_alert(alert_id):
+        conn = connect()
+        try:
+            return dict(conn.execute(
+                "SELECT * FROM a3_followup_quality_alerts WHERE id=?",
+                (alert_id,),
+            ).fetchone())
+        finally:
+            conn.close()
+
+    async def dispatch(request):
+        # Exercise real route selection, including the dynamic action route.
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        scope = {
+            **request.scope, "app": crm.app,
+            "asgi": {"version": "3.0", "spec_version": "2.4"},
+        }
+        await crm.app(scope, request.receive, send)
+        return (
+            next(m["status"] for m in messages if m["type"] == "http.response.start"),
+            b"".join(m.get("body", b"") for m in messages),
+            dict(next(m["headers"] for m in messages if m["type"] == "http.response.start")),
+        )
+
+    with patch.dict(os.environ, env):
+        policy = sla.get_a3_followup_quality_sla_policy()
+        assert (policy["response_hours"], policy["resolution_hours"], policy["cooldown_hours"]) == (4, 24, 12)
+        with patch.dict(os.environ, dict(zip(env, ("6", "36", "8")))):
+            configured = sla.get_a3_followup_quality_sla_policy()
+            assert (configured["response_hours"], configured["resolution_hours"], configured["cooldown_hours"]) == (6, 36, 8)
+        with patch.dict(os.environ, dict(zip(env, ("invalid", "-2", "9999")))):
+            bounded = sla.get_a3_followup_quality_sla_policy()
+            assert (bounded["response_hours"], bounded["resolution_hours"], bounded["cooldown_hours"]) == (4, 4, 720)
+        with patch.dict(os.environ, dict(zip(env, ("0", "0", "0")))):
+            minimum = sla.get_a3_followup_quality_sla_policy()
+            assert (minimum["response_hours"], minimum["resolution_hours"], minimum["cooldown_hours"]) == (1, 1, 1)
+
+        edge = [{"status": "active", "first_detected_at": stamp(now - timedelta(hours=4))}]
+        sla.enrich_a3_followup_quality_alert_sla(edge, now - timedelta(seconds=1))
+        assert not edge[0]["is_response_overdue"]
+        sla.enrich_a3_followup_quality_alert_sla(edge, now)
+        assert edge[0]["is_response_overdue"]
+        assert edge[0]["response_status_label"].startswith("Просрочено")
+        aware = [{"status": "active", "first_detected_at": "2026-07-16T10:00:00+03:00"}]
+        sla.enrich_a3_followup_quality_alert_sla(aware, now.replace(tzinfo=timezone.utc))
+        assert aware[0]["is_response_overdue"]
+        assert aware[0]["response_due_at_calculated"] == "2026-07-16 14:00:00+03:00"
+
+        conn = connect()
+        cursor = conn.cursor()
+        columns = {row["name"] for row in cursor.execute("PRAGMA table_info(a3_followup_quality_alerts)")}
+        assert {"response_due_at", "resolution_due_at", "escalated_at", "last_escalated_at", "escalation_count"} <= columns
+        cursor.executemany("""
+            INSERT INTO users (username, password, role, company_id, is_active, telegram_chat_id)
+            VALUES (?, 'x', 'superadmin', 2, ?, ?)
+        """, [("sla_admin", 1, "sla-chat"), ("sla_disabled", 0, "disabled-chat")])
+        admins = [dict(row) for row in cursor.execute("""
+            SELECT username, telegram_chat_id, is_active FROM users
+            WHERE role='superadmin' AND COALESCE(is_active, 1)=1
+        """)]
+        chat_count = sum(bool(str(admin["telegram_chat_id"] or "").strip()) for admin in admins)
+        cursor.execute("""
+            INSERT INTO a3_platform_incidents (
+                company_id, incident_key, status, title, first_detected_at,
+                last_detected_at, created_at, updated_at
+            ) VALUES (2, 'quality_sla_test', 'active', 'Проверка SLA', ?, ?, ?, ?)
+        """, (stamp(now),) * 4)
+        incident_id = cursor.lastrowid
+        ids = {}
+        for name, age, status in (
+            ("response", 5, "active"), ("both", 25, "active"),
+            ("acknowledged", 25, "acknowledged"), ("within", 1, "active"),
+            ("closed", 30, "resolved"),
+        ):
+            created = now - timedelta(hours=age)
+            cursor.execute("""
+                INSERT INTO a3_followup_quality_alerts (
+                    alert_key, alert_type, severity, company_id, incident_id,
+                    owner_username, title, message, link, metric_value, status,
+                    first_detected_at, last_detected_at, acknowledged_at,
+                    resolved_at, created_at, updated_at
+                ) VALUES (?, 'repeat_return', 'warning', 2, ?, 'super', ?,
+                          'Проверка срока', ?, 2, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                f"quality_sla_test:{name}", incident_id, f"SLA {name}", base,
+                status, stamp(created), stamp(created),
+                stamp(created + timedelta(hours=1)) if status == "acknowledged" else None,
+                stamp(created + timedelta(hours=2)) if status == "resolved" else None,
+                stamp(created), stamp(created),
+            ))
+            ids[name] = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        telegram_calls = []
+
+        def telegram_sender(chat_id, message):
+            # The DB change is committed before an external send starts.
+            assert read_alert(ids["response"])["escalation_count"] >= 1
+            telegram_calls.append((chat_id, message))
+            return True
+
+        try:
+            overview = sla.get_a3_followup_quality_sla_overview(now)
+            assert overview["status"] == "critical"
+            assert overview["summary"]["total"] == 4
+            assert overview["summary"]["overdue"] == 3
+            assert overview["summary"]["response_overdue"] == 2
+            assert overview["summary"]["resolution_overdue"] == 2
+            assert overview["summary"]["ready"] == 3
+            assert read_alert(ids["response"])["response_due_at"] is None
+
+            first = sla.run_a3_followup_quality_sla_monitor(now, telegram_sender)
+            assert first["checked"] == 4
+            assert first["response_overdue"] == first["resolution_overdue"] == 2
+            assert first["escalated_alerts"] == 3
+            assert first["notifications_created"] == 3 * len(admins)
+            assert first["telegram_sent"] == 3 * chat_count
+            assert {item["stage"] for item in first["items"]} == {"response_overdue", "resolution_overdue"}
+            assert all(chat_id != "disabled-chat" and "Сигнал #" in message for chat_id, message in telegram_calls)
+            response = read_alert(ids["response"])
+            assert response["response_due_at"] == stamp(now - timedelta(hours=1))
+            assert response["resolution_due_at"] == stamp(now + timedelta(hours=19))
+            assert response["escalated_at"] == response["last_escalated_at"] == stamp(now)
+            assert response["escalation_count"] == 1
+            assert read_alert(ids["within"])["escalation_count"] == 0
+            assert read_alert(ids["closed"])["escalation_count"] == 0
+            conn = connect()
+            notifications = [dict(row) for row in conn.execute(
+                "SELECT * FROM notifications WHERE link LIKE ?", (base + "?status=all#alert-%",),
+            )]
+            events = conn.execute("""
+                SELECT event_type, actor_username FROM a3_platform_incident_events
+                WHERE incident_id=?
+            """, (incident_id,)).fetchall()
+            conn.close()
+            assert len(notifications) == 3 * len(admins)
+            assert {row["username"] for row in notifications} == {admin["username"] for admin in admins}
+            assert all(row["company_id"] == 2 for row in notifications)
+            assert len(events) == 3
+            assert all(row["event_type"] == "followup_quality_escalated" and row["actor_username"] == "a3_quality_sla_monitor" for row in events)
+
+            repeated = sla.run_a3_followup_quality_sla_monitor(now + timedelta(minutes=1), telegram_sender)
+            assert repeated["suppressed"] == 3
+            assert repeated["notifications_created"] == repeated["telegram_sent"] == 0
+            assert len(telegram_calls) == 3 * chat_count
+            assert crm.resolve_a3_followup_quality_alert(ids["within"], "super", "Устранено.", now=now)["ok"]
+            with patch.dict(os.environ, dict(zip(env, ("48", "72", "12")))):
+                frozen = sla.get_a3_followup_quality_sla_overview(now)["items"]
+                assert next(item for item in frozen if item["id"] == ids["response"])["response_due_at_calculated"] == response["response_due_at"]
+            early = sla.run_a3_followup_quality_sla_monitor(now + timedelta(hours=12, seconds=-1), telegram_sender)
+            assert early["suppressed"] == 3 and early["escalated_alerts"] == 0
+            again = sla.run_a3_followup_quality_sla_monitor(now + timedelta(hours=12), telegram_sender)
+            assert again["escalated_alerts"] == 3
+            assert read_alert(ids["response"])["escalation_count"] == 2
+            assert read_alert(ids["response"])["escalated_at"] == stamp(now)
+
+            conn = connect()
+            conn.execute("UPDATE users SET is_active=0 WHERE role='superadmin'")
+            conn.commit()
+            conn.close()
+            try:
+                missing = sla.run_a3_followup_quality_sla_monitor(now + timedelta(hours=24), telegram_sender)
+                assert missing["without_recipients"] == 3
+                assert missing["notifications_created"] == missing["escalated_alerts"] == 0
+                assert read_alert(ids["response"])["escalation_count"] == 2
+            finally:
+                conn = connect()
+                conn.executemany("UPDATE users SET is_active=? WHERE username=?", [(admin["is_active"], admin["username"]) for admin in admins])
+                conn.commit()
+                conn.close()
+
+            def failed_telegram(chat_id, message):
+                raise RuntimeError("Test transport failure")
+
+            failed = sla.run_a3_followup_quality_sla_monitor(now + timedelta(hours=24), failed_telegram)
+            assert failed["escalated_alerts"] == 3
+            assert failed["notifications_created"] == 3 * len(admins)
+            assert failed["telegram_sent"] == 0
+            assert sla.run_a3_followup_quality_sla_monitor(now + timedelta(hours=24), telegram_sender)["suppressed"] == 3
+
+            # Acknowledgement ends response escalation; resolution ends all escalation.
+            assert crm.acknowledge_a3_followup_quality_alert(ids["response"], "super", now=now + timedelta(hours=25))["ok"]
+            active = sla.get_a3_followup_quality_sla_overview(now + timedelta(hours=25))
+            acknowledged = next(item for item in active["items"] if item["id"] == ids["response"])
+            assert not acknowledged["is_response_overdue"]
+            assert acknowledged["response_sla_breached"] and acknowledged["is_resolution_overdue"]
+            assert crm.resolve_a3_followup_quality_alert(ids["response"], "super", "Причина устранена.", now=now + timedelta(hours=26))["ok"]
+            assert crm.reopen_a3_followup_quality_alert(ids["response"], "super", now=now + timedelta(hours=27))["ok"]
+            assert read_alert(ids["response"])["response_due_at"] == response["response_due_at"]
+            assert read_alert(ids["response"])["escalation_count"] == 3
+
+            # Actual router dispatch verifies auth and prevents /sla/run matching {alert_id}/{action}.
+            with patch.object(telegram_utils, "send_message_to_chat", return_value=True):
+                for username, expected in ((None, 401), ("owner2", 403), ("manager1", 403), ("worker2", 403), ("sla_disabled", 401)):
+                    request = make_json_request(username, api_base + "/sla/run", {})
+                    code, body, _ = await dispatch(request)
+                    assert code == expected, (username, code, body)
+                    request = make_json_request(username, api_base + "/sla", {})
+                    request.scope["method"] = "GET"
+                    assert (await dispatch(request))[0] == expected
+                code, body, _ = await dispatch(make_json_request("super", api_base + "/sla/run", {}))
+                assert code == 200 and json.loads(body)["ok"] is True
+                request = make_asgi_request("super", api_base + "/sla")
+                code, body, _ = await dispatch(request)
+                assert code == 200 and "response_hours" in json.loads(body)["policy"]
+                for username, location in ((None, b"/login"), ("owner2", b"/")):
+                    code, _, headers = await dispatch(make_json_request(username, base + "/sla/run", {}))
+                    assert code == 302 and headers[b"location"] == location
+                code, _, headers = await dispatch(make_form_request("super", base + "/sla/run", {"return_status": "all", "search": "SLA"}))
+                assert code == 302
+                assert b"status=all" in headers[b"location"] and b"search=SLA" in headers[b"location"]
+                assert b"notice=quality_sla_complete" in headers[b"location"]
+                assert headers[b"location"].endswith(b"#sla-monitor")
+
+            page = await crm.platform_a3_followup_quality_alerts_page(
+                make_asgi_request("super", base), status="all",
+                notice="quality_sla_complete", sla_checked=4, sla_escalated=3,
+            )
+            html = page.body.decode()
+            for label in ("Срок реакции", "Срок устранения", "Просроченных сигналов", "Эскалаций", "Проверить SLA", "Проверено сигналов: 4", "Эскалаций: 3"):
+                assert label in html
+            center = crm.get_a3_followup_quality_alerts("all", now=now + timedelta(hours=28))
+            csv_rows = crm.a3_followup_quality_alert_csv_rows(center)
+            assert {"Срок реакции", "Срок устранения", "Эскалации", "Последняя эскалация"} <= set(csv_rows[0])
+            csv_row = next(row for row in csv_rows[1:] if row[0] == ids["response"])
+            assert csv_row[csv_rows[0].index("Срок реакции")] == response["response_due_at"]
+
+            # Real quality lifecycle: normalize existing alerts, then create a new episode.
+            healthy_report = {"repeat_returns": [], "owner_quality": []}
+            with patch.object(quality, "get_a3_followup_analytics", return_value=healthy_report):
+                normalized = quality.run_a3_followup_quality_monitor(now + timedelta(hours=29), telegram_sender)
+            assert normalized["alerts_auto_resolved"] == 3
+            closed = read_alert(ids["response"])
+            assert closed["resolution_kind"] == "automatic" and closed["escalation_count"] >= 3
+            after_close = sla.run_a3_followup_quality_sla_monitor(now + timedelta(hours=48), telegram_sender)
+            assert after_close["checked"] == after_close["notifications_created"] == 0
+            sla_closed = crm.get_a3_followup_quality_alerts("resolved", now=now + timedelta(hours=48))
+            historical = next(item for item in sla_closed["items"] if item["id"] == ids["response"])
+            assert historical["sla_stage_label"] == "Закрыт с нарушением SLA"
+            assert not historical["sla_ready"] and not historical["is_resolution_overdue"]
+
+            bad_report = {"repeat_returns": [{
+                "id": "sla-new", "rework_count": 2, "company_id": 2,
+                "incident_id": incident_id, "owner_username": "super",
+                "title": "Новый эпизод SLA", "verification_attempts": 2, "url": base,
+            }], "owner_quality": []}
+            with patch.object(quality, "get_a3_followup_analytics", return_value=bad_report):
+                created = quality.run_a3_followup_quality_monitor(now, lambda *_: True)
+                new_id = created["items"][0]["alert_id"]
+                assert read_alert(new_id)["response_due_at"] == stamp(now + timedelta(hours=4))
+                with patch.dict(os.environ, dict(zip(env, ("48", "72", "12")))):
+                    quality.run_a3_followup_quality_monitor(now + timedelta(minutes=1), lambda *_: True)
+                assert read_alert(new_id)["response_due_at"] == stamp(now + timedelta(hours=4))
+
+            # Cron auth has no side effects; successful cron normalizes before SLA.
+            cron_path = "/automation/cron/a3-incident-actions"
+            with patch.dict(os.environ, {"AUTOMATION_CRON_SECRET": ""}):
+                code, _, _ = await dispatch(make_public_asgi_request(cron_path))
+                assert code == 503
+            with patch.dict(os.environ, {"AUTOMATION_CRON_SECRET": "sla-test-secret"}), patch.object(quality, "get_a3_followup_analytics", return_value=healthy_report), patch.object(telegram_utils, "send_message_to_chat", return_value=True) as sender:
+                assert (await dispatch(make_public_asgi_request(cron_path)))[0] == 403
+                assert (await dispatch(make_public_asgi_request(cron_path, headers=[(b"x-automation-secret", b"wrong")])))[0] == 403
+                assert read_alert(new_id)["status"] == "active"
+                code, body, _ = await dispatch(make_public_asgi_request(cron_path, headers=[(b"x-automation-secret", b"sla-test-secret")]))
+                result = json.loads(body)
+                assert code == 200 and result["ok"]
+                assert result["quality_summary"]["alerts_auto_resolved"] == 1
+                assert result["quality_sla_summary"]["checked"] == 0
+                assert result["quality_sla_summary"]["notifications_created"] == 0
+                sender.assert_not_called()
+            with patch.object(quality, "get_a3_followup_analytics", return_value=bad_report):
+                new_episode = quality.run_a3_followup_quality_monitor(now + timedelta(days=3), lambda *_: True)
+            next_id = new_episode["items"][0]["alert_id"]
+            assert next_id != new_id
+            assert read_alert(next_id)["escalation_count"] == 0
+            assert read_alert(next_id)["response_due_at"] == stamp(now + timedelta(days=3, hours=4))
+        finally:
+            conn = connect()
+            conn.execute("DELETE FROM notifications WHERE link LIKE ?", (base + "%",))
+            conn.execute("DELETE FROM a3_followup_quality_alerts WHERE incident_id=?", (incident_id,))
+            conn.execute("DELETE FROM a3_platform_incident_events WHERE incident_id=?", (incident_id,))
+            conn.execute("DELETE FROM a3_platform_incidents WHERE id=?", (incident_id,))
+            conn.execute("DELETE FROM users WHERE username IN ('sla_admin', 'sla_disabled')")
+            conn.commit()
+            conn.close()
+
+
 async def assert_a3_followup_analytics():
     now = datetime(2026, 7, 15, 12, 0)
     conn = connect()
@@ -30410,6 +30720,7 @@ def main():
         asyncio.run(assert_platform_a3_incident_reviews())
         asyncio.run(assert_a3_incident_followups())
         asyncio.run(assert_a3_followup_analytics())
+        asyncio.run(assert_a3_followup_quality_sla())
         asyncio.run(assert_platform_calendar_health())
         asyncio.run(assert_daily_route_schedule())
         asyncio.run(assert_archive_restore(task))

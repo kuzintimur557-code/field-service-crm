@@ -92,6 +92,10 @@ from app.services.a3_followup_quality_monitor import (
     resolve_a3_followup_quality_alert,
     run_a3_followup_quality_monitor,
 )
+from app.services.a3_followup_quality_sla import (
+    get_a3_followup_quality_sla_overview,
+    run_a3_followup_quality_sla_monitor,
+)
 from app.services.decision_engine import get_decision_engine
 
 from app.services.governance import (
@@ -16453,6 +16457,8 @@ async def platform_a3_followup_quality_alerts_page(
     search: str = "",
     notice: str = "",
     error: str = "",
+    sla_checked: int = 0,
+    sla_escalated: int = 0,
 ):
     username = get_user(request)
     if not username:
@@ -16460,6 +16466,7 @@ async def platform_a3_followup_quality_alerts_page(
     if get_role(username) != "superadmin":
         return RedirectResponse("/", status_code=302)
     center = get_a3_followup_quality_alerts(status, search)
+    quality_sla = get_a3_followup_quality_sla_overview()
     return templates.TemplateResponse(
         request,
         "platform_a3_followup_quality_alerts.html",
@@ -16468,6 +16475,9 @@ async def platform_a3_followup_quality_alerts_page(
             "username": username,
             "center": center,
             "alerts": center["items"],
+            "quality_sla": quality_sla,
+            "sla_checked": max(0, sla_checked),
+            "sla_escalated": max(0, sla_escalated),
             "notice": notice,
             "error": error,
             "links": get_platform_dashboard_links(),
@@ -16491,6 +16501,55 @@ async def api_platform_a3_followup_quality_alerts(
         "ok": True,
         **get_a3_followup_quality_alerts(status, search, limit),
     }
+
+
+@app.get("/api/platform/a3-health/incidents/actions/quality-alerts/sla")
+async def api_platform_a3_followup_quality_alert_sla(request: Request):
+    username = get_user(request)
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    return {"ok": True, **get_a3_followup_quality_sla_overview()}
+
+
+@app.post(
+    "/platform/a3-health/incidents/actions/quality-alerts/sla/run"
+)
+async def run_platform_a3_followup_quality_alert_sla(request: Request):
+    username = get_user(request)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+    form = await request.form()
+    result = run_a3_followup_quality_sla_monitor()
+    target = build_a3_followup_quality_alerts_url(
+        form.get("return_status") or "active",
+        form.get("search") or "",
+    )
+    separator = "&" if "?" in target else "?"
+    params = urlencode({
+        "notice": "quality_sla_complete",
+        "sla_checked": result["checked"],
+        "sla_escalated": result["escalated_alerts"],
+    })
+    return RedirectResponse(
+        f"{target}{separator}{params}#sla-monitor",
+        status_code=302,
+    )
+
+
+@app.post(
+    "/api/platform/a3-health/incidents/actions/quality-alerts/sla/run"
+)
+async def api_run_platform_a3_followup_quality_alert_sla(request: Request):
+    username = get_user(request)
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    return {"ok": True, **run_a3_followup_quality_sla_monitor()}
 
 
 def _change_a3_followup_quality_alert(alert_id, username, action, note=""):
@@ -46310,6 +46369,7 @@ async def run_a3_incident_action_monitor_cron(request: Request):
         "ok": True,
         "summary": run_a3_incident_followup_monitor(),
         "quality_summary": run_a3_followup_quality_monitor(),
+        "quality_sla_summary": run_a3_followup_quality_sla_monitor(),
     }
 
 

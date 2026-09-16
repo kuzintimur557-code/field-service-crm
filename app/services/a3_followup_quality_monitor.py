@@ -4,6 +4,11 @@ from urllib.parse import urlencode
 
 from app.database import connect
 from app.services.a3_followup_analytics import get_a3_followup_analytics
+from app.services.a3_followup_quality_sla import (
+    enrich_a3_followup_quality_alert_sla,
+    get_a3_followup_quality_sla_policy,
+    persist_a3_followup_quality_alert_deadlines,
+)
 
 
 A3_FOLLOWUP_REPEAT_RETURN_THRESHOLD = 2
@@ -204,6 +209,8 @@ def _latest_alerts(cursor):
 
 def _sync_quality_alerts(cursor, signals, now_text):
     latest = _latest_alerts(cursor)
+    sla_policy = get_a3_followup_quality_sla_policy()
+    persist_a3_followup_quality_alert_deadlines(cursor, latest.values(), sla_policy)
     detected_keys = {signal["key"] for signal in signals}
     active = {}
     reopened = 0
@@ -250,6 +257,9 @@ def _sync_quality_alerts(cursor, signals, now_text):
             now_text, now_text,
         ))
         alert_id = cursor.lastrowid
+        persist_a3_followup_quality_alert_deadlines(cursor, [{
+            "id": alert_id, "first_detected_at": now_text,
+        }], sla_policy)
         active[signal["key"]] = {
             **signal,
             "id": alert_id,
@@ -509,7 +519,7 @@ def get_a3_followup_quality_alerts(
     conn = connect()
     try:
         all_rows = [dict(row) for row in conn.execute("""
-            SELECT status, severity FROM a3_followup_quality_alerts
+            SELECT * FROM a3_followup_quality_alerts
         """).fetchall()]
         rows = [dict(row) for row in conn.execute(f"""
             SELECT * FROM a3_followup_quality_alerts
@@ -523,6 +533,10 @@ def get_a3_followup_quality_alerts(
         """, (*params, scan_limit)).fetchall()]
     finally:
         conn.close()
+    now_value = now or datetime.now()
+    sla_policy = get_a3_followup_quality_sla_policy()
+    enrich_a3_followup_quality_alert_sla(all_rows, now_value, sla_policy)
+    enrich_a3_followup_quality_alert_sla(rows, now_value, sla_policy)
     if search_text:
         needle = search_text.casefold()
         rows = [
@@ -534,7 +548,6 @@ def get_a3_followup_quality_alerts(
                 str(item.get("owner_username") or ""),
             )).casefold()
         ][:safe_limit]
-    now_value = now or datetime.now()
     for item in rows:
         item.update({
             "status_label": A3_QUALITY_ALERT_STATUS_LABELS.get(
@@ -573,6 +586,20 @@ def get_a3_followup_quality_alerts(
             for row in all_rows
         ),
     }
+    sla_summary = {
+        "response_overdue": sum(
+            item["is_response_overdue"] for item in all_rows
+        ),
+        "resolution_overdue": sum(
+            item["is_resolution_overdue"] for item in all_rows
+        ),
+        "escalated": sum(
+            item["is_escalated"]
+            and item["status"] in {"active", "acknowledged"}
+            for item in all_rows
+        ),
+        "ready": sum(item["sla_ready"] for item in all_rows),
+    }
     status_options = []
     for key, label in A3_QUALITY_ALERT_FILTER_LABELS.items():
         count_key = "total" if key == "all" else key
@@ -591,6 +618,8 @@ def get_a3_followup_quality_alerts(
         "status_filter": selected_status,
         "search": search_text,
         "summary": counts,
+        "sla_summary": sla_summary,
+        "sla_policy": sla_policy,
         "items": rows,
         "visible": len(rows),
         "status_options": status_options,
@@ -609,6 +638,8 @@ def a3_followup_quality_alert_csv_rows(center):
         "Обнаружен", "Последнее обнаружение", "Уведомлений",
         "Принял в работу", "Дата принятия", "Комментарий",
         "Закрыл", "Дата закрытия", "Результат закрытия", "Вид закрытия",
+        "Срок реакции", "Состояние реакции", "Срок устранения",
+        "Состояние устранения", "Эскалации", "Последняя эскалация",
     ]]
     for item in center["items"]:
         rows.append([
@@ -621,6 +652,10 @@ def a3_followup_quality_alert_csv_rows(center):
             item["acknowledged_at"] or "", item["acknowledged_note"] or "",
             item["resolved_by"] or "", item["resolved_at"] or "",
             item["resolution_note"] or "", item["resolution_kind"] or "",
+            item["response_due_at_calculated"], item["response_status_label"],
+            item["resolution_due_at_calculated"],
+            item["resolution_status_label"], item["escalation_count"],
+            item["last_escalated_at"] or "",
         ])
     return [[
         "'" + value
@@ -661,6 +696,7 @@ def _change_quality_alert(alert_id, actor_username, action, note="", now=None):
             conn.rollback()
             return {"ok": False, "error": "alert_not_found"}
         alert = dict(row)
+        persist_a3_followup_quality_alert_deadlines(cursor, [alert])
         if action_name == "acknowledge":
             if alert["status"] != "active":
                 conn.rollback()

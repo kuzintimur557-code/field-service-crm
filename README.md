@@ -78,6 +78,24 @@ uvicorn app.main:app --reload --port 8011
 - `CALENDAR_INCIDENT_RECOVERY_MINUTES` - по умолчанию `120`
 - `CALENDAR_WATCHDOG_STALE_HOURS` - по умолчанию `6`
 - `CALENDAR_SCHEDULER_STUCK_MINUTES` - по умолчанию `30`
+- `A3_QUALITY_ALERT_RESPONSE_HOURS` - срок реакции на сигнал качества A3, `4` ч.
+- `A3_QUALITY_ALERT_RESOLUTION_HOURS` - срок устранения, `24` ч.
+- `A3_QUALITY_ALERT_ESCALATION_COOLDOWN_HOURS` - интервал повторной эскалации, `12` ч.
+
+Сроки SLA отсчитываются от первого обнаружения и сохраняются для каждого
+эпизода. Повторное открытие того же сигнала сохраняет сроки и историю
+эскалаций; новый эпизод получает новые сроки. Для старых записей сроки
+сохраняются при первой проверке или изменении состояния. Настройки принимают
+целые значения от 1 до 720 часов; срок устранения не может быть короче реакции.
+
+Проверку можно запустить в центре сигналов кнопкой «Проверить SLA» или через
+`POST /api/platform/a3-health/incidents/actions/quality-alerts/sla/run`
+(только superadmin). Сводка: `GET /api/platform/a3-health/incidents/actions/quality-alerts/sla`.
+Cron `POST /automation/cron/a3-incident-actions` сначала обновляет сигналы
+качества, затем проверяет SLA: автоматически закрытые сигналы не эскалируются.
+Эскалация уведомляет активных superadmin в приложении и в Telegram, если у них
+указан чат и настроен бот. Повторный запуск до истечения интервала не дублирует
+уведомления; результат доступен в `quality_sla_summary`.
 
 Railway metadata обычно задаётся автоматически:
 
