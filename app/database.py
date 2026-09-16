@@ -1,5 +1,7 @@
 import sqlite3
 import os
+import importlib.util
+import re
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlsplit
@@ -35,6 +37,9 @@ def get_database_runtime_config():
     """Return safe database metadata without exposing credentials or hosts."""
     raw_backend = str(os.getenv("DATABASE_BACKEND") or "").strip().lower()
     database_url = str(os.getenv("DATABASE_URL") or "").strip()
+    postgresql_experimental = str(
+        os.getenv("POSTGRESQL_EXPERIMENTAL") or ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
     url_backend = _database_url_backend(database_url)
     configured_backend = DATABASE_BACKEND_ALIASES.get(raw_backend, raw_backend)
     source = "DATABASE_BACKEND" if raw_backend else "default"
@@ -63,10 +68,14 @@ def get_database_runtime_config():
         and configured_backend != url_backend
     ):
         errors.append("backend_url_mismatch")
+    postgresql_driver_available = bool(importlib.util.find_spec("psycopg"))
     if configured_backend == DATABASE_BACKEND_POSTGRESQL:
         if not database_url:
             errors.append("database_url_required")
-        errors.append("postgresql_adapter_pending")
+        if not postgresql_driver_available:
+            errors.append("postgresql_driver_missing")
+        if not postgresql_experimental:
+            errors.append("postgresql_experimental_opt_in_required")
     elif database_url:
         errors.append("database_url_not_used")
 
@@ -80,8 +89,13 @@ def get_database_runtime_config():
             configured_backend,
             "Неизвестная база",
         ),
-        "active_backend": DATABASE_BACKEND_SQLITE,
-        "active_backend_label": labels[DATABASE_BACKEND_SQLITE],
+        "active_backend": (
+            configured_backend if not errors else DATABASE_BACKEND_SQLITE
+        ),
+        "active_backend_label": labels.get(
+            configured_backend if not errors else DATABASE_BACKEND_SQLITE,
+            "Неизвестная база",
+        ),
         "configuration_source": source,
         "database_url_configured": bool(database_url),
         "database_url_backend": url_backend,
@@ -90,6 +104,8 @@ def get_database_runtime_config():
         "migration_required": (
             configured_backend == DATABASE_BACKEND_POSTGRESQL
         ),
+        "postgresql_experimental": postgresql_experimental,
+        "postgresql_adapter_ready": postgresql_driver_available,
         "postgresql_ready": False,
     }
 
@@ -102,17 +118,68 @@ def connect():
             "Database configuration is not supported by this release: "
             f"{reasons}. No DATABASE_URL value was logged."
         )
+    if config["configured_backend"] == DATABASE_BACKEND_POSTGRESQL:
+        from app.postgres_adapter import connect_postgres
+
+        return connect_postgres(os.getenv("DATABASE_URL"))
+
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def add_column_if_missing(cursor, table, column, column_type):
+    if getattr(cursor, "backend", DATABASE_BACKEND_SQLITE) == (
+        DATABASE_BACKEND_POSTGRESQL
+    ):
+        for identifier in (table, column):
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", identifier):
+                raise ValueError("Invalid database identifier")
+        existing = cursor.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema=CURRENT_SCHEMA()
+              AND table_name=?
+              AND column_name=?
+        """, (table, column)).fetchone()
+        if not existing:
+            cursor.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
+            )
+        return
+
     columns = cursor.execute(f"PRAGMA table_info({table})").fetchall()
     column_names = [column_info["name"] for column_info in columns]
 
     if column not in column_names:
         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+
+
+def sync_postgres_sequences(cursor):
+    if getattr(cursor, "backend", DATABASE_BACKEND_SQLITE) != (
+        DATABASE_BACKEND_POSTGRESQL
+    ):
+        return
+    tables = cursor.execute("""
+        SELECT table_name
+        FROM information_schema.columns
+        WHERE table_schema=CURRENT_SCHEMA()
+          AND column_name='id'
+          AND position('nextval(' in COALESCE(column_default, ''))=1
+        ORDER BY table_name
+    """).fetchall()
+    for row in tables:
+        table = row["table_name"]
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table):
+            raise ValueError("Invalid database identifier")
+        cursor.execute(f"""
+            SELECT setval(
+                pg_get_serial_sequence(?, 'id'),
+                COALESCE(MAX(id), 1),
+                COUNT(*) > 0
+            )
+            FROM {table}
+        """, (table,))
 
 
 def init_db():
@@ -1700,5 +1767,6 @@ def init_db():
             datetime.now().strftime("%Y-%m-%d %H:%M")
         ))
 
+    sync_postgres_sequences(c)
     conn.commit()
     conn.close()

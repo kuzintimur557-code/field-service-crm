@@ -6,3 +6,4 @@ requests
 reportlab
 pillow
 bcrypt
+psycopg[binary]>=3.2,<4

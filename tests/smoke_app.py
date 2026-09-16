@@ -153,24 +153,45 @@ def assert_database_runtime_configuration():
     with patch.dict(os.environ, {
         "DATABASE_BACKEND": "postgresql",
         "DATABASE_URL": private_url,
+        "POSTGRESQL_EXPERIMENTAL": "1",
     }):
         config = database_module.get_database_runtime_config()
         assert config["configured_backend"] == "postgresql"
         assert config["database_url_backend"] == "postgresql"
         assert config["database_url_configured"] is True
-        assert config["configuration_valid"] is False
+        assert config["configuration_valid"] is (
+            config["postgresql_adapter_ready"]
+        )
         assert config["migration_required"] is True
-        assert "postgresql_adapter_pending" in config["errors"]
+        assert config["postgresql_ready"] is False
         serialized = json.dumps(config)
         assert "private_user" not in serialized
         assert "private_password" not in serialized
         assert "db.internal" not in serialized
-        try:
-            database_module.connect()
-            raise AssertionError("PostgreSQL must fail closed until adapter exists")
-        except database_module.DatabaseConfigurationError as error:
-            assert private_url not in str(error)
-            assert "postgresql_adapter_pending" in str(error)
+        with patch.object(
+            database_module.importlib.util,
+            "find_spec",
+            return_value=None,
+        ):
+            missing_driver = database_module.get_database_runtime_config()
+            assert missing_driver["configuration_valid"] is False
+            assert "postgresql_driver_missing" in missing_driver["errors"]
+            try:
+                database_module.connect()
+                raise AssertionError("Missing PostgreSQL driver must fail closed")
+            except database_module.DatabaseConfigurationError as error:
+                assert private_url not in str(error)
+                assert "postgresql_driver_missing" in str(error)
+
+    with patch.dict(os.environ, {
+        "DATABASE_BACKEND": "postgresql",
+        "DATABASE_URL": private_url,
+        "POSTGRESQL_EXPERIMENTAL": "0",
+    }):
+        no_opt_in = database_module.get_database_runtime_config()
+        assert no_opt_in["configuration_valid"] is False
+        assert "postgresql_experimental_opt_in_required" in no_opt_in["errors"]
+        assert no_opt_in["active_backend"] == "sqlite"
 
     with patch.dict(os.environ, {
         "DATABASE_BACKEND": "sqlite",
@@ -202,6 +223,107 @@ def assert_database_runtime_configuration():
         assert database_item["status"] == "critical"
         assert database_item["value"] == "SQLite"
         assert production["database_production_ready"] is False
+
+
+def assert_postgres_adapter_foundation():
+    from app.postgres_adapter import (
+        HybridRow,
+        PostgresConnectionAdapter,
+        translate_sqlite_sql,
+        validate_identifier,
+    )
+
+    row = HybridRow(("id", "title"), (7, "Проверка"))
+    assert row[0] == row["id"] == 7
+    assert row[-1] == row["title"] == "Проверка"
+    assert dict(row) == {"id": 7, "title": "Проверка"}
+    assert list(row.keys()) == ["id", "title"]
+
+    translated = translate_sqlite_sql(
+        "SELECT * FROM tasks WHERE id=? AND title='?' AND note LIKE '%важно%'",
+        has_parameters=True,
+    )
+    assert "id=%s" in translated
+    assert "title='?'" in translated
+    assert "LIKE '%%важно%%'" in translated
+    assert translate_sqlite_sql("BEGIN IMMEDIATE") == "BEGIN"
+    assert "BIGSERIAL PRIMARY KEY" in translate_sqlite_sql(
+        "CREATE TABLE sample (id INTEGER PRIMARY KEY AUTOINCREMENT)"
+    )
+    assert translate_sqlite_sql(
+        "INSERT OR IGNORE INTO sample (id) VALUES (?)",
+        has_parameters=True,
+    ) == "INSERT INTO sample (id) VALUES (%s) ON CONFLICT DO NOTHING"
+    assert "TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')" in translate_sqlite_sql(
+        "SELECT date('now')"
+    )
+    assert "STRING_AGG((actions.key)::text, ',')" in translate_sqlite_sql(
+        "SELECT GROUP_CONCAT(actions.key) FROM actions"
+    )
+    assert validate_identifier("safe_table_2") == "safe_table_2"
+    try:
+        validate_identifier("unsafe; DROP TABLE users")
+        raise AssertionError("Unsafe SQL identifier was accepted")
+    except ValueError:
+        pass
+
+    class FakeCursor:
+        def __init__(self, last_value=42):
+            self.queries = []
+            self.rowcount = 1
+            self.description = ()
+            self.last_value = last_value
+
+        def execute(self, query, parameters=None):
+            self.queries.append((query, parameters))
+            return self
+
+        def executemany(self, query, parameters):
+            self.queries.append((query, list(parameters)))
+            return self
+
+        def fetchone(self):
+            return (self.last_value,)
+
+        def fetchall(self):
+            return []
+
+        def close(self):
+            return None
+
+    class FakeConnection:
+        def __init__(self):
+            self.cursors = []
+            self.committed = False
+            self.rolled_back = False
+            self.closed = False
+
+        def cursor(self):
+            cursor = FakeCursor()
+            self.cursors.append(cursor)
+            return cursor
+
+        def commit(self):
+            self.committed = True
+
+        def rollback(self):
+            self.rolled_back = True
+
+        def close(self):
+            self.closed = True
+
+    raw = FakeConnection()
+    connection = PostgresConnectionAdapter(raw)
+    cursor = connection.cursor()
+    cursor.execute("INSERT INTO tasks (title) VALUES (?)", ("Тест",))
+    assert cursor._cursor.queries == [(
+        "INSERT INTO tasks (title) VALUES (%s)",
+        ("Тест",),
+    )]
+    assert cursor.lastrowid == 42
+    assert raw.cursors[-1].queries[-1][0] == "SELECT LASTVAL()"
+    connection.commit()
+    assert raw.committed is True
 
 
 def make_multipart_request(username, path, data):
@@ -30775,6 +30897,7 @@ def main():
     try:
         task = seed_data()
         assert_database_runtime_configuration()
+        assert_postgres_adapter_foundation()
         assert_session_cookie_auth()
         assert_task_access(task)
         assert_automation_foundation()

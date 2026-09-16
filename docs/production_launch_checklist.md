@@ -12,10 +12,10 @@ Set these variables before production deploy:
 - `DATA_DIR` if the server uses a mounted persistent volume
 - `DATABASE_BACKEND=sqlite` while the PostgreSQL migration is unfinished
 
-Do not attach `DATABASE_URL` to the application service until the PostgreSQL
-adapter, data migration and PostgreSQL smoke job are complete. The current
-guardrail deliberately stops startup instead of silently falling back to
-SQLite when PostgreSQL is requested.
+Do not attach `DATABASE_URL` or enable `POSTGRESQL_EXPERIMENTAL` on the
+application service until the full PostgreSQL application smoke, data migration
+and restore drill are complete. The current guardrail deliberately stops
+startup instead of silently falling back to SQLite when PostgreSQL is requested.
 
 Railway normally sets deployment metadata automatically:
 
