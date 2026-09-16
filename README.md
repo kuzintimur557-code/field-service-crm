@@ -7,7 +7,7 @@ A3 Ops Center и AI-ready аналитика.
 ## Стек
 
 - FastAPI
-- SQLite
+- SQLite (текущий backend; идёт подготовка миграции на PostgreSQL)
 - Jinja2
 - Railway
 - GitHub Actions
@@ -71,6 +71,8 @@ uvicorn app.main:app --reload --port 8011
 Опционально:
 
 - `DATA_DIR`
+- `DATABASE_BACKEND` - сейчас должен оставаться `sqlite`
+- `DATABASE_URL` - будущая строка PostgreSQL; до завершения adapter не включать
 - `BOT_TOKEN`
 - `CHAT_ID`
 - `CALENDAR_INCIDENT_RESPONSE_MINUTES` - по умолчанию `30`
@@ -105,6 +107,18 @@ Railway metadata обычно задаётся автоматически:
 - `RAILWAY_DEPLOYMENT_ID`
 - `RAILWAY_SERVICE_NAME`
 
+## Миграция на PostgreSQL
+
+Переход выполняется по этапам, чтобы не потерять данные и не сломать текущую
+SQLite-версию. Первый этап добавляет явную конфигурацию backend и блокирует
+случайное использование `DATABASE_URL`, которое приложение ещё не обслуживает.
+Текущий релиз продолжает работать с `DATABASE_BACKEND=sqlite`.
+
+Если задать PostgreSQL раньше завершения adapter, приложение завершит запуск с
+безопасной ошибкой конфигурации и не выведет строку подключения в лог. Текущий
+статус миграции и следующий шаг видны на страницах `/system` и
+`/platform/readiness`. Подробный порядок: `docs/postgresql_migration.md`.
+
 ## Проверки перед коммитом
 
 Быстрая проверка:
@@ -138,7 +152,7 @@ python3 tests/smoke_security.py
 Публичные:
 
 - `GET /health` - приложение и база отвечают
-- `GET /ready` - SQLite quick check, ключевые таблицы, uploads
+- `GET /ready` - конфигурация backend, SQLite quick check, ключевые таблицы, uploads
 
 Админские:
 

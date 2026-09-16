@@ -161,7 +161,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.database import connect, init_db
+from app.database import (
+    DatabaseConfigurationError,
+    connect,
+    get_database_runtime_config,
+    init_db,
+)
 from app.telegram_utils import send_message, send_photo, send_message_to_chat
 
 from datetime import datetime, timedelta
@@ -5898,6 +5903,14 @@ def get_production_config_status():
     data_dir_writable = data_dir_exists and os.access(DATA_DIR, os.W_OK)
     uploads_writable = uploads_exists and os.access(UPLOAD_DIR, os.W_OK)
     storage_ready = data_dir_writable and uploads_writable
+    database_runtime = get_database_runtime_config()
+    database_production_ready = database_runtime["postgresql_ready"]
+    database_config_status = (
+        "critical"
+        if not database_runtime["configuration_valid"]
+        or (production_mode and not database_production_ready)
+        else "ok" if database_production_ready else "warning"
+    )
 
     items = [
         make_production_config_item(
@@ -5911,6 +5924,32 @@ def get_production_config_status():
                 else "Сейчас приложение работает не в боевом режиме."
             ),
             "Для релиза используйте ENV=production или Railway окружение.",
+        ),
+        make_production_config_item(
+            "database_backend",
+            "База данных production",
+            database_config_status,
+            database_runtime["configured_backend_label"],
+            (
+                "Конфигурация базы содержит несовместимые параметры."
+                if not database_runtime["configuration_valid"]
+                else (
+                    "PostgreSQL adapter готов к production."
+                    if database_production_ready
+                    else (
+                        "SQLite остаётся активной базой на этапе миграции. "
+                        "Для локальной разработки это допустимо."
+                    )
+                )
+            ),
+            (
+                "Устраните конфликт DATABASE_BACKEND и DATABASE_URL."
+                if not database_runtime["configuration_valid"]
+                else (
+                    "Проверяйте миграцию на отдельной PostgreSQL базе; "
+                    "не переключайте production до завершения adapter и smoke."
+                )
+            ),
         ),
         make_production_config_item(
             "secret_key",
@@ -6002,6 +6041,8 @@ def get_production_config_status():
         "data_dir_writable": data_dir_writable,
         "uploads_writable": uploads_writable,
         "storage_ready": storage_ready,
+        "database_runtime": database_runtime,
+        "database_production_ready": database_production_ready,
         "items": items,
         "status": status,
         "status_label": status_label,
@@ -40143,6 +40184,7 @@ def build_system_diagnostics(role=""):
         else 0
     )
     production_config = get_production_config_status()
+    database_runtime = production_config["database_runtime"]
     env_name = production_config["environment"]
     railway_environment = production_config["railway_environment"]
     default_secret = production_config["secret_is_default"]
@@ -40166,6 +40208,28 @@ def build_system_diagnostics(role=""):
             APP_VERSION,
             "FastAPI приложение отвечает и отдаёт системную страницу.",
             "Продолжайте контролировать релизные проверки.",
+            "/platform/readiness",
+        ),
+        make_system_check(
+            "database_backend",
+            "Backend базы",
+            (
+                "critical"
+                if not database_runtime["configuration_valid"]
+                or (
+                    production_config["production_mode"]
+                    and not database_runtime["postgresql_ready"]
+                )
+                else "warning" if not database_runtime["postgresql_ready"] else "ok"
+            ),
+            database_runtime["active_backend_label"],
+            (
+                "Приложение работает на SQLite; миграция PostgreSQL ещё "
+                "не завершена."
+                if not database_runtime["postgresql_ready"]
+                else "Приложение работает на PostgreSQL."
+            ),
+            "Завершите PostgreSQL adapter и прогон smoke на новой базе.",
             "/platform/readiness",
         ),
         make_system_check(
@@ -40449,6 +40513,7 @@ def build_system_diagnostics(role=""):
         "db_size": db_size,
         "db_size_label": format_file_size(db_size),
         "db_path": str(db_path),
+        "database_runtime": database_runtime,
         "data_dir": str(DATA_DIR),
         "uploads_exists": uploads_exists,
         "uploads_files": uploads_files,
@@ -40485,6 +40550,7 @@ def build_system_diagnostics(role=""):
 
 
 def get_public_health_status():
+    database_runtime = get_database_runtime_config()
     database_ok = False
     database_error = ""
     conn = None
@@ -40493,7 +40559,7 @@ def get_public_health_status():
         conn = connect()
         conn.execute("SELECT 1").fetchone()
         database_ok = True
-    except (OSError, sqlite3.Error) as error:
+    except (OSError, sqlite3.Error, DatabaseConfigurationError) as error:
         database_error = error.__class__.__name__
     finally:
         if conn:
@@ -40510,6 +40576,7 @@ def get_public_health_status():
         "status_label": "Работает" if database_ok else "Проблема",
         "database": {
             "ok": database_ok,
+            "backend": database_runtime["active_backend"],
             "status": status,
             "status_label": "Доступна" if database_ok else "Недоступна",
             "error": database_error,
@@ -40519,6 +40586,7 @@ def get_public_health_status():
 
 
 def get_public_readiness_status():
+    database_runtime = get_database_runtime_config()
     conn = None
     database_ok = False
     quick_check_ok = False
@@ -40543,21 +40611,42 @@ def get_public_readiness_status():
             for table in BACKUP_REQUIRED_TABLES
             if table not in tables
         ]
-    except (OSError, sqlite3.Error) as error:
+    except (OSError, sqlite3.Error, DatabaseConfigurationError) as error:
         database_error = error.__class__.__name__
     finally:
         if conn:
             conn.close()
 
     tables_ok = database_ok and not missing_tables
-    ready = database_ok and quick_check_ok and tables_ok and uploads_ok
+    ready = (
+        database_runtime["configuration_valid"]
+        and database_ok
+        and quick_check_ok
+        and tables_ok
+        and uploads_ok
+    )
     checks = [
+        {
+            "key": "database_configuration",
+            "ok": database_runtime["configuration_valid"],
+            "status": (
+                "ok"
+                if database_runtime["configuration_valid"]
+                else "critical"
+            ),
+            "status_label": (
+                database_runtime["active_backend_label"]
+                if database_runtime["configuration_valid"]
+                else "Ошибка конфигурации"
+            ),
+        },
         {
             "key": "database",
             "ok": database_ok,
             "status": "ok" if database_ok else "critical",
             "status_label": "Доступна" if database_ok else "Недоступна",
             "error": database_error,
+            "backend": database_runtime["active_backend"],
         },
         {
             "key": "sqlite_quick_check",

@@ -128,6 +128,82 @@ def make_json_request(username, path, data):
     }, receive)
 
 
+def assert_database_runtime_configuration():
+    from unittest.mock import patch
+    from app import database as database_module
+
+    with patch.dict(os.environ, {
+        "DATABASE_BACKEND": "sqlite",
+        "DATABASE_URL": "",
+    }):
+        config = database_module.get_database_runtime_config()
+        assert config["configuration_valid"] is True
+        assert config["configured_backend"] == "sqlite"
+        assert config["active_backend"] == "sqlite"
+        assert config["database_url_configured"] is False
+        conn = database_module.connect()
+        try:
+            assert conn.execute("SELECT 1").fetchone()[0] == 1
+        finally:
+            conn.close()
+
+    private_url = (
+        "postgresql://private_user:private_password@db.internal:5432/crm"
+    )
+    with patch.dict(os.environ, {
+        "DATABASE_BACKEND": "postgresql",
+        "DATABASE_URL": private_url,
+    }):
+        config = database_module.get_database_runtime_config()
+        assert config["configured_backend"] == "postgresql"
+        assert config["database_url_backend"] == "postgresql"
+        assert config["database_url_configured"] is True
+        assert config["configuration_valid"] is False
+        assert config["migration_required"] is True
+        assert "postgresql_adapter_pending" in config["errors"]
+        serialized = json.dumps(config)
+        assert "private_user" not in serialized
+        assert "private_password" not in serialized
+        assert "db.internal" not in serialized
+        try:
+            database_module.connect()
+            raise AssertionError("PostgreSQL must fail closed until adapter exists")
+        except database_module.DatabaseConfigurationError as error:
+            assert private_url not in str(error)
+            assert "postgresql_adapter_pending" in str(error)
+
+    with patch.dict(os.environ, {
+        "DATABASE_BACKEND": "sqlite",
+        "DATABASE_URL": private_url,
+    }):
+        config = database_module.get_database_runtime_config()
+        assert config["configuration_valid"] is False
+        assert "backend_url_mismatch" in config["errors"]
+        assert "database_url_not_used" in config["errors"]
+
+    with patch.dict(os.environ, {
+        "DATABASE_BACKEND": "mysql",
+        "DATABASE_URL": "",
+    }):
+        config = database_module.get_database_runtime_config()
+        assert config["configuration_valid"] is False
+        assert "unsupported_backend" in config["errors"]
+
+    with patch.dict(os.environ, {
+        "ENV": "production",
+        "DATABASE_BACKEND": "sqlite",
+        "DATABASE_URL": "",
+    }):
+        production = crm.get_production_config_status()
+        database_item = next(
+            item for item in production["items"]
+            if item["key"] == "database_backend"
+        )
+        assert database_item["status"] == "critical"
+        assert database_item["value"] == "SQLite"
+        assert production["database_production_ready"] is False
+
+
 def make_multipart_request(username, path, data):
     boundary = "----smoke-boundary"
     parts = []
@@ -19181,6 +19257,7 @@ async def assert_platform_calendar_health():
         assert health_payload["build"]["version"] == crm.APP_VERSION
         assert "commit" in health_payload["build"]
         assert health_payload["database"]["ok"] is True
+        assert health_payload["database"]["backend"] == "sqlite"
         assert "db_path" not in health_payload
         assert "branch" not in health_payload["build"]
         assert "system_events" not in health_payload
@@ -19189,6 +19266,7 @@ async def assert_platform_calendar_health():
         assert readiness_status["ok"] is True
         assert readiness_status["status"] == "ok"
         assert {
+            "database_configuration",
             "database",
             "sqlite_quick_check",
             "required_tables",
@@ -19238,6 +19316,8 @@ async def assert_platform_calendar_health():
         assert "Конфигурация окружения" in system_html
         assert "Фоновые запуски" in system_html
         assert "Telegram" in system_html
+        assert "База данных production" in system_html
+        assert "Backend базы" in system_html
         assert "Резервные копии" in system_html
         assert "Пути и файлы" in system_html
         assert "Ошибки приложения" in system_html
@@ -19267,6 +19347,9 @@ async def assert_platform_calendar_health():
         assert "backup_status" in system_page.context
         assert "system_events" in system_page.context
         assert "production_config" in system_page.context
+        assert system_page.context["database_runtime"]["active_backend"] == (
+            "sqlite"
+        )
         assert system_page.context["build_metadata"]["version"] == (
             crm.APP_VERSION
         )
@@ -19315,6 +19398,7 @@ async def assert_platform_calendar_health():
         assert system_page.context["db_size_label"]
         assert {
             "secret_key",
+            "database_backend",
             "secure_cookie",
             "telegram",
             "automation_cron_secret",
@@ -30690,6 +30774,7 @@ async def assert_a3_api_layer():
 def main():
     try:
         task = seed_data()
+        assert_database_runtime_configuration()
         assert_session_cookie_auth()
         assert_task_access(task)
         assert_automation_foundation()

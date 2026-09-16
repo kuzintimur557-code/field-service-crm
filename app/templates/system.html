@@ -144,6 +144,12 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             <div class="metric-value">{{ env_name }}</div>
         </div>
         <div class="metric">
+            <div class="metric-label">База данных</div>
+            <div class="metric-value {{ 'ok' if database_runtime.postgresql_ready else 'warning' }}">
+                {{ database_runtime.active_backend_label }}
+            </div>
+        </div>
+        <div class="metric">
             <div class="metric-label">Railway</div>
             <div class="metric-value {{ 'ok' if railway_environment else 'warning' }}">
                 {{ "активно" if railway_environment else "локально" }}

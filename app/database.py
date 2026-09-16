@@ -2,6 +2,7 @@ import sqlite3
 import os
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urlsplit
 
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "."))
@@ -9,8 +10,98 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_NAME = str(DATA_DIR / "crm.db")
 
+DATABASE_BACKEND_SQLITE = "sqlite"
+DATABASE_BACKEND_POSTGRESQL = "postgresql"
+DATABASE_BACKEND_ALIASES = {
+    "postgres": DATABASE_BACKEND_POSTGRESQL,
+    "postgresql": DATABASE_BACKEND_POSTGRESQL,
+    "sqlite": DATABASE_BACKEND_SQLITE,
+}
+
+
+class DatabaseConfigurationError(RuntimeError):
+    pass
+
+
+def _database_url_backend(database_url):
+    try:
+        scheme = urlsplit(str(database_url or "").strip()).scheme.lower()
+    except ValueError:
+        return "invalid"
+    return DATABASE_BACKEND_ALIASES.get(scheme, scheme or "")
+
+
+def get_database_runtime_config():
+    """Return safe database metadata without exposing credentials or hosts."""
+    raw_backend = str(os.getenv("DATABASE_BACKEND") or "").strip().lower()
+    database_url = str(os.getenv("DATABASE_URL") or "").strip()
+    url_backend = _database_url_backend(database_url)
+    configured_backend = DATABASE_BACKEND_ALIASES.get(raw_backend, raw_backend)
+    source = "DATABASE_BACKEND" if raw_backend else "default"
+
+    if not configured_backend and url_backend:
+        configured_backend = url_backend
+        source = "DATABASE_URL"
+    if not configured_backend:
+        configured_backend = DATABASE_BACKEND_SQLITE
+
+    errors = []
+    if configured_backend not in {
+        DATABASE_BACKEND_SQLITE,
+        DATABASE_BACKEND_POSTGRESQL,
+    }:
+        errors.append("unsupported_backend")
+    if database_url and url_backend not in {
+        DATABASE_BACKEND_SQLITE,
+        DATABASE_BACKEND_POSTGRESQL,
+    }:
+        errors.append("unsupported_database_url")
+    if (
+        raw_backend
+        and database_url
+        and url_backend
+        and configured_backend != url_backend
+    ):
+        errors.append("backend_url_mismatch")
+    if configured_backend == DATABASE_BACKEND_POSTGRESQL:
+        if not database_url:
+            errors.append("database_url_required")
+        errors.append("postgresql_adapter_pending")
+    elif database_url:
+        errors.append("database_url_not_used")
+
+    labels = {
+        DATABASE_BACKEND_SQLITE: "SQLite",
+        DATABASE_BACKEND_POSTGRESQL: "PostgreSQL",
+    }
+    return {
+        "configured_backend": configured_backend,
+        "configured_backend_label": labels.get(
+            configured_backend,
+            "Неизвестная база",
+        ),
+        "active_backend": DATABASE_BACKEND_SQLITE,
+        "active_backend_label": labels[DATABASE_BACKEND_SQLITE],
+        "configuration_source": source,
+        "database_url_configured": bool(database_url),
+        "database_url_backend": url_backend,
+        "configuration_valid": not errors,
+        "errors": errors,
+        "migration_required": (
+            configured_backend == DATABASE_BACKEND_POSTGRESQL
+        ),
+        "postgresql_ready": False,
+    }
+
 
 def connect():
+    config = get_database_runtime_config()
+    if not config["configuration_valid"]:
+        reasons = ", ".join(config["errors"])
+        raise DatabaseConfigurationError(
+            "Database configuration is not supported by this release: "
+            f"{reasons}. No DATABASE_URL value was logged."
+        )
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn

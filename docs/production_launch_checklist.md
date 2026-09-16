@@ -10,6 +10,12 @@ Set these variables before production deploy:
 - `AUTOMATION_CRON_SECRET` with a long random value
 - `BOT_TOKEN` and `CHAT_ID` if Telegram alerts are enabled
 - `DATA_DIR` if the server uses a mounted persistent volume
+- `DATABASE_BACKEND=sqlite` while the PostgreSQL migration is unfinished
+
+Do not attach `DATABASE_URL` to the application service until the PostgreSQL
+adapter, data migration and PostgreSQL smoke job are complete. The current
+guardrail deliberately stops startup instead of silently falling back to
+SQLite when PostgreSQL is requested.
 
 Railway normally sets deployment metadata automatically:
 
@@ -50,6 +56,7 @@ Expected:
 - `/health` returns `200`
 - `/ready` returns `200`
 - `/system` shows no critical production blockers
+- `/system` shows the expected database backend and no configuration conflict
 - backups are visible and restore check is available
 
 ## 4. Automation Cron
@@ -75,6 +82,7 @@ Pause rollout if any of these happen:
 - `/ready` returns `503`
 - `/system` shows critical runtime errors
 - database quick check fails
+- database backend configuration is invalid or PostgreSQL cutover is incomplete
 - uploads are not writable
 - login or session checks fail
 - company isolation smoke tests fail
