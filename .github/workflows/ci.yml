@@ -52,7 +52,7 @@ jobs:
         run: python tests/smoke_security.py
 
   postgres-schema-smoke:
-    name: PostgreSQL schema smoke
+    name: PostgreSQL application smoke
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -99,3 +99,6 @@ jobs:
 
       - name: Run PostgreSQL schema smoke
         run: python tests/smoke_postgresql.py
+
+      - name: Run PostgreSQL application smoke
+        run: python tests/smoke_app.py

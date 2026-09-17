@@ -14,7 +14,7 @@ SQLite remains the default runtime. The PostgreSQL foundation now includes:
 - a psycopg adapter for placeholders, row access and generated identifiers;
 - translation for the SQLite SQL forms used by schema initialization;
 - idempotent schema creation and sequence synchronization on PostgreSQL;
-- a PostgreSQL 16 schema smoke job in CI;
+- schema and complete application smoke checks on PostgreSQL 16 in CI;
 - backend-aware `/health` and `/ready` database checks;
 - `POSTGRESQL_EXPERIMENTAL=1` as an explicit non-production opt-in;
 - unsupported, conflicting or incomplete PostgreSQL settings stop startup;
@@ -28,28 +28,25 @@ SQLite remains the default runtime. The PostgreSQL foundation now includes:
 The application uses direct SQL and depends on SQLite behavior in several
 places. The adapter must handle these areas before cutover:
 
-1. Run the complete application smoke suite against PostgreSQL and resolve any
-   remaining query-level incompatibilities.
-2. Replace SQLite-only health checks such as `PRAGMA quick_check` and
-   `sqlite_master` inspection.
-3. Validate partial indexes and transaction locking used by automation
+1. Add an idempotent SQLite-to-PostgreSQL data migration with row-count and
+   company-isolation verification.
+2. Validate partial indexes and transaction locking used by automation
    monitors under concurrent PostgreSQL sessions.
-4. Health checks, backup creation and restore drills currently operate on
-   a local database file.
+3. Replace the SQLite backup fixture with PostgreSQL-native backup creation and
+   restore drills. The application smoke currently isolates the legacy backup
+   lifecycle in a temporary SQLite database.
 
 ## Safe sequence
 
-1. Keep the connection adapter and schema smoke green on both backends.
-2. Run the complete application smoke suite against disposable SQLite and PostgreSQL
-   databases in CI.
-3. Add an idempotent SQLite-to-PostgreSQL data migration with row-count and
+1. Keep the connection adapter and application smoke green on both backends.
+2. Add an idempotent SQLite-to-PostgreSQL data migration with row-count and
    company-isolation verification.
-4. Add PostgreSQL-native backup and restore checks.
-5. Rehearse migration on a production copy and record timings and rollback
+3. Add PostgreSQL-native backup and restore checks.
+4. Rehearse migration on a production copy and record timings and rollback
    criteria.
-6. Set `DATABASE_BACKEND=postgresql` and `DATABASE_URL` only during the approved
+5. Set `DATABASE_BACKEND=postgresql` and `DATABASE_URL` only during the approved
    cutover window.
-7. Keep the verified SQLite backup until the PostgreSQL restore drill passes.
+6. Keep the verified SQLite backup until the PostgreSQL restore drill passes.
 
 ## Schema smoke
 
@@ -67,7 +64,9 @@ It initializes the schema twice, verifies core tables and A3 quality SLA
 columns, checks idempotent development seeds, verifies generated IDs and row
 access, then checks PostgreSQL health and readiness responses. `/health` must
 pass, while `/ready` remains blocked by `database_release_support` until the
-full application smoke and data migration are complete.
+data migration and PostgreSQL-native backup drill are complete. CI then runs
+the complete application smoke against the same disposable PostgreSQL service;
+only the legacy file-backup lifecycle uses a temporary SQLite fixture.
 
 ## Exit criteria
 

@@ -113,15 +113,17 @@ def get_a3_followup_analytics(period="30", company_id="all", now=None):
     )
     conn = connect()
     try:
-        rows = conn.execute("""
+        company_filter = "" if selected_company == "all" else "WHERE f.company_id=?"
+        company_params = () if selected_company == "all" else (selected_company,)
+        rows = conn.execute(f"""
             SELECT f.*, COALESCE(c.name, 'Компания #' || f.company_id) AS company_name
             FROM a3_incident_followups AS f
             JOIN a3_platform_incidents AS i
               ON i.id=f.incident_id AND i.company_id=f.company_id
             LEFT JOIN companies AS c ON c.id=f.company_id
-            WHERE (?='all' OR f.company_id=?)
+            {company_filter}
             ORDER BY f.id
-        """, (selected_company, selected_company)).fetchall()
+        """, company_params).fetchall()
     finally:
         conn.close()
 

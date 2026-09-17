@@ -111,6 +111,37 @@ def _translate_placeholders(query, has_parameters):
 
 def translate_sqlite_sql(query, has_parameters=False):
     translated = str(query)
+    table_info = re.fullmatch(
+        r"\s*PRAGMA\s+table_info\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*;?\s*",
+        translated,
+        flags=re.IGNORECASE,
+    )
+    if table_info:
+        table = validate_identifier(table_info.group(1))
+        return (
+            "SELECT column_name AS name "
+            "FROM information_schema.columns "
+            "WHERE table_schema=CURRENT_SCHEMA() "
+            f"AND table_name='{table}' "
+            "ORDER BY ordinal_position"
+        )
+
+    sqlite_catalog = """(
+        SELECT table_name AS name, 'table' AS type
+        FROM information_schema.tables
+        WHERE table_schema=CURRENT_SCHEMA()
+          AND table_type='BASE TABLE'
+        UNION ALL
+        SELECT indexname AS name, 'index' AS type
+        FROM pg_indexes
+        WHERE schemaname=CURRENT_SCHEMA()
+    ) AS sqlite_master"""
+    translated = re.sub(
+        r"\bsqlite_master\b",
+        sqlite_catalog,
+        translated,
+        flags=re.IGNORECASE,
+    )
     translated = re.sub(
         r"\bBEGIN\s+IMMEDIATE\b",
         "BEGIN",
@@ -124,14 +155,74 @@ def translate_sqlite_sql(query, has_parameters=False):
         flags=re.IGNORECASE,
     )
     translated = re.sub(
+        r"\bINTEGER\s+PRIMARY\s+KEY\b",
+        "BIGSERIAL PRIMARY KEY",
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
         r"\bdate\s*\(\s*'now'\s*\)",
         "TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')",
         translated,
         flags=re.IGNORECASE,
     )
     translated = re.sub(
+        r"datetime\s*\(\s*'now'\s*,\s*'([+-]?\d+)\s+days?'\s*\)",
+        lambda match: (
+            "(CURRENT_TIMESTAMP + INTERVAL "
+            f"'{int(match.group(1))} days')"
+        ),
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
+        r"datetime\s*\(\s*([A-Za-z_][A-Za-z0-9_.]*)\s*,\s*"
+        r"'\+'\s*\|\|\s*\?\s*\|\|\s*'\s*minutes?'\s*\)",
+        (
+            r"TO_CHAR((\1)::timestamp + ((?)::integer * INTERVAL '1 minute'), "
+            r"'YYYY-MM-DD HH24:MI:SS')"
+        ),
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
+        r"datetime\s*\(\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\)",
+        r"(\1)::timestamp",
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
         r"GROUP_CONCAT\s*\(\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\)",
         r"STRING_AGG((\1)::text, ',')",
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
+        r"CAST\s*\(\s*REPLACE\s*\(\s*COALESCE\s*\(\s*"
+        r"([A-Za-z_][A-Za-z0-9_.]*)\s*,\s*'0'\s*\)\s*,\s*','\s*,\s*"
+        r"'\.'\s*\)\s+AS\s+REAL\s*\)",
+        (
+            r"CAST(NULLIF(REPLACE(COALESCE((\1)::text, '0'), ',', '.'), '') "
+            r"AS DOUBLE PRECISION)"
+        ),
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
+        r"\b(SUM|AVG)\s*\(\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\)",
+        (
+            r"\1(CAST(NULLIF(REPLACE((\2)::text, ',', '.'), '') "
+            r"AS DOUBLE PRECISION))"
+        ),
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
+        r"\?\s+IS\s+(NOT\s+)?NULL",
+        lambda match: (
+            "CAST(? AS TEXT) IS "
+            f"{'NOT ' if match.group(1) else ''}NULL"
+        ),
         translated,
         flags=re.IGNORECASE,
     )
@@ -245,6 +336,9 @@ class PostgresConnectionAdapter:
 
     def execute(self, query, parameters=None):
         return self.cursor().execute(query, parameters)
+
+    def executemany(self, query, parameters):
+        return self.cursor().executemany(query, parameters)
 
     def commit(self):
         return self._raw.commit()

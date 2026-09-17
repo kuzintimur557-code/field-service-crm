@@ -20,7 +20,8 @@ os.environ["DATA_DIR"] = TEMP_DATA.name
 os.environ["SECRET_KEY"] = "smoke-test-secret"
 
 from app import main as crm  # noqa: E402
-from app.database import connect  # noqa: E402
+from app import database as database_module  # noqa: E402
+from app.database import connect, sync_postgres_sequences  # noqa: E402
 from app.services.daily_schedule import (  # noqa: E402
     build_day_readiness,
     find_common_time_slot,
@@ -250,6 +251,9 @@ def assert_postgres_adapter_foundation():
     assert "BIGSERIAL PRIMARY KEY" in translate_sqlite_sql(
         "CREATE TABLE sample (id INTEGER PRIMARY KEY AUTOINCREMENT)"
     )
+    assert "BIGSERIAL PRIMARY KEY" in translate_sqlite_sql(
+        "CREATE TABLE sample (id INTEGER PRIMARY KEY)"
+    )
     assert translate_sqlite_sql(
         "INSERT OR IGNORE INTO sample (id) VALUES (?)",
         has_parameters=True,
@@ -257,9 +261,45 @@ def assert_postgres_adapter_foundation():
     assert "TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')" in translate_sqlite_sql(
         "SELECT date('now')"
     )
+    datetime_query = translate_sqlite_sql(
+        "SELECT datetime(created_at) < datetime('now', '-30 days')"
+    )
+    assert "(created_at)::timestamp" in datetime_query
+    assert "CURRENT_TIMESTAMP + INTERVAL '-30 days'" in datetime_query
+    incident_due_query = translate_sqlite_sql(
+        "SELECT datetime(first_detected_at, '+' || ? || ' minutes')",
+        has_parameters=True,
+    )
+    assert "TO_CHAR((first_detected_at)::timestamp" in incident_due_query
+    assert "(%s)::integer * INTERVAL '1 minute'" in incident_due_query
     assert "STRING_AGG((actions.key)::text, ',')" in translate_sqlite_sql(
         "SELECT GROUP_CONCAT(actions.key) FROM actions"
     )
+    numeric_aggregate = translate_sqlite_sql(
+        "SELECT SUM(price), AVG(tasks.price) FROM tasks"
+    )
+    assert "REPLACE((price)::text, ',', '.')" in numeric_aggregate
+    assert "REPLACE((tasks.price)::text, ',', '.')" in numeric_aggregate
+    assert numeric_aggregate.count("AS DOUBLE PRECISION") == 2
+    sqlite_numeric_cast = translate_sqlite_sql(
+        "SELECT CAST(REPLACE(COALESCE(price, '0'), ',', '.') AS REAL)"
+    )
+    assert "NULLIF(REPLACE(COALESCE((price)::text" in sqlite_numeric_cast
+    assert "AS DOUBLE PRECISION" in sqlite_numeric_cast
+    null_parameter_query = translate_sqlite_sql(
+        "SELECT CASE WHEN ? IS NULL THEN 0 ELSE 1 END",
+        has_parameters=True,
+    )
+    assert "CAST(%s AS TEXT) IS NULL" in null_parameter_query
+    catalog_query = translate_sqlite_sql(
+        "SELECT name FROM sqlite_master WHERE type='index'"
+    )
+    assert "information_schema.tables" in catalog_query
+    assert "pg_indexes" in catalog_query
+    assert "AS sqlite_master" in catalog_query
+    table_info_query = translate_sqlite_sql("PRAGMA table_info(tasks)")
+    assert "column_name AS name" in table_info_query
+    assert "table_name='tasks'" in table_info_query
     assert validate_identifier("safe_table_2") == "safe_table_2"
     try:
         validate_identifier("unsafe; DROP TABLE users")
@@ -324,6 +364,13 @@ def assert_postgres_adapter_foundation():
     assert raw.cursors[-1].queries[-1][0] == "SELECT LASTVAL()"
     connection.commit()
     assert raw.committed is True
+    connection.executemany(
+        "UPDATE tasks SET title=? WHERE id=?",
+        [("Первый", 1), ("Второй", 2)],
+    )
+    assert raw.cursors[-1].queries[-1][0] == (
+        "UPDATE tasks SET title=%s WHERE id=%s"
+    )
 
 
 def make_multipart_request(username, path, data):
@@ -438,6 +485,22 @@ def seed_data():
     (crm.UPLOAD_DIR / "after.png").write_bytes(b"smoke-after")
 
     return task
+
+
+def prepare_backend_smoke_fixtures():
+    """Keep the SQLite-only backup lifecycle isolated during PostgreSQL smoke."""
+    from unittest.mock import patch
+
+    runtime = database_module.get_database_runtime_config()
+    if runtime["active_backend"] != "postgresql":
+        return
+
+    with patch.dict(os.environ, {
+        "DATABASE_BACKEND": "sqlite",
+        "DATABASE_URL": "",
+        "POSTGRESQL_EXPERIMENTAL": "0",
+    }):
+        database_module.init_db()
 
 
 def assert_session_cookie_auth():
@@ -3289,6 +3352,8 @@ async def assert_automation_page():
     SELECT *
     FROM automation_actions
     WHERE rule_id=?
+    ORDER BY sort_order, id
+    LIMIT 1
     """, (rule["id"],)).fetchone()
     conn.close()
 
@@ -10626,6 +10691,7 @@ async def assert_platform_companies_page():
         (1, "Smoke Company 1", "owner1", "2026-05-17 09:00"),
         (2, "Smoke Company 2", "owner2", "2026-05-17 09:00"),
     ])
+    sync_postgres_sequences(c)
     conn.commit()
     conn.close()
 
@@ -19379,31 +19445,49 @@ async def assert_platform_calendar_health():
         assert health_payload["build"]["version"] == crm.APP_VERSION
         assert "commit" in health_payload["build"]
         assert health_payload["database"]["ok"] is True
-        assert health_payload["database"]["backend"] == "sqlite"
+        expected_backend = crm.get_database_runtime_config()["active_backend"]
+        assert health_payload["database"]["backend"] == expected_backend
         assert "db_path" not in health_payload
         assert "branch" not in health_payload["build"]
         assert "system_events" not in health_payload
         assert "production_config" not in health_payload
         readiness_status = crm.get_public_readiness_status()
-        assert readiness_status["ok"] is True
-        assert readiness_status["status"] == "ok"
+        expected_database_check = (
+            "postgresql_connection_check"
+            if expected_backend == "postgresql"
+            else "sqlite_quick_check"
+        )
+        expected_ready = expected_backend == "sqlite"
+        assert readiness_status["ok"] is expected_ready
+        assert readiness_status["status"] == (
+            "ok" if expected_ready else "critical"
+        )
         assert {
             "database_configuration",
             "database",
-            "sqlite_quick_check",
+            expected_database_check,
             "required_tables",
             "database_release_support",
             "uploads",
         }.issubset({item["key"] for item in readiness_status["checks"]})
         readiness_response = await crm.public_ready()
-        assert readiness_response.status_code == 200
+        assert readiness_response.status_code == (200 if expected_ready else 503)
         readiness_payload = json.loads(readiness_response.body)
-        assert readiness_payload["ok"] is True
+        assert readiness_payload["ok"] is expected_ready
         assert readiness_payload["app"] == "field-service-crm"
         assert readiness_payload["version"] == crm.APP_VERSION
         assert readiness_payload["build"]["version"] == crm.APP_VERSION
-        assert readiness_payload["status_label"] == "Готово"
-        assert all(item["ok"] for item in readiness_payload["checks"])
+        assert readiness_payload["status_label"] == (
+            "Готово" if expected_ready else "Не готово"
+        )
+        if expected_ready:
+            assert all(item["ok"] for item in readiness_payload["checks"])
+        else:
+            release_support = next(
+                item for item in readiness_payload["checks"]
+                if item["key"] == "database_release_support"
+            )
+            assert release_support["ok"] is False
         assert "db_path" not in readiness_payload
         assert "data_dir" not in readiness_payload
         assert "production_config" not in readiness_payload
@@ -19471,14 +19555,16 @@ async def assert_platform_calendar_health():
         assert "system_events" in system_page.context
         assert "production_config" in system_page.context
         assert system_page.context["database_runtime"]["active_backend"] == (
-            "sqlite"
+            expected_backend
         )
         assert system_page.context["build_metadata"]["version"] == (
             crm.APP_VERSION
         )
         assert "commit" in system_page.context["build_metadata"]
         assert system_page.context["public_health_status"]["ok"] is True
-        assert system_page.context["public_readiness_status"]["ok"] is True
+        assert system_page.context["public_readiness_status"]["ok"] is (
+            expected_ready
+        )
         assert system_page.context["system_links"]["readiness"] == (
             "/platform/readiness"
         )
@@ -19589,7 +19675,7 @@ async def assert_platform_calendar_health():
         assert system_api["backup_status"]["status_label"]
         assert system_api["build_metadata"]["version"] == crm.APP_VERSION
         assert system_api["public_health_status"]["ok"] is True
-        assert system_api["public_readiness_status"]["ok"] is True
+        assert system_api["public_readiness_status"]["ok"] is expected_ready
         assert any(
             item["url"] == "/ready"
             for item in system_api["deployment_endpoints"]
@@ -30896,6 +30982,7 @@ async def assert_a3_api_layer():
 
 def main():
     try:
+        prepare_backend_smoke_fixtures()
         task = seed_data()
         assert_database_runtime_configuration()
         assert_postgres_adapter_foundation()

@@ -110,8 +110,8 @@ Railway metadata обычно задаётся автоматически:
 ## Миграция на PostgreSQL
 
 Переход выполняется по этапам, чтобы не потерять данные и не сломать текущую
-SQLite-версию. Добавлены psycopg adapter, перенос общей схемы и отдельный
-PostgreSQL schema smoke в CI. Текущий релиз продолжает работать с
+SQLite-версию. Добавлены psycopg adapter, перенос общей схемы и полный
+PostgreSQL application smoke в CI. Текущий релиз продолжает работать с
 `DATABASE_BACKEND=sqlite`.
 
 Тестовый запуск PostgreSQL требует явного `POSTGRESQL_EXPERIMENTAL=1`. Боевой
@@ -201,7 +201,7 @@ CI запускает:
 - Python compile check
 - `tests/smoke_app.py`
 - `tests/smoke_security.py`
-- `tests/smoke_postgresql.py` на отдельном PostgreSQL 16
+- `tests/smoke_postgresql.py` и полный `tests/smoke_app.py` на PostgreSQL 16
 
 ## Документы
 

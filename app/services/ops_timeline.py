@@ -29,30 +29,6 @@ def create_ops_timeline_event(
     conn = connect()
     c = conn.cursor()
 
-    try:
-        c.execute("""
-            ALTER TABLE ops_timeline_events
-            ADD COLUMN source TEXT
-        """)
-    except Exception:
-        pass
-
-    try:
-        c.execute("""
-            ALTER TABLE ops_timeline_events
-            ADD COLUMN target_type TEXT
-        """)
-    except Exception:
-        pass
-
-    try:
-        c.execute("""
-            ALTER TABLE ops_timeline_events
-            ADD COLUMN target_id INTEGER
-        """)
-    except Exception:
-        pass
-
     existing = c.execute("""
         SELECT id
         FROM ops_timeline_events

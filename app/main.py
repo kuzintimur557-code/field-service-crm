@@ -31847,7 +31847,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     FROM tasks
     WHERE company_id=?
       AND payment_status!='paid'
-      AND COALESCE(price, 0) > 0
+      AND CAST(REPLACE(COALESCE(price, '0'), ',', '.') AS REAL) > 0
     ORDER BY task_date ASC
     LIMIT 20
     """, (company_id,)).fetchall()
@@ -31904,7 +31904,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
         FROM finance_summary
         WHERE company_id=?
         GROUP BY client_name
-        HAVING jobs_count > 1
+        HAVING COUNT(task_id) > 1
     )
     """, (company_id,)).fetchone()
 
@@ -31918,7 +31918,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     FROM finance_summary
     WHERE company_id=?
     GROUP BY client_name
-    HAVING jobs_count > 1
+    HAVING COUNT(task_id) > 1
     ORDER BY revenue DESC
     LIMIT 10
     """, (company_id,)).fetchall()
@@ -31946,7 +31946,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     JOIN users ON users.id = payroll_payouts.worker_id
     WHERE payroll_payouts.company_id=?
       AND payroll_payouts.status='paid'
-    GROUP BY payroll_payouts.worker_id
+    GROUP BY payroll_payouts.worker_id, users.username
     ORDER BY total_paid DESC
     LIMIT 10
     """, (company_id,)).fetchall()
@@ -31961,7 +31961,7 @@ async def owner_dashboard_page(request: Request, month: str = ""):
     FROM finance_summary
     WHERE company_id=?
     GROUP BY client_name
-    HAVING revenue > 0
+    HAVING SUM(price) > 0
        AND ((SUM(profit) - SUM(payroll_total)) / SUM(price) * 100) < 15
     ORDER BY ((SUM(profit) - SUM(payroll_total)) / SUM(price) * 100) ASC
     LIMIT 10
@@ -32269,7 +32269,7 @@ async def finance_summary_page(request: Request, month: str = ""):
     WHERE payroll_payouts.company_id=?
       AND payroll_payouts.month=?
       AND payroll_payouts.status='paid'
-    GROUP BY payroll_payouts.worker_id
+    GROUP BY payroll_payouts.worker_id, users.username
     ORDER BY total_paid DESC
     LIMIT 10
     """, (company_id, month)).fetchall()
@@ -35082,7 +35082,7 @@ async def ai_insights_page(request: Request):
     WHERE company_id=?
       AND archived=0
     GROUP BY client
-    HAVING revenue > 0
+    HAVING COALESCE(SUM(price), 0) > 0
     ORDER BY revenue ASC
     LIMIT 5
     """, (company_id,)).fetchall()
