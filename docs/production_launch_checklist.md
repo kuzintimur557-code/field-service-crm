@@ -17,6 +17,17 @@ application service until the full PostgreSQL application smoke, data migration
 and restore drill are complete. The current guardrail deliberately stops
 startup instead of silently falling back to SQLite when PostgreSQL is requested.
 
+Before a PostgreSQL cutover:
+
+- rehearse `scripts/migrate_sqlite_to_postgresql.py` on a verified production
+  copy and a new empty PostgreSQL database;
+- record the source fingerprint, table count, row count and duration;
+- stop application writes before creating the final SQLite backup;
+- run the migration dry run, then repeat it with `--execute`;
+- run the same `--execute` command again and require
+  `"already_migrated": true` with clean verification;
+- keep the SQLite backup until the PostgreSQL-native restore drill succeeds.
+
 Railway normally sets deployment metadata automatically:
 
 - `RAILWAY_ENVIRONMENT`
@@ -34,6 +45,9 @@ Run:
 ./quick_check.sh
 python3 tests/smoke_security.py
 ```
+
+With a disposable PostgreSQL test database configured, also run
+`python3 tests/smoke_postgresql_migration.py`.
 
 Optional HTTP check against a running server:
 

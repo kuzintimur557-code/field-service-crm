@@ -100,5 +100,8 @@ jobs:
       - name: Run PostgreSQL schema smoke
         run: python tests/smoke_postgresql.py
 
+      - name: Run SQLite to PostgreSQL migration smoke
+        run: python tests/smoke_postgresql_migration.py
+
       - name: Run PostgreSQL application smoke
         run: python tests/smoke_app.py

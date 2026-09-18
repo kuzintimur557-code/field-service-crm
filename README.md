@@ -111,7 +111,9 @@ Railway metadata обычно задаётся автоматически:
 
 Переход выполняется по этапам, чтобы не потерять данные и не сломать текущую
 SQLite-версию. Добавлены psycopg adapter, перенос общей схемы и полный
-PostgreSQL application smoke в CI. Текущий релиз продолжает работать с
+PostgreSQL application smoke в CI. Также добавлен защищённый перенос данных:
+dry-run, согласованный SQLite snapshot, точная сверка строк и проверка
+изоляции компаний. Текущий релиз продолжает работать с
 `DATABASE_BACKEND=sqlite`.
 
 Тестовый запуск PostgreSQL требует явного `POSTGRESQL_EXPERIMENTAL=1`. Боевой
@@ -119,6 +121,17 @@ PostgreSQL application smoke в CI. Текущий релиз продолжае
 проверки восстановления. Ошибки конфигурации не выводят строку подключения в
 лог. Текущий статус и следующий шаг видны на страницах `/system` и
 `/platform/readiness`. Подробный порядок: `docs/postgresql_migration.md`.
+
+Проверка миграции без записи в PostgreSQL:
+
+```bash
+export DATABASE_URL='postgresql://user:password@host:5432/field_service'
+python3 scripts/migrate_sqlite_to_postgresql.py --sqlite /path/to/crm.db
+```
+
+Запись разрешается только явным флагом `--execute` и только в пустую целевую
+базу или схему. Повтор команды с тем же источником проверяет результат без
+повторного копирования.
 
 ## Проверки перед коммитом
 
@@ -201,7 +214,8 @@ CI запускает:
 - Python compile check
 - `tests/smoke_app.py`
 - `tests/smoke_security.py`
-- `tests/smoke_postgresql.py` и полный `tests/smoke_app.py` на PostgreSQL 16
+- `tests/smoke_postgresql.py`, `tests/smoke_postgresql_migration.py` и полный
+  `tests/smoke_app.py` на PostgreSQL 16
 
 ## Документы
 
