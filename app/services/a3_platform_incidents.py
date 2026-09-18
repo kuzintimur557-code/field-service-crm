@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
-from app.database import connect
+from app.database import begin_locked_transaction, connect
 
 
 A3_PLATFORM_INCIDENT_KEY = "a3_scheduler_health"
@@ -361,7 +361,7 @@ def escalate_overdue_a3_platform_incidents(now=None, telegram_sender=None):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         admins = _load_platform_admins(cursor)
         rows = cursor.execute("""
             SELECT
@@ -472,7 +472,7 @@ def sync_a3_platform_incidents(report, now=None, telegram_sender=None):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         admins = _load_platform_admins(cursor)
 
         for item in list((report or {}).get("items") or []):
@@ -1067,7 +1067,7 @@ def acknowledge_a3_platform_incident(
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         if not _platform_admin_exists(cursor, actor_username):
             conn.rollback()
             return {
@@ -1164,7 +1164,7 @@ def assign_a3_platform_incident(
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         if not _platform_admin_exists(cursor, actor_username):
             conn.rollback()
             return {
@@ -1285,7 +1285,7 @@ def add_a3_platform_incident_note(
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         if not _platform_admin_exists(cursor, actor_username):
             conn.rollback()
             return {

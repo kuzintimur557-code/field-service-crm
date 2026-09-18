@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
-from app.database import connect
+from app.database import begin_locked_transaction, connect
 
 
 A3_FOLLOWUP_FILTER_LABELS = {
@@ -550,7 +550,7 @@ def create_a3_incident_followup(
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         if not _platform_admin_exists(cursor, actor_username):
             conn.rollback()
             return {"ok": False, "error": "forbidden", "message": "Недостаточно прав."}
@@ -655,7 +655,7 @@ def update_a3_incident_followup(
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         if not _platform_admin_exists(cursor, actor_username):
             conn.rollback()
             return {"ok": False, "error": "forbidden", "message": "Недостаточно прав."}
@@ -857,7 +857,7 @@ def review_a3_incident_followup(
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         if not _platform_admin_exists(cursor, actor_username):
             conn.rollback()
             return {

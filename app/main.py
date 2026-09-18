@@ -162,6 +162,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.database import (
+    begin_locked_transaction,
     connect,
     get_database_error_types,
     get_database_runtime_config,
@@ -4695,6 +4696,14 @@ def run_automation_event(
 
     conn = connect()
     c = conn.cursor()
+    begin_locked_transaction(
+        c,
+        "automation_event",
+        company_id,
+        trigger_key,
+        entity_type,
+        entity_id,
+    )
 
     rules_query = """
     SELECT *
@@ -25551,7 +25560,7 @@ def add_calendar_scheduler_incident_note(
         }
 
     conn = connect()
-    conn.execute("BEGIN IMMEDIATE")
+    begin_locked_transaction(conn, "calendar_scheduler_incidents")
     c = conn.cursor()
     actor = c.execute("""
     SELECT username
@@ -25615,7 +25624,7 @@ def reassign_calendar_scheduler_incident(
 
     now_value = datetime.now().strftime("%Y-%m-%d %H:%M")
     conn = connect()
-    conn.execute("BEGIN IMMEDIATE")
+    begin_locked_transaction(conn, "calendar_scheduler_incidents")
     c = conn.cursor()
     actor = c.execute("""
     SELECT username
@@ -25826,7 +25835,7 @@ def escalate_calendar_scheduler_incidents(
     cutoff = now_dt - timedelta(minutes=after_minutes)
     now_value = now_dt.strftime("%Y-%m-%d %H:%M")
     conn = connect()
-    conn.execute("BEGIN IMMEDIATE")
+    begin_locked_transaction(conn, "calendar_scheduler_incidents")
     c = conn.cursor()
     incidents = c.execute("""
     SELECT
@@ -25982,7 +25991,7 @@ def notify_overdue_calendar_recoveries(
     cutoff = now_dt - timedelta(minutes=after_minutes)
     now_value = now_dt.strftime("%Y-%m-%d %H:%M")
     conn = connect()
-    conn.execute("BEGIN IMMEDIATE")
+    begin_locked_transaction(conn, "calendar_scheduler_incidents")
     c = conn.cursor()
     incidents = c.execute("""
     SELECT

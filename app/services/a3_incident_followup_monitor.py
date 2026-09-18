@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 
-from app.database import connect
+from app.database import begin_locked_transaction, connect
 
 
 A3_FOLLOWUP_DUE_SOON_HOURS = 24
@@ -280,7 +280,7 @@ def run_a3_incident_followup_monitor(now=None, telegram_sender=None):
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         admins = _load_platform_admins(cursor)
         rows = cursor.execute("""
             SELECT

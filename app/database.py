@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import importlib.util
+import hashlib
 import re
 from pathlib import Path
 from datetime import datetime
@@ -139,6 +140,31 @@ def connect():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def transaction_lock_key(scope, *parts):
+    """Return a stable signed bigint for a PostgreSQL advisory lock."""
+    components = [str(scope or "").strip()]
+    components.extend(str(part) for part in parts)
+    if not components[0]:
+        raise ValueError("Transaction lock scope is required")
+    payload = "\x1f".join(components).encode("utf-8")
+    digest = hashlib.blake2b(payload, digest_size=8).digest()
+    return int.from_bytes(digest, byteorder="big", signed=True)
+
+
+def begin_locked_transaction(connection_or_cursor, scope, *parts):
+    """Begin a write transaction and serialize its logical work scope."""
+    connection_or_cursor.execute("BEGIN IMMEDIATE")
+    if getattr(
+        connection_or_cursor,
+        "backend",
+        DATABASE_BACKEND_SQLITE,
+    ) == DATABASE_BACKEND_POSTGRESQL:
+        connection_or_cursor.execute(
+            "SELECT pg_advisory_xact_lock(?)",
+            (transaction_lock_key(scope, *parts),),
+        )
 
 
 def add_column_if_missing(cursor, table, column, column_type):

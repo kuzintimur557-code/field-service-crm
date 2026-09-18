@@ -46,8 +46,12 @@ Run:
 python3 tests/smoke_security.py
 ```
 
-With a disposable PostgreSQL test database configured, also run
-`python3 tests/smoke_postgresql_migration.py`.
+With a disposable PostgreSQL test database configured, also run:
+
+```bash
+python3 tests/smoke_postgresql_migration.py
+python3 tests/smoke_postgresql_concurrency.py
+```
 
 Optional HTTP check against a running server:
 

@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 
-from app.database import connect
+from app.database import begin_locked_transaction, connect
 
 
 A3_QUALITY_ALERT_RESPONSE_HOURS = 4
@@ -298,7 +298,7 @@ def run_a3_followup_quality_sla_monitor(now=None, telegram_sender=None):
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         admins = _load_admins(cursor)
         alerts = [dict(row) for row in cursor.execute("""
             SELECT alerts.*, COALESCE(

@@ -113,7 +113,9 @@ Railway metadata обычно задаётся автоматически:
 SQLite-версию. Добавлены psycopg adapter, перенос общей схемы и полный
 PostgreSQL application smoke в CI. Также добавлен защищённый перенос данных:
 dry-run, согласованный SQLite snapshot, точная сверка строк и проверка
-изоляции компаний. Текущий релиз продолжает работать с
+изоляции компаний. Конкурентные A3, календарные и automation-транзакции
+защищены PostgreSQL advisory locks; partial indexes проверяются двумя
+параллельными сессиями. Текущий релиз продолжает работать с
 `DATABASE_BACKEND=sqlite`.
 
 Тестовый запуск PostgreSQL требует явного `POSTGRESQL_EXPERIMENTAL=1`. Боевой
@@ -214,8 +216,9 @@ CI запускает:
 - Python compile check
 - `tests/smoke_app.py`
 - `tests/smoke_security.py`
-- `tests/smoke_postgresql.py`, `tests/smoke_postgresql_migration.py` и полный
-  `tests/smoke_app.py` на PostgreSQL 16
+- `tests/smoke_postgresql.py`, `tests/smoke_postgresql_migration.py`,
+  `tests/smoke_postgresql_concurrency.py` и полный `tests/smoke_app.py` на
+  PostgreSQL 16
 
 ## Документы
 

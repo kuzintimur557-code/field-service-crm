@@ -5,7 +5,7 @@
 Move production data from SQLite to PostgreSQL without changing local
 development until the new backend passes the same application smoke checks.
 
-## Current phase: guarded data migration
+## Current phase: PostgreSQL-native backup and restore
 
 SQLite remains the default runtime. The PostgreSQL foundation now includes:
 
@@ -20,22 +20,24 @@ SQLite remains the default runtime. The PostgreSQL foundation now includes:
 - exact table counts, row counts, row checksums, ID bounds and company
   isolation checks before a migration is marked complete;
 - resumable interrupted runs and verification-only repeated runs;
+- transaction-scoped PostgreSQL advisory locks for A3 monitors, calendar
+  incident operations and idempotent automation events;
+- concurrent-session checks for partial unique indexes and duplicate-action
+  protection;
 - backend-aware `/health` and `/ready` database checks;
 - `POSTGRESQL_EXPERIMENTAL=1` as an explicit non-production opt-in;
 - unsupported, conflicting or incomplete PostgreSQL settings stop startup;
 - diagnostics expose only the backend name and never the URL, host, user or
   password;
-- production readiness remains blocked until application and migration smoke
-  checks are complete.
+- production readiness remains blocked until the PostgreSQL-native backup and
+  restore drill is complete.
 
 ## Known compatibility work
 
 The application uses direct SQL and depends on SQLite behavior in several
-places. These areas remain before cutover:
+places. This area remains before cutover:
 
-1. Validate partial indexes and transaction locking used by automation
-   monitors under concurrent PostgreSQL sessions.
-2. Replace the SQLite backup fixture with PostgreSQL-native backup creation and
+1. Replace the SQLite backup fixture with PostgreSQL-native backup creation and
    restore drills. The application smoke currently isolates the legacy backup
    lifecycle in a temporary SQLite database.
 
@@ -103,6 +105,7 @@ export POSTGRESQL_EXPERIMENTAL=1
 export DATABASE_URL=postgresql://user:password@127.0.0.1:5432/field_service_test
 python3 tests/smoke_postgresql.py
 python3 tests/smoke_postgresql_migration.py
+python3 tests/smoke_postgresql_concurrency.py
 ```
 
 It initializes the schema twice, verifies core tables and A3 quality SLA
@@ -110,7 +113,10 @@ columns, checks idempotent development seeds, verifies generated IDs and row
 access, then checks PostgreSQL health and readiness responses. The migration
 smoke uses isolated PostgreSQL schemas to verify dry run, copy, exact data
 comparison, safe repetition, changed-source refusal and tenant-isolation
-refusal. `/health` must
+refusal. The concurrency smoke opens simultaneous PostgreSQL sessions and
+verifies advisory-lock serialization, independent lock scopes, A3 incident
+deduplication, automation action idempotency and partial-index predicates.
+`/health` must
 pass, while `/ready` remains blocked by `database_release_support` until the
 data migration and PostgreSQL-native backup drill are complete. CI then runs
 the complete application smoke against the same disposable PostgreSQL service;

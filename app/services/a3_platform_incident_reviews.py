@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
-from app.database import connect
+from app.database import begin_locked_transaction, connect
 from app.services.a3_platform_incidents import (
     get_a3_platform_incident_policy,
 )
@@ -437,7 +437,7 @@ def save_a3_platform_incident_review(
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         if not _platform_admin_exists(cursor, actor_username):
             conn.rollback()
             return {

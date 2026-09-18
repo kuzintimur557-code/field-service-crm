@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
-from app.database import connect
+from app.database import begin_locked_transaction, connect
 from app.services.a3_followup_analytics import get_a3_followup_analytics
 from app.services.a3_followup_quality_sla import (
     enrich_a3_followup_quality_alert_sla,
@@ -413,7 +413,7 @@ def run_a3_followup_quality_monitor(now=None, telegram_sender=None):
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         admins = _load_admins(cursor)
         synced = _sync_quality_alerts(cursor, overview["signals"], now_text)
         result["alerts_created"] = synced["created"]
@@ -681,7 +681,7 @@ def _change_quality_alert(alert_id, actor_username, action, note="", now=None):
     conn = connect()
     try:
         cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE")
+        begin_locked_transaction(cursor, "a3_platform_operations")
         admin = cursor.execute("""
             SELECT 1 FROM users
             WHERE username=? AND role='superadmin' AND COALESCE(is_active, 1)=1
