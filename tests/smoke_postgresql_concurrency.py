@@ -118,14 +118,15 @@ def _verify_partial_indexes_and_incident_sync():
                   'idx_automation_action_runs_source',
                   'idx_a3_platform_incident_active',
                   'idx_a3_followup_quality_alerts_open_key',
-                  'idx_calendar_day_ack_automation_unique'
+                  'idx_calendar_day_ack_automation_unique',
+                  'idx_background_jobs_active_dedupe'
               )
         """).fetchall()
         definitions = {
             row["indexname"]: row["indexdef"].lower()
             for row in index_rows
         }
-        assert len(definitions) == 4
+        assert len(definitions) == 5
         assert "unique index" in definitions[
             "idx_automation_action_runs_source"
         ]
@@ -133,6 +134,7 @@ def _verify_partial_indexes_and_incident_sync():
             "idx_a3_platform_incident_active",
             "idx_a3_followup_quality_alerts_open_key",
             "idx_calendar_day_ack_automation_unique",
+            "idx_background_jobs_active_dedupe",
         ):
             assert "unique index" in definitions[index_name]
             assert " where " in definitions[index_name]
@@ -318,6 +320,67 @@ def _verify_concurrent_automation_idempotency():
         connection.close()
 
 
+def _verify_background_job_concurrency():
+    from app.services.background_jobs import (
+        enqueue_background_job,
+        process_background_jobs,
+    )
+
+    def enqueue_duplicate(_item):
+        return enqueue_background_job(
+            "test.concurrent",
+            payload={},
+            dedupe_key="postgresql-concurrent-dedupe",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        dedupe_results = list(executor.map(enqueue_duplicate, range(2)))
+    assert sum(1 for item in dedupe_results if item["created"]) == 1
+
+    connection = database.connect()
+    connection.execute("DELETE FROM background_jobs")
+    connection.commit()
+    connection.close()
+
+    for item_id in (1, 2):
+        enqueue_background_job(
+            "test.concurrent",
+            payload={"item_id": item_id},
+            dedupe_key=f"postgresql-job-{item_id}",
+        )
+
+    processed_ids = []
+
+    def handle_job(payload, _job):
+        processed_ids.append(payload["item_id"])
+        return {"item_id": payload["item_id"]}
+
+    def run_worker(worker_number):
+        return process_background_jobs(
+            {"test.concurrent": handle_job},
+            worker_id=f"postgresql-worker-{worker_number}",
+            limit=1,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        worker_results = list(executor.map(run_worker, range(2)))
+    assert sum(item["succeeded"] for item in worker_results) == 2
+    assert sorted(processed_ids) == [1, 2]
+
+    connection = database.connect()
+    try:
+        statuses = connection.execute("""
+            SELECT status, COUNT(*) AS value
+            FROM background_jobs
+            GROUP BY status
+        """).fetchall()
+        assert {row["status"]: row["value"] for row in statuses} == {
+            "succeeded": 2,
+        }
+    finally:
+        connection.close()
+
+
 def main():
     if os.getenv("DATABASE_BACKEND") != "postgresql":
         raise RuntimeError("DATABASE_BACKEND=postgresql is required")
@@ -343,9 +406,10 @@ def main():
         _verify_lock_serialization()
         _verify_partial_indexes_and_incident_sync()
         _verify_concurrent_automation_idempotency()
+        _verify_background_job_concurrency()
         print(
             "PostgreSQL concurrency smoke passed: advisory locks, "
-            "partial indexes and automation idempotency."
+            "partial indexes, durable jobs and automation idempotency."
         )
     finally:
         os.environ["DATABASE_URL"] = previous_url

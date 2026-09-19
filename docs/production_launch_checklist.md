@@ -15,6 +15,7 @@ Set these variables before production deploy:
 - `POSTGRESQL_EXPERIMENTAL=1` as the explicit cutover guard
 - `OBJECT_STORAGE_BACKEND=s3`
 - `S3_BUCKET`, region or custom endpoint, and provider credentials or IAM role
+- background queue policy variables when the defaults do not fit the workload
 
 Keep `DATABASE_BACKEND=sqlite` until the full PostgreSQL application smoke,
 data-migration rehearsal and restore drill are complete. The guardrail stops
@@ -64,6 +65,7 @@ python3 tests/smoke_postgresql_migration.py
 python3 tests/smoke_postgresql_concurrency.py
 python3 tests/smoke_postgresql_backup.py
 python3 tests/smoke_object_storage.py
+python3 tests/smoke_background_jobs.py
 ```
 
 Optional HTTP check against a running server:
@@ -91,6 +93,7 @@ Expected:
 - backups are visible and restore check is available
 - the configured file-storage backend is available
 - the latest backup has a valid external copy when S3 is enabled
+- the background queue has no stale workers or failed jobs
 
 ## 4. Automation Cron
 
@@ -99,6 +102,7 @@ Protected cron endpoints require the `x-automation-secret` header:
 - `POST /automation/cron/ai-digest`
 - `POST /automation/cron/calendar-plans`
 - `POST /automation/cron/calendar-plans/watchdog`
+- `POST /automation/cron/background-jobs` every minute
 
 Example:
 
@@ -107,6 +111,15 @@ curl -X POST \
   -H "x-automation-secret: $AUTOMATION_CRON_SECRET" \
   https://your-domain.example/automation/cron/ai-digest
 ```
+
+Use either the one-minute cron endpoint or a dedicated worker process:
+
+```bash
+python3 scripts/run_background_worker.py --watch
+```
+
+Do not run both unless concurrent workers are intentional. Atomic claims make
+that safe, but one processing mode is simpler to operate.
 
 ## 5. Rollback Signals
 
@@ -118,6 +131,7 @@ Pause rollout if any of these happen:
 - database backend configuration is invalid or PostgreSQL cutover is incomplete
 - uploads are not writable
 - S3 bucket access or the off-site backup mirror fails
+- the background queue reports stale or failed jobs
 - login or session checks fail
 - company isolation smoke tests fail
 

@@ -20013,7 +20013,10 @@ async def assert_platform_calendar_health():
         assert backup_page.context["links"]["platform"] == "/platform"
         assert backup_page.context["links"]["system"] == "/system"
         assert backup_page.context["links"]["create"] == "/backup/create"
+        assert backup_page.context["links"]["run_jobs"] == "/backup/jobs/run"
         assert backup_page.context["backup_status"]["status_label"]
+        assert backup_page.context["background_queue_status"]["status"] == "ok"
+        assert "Фоновая очередь" in backup_html
         assert "backup_events" in backup_page.context
         anonymous_backup_export = await crm.backup_export(
             make_public_asgi_request("/backup/export"),
@@ -20038,6 +20041,7 @@ async def assert_platform_calendar_health():
         assert "Последние копии" in backup_csv
         assert "Проверка последней" in backup_csv
         assert "Проверка восстановления" in backup_csv
+        assert "Фоновая очередь" in backup_csv
         assert "Журнал операций" in backup_csv
         anonymous_backup_api = await crm.api_platform_backup_status(
             make_public_asgi_request("/api/platform/backup-status"),
@@ -20056,6 +20060,14 @@ async def assert_platform_calendar_health():
         assert "cleanup_count" in backup_api
         assert "latest_verification" in backup_api
         assert "restore_check" in backup_api
+        anonymous_jobs_api = await crm.api_platform_background_jobs(
+            make_public_asgi_request("/api/platform/background-jobs"),
+        )
+        assert anonymous_jobs_api.status_code == 401
+        boss_jobs_api = await crm.api_platform_background_jobs(
+            make_asgi_request("owner2", "/api/platform/background-jobs"),
+        )
+        assert boss_jobs_api.status_code == 403
         anonymous_restore_check = await crm.backup_restore_check(
             make_public_asgi_request("/backup/restore-check"),
         )
@@ -20151,12 +20163,33 @@ async def assert_platform_calendar_health():
             make_asgi_request("super", "/backup/create"),
         )
         assert create_backup_response.status_code == 302
-        assert create_backup_response.headers["location"].startswith(
-            "/backup?notice=backup_created&file="
+        assert "notice=backup_queued" in (
+            create_backup_response.headers["location"]
         )
-        created_backup_name = create_backup_response.headers[
-            "location"
-        ].split("file=", 1)[1]
+        queued_backup_status = crm.get_background_queue_status()
+        assert queued_backup_status["pending"] == 1
+        duplicate_backup_response = await crm.backup_create(
+            make_asgi_request("super", "/backup/create"),
+        )
+        assert "notice=backup_already_queued" in (
+            duplicate_backup_response.headers["location"]
+        )
+        processed_backup = await crm.api_platform_run_background_jobs(
+            make_asgi_request(
+                "super",
+                "/api/platform/background-jobs/run",
+            ),
+        )
+        assert processed_backup["ok"] is True
+        assert processed_backup["summary"]["succeeded"] == 1
+        created_backup_name = processed_backup["summary"]["items"][0][
+            "result"
+        ]["filename"]
+        completed_jobs_api = await crm.api_platform_background_jobs(
+            make_asgi_request("super", "/api/platform/background-jobs"),
+        )
+        assert completed_jobs_api["summary"]["pending"] == 0
+        assert completed_jobs_api["items"][0]["status"] == "succeeded"
         verified_backup_status = crm.get_backup_status()
         assert verified_backup_status["latest_name"] == created_backup_name
         assert verified_backup_status["latest_verification"]["status"] == "ok"
@@ -20219,7 +20252,9 @@ async def assert_platform_calendar_health():
             make_asgi_request("super", "/backup"),
         )
         logged_backup_html = logged_backup_page.body.decode("utf-8")
-        assert "Резервная копия базы создана." in logged_backup_html
+        assert "Резервная копия базы создана фоновой очередью." in (
+            logged_backup_html
+        )
         expected_restore_message = (
             "PostgreSQL-копия восстановлена во временную базу"
             if expected_backend == "postgresql"

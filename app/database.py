@@ -673,6 +673,30 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS background_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        job_type TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        priority INTEGER NOT NULL DEFAULT 100,
+        payload_json TEXT,
+        result_json TEXT,
+        dedupe_key TEXT NOT NULL DEFAULT '',
+        requested_by TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        available_at TEXT NOT NULL,
+        locked_at TEXT,
+        locked_by TEXT,
+        started_at TEXT,
+        finished_at TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS system_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_type TEXT,
@@ -1702,6 +1726,22 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_backup_events_created
     ON backup_events(created_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_background_jobs_claim
+    ON background_jobs(status, available_at, priority, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_background_jobs_history
+    ON background_jobs(job_type, created_at, id)
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_background_jobs_active_dedupe
+    ON background_jobs(dedupe_key)
+    WHERE dedupe_key!='' AND status IN ('pending', 'running')
     """)
 
     c.execute("""

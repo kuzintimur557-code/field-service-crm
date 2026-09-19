@@ -104,6 +104,18 @@ h1{font-size:28px}
     {% if notice == "backup_created" %}
     <div class="notice">Резервная копия создана: {{ file }}.</div>
     {% endif %}
+    {% if notice == "backup_queued" %}
+    <div class="notice">Создание резервной копии поставлено в очередь. Задание №{{ job }}.</div>
+    {% endif %}
+    {% if notice == "backup_already_queued" %}
+    <div class="notice">Создание резервной копии уже ожидает выполнения. Задание №{{ job }}.</div>
+    {% endif %}
+    {% if notice == "background_jobs_run" %}
+    <div class="notice">Фоновая очередь проверена. Выполнено заданий: {{ processed }}.</div>
+    {% endif %}
+    {% if notice == "background_jobs_failed" %}
+    <div class="notice error">Очередь проверена, но часть заданий завершилась ошибкой: {{ failed }}. Откройте журнал ниже.</div>
+    {% endif %}
     {% if notice == "backup_cleanup_done" %}
     <div class="notice">Старые копии удалены: {{ deleted }}. Освобождено: {{ freed }}.</div>
     {% endif %}
@@ -124,6 +136,9 @@ h1{font-size:28px}
     {% endif %}
     {% if error == "backup_storage_failed" %}
     <div class="notice error">Локальная копия создана, но не сохранена в S3. Проверьте bucket и права.</div>
+    {% endif %}
+    {% if error == "backup_queue_failed" %}
+    <div class="notice error">Не удалось поставить копию в фоновую очередь. Проверьте базу и журнал системы.</div>
     {% endif %}
     {% if error == "invalid_backup" %}
     <div class="notice error">Некорректное имя резервной копии.</div>
@@ -165,6 +180,52 @@ h1{font-size:28px}
             <div class="metric-label">Общий размер</div>
             <div class="metric-value">{{ backup_status["total_size_label"] }}</div>
         </div>
+    </section>
+
+    <section class="section">
+        <div class="retention">
+            <div>
+                <div class="retention-title">Фоновая очередь — {{ background_queue_status["status_label"] }}</div>
+                <div class="retention-text">
+                    {{ background_queue_status["message"] }}
+                    Ожидают: {{ background_queue_status["pending"] }}.
+                    Выполняются: {{ background_queue_status["running"] }}.
+                    Ошибок за 24 часа: {{ background_queue_status["failed_24h"] }}.
+                </div>
+            </div>
+            {% if background_queue_status["due"] %}
+            <form method="post" action="{{ links['run_jobs'] }}">
+                <button class="button secondary" type="submit">Запустить очередь</button>
+            </form>
+            {% endif %}
+        </div>
+        {% if backup_jobs %}
+        <div class="events" style="margin-top:8px">
+            {% for item in backup_jobs %}
+            <div class="event">
+                <div>
+                    <div class="event-title">Задание №{{ item["id"] }}</div>
+                    <div class="event-meta">{{ item["created_at"] }}</div>
+                </div>
+                <div>
+                    <div class="event-meta">
+                        Попыток: {{ item["attempts"] }} из {{ item["max_attempts"] }}.
+                        {% if item["result"].get("filename") %}
+                        Файл: {{ item["result"]["filename"] }}.
+                        {% endif %}
+                        {% if item["last_error"] %}
+                        Код ошибки: {{ item["last_error"] }}.
+                        {% endif %}
+                    </div>
+                </div>
+                <span class="event-status {% if item['status'] == 'failed' %}error{% elif item['status'] in ('pending', 'running') %}idle{% endif %}">
+                    {{ item["status_label"] }}
+                </span>
+                <div class="event-meta">{{ item["requested_by"] or "система" }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </section>
 
     <section class="section">

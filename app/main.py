@@ -185,6 +185,13 @@ from app.object_storage import (
     save_storage_path,
     s3_object_exists,
 )
+from app.services.background_jobs import (
+    BackgroundJobExecutionError,
+    enqueue_background_job,
+    get_background_queue_status,
+    get_recent_background_jobs,
+    process_background_jobs,
+)
 from app.telegram_utils import send_message, send_photo, send_message_to_chat
 
 from datetime import datetime, timedelta
@@ -11678,11 +11685,82 @@ def cleanup_old_database_backups():
     }
 
 
+def enqueue_database_backup_job(username):
+    return enqueue_background_job(
+        "database_backup",
+        payload={"requested_by": str(username or "")[:120]},
+        requested_by=username,
+        dedupe_key="database_backup",
+        priority=20,
+    )
+
+
+def run_database_backup_job(payload, job):
+    username = str(
+        job.get("requested_by")
+        or payload.get("requested_by")
+        or "background-worker"
+    )[:120]
+    filename, error = create_database_backup(username)
+    if error:
+        details = {
+            "db_missing": "Файл базы данных не найден.",
+            "backup_tool_missing": "Утилита pg_dump недоступна.",
+            "backup_timeout": "Создание копии превысило лимит времени.",
+            "backup_schema_incomplete": "В схеме нет части ключевых таблиц.",
+            "backup_storage_failed": "Копия не сохранена во внешнем S3.",
+        }.get(error, "Не удалось создать резервную копию базы данных.")
+        try:
+            log_backup_event(
+                username,
+                "Фоновое создание копии",
+                "Ошибка",
+                filename or "",
+                details,
+            )
+        except Exception:
+            pass
+        retryable = error not in {
+            "db_missing",
+            "backup_tool_missing",
+            "backup_schema_incomplete",
+        }
+        raise BackgroundJobExecutionError(error, retryable=retryable)
+
+    try:
+        log_backup_event(
+            username,
+            "Создание копии",
+            "Успешно",
+            filename,
+            "Резервная копия базы создана фоновой очередью.",
+        )
+    except Exception:
+        pass
+    return {"filename": filename}
+
+
+def get_background_job_handlers():
+    return {
+        "database_backup": run_database_backup_job,
+    }
+
+
+def run_background_job_batch(worker_id="web-worker", limit=None):
+    return process_background_jobs(
+        get_background_job_handlers(),
+        worker_id=worker_id,
+        limit=limit,
+    )
+
+
 def build_backup_links():
     return {
         "platform": get_platform_dashboard_links()["page"],
         "system": "/system",
         "create": "/backup/create",
+        "jobs": "/api/platform/background-jobs",
+        "run_jobs": "/backup/jobs/run",
     }
 
 
@@ -11871,6 +11949,7 @@ def get_platform_release_readiness(
         production_config["automation_cron_secret_configured"]
     )
     backup_status = get_backup_status()
+    background_queue_status = get_background_queue_status()
 
     checks = [
         make_release_readiness_check(
@@ -11986,6 +12065,24 @@ def get_platform_release_readiness(
                 else "Секрет фоновых запусков не настроен."
             ),
             "Укажите AUTOMATION_CRON_SECRET для расписаний и дайджестов.",
+            "/system",
+            7,
+            "operations",
+            "Операции",
+        ),
+        make_release_readiness_check(
+            "background_jobs",
+            "Фоновая очередь",
+            background_queue_status["status"],
+            (
+                f"Ожидают: {background_queue_status['pending']}; "
+                f"в работе: {background_queue_status['running']}; "
+                f"ошибок за 24 часа: {background_queue_status['failed_24h']}."
+            ),
+            (
+                "Подключите worker или cron "
+                "/automation/cron/background-jobs."
+            ),
             "/system",
             7,
             "operations",
@@ -40464,6 +40561,7 @@ def build_system_diagnostics(role=""):
         production_config["automation_cron_secret_configured"]
     )
     backup_status = get_backup_status()
+    background_queue_status = get_background_queue_status()
     db_exists = backup_status["db_exists"]
     db_size = backup_status["db_size"]
     db_path_label = backup_status["db_path"]
@@ -40597,6 +40695,21 @@ def build_system_diagnostics(role=""):
             ),
             "Укажите AUTOMATION_CRON_SECRET для расписаний и дайджестов.",
             "/platform/readiness",
+        ),
+        make_system_check(
+            "background_jobs",
+            "Фоновая очередь",
+            background_queue_status["status"],
+            (
+                f"{background_queue_status['pending']} ожидают / "
+                f"{background_queue_status['running']} выполняются"
+            ),
+            background_queue_status["message"],
+            (
+                "Запускайте worker или cron endpoint фоновой очереди "
+                "не реже одного раза в минуту."
+            ),
+            "/api/platform/background-jobs",
         ),
         make_system_check(
             "runtime_errors",
@@ -40764,6 +40877,15 @@ def build_system_diagnostics(role=""):
             "method": "POST",
         },
         {
+            "title": "Фоновая очередь",
+            "url": "/automation/cron/background-jobs",
+            "access_label": "cron secret",
+            "status": background_queue_status["status"],
+            "status_label": background_queue_status["status_label"],
+            "summary": background_queue_status["message"],
+            "method": "POST",
+        },
+        {
             "title": "Резервные копии",
             "url": "/backup",
             "access_label": "superadmin",
@@ -40804,6 +40926,7 @@ def build_system_diagnostics(role=""):
         "public_readiness_status": public_readiness_status,
         "deployment_endpoints": deployment_endpoints,
         "backup_status": backup_status,
+        "background_queue_status": background_queue_status,
         "system_event_summary": system_event_summary,
         "system_checks": system_checks,
         "system_score": system_score,
@@ -41306,6 +41429,9 @@ async def backup_page(
     notice: str = "",
     error: str = "",
     file: str = "",
+    job: str = "",
+    processed: str = "",
+    failed: str = "",
     deleted: str = "",
     freed: str = "",
 ):
@@ -41321,6 +41447,11 @@ async def backup_page(
 
     backup_status = get_backup_status()
     backup_events = get_backup_event_history()
+    background_queue_status = get_background_queue_status()
+    backup_jobs = get_recent_background_jobs(
+        job_type="database_backup",
+        limit=8,
+    )
 
     return templates.TemplateResponse(
         request,
@@ -41331,10 +41462,15 @@ async def backup_page(
             "role": role,
             "backup_status": backup_status,
             "backup_events": backup_events,
+            "background_queue_status": background_queue_status,
+            "backup_jobs": backup_jobs,
             "links": build_backup_links(),
             "notice": notice,
             "error": error,
             "file": file,
+            "job": job,
+            "processed": processed,
+            "failed": failed,
             "deleted": deleted,
             "freed": freed,
         },
@@ -41353,43 +41489,63 @@ async def backup_create(request: Request):
     if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
-    filename, error = create_database_backup(username)
-
-    if error:
-        backup_error_details = {
-            "db_missing": "Файл базы данных не найден.",
-            "backup_tool_missing": "Утилита pg_dump недоступна.",
-            "backup_timeout": "Создание PostgreSQL-копии превысило лимит времени.",
-            "backup_schema_incomplete": "В схеме нет части ключевых таблиц.",
-            "backup_storage_failed": "Не удалось сохранить копию в S3.",
-        }
+    try:
+        queued = enqueue_database_backup_job(username)
+    except Exception:
         log_backup_event(
             username,
-            "Создание копии",
+            "Постановка копии в очередь",
             "Ошибка",
             "",
-            backup_error_details.get(
-                error,
-                "Не удалось создать резервную копию базы данных.",
-            ),
+            "Не удалось поставить резервную копию в фоновую очередь.",
         )
         return RedirectResponse(
-            f"/backup?error={error}",
+            "/backup?error=backup_queue_failed",
             status_code=302,
         )
 
     log_backup_event(
         username,
-        "Создание копии",
-        "Успешно",
-        filename,
-        "Резервная копия базы создана.",
+        "Постановка копии в очередь",
+        "Успешно" if queued["created"] else "Без изменений",
+        "",
+        (
+            "Резервная копия поставлена в фоновую очередь."
+            if queued["created"]
+            else "Создание резервной копии уже ожидает выполнения."
+        ),
     )
 
-    return RedirectResponse(
-        f"/backup?notice=backup_created&file={filename}",
-        status_code=302,
+    notice = "backup_queued" if queued["created"] else "backup_already_queued"
+    params = urlencode({
+        "notice": notice,
+        "job": queued["job"]["id"],
+    })
+    return RedirectResponse(f"/backup?{params}", status_code=302)
+
+
+@app.post("/backup/jobs/run")
+async def backup_run_background_jobs(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    summary = run_background_job_batch(
+        worker_id=f"backup-{username}-{uuid4().hex[:10]}",
     )
+    params = urlencode({
+        "notice": (
+            "background_jobs_failed"
+            if summary["failed"] or summary["stale_failed"]
+            else "background_jobs_run"
+        ),
+        "processed": summary["succeeded"],
+        "failed": summary["failed"] + summary["stale_failed"],
+    })
+    return RedirectResponse(f"/backup?{params}", status_code=302)
 
 
 @app.post("/backup/cleanup")
@@ -41487,6 +41643,7 @@ async def backup_export(request: Request):
 
     backup_status = get_backup_status()
     backup_events = get_backup_event_history()
+    background_queue_status = get_background_queue_status()
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Резервные копии"])
@@ -41533,6 +41690,13 @@ async def backup_export(request: Request):
     writer.writerow(["Срок хранения, дней", backup_status["retention_days"]])
     writer.writerow(["К очистке", backup_status["cleanup_count"]])
     writer.writerow(["Размер к очистке", backup_status["cleanup_size_label"]])
+    writer.writerow([
+        "Фоновая очередь",
+        background_queue_status["status_label"],
+    ])
+    writer.writerow(["Заданий ожидают", background_queue_status["pending"]])
+    writer.writerow(["Заданий выполняются", background_queue_status["running"]])
+    writer.writerow(["Ошибок очереди за 24 часа", background_queue_status["failed_24h"]])
     writer.writerow([])
 
     writer.writerow(["Последние копии"])
@@ -41611,6 +41775,67 @@ async def api_platform_backup_status(request: Request):
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
     return get_backup_status()
+
+
+@app.get("/api/platform/background-jobs")
+async def api_platform_background_jobs(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    return {
+        "summary": get_background_queue_status(),
+        "items": get_recent_background_jobs(limit=50),
+    }
+
+
+@app.post("/api/platform/background-jobs/run")
+async def api_platform_run_background_jobs(request: Request):
+    username = get_user(request)
+
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    summary = run_background_job_batch(
+        worker_id=f"manual-{username}-{uuid4().hex[:10]}",
+    )
+    return {
+        "ok": not summary["failed"] and not summary["stale_failed"],
+        "summary": summary,
+    }
+
+
+@app.post("/automation/cron/background-jobs")
+async def run_background_jobs_cron(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
+            status_code=503,
+        )
+    token = (request.headers.get("x-automation-secret") or "").strip()
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    summary = run_background_job_batch(
+        worker_id=f"cron-{uuid4().hex[:12]}",
+    )
+    payload = {
+        "ok": not summary["failed"] and not summary["stale_failed"],
+        "summary": summary,
+    }
+    if not payload["ok"]:
+        return JSONResponse(payload, status_code=503)
+    return payload
 
 
 def build_debug_links():

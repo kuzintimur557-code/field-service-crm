@@ -79,6 +79,8 @@ uvicorn app.main:app --reload --port 8011
 - `OBJECT_STORAGE_BACKEND` - `local` или `s3`
 - `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`, `S3_PREFIX` - S3-хранилище
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` - ключи, если нет IAM role
+- `BACKGROUND_JOB_BATCH_SIZE`, `BACKGROUND_JOB_MAX_ATTEMPTS` - размер пачки и повторы фоновой очереди
+- `BACKGROUND_JOB_STALE_MINUTES` - срок lease до возврата зависшего задания
 - `BOT_TOKEN`
 - `CHAT_ID`
 - `CALENDAR_INCIDENT_RESPONSE_MINUTES` - по умолчанию `30`
@@ -205,6 +207,7 @@ python3 tests/smoke_security.py
 - `POST /automation/cron/calendar-plans/watchdog`
 - `POST /automation/cron/a3-autonomous` - выполняет автономный цикл A3
 - `POST /automation/cron/a3-watchdog` - независимо контролирует запуски A3
+- `POST /automation/cron/background-jobs` - выполняет задания постоянной очереди
 
 Для A3 настройте два задания: основной цикл и watchdog. Watchdog должен
 вызываться отдельным внешним расписанием, чтобы сообщить об остановке
@@ -217,6 +220,21 @@ curl -X POST \
   -H "x-automation-secret: $AUTOMATION_CRON_SECRET" \
   https://your-domain.example/automation/cron/ai-digest
 ```
+
+## Фоновая очередь
+
+Длительное создание резервной копии выполняется через постоянную очередь в
+базе данных. Задания переживают перезапуск приложения, защищены от параллельного
+захвата, повторяются с задержкой и возвращаются в очередь после истечения lease.
+
+Очередь можно обрабатывать cron endpoint раз в минуту или отдельным worker:
+
+```bash
+python3 scripts/run_background_worker.py --watch
+```
+
+Статус доступен суперадмину через `/api/platform/background-jobs`, `/system` и
+страницу `/backup`. Подробности: `docs/background_jobs.md`.
 
 ## CI
 
@@ -233,6 +251,7 @@ CI запускает:
 - `tests/smoke_app.py`
 - `tests/smoke_security.py`
 - `tests/smoke_object_storage.py`
+- `tests/smoke_background_jobs.py`
 - `tests/smoke_postgresql.py`, `tests/smoke_postgresql_migration.py`,
   `tests/smoke_postgresql_concurrency.py`,
   `tests/smoke_postgresql_backup.py` и полный `tests/smoke_app.py` на PostgreSQL 16
@@ -241,6 +260,7 @@ CI запускает:
 
 - [Production Launch Checklist](docs/production_launch_checklist.md)
 - [Object Storage](docs/object_storage.md)
+- [Background Jobs](docs/background_jobs.md)
 - [UI Russian Language Guide](docs/ui_language_ru.md)
 - [Changelog](CHANGELOG.md)
 

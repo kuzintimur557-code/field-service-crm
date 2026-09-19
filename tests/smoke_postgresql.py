@@ -19,6 +19,7 @@ REQUIRED_TABLES = {
     "tasks",
     "system_events",
     "a3_followup_quality_alerts",
+    "background_jobs",
 }
 
 REQUIRED_QUALITY_SLA_COLUMNS = {
