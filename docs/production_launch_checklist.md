@@ -66,6 +66,7 @@ python3 tests/smoke_postgresql_concurrency.py
 python3 tests/smoke_postgresql_backup.py
 python3 tests/smoke_object_storage.py
 python3 tests/smoke_background_jobs.py
+python3 tests/smoke_error_monitoring.py
 ```
 
 Optional HTTP check against a running server:

@@ -381,6 +381,36 @@ def _verify_background_job_concurrency():
         connection.close()
 
 
+def _verify_error_monitoring_concurrency():
+    from app.services.error_monitoring import record_error_incident
+
+    def record_error(item_id):
+        return record_error_incident(
+            "PostgreSQLConcurrencyError",
+            method="POST",
+            path=f"/api/concurrency/{item_id}",
+            error_id=f"postgresql-error-{item_id}",
+            request_id=f"postgresql-request-{item_id}",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(record_error, (101, 202)))
+    assert sum(1 for item in results if item["created"]) == 1
+
+    connection = database.connect()
+    try:
+        incidents = connection.execute("""
+            SELECT fingerprint, occurrence_count, path_pattern
+            FROM application_error_incidents
+            WHERE error_type='PostgreSQLConcurrencyError'
+        """).fetchall()
+        assert len(incidents) == 1
+        assert incidents[0]["occurrence_count"] == 2
+        assert incidents[0]["path_pattern"] == "/api/concurrency/:id"
+    finally:
+        connection.close()
+
+
 def main():
     if os.getenv("DATABASE_BACKEND") != "postgresql":
         raise RuntimeError("DATABASE_BACKEND=postgresql is required")
@@ -407,9 +437,11 @@ def main():
         _verify_partial_indexes_and_incident_sync()
         _verify_concurrent_automation_idempotency()
         _verify_background_job_concurrency()
+        _verify_error_monitoring_concurrency()
         print(
             "PostgreSQL concurrency smoke passed: advisory locks, "
-            "partial indexes, durable jobs and automation idempotency."
+            "partial indexes, durable jobs, grouped errors and automation "
+            "idempotency."
         )
     finally:
         os.environ["DATABASE_URL"] = previous_url

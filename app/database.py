@@ -710,6 +710,36 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS application_error_incidents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fingerprint TEXT NOT NULL UNIQUE,
+        error_type TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'runtime',
+        method TEXT,
+        path_pattern TEXT,
+        severity TEXT NOT NULL DEFAULT 'critical',
+        status TEXT NOT NULL DEFAULT 'active',
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        occurrence_count INTEGER NOT NULL DEFAULT 1,
+        reopen_count INTEGER NOT NULL DEFAULT 0,
+        last_error_id TEXT,
+        last_request_id TEXT,
+        last_username TEXT,
+        first_notified_at TEXT,
+        last_notified_at TEXT,
+        notification_count INTEGER NOT NULL DEFAULT 0,
+        acknowledged_at TEXT,
+        acknowledged_by TEXT,
+        resolved_at TEXT,
+        resolved_by TEXT,
+        resolution_note TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS task_comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER,
@@ -1647,6 +1677,11 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_system_events_created
     ON system_events(created_at, id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_application_error_incidents_status_seen
+    ON application_error_incidents(status, last_seen_at, id)
     """)
 
     c.execute("""

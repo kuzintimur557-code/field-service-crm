@@ -74,6 +74,11 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
 .retention-box{border:1px solid #edf0f4;border-radius:8px;background:#fbfdff;padding:14px}
 .retention-box span{display:block;font-size:12px;color:#64748b;font-weight:900;margin-bottom:7px}
 .retention-box strong{display:block;font-size:16px;word-break:break-word}
+.incident-list{display:grid;gap:10px}
+.incident-row{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:14px;align-items:start;padding:14px;border:1px solid #edf0f4;border-radius:8px;background:#fbfdff}
+.incident-title{font-weight:900;margin-bottom:5px;word-break:break-word}
+.incident-meta{font-size:12px;color:#64748b;font-weight:800;line-height:1.55;word-break:break-word}
+.incident-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:900px){
     .page{padding:18px}
     .topbar{display:block}
@@ -82,6 +87,8 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
     .summary-card,.grid,.backup-grid,.endpoint-grid,.retention-grid{grid-template-columns:1fr}
     .check{grid-template-columns:1fr}
     .event-row{grid-template-columns:1fr}
+    .incident-row{grid-template-columns:1fr}
+    .incident-actions{justify-content:flex-start}
     .path-row{grid-template-columns:1fr}
     h1{font-size:28px}
 }
@@ -103,6 +110,7 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
             {% if role == "superadmin" %}
             <a class="button" href="{{ system_links['readiness'] }}">Готовность</a>
             <a class="button" href="{{ system_links['export'] }}">Экспорт отчёта</a>
+            <a class="button" href="{{ system_links['errors_export'] }}">Экспорт ошибок</a>
             <a class="button" href="{{ system_links['events_export'] }}">Экспорт событий</a>
             <a class="button primary" href="{{ system_links['backup'] }}">Резервные копии</a>
             {% endif %}
@@ -113,6 +121,12 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
     <div class="notice">Старые события журнала удалены: {{ deleted }}.</div>
     {% elif notice == "system_events_cleanup_empty" %}
     <div class="notice">Старых системных событий для очистки нет.</div>
+    {% elif notice == "error_incident_acknowledged" %}
+    <div class="notice">Ошибка #{{ incident }} принята в работу.</div>
+    {% elif notice == "error_incident_resolved" %}
+    <div class="notice">Ошибка #{{ incident }} отмечена как решённая.</div>
+    {% elif notice == "error_incident_action_skipped" %}
+    <div class="notice">Статус ошибки #{{ incident }} уже изменён или запись не найдена.</div>
     {% endif %}
 
     <section class="status-panel">
@@ -337,6 +351,80 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
     </section>
 
     {% if role == "superadmin" %}
+    <section class="section" id="error-incidents">
+        <div class="section-head">
+            <div>
+                <div class="section-title">Журнал ошибок приложения</div>
+                <div class="section-note">
+                    Одинаковые сбои объединяются по типу и маршруту. Текст исключения и данные запроса не сохраняются.
+                    Уведомление отправляется после {{ error_monitoring.policy.alert_threshold }} повторов,
+                    повторно — не чаще чем раз в {{ error_monitoring.policy.alert_cooldown_minutes }} мин.
+                </div>
+            </div>
+            <div class="actions">
+                <span class="pill {{ error_monitoring.status }}">{{ error_monitoring.status_label }}</span>
+                <a class="button" href="{{ system_links['errors_export'] }}">CSV</a>
+            </div>
+        </div>
+
+        <div class="retention-grid">
+            <div class="retention-box">
+                <span>Открыто</span>
+                <strong>{{ error_monitoring.summary.open }}</strong>
+            </div>
+            <div class="retention-box">
+                <span>Повторяются</span>
+                <strong>{{ error_monitoring.summary.repeated }}</strong>
+            </div>
+            <div class="retention-box">
+                <span>Принято в работу</span>
+                <strong>{{ error_monitoring.summary.acknowledged }}</strong>
+            </div>
+            <div class="retention-box">
+                <span>Решено</span>
+                <strong>{{ error_monitoring.summary.resolved }}</strong>
+            </div>
+        </div>
+
+        {% if error_monitoring.incidents %}
+        <div class="incident-list">
+            {% for item in error_monitoring.incidents %}
+            <div class="incident-row">
+                <div>
+                    <span class="pill {{ item.status_tone }}">{{ item.status_label }}</span>
+                </div>
+                <div>
+                    <div class="incident-title">
+                        #{{ item.id }} · {{ item.error_type }} · {{ item.method or "—" }} {{ item.path_pattern }}
+                    </div>
+                    <div class="incident-meta">
+                        Повторов: {{ item.occurrence_count }} · повторных открытий: {{ item.reopen_count }} · уведомлений: {{ item.notification_count }}<br>
+                        Впервые: {{ item.first_seen_at }} · последнее: {{ item.last_seen_at }}<br>
+                        error_id: {{ item.last_error_id or "—" }} · request_id: {{ item.last_request_id or "—" }}
+                        {% if item.acknowledged_by %}<br>Принял: {{ item.acknowledged_by }} · {{ item.acknowledged_at }}{% endif %}
+                        {% if item.resolved_by %}<br>Решил: {{ item.resolved_by }} · {{ item.resolved_at }}{% endif %}
+                    </div>
+                </div>
+                <div class="incident-actions">
+                    {% if item.status == "active" %}
+                    <form class="inline-form" method="post" action="/system/errors/{{ item.id }}/acknowledge">
+                        <button class="button" type="submit">Принять</button>
+                    </form>
+                    {% endif %}
+                    {% if item.status in ["active", "acknowledged"] %}
+                    <form class="inline-form" method="post" action="/system/errors/{{ item.id }}/resolve">
+                        <button class="button primary" type="submit">Решено</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">Ошибок приложения пока нет.</div>
+        {% endif %}
+    </section>
+
     <section class="section">
         <div class="section-head">
             <div>

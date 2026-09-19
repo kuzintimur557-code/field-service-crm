@@ -192,6 +192,14 @@ from app.services.background_jobs import (
     get_recent_background_jobs,
     process_background_jobs,
 )
+from app.services.error_monitoring import (
+    acknowledge_error_incident,
+    get_error_incidents,
+    get_error_monitoring_overview,
+    normalize_error_path,
+    record_error_incident,
+    resolve_error_incident,
+)
 from app.telegram_utils import send_message, send_photo, send_message_to_chat
 
 from datetime import datetime, timedelta
@@ -10665,8 +10673,8 @@ def log_system_event(
             datetime.now().strftime("%Y-%m-%d %H:%M"),
         ))
         conn.commit()
-    except sqlite3.Error as error:
-        print("System event log error:", error)
+    except get_database_error_types() as error:
+        print("System event log error:", error.__class__.__name__)
     finally:
         if conn:
             conn.close()
@@ -11050,6 +11058,62 @@ async def http_exception_handler(
         return finalize_response_headers(response, request_id)
 
 
+def notify_error_incident(incident):
+    incident_id = int(incident.get("id") or 0)
+    if not incident_id:
+        return {"notifications_created": 0, "telegram_sent": False}
+
+    title = f"Повторяющаяся ошибка приложения #{incident_id}"
+    message = (
+        f"{incident.get('error_type') or 'Exception'} · "
+        f"{incident.get('method') or '—'} "
+        f"{incident.get('path_pattern') or '/'} · "
+        f"повторов: {int(incident.get('occurrence_count') or 0)}."
+    )
+    admins = []
+    connection = None
+    try:
+        connection = connect()
+        admins = connection.execute("""
+            SELECT username, company_id
+            FROM users
+            WHERE role='superadmin'
+              AND COALESCE(is_active, 1)=1
+            ORDER BY username
+        """).fetchall()
+    except Exception:
+        admins = []
+    finally:
+        if connection:
+            connection.close()
+
+    notifications_created = 0
+    for admin in admins:
+        try:
+            create_notification(
+                admin["company_id"],
+                admin["username"],
+                title,
+                message,
+                "/system#error-incidents",
+            )
+            notifications_created += 1
+        except Exception:
+            continue
+
+    telegram_sent = False
+    try:
+        telegram_sent = bool(send_message(
+            f"⚠️ {title}\n{message}\nОткройте /system для разбора.",
+        ))
+    except Exception:
+        telegram_sent = False
+    return {
+        "notifications_created": notifications_created,
+        "telegram_sent": telegram_sent,
+    }
+
+
 def log_runtime_exception(request, error, request_id=""):
     error_id = uuid4().hex[:12]
     request_id = request_id or get_request_id(request)
@@ -11071,10 +11135,31 @@ def log_runtime_exception(request, error, request_id=""):
         method = ""
 
     error_type = type(error).__name__
-    error_message = str(error or "")[:500]
+    incident_result = None
+    try:
+        incident_result = record_error_incident(
+            error_type,
+            method=method,
+            path=path,
+            source="runtime",
+            severity="critical",
+            error_id=error_id,
+            request_id=request_id,
+            username=username,
+        )
+    except Exception:
+        incident_result = None
+
+    incident = (
+        incident_result.get("incident", {})
+        if incident_result
+        else {}
+    )
+    safe_path = incident.get("path_pattern") or normalize_error_path(path)
     details = (
-        f"id={error_id}; request_id={request_id}; method={method}; path={path}; "
-        f"type={error_type}; message={error_message}"
+        f"id={error_id}; request_id={request_id}; method={method}; "
+        f"path={safe_path}; type={error_type}; "
+        f"incident_id={incident.get('id') or ''}"
     )
     log_system_event(
         "runtime_error",
@@ -11084,6 +11169,9 @@ def log_runtime_exception(request, error, request_id=""):
         f"Ошибка приложения {error_id}",
         details,
     )
+
+    if incident_result and incident_result.get("notification_due"):
+        notify_error_incident(incident)
 
     return error_id
 
@@ -40532,6 +40620,7 @@ def build_system_links():
         "readiness": build_platform_readiness_links()["page"],
         "export": "/system/export",
         "events_export": "/system/events/export",
+        "errors_export": "/system/errors/export",
         "backup": "/backup",
         "debug": "/debug",
     }
@@ -40569,6 +40658,11 @@ def build_system_diagnostics(role=""):
     public_readiness_status = get_public_readiness_status()
     build_metadata = get_build_metadata()
     system_event_summary = get_recent_system_event_summary()
+    error_monitoring = get_error_monitoring_overview(
+        limit=30 if role == "superadmin" else 1,
+    )
+    if role != "superadmin":
+        error_monitoring["incidents"] = []
     system_generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     system_links = build_system_links()
 
@@ -40714,30 +40808,21 @@ def build_system_diagnostics(role=""):
         make_system_check(
             "runtime_errors",
             "Ошибки приложения",
+            error_monitoring["status"],
             (
-                "critical"
-                if system_event_summary["runtime_error_count"]
+                f"{error_monitoring['summary']['open']} открыто / "
+                f"{error_monitoring['summary']['repeated']} повторяются"
+            ),
+            (
+                "Открытых ошибок приложения нет."
+                if not error_monitoring["summary"]["open"]
                 else (
-                    "warning"
-                    if system_event_summary["critical_count"]
-                    else "ok"
+                    "Одинаковые ошибки объединены по типу и маршруту. "
+                    "Проверьте ответственного и статус устранения."
                 )
             ),
-            (
-                f"{system_event_summary['critical_count']} критичных"
-                " / "
-                f"{system_event_summary['runtime_error_count']} ошибок"
-            ),
-            (
-                "За последние 24 часа критичных ошибок не было."
-                if not system_event_summary["critical_count"]
-                else (
-                    "За последние 24 часа есть критичные события "
-                    "в системном журнале."
-                )
-            ),
-            "Откройте журнал системы и разберите последние критичные события.",
-            "/system",
+            "Разберите активные инциденты в журнале ошибок приложения.",
+            "/system#error-incidents",
         ),
         make_system_check(
             "http_observability",
@@ -40928,6 +41013,7 @@ def build_system_diagnostics(role=""):
         "backup_status": backup_status,
         "background_queue_status": background_queue_status,
         "system_event_summary": system_event_summary,
+        "error_monitoring": error_monitoring,
         "system_checks": system_checks,
         "system_score": system_score,
         "system_status": system_status,
@@ -41148,6 +41234,7 @@ async def system_page(
     request: Request,
     notice: str = "",
     deleted: int = 0,
+    incident: int = 0,
 ):
 
     username = get_user(request)
@@ -41166,6 +41253,7 @@ async def system_page(
         "role": role,
         "notice": notice,
         "deleted": deleted,
+        "incident": incident,
     }
     context.update(build_system_diagnostics(role))
 
@@ -41192,6 +41280,7 @@ async def system_export(request: Request):
     production_config = diagnostics["production_config"]
     backup_status = diagnostics["backup_status"]
     event_summary = diagnostics["system_event_summary"]
+    error_monitoring = diagnostics["error_monitoring"]
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -41309,6 +41398,36 @@ async def system_export(request: Request):
         writer.writerow(["Детали", latest["details"]])
     writer.writerow([])
 
+    writer.writerow(["Журнал ошибок приложения"])
+    writer.writerow(["Статус", error_monitoring["status_label"]])
+    writer.writerow(["Открыто", error_monitoring["summary"]["open"]])
+    writer.writerow([
+        "Повторяющихся",
+        error_monitoring["summary"]["repeated"],
+    ])
+    writer.writerow(["Решено", error_monitoring["summary"]["resolved"]])
+    writer.writerow([
+        "Порог уведомления",
+        error_monitoring["policy"]["alert_threshold"],
+    ])
+    writer.writerow([
+        "ID", "Статус", "Тип", "Метод", "Маршрут", "Повторов",
+        "Первое событие", "Последнее событие", "Последний error_id",
+    ])
+    for incident in error_monitoring["incidents"]:
+        writer.writerow([
+            incident["id"],
+            incident["status_label"],
+            incident["error_type"],
+            incident["method"],
+            incident["path_pattern"],
+            incident["occurrence_count"],
+            incident["first_seen_at"],
+            incident["last_seen_at"],
+            incident["last_error_id"],
+        ])
+    writer.writerow([])
+
     writer.writerow(["Журнал системы"])
     writer.writerow([
         "Дата",
@@ -41354,6 +41473,142 @@ async def api_system_diagnostics(request: Request):
     diagnostics["export_url"] = "/system/export"
 
     return diagnostics
+
+
+@app.get("/api/system/error-incidents")
+async def api_system_error_incidents(
+    request: Request,
+    status: str = "all",
+    limit: int = 50,
+):
+    username = get_user(request)
+    if not username:
+        return JSONResponse({"error": "auth_required"}, status_code=401)
+    if get_role(username) != "superadmin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    return {
+        "ok": True,
+        "status": status,
+        "incidents": get_error_incidents(status=status, limit=limit),
+        "overview": get_error_monitoring_overview(limit=0),
+        "export_url": "/system/errors/export",
+    }
+
+
+@app.post("/system/errors/{incident_id}/acknowledge")
+async def system_error_incident_acknowledge(
+    request: Request,
+    incident_id: int,
+):
+    username = get_user(request)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+    result = acknowledge_error_incident(incident_id, username)
+    notice = (
+        "error_incident_acknowledged"
+        if result["ok"]
+        else "error_incident_action_skipped"
+    )
+    if result["ok"]:
+        log_system_event(
+            "error_incident",
+            "info",
+            username,
+            "monitoring",
+            f"Ошибка #{incident_id} принята в работу",
+            "Статус инцидента изменён на acknowledged.",
+        )
+    return RedirectResponse(
+        "/system?" + urlencode({"notice": notice, "incident": incident_id})
+        + "#error-incidents",
+        status_code=302,
+    )
+
+
+@app.post("/system/errors/{incident_id}/resolve")
+async def system_error_incident_resolve(
+    request: Request,
+    incident_id: int,
+):
+    username = get_user(request)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+    result = resolve_error_incident(
+        incident_id,
+        username,
+        "Решено вручную в системной диагностике.",
+    )
+    notice = (
+        "error_incident_resolved"
+        if result["ok"]
+        else "error_incident_action_skipped"
+    )
+    if result["ok"]:
+        log_system_event(
+            "error_incident",
+            "ok",
+            username,
+            "monitoring",
+            f"Ошибка #{incident_id} решена",
+            "Статус инцидента изменён на resolved.",
+        )
+    return RedirectResponse(
+        "/system?" + urlencode({"notice": notice, "incident": incident_id})
+        + "#error-incidents",
+        status_code=302,
+    )
+
+
+@app.get("/system/errors/export")
+async def system_error_incidents_export(request: Request):
+    username = get_user(request)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    if get_role(username) != "superadmin":
+        return RedirectResponse("/", status_code=302)
+
+    incidents = get_error_incidents(limit=500)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Журнал ошибок приложения"])
+    writer.writerow([
+        "ID", "Статус", "Уровень", "Тип", "Источник", "Метод",
+        "Маршрут", "Повторов", "Повторных открытий", "Первое событие",
+        "Последнее событие", "Принял", "Решил", "Последний error_id",
+        "Последний request_id", "Уведомлений",
+    ])
+    for incident in incidents:
+        writer.writerow([
+            incident["id"],
+            incident["status_label"],
+            incident["severity"],
+            incident["error_type"],
+            incident["source"],
+            incident["method"],
+            incident["path_pattern"],
+            incident["occurrence_count"],
+            incident["reopen_count"],
+            incident["first_seen_at"],
+            incident["last_seen_at"],
+            incident["acknowledged_by"],
+            incident["resolved_by"],
+            incident["last_error_id"],
+            incident["last_request_id"],
+            incident["notification_count"],
+        ])
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename=application_error_incidents.csv"
+            ),
+        },
+    )
 
 
 @app.get("/system/events/export")

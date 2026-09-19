@@ -19549,6 +19549,9 @@ async def assert_platform_calendar_health():
         assert system_page.context["system_links"]["events_export"] == (
             "/system/events/export"
         )
+        assert system_page.context["system_links"]["errors_export"] == (
+            "/system/errors/export"
+        )
         assert system_page.context["system_links"]["backup"] == "/backup"
         assert "/platform/readiness" in system_page.context[
             "superadmin_only_urls"
@@ -19567,6 +19570,7 @@ async def assert_platform_calendar_health():
         })
         assert system_page.context["production_config"]["items"]
         assert "system_event_summary" in system_page.context
+        assert "error_monitoring" in system_page.context
         assert system_page.context["system_event_summary"]["hours"] == (
             crm.SYSTEM_EVENT_ALERT_HOURS
         )
@@ -19629,6 +19633,7 @@ async def assert_platform_calendar_health():
         )
         assert "Резервные копии" in system_export_csv
         assert "Ошибки за 24 часа" in system_export_csv
+        assert "Журнал ошибок приложения" in system_export_csv
         assert "HTTP событий" in system_export_csv
         assert "HTTP 5xx" in system_export_csv
         assert "Медленных HTTP" in system_export_csv
@@ -19672,6 +19677,7 @@ async def assert_platform_calendar_health():
             system_api["system_event_summary"]["http_critical_count"] >= 1
         )
         assert isinstance(system_api["system_events"], list)
+        assert "error_monitoring" in system_api
         admin_page = await crm.admin_page(
             make_asgi_request("super", "/admin"),
         )
@@ -19952,8 +19958,13 @@ async def assert_platform_calendar_health():
             event["event_type"] == "runtime_error"
             and event["source"] == "runtime"
             and event["severity"] == "critical"
-            and "Smoke runtime failure" in event["details"]
+            and "Smoke runtime failure" not in event["details"]
             and "request_id=" in event["details"]
+            and "incident_id=" in event["details"]
+            for event in runtime_error_events
+        )
+        assert all(
+            "Smoke runtime failure" not in event["details"]
             for event in runtime_error_events
         )
         api_runtime_error_response = await crm.unhandled_exception_handler(
@@ -19983,14 +19994,15 @@ async def assert_platform_calendar_health():
             item for item in runtime_system_page.context["system_checks"]
             if item["key"] == "runtime_errors"
         )
-        assert runtime_check["status"] == "critical"
+        assert runtime_check["status"] == "warning"
         assert runtime_system_page.context["system_event_summary"][
             "runtime_error_count"
         ] >= 2
         assert "Ошибки приложения" in runtime_system_html
-        assert "За последние 24 часа есть критичные события" in (
-            runtime_system_html
-        )
+        assert "Одинаковые ошибки объединены" in runtime_system_html
+        assert runtime_system_page.context["error_monitoring"]["summary"][
+            "open"
+        ] >= 2
         anonymous_backup_page = await crm.backup_page(
             make_public_asgi_request("/backup"),
         )

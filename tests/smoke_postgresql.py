@@ -18,6 +18,7 @@ REQUIRED_TABLES = {
     "companies",
     "tasks",
     "system_events",
+    "application_error_incidents",
     "a3_followup_quality_alerts",
     "background_jobs",
 }

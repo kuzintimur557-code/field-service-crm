@@ -81,6 +81,9 @@ uvicorn app.main:app --reload --port 8011
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` - ключи, если нет IAM role
 - `BACKGROUND_JOB_BATCH_SIZE`, `BACKGROUND_JOB_MAX_ATTEMPTS` - размер пачки и повторы фоновой очереди
 - `BACKGROUND_JOB_STALE_MINUTES` - срок lease до возврата зависшего задания
+- `ERROR_MONITOR_ALERT_THRESHOLD` - число одинаковых ошибок до уведомления, по умолчанию `3`
+- `ERROR_MONITOR_ALERT_COOLDOWN_MINUTES` - пауза между повторными уведомлениями, по умолчанию `60`
+- `ERROR_MONITOR_RECENT_HOURS` - окно недавних ошибок в диагностике, по умолчанию `24`
 - `BOT_TOKEN`
 - `CHAT_ID`
 - `CALENDAR_INCIDENT_RESPONSE_MINUTES` - по умолчанию `30`
@@ -236,6 +239,11 @@ python3 scripts/run_background_worker.py --watch
 Статус доступен суперадмину через `/api/platform/background-jobs`, `/system` и
 страницу `/backup`. Подробности: `docs/background_jobs.md`.
 
+Сгруппированный журнал ошибок доступен суперадмину на `/system` и через
+`/api/system/error-incidents`. Он хранит тип ошибки, нормализованный маршрут,
+счётчики и технические идентификаторы без текста исключения. Подробности:
+`docs/error_monitoring.md`.
+
 ## CI
 
 GitHub Actions workflow:
@@ -252,6 +260,7 @@ CI запускает:
 - `tests/smoke_security.py`
 - `tests/smoke_object_storage.py`
 - `tests/smoke_background_jobs.py`
+- `tests/smoke_error_monitoring.py`
 - `tests/smoke_postgresql.py`, `tests/smoke_postgresql_migration.py`,
   `tests/smoke_postgresql_concurrency.py`,
   `tests/smoke_postgresql_backup.py` и полный `tests/smoke_app.py` на PostgreSQL 16
@@ -261,6 +270,7 @@ CI запускает:
 - [Production Launch Checklist](docs/production_launch_checklist.md)
 - [Object Storage](docs/object_storage.md)
 - [Background Jobs](docs/background_jobs.md)
+- [Error Monitoring](docs/error_monitoring.md)
 - [UI Russian Language Guide](docs/ui_language_ru.md)
 - [Changelog](CHANGELOG.md)
 
