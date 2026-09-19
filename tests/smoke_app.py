@@ -164,7 +164,7 @@ def assert_database_runtime_configuration():
             config["postgresql_adapter_ready"]
         )
         assert config["migration_required"] is True
-        assert config["postgresql_ready"] is False
+        assert config["postgresql_ready"] is True
         serialized = json.dumps(config)
         assert "private_user" not in serialized
         assert "private_password" not in serialized
@@ -485,22 +485,6 @@ def seed_data():
     (crm.UPLOAD_DIR / "after.png").write_bytes(b"smoke-after")
 
     return task
-
-
-def prepare_backend_smoke_fixtures():
-    """Keep the SQLite-only backup lifecycle isolated during PostgreSQL smoke."""
-    from unittest.mock import patch
-
-    runtime = database_module.get_database_runtime_config()
-    if runtime["active_backend"] != "postgresql":
-        return
-
-    with patch.dict(os.environ, {
-        "DATABASE_BACKEND": "sqlite",
-        "DATABASE_URL": "",
-        "POSTGRESQL_EXPERIMENTAL": "0",
-    }):
-        database_module.init_db()
 
 
 def assert_session_cookie_auth():
@@ -19457,7 +19441,7 @@ async def assert_platform_calendar_health():
             if expected_backend == "postgresql"
             else "sqlite_quick_check"
         )
-        expected_ready = expected_backend == "sqlite"
+        expected_ready = True
         assert readiness_status["ok"] is expected_ready
         assert readiness_status["status"] == (
             "ok" if expected_ready else "critical"
@@ -19480,14 +19464,7 @@ async def assert_platform_calendar_health():
         assert readiness_payload["status_label"] == (
             "Готово" if expected_ready else "Не готово"
         )
-        if expected_ready:
-            assert all(item["ok"] for item in readiness_payload["checks"])
-        else:
-            release_support = next(
-                item for item in readiness_payload["checks"]
-                if item["key"] == "database_release_support"
-            )
-            assert release_support["ok"] is False
+        assert all(item["ok"] for item in readiness_payload["checks"])
         assert "db_path" not in readiness_payload
         assert "data_dir" not in readiness_payload
         assert "production_config" not in readiness_payload
@@ -20099,9 +20076,12 @@ async def assert_platform_calendar_health():
         backup_dir = crm.DATA_DIR / "backups"
         backup_dir.mkdir(parents=True, exist_ok=True)
         retention_files = []
+        backup_extension = ".dump" if expected_backend == "postgresql" else ".db"
 
         for index, days_old in enumerate((40, 41, 42, 43, 44), start=1):
-            backup_file = backup_dir / f"smoke_retention_{index}.db"
+            backup_file = backup_dir / (
+                f"smoke_retention_{index}{backup_extension}"
+            )
             backup_file.write_bytes(b"backup")
             backup_time = (
                 datetime.now() - timedelta(days=days_old)
@@ -20126,7 +20106,12 @@ async def assert_platform_calendar_health():
         assert "Политика хранения" in retention_html
         assert "Проверка целостности" in retention_html
         assert "Проверка восстановления" in retention_html
-        assert "Файл не читается как SQLite база." in retention_html
+        expected_invalid_message = (
+            "Манифест PostgreSQL-копии отсутствует или повреждён."
+            if expected_backend == "postgresql"
+            else "Файл не читается как SQLite база."
+        )
+        assert expected_invalid_message in retention_html
         assert "Очистить старые" in retention_html
         anonymous_backup_cleanup = await crm.backup_cleanup(
             make_public_asgi_request("/backup/cleanup"),
@@ -20179,11 +20164,25 @@ async def assert_platform_calendar_health():
         assert verified_backup_status["status"] == "warning"
         assert verified_backup_status["verification_checked_count"] == 1
         assert verified_backup_status["verification_problem_count"] == 0
+        if expected_backend == "postgresql":
+            manifest_path, manifest_error = crm.get_backup_download_path(
+                f"{created_backup_name}.json"
+            )
+            assert manifest_error == ""
+            assert manifest_path.is_file()
+            assert verified_backup_status["recent_files"][0][
+                "manifest_download_url"
+            ].endswith(f"{created_backup_name}.json")
         verified_backup_page = await crm.backup_page(
             make_asgi_request("super", "/backup"),
         )
         verified_backup_html = verified_backup_page.body.decode("utf-8")
-        assert "Копия читается, ключевые таблицы на месте." in (
+        expected_verified_message = (
+            "Архив PostgreSQL читается, ключевые таблицы на месте."
+            if expected_backend == "postgresql"
+            else "Копия читается, ключевые таблицы на месте."
+        )
+        assert expected_verified_message in (
             verified_backup_html
         )
         restore_check_response = await crm.backup_restore_check(
@@ -20221,9 +20220,12 @@ async def assert_platform_calendar_health():
         )
         logged_backup_html = logged_backup_page.body.decode("utf-8")
         assert "Резервная копия базы создана." in logged_backup_html
-        assert "Копия успешно скопирована во временную папку" in (
-            logged_backup_html
+        expected_restore_message = (
+            "PostgreSQL-копия восстановлена во временную базу"
+            if expected_backend == "postgresql"
+            else "Копия успешно скопирована во временную папку"
         )
+        assert expected_restore_message in logged_backup_html
         logged_system_page = await crm.system_page(
             make_asgi_request("super", "/system"),
         )
@@ -20261,12 +20263,13 @@ async def assert_platform_calendar_health():
         assert invalid_backup_download.headers["location"] == (
             "/backup?error=invalid_backup"
         )
+        missing_backup_name = f"missing{backup_extension}"
         missing_backup_download = await crm.backup_download(
             make_asgi_request(
                 "super",
-                "/backup/download?file=missing.db",
+                f"/backup/download?file={missing_backup_name}",
             ),
-            "missing.db",
+            missing_backup_name,
         )
         assert missing_backup_download.status_code == 302
         assert missing_backup_download.headers["location"] == (
@@ -30982,7 +30985,6 @@ async def assert_a3_api_layer():
 
 def main():
     try:
-        prepare_backend_smoke_fixtures()
         task = seed_data()
         assert_database_runtime_configuration()
         assert_postgres_adapter_foundation()

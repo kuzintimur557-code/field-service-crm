@@ -10,11 +10,12 @@ Set these variables before production deploy:
 - `AUTOMATION_CRON_SECRET` with a long random value
 - `BOT_TOKEN` and `CHAT_ID` if Telegram alerts are enabled
 - `DATA_DIR` if the server uses a mounted persistent volume
-- `DATABASE_BACKEND=sqlite` while the PostgreSQL migration is unfinished
+- `DATABASE_BACKEND=postgresql` after the rehearsed cutover
+- `DATABASE_URL` for the production PostgreSQL database
+- `POSTGRESQL_EXPERIMENTAL=1` as the explicit cutover guard
 
-Do not attach `DATABASE_URL` or enable `POSTGRESQL_EXPERIMENTAL` on the
-application service until the full PostgreSQL application smoke, data migration
-and restore drill are complete. The current guardrail deliberately stops
+Keep `DATABASE_BACKEND=sqlite` until the full PostgreSQL application smoke,
+data-migration rehearsal and restore drill are complete. The guardrail stops
 startup instead of silently falling back to SQLite when PostgreSQL is requested.
 
 Before a PostgreSQL cutover:
@@ -51,6 +52,7 @@ With a disposable PostgreSQL test database configured, also run:
 ```bash
 python3 tests/smoke_postgresql_migration.py
 python3 tests/smoke_postgresql_concurrency.py
+python3 tests/smoke_postgresql_backup.py
 ```
 
 Optional HTTP check against a running server:
@@ -99,7 +101,7 @@ Pause rollout if any of these happen:
 
 - `/ready` returns `503`
 - `/system` shows critical runtime errors
-- database quick check fails
+- database connection or integrity check fails
 - database backend configuration is invalid or PostgreSQL cutover is incomplete
 - uploads are not writable
 - login or session checks fail

@@ -120,7 +120,7 @@ def get_database_runtime_config():
         ),
         "postgresql_experimental": postgresql_experimental,
         "postgresql_adapter_ready": postgresql_driver_available,
-        "postgresql_ready": False,
+        "postgresql_ready": True,
     }
 
 

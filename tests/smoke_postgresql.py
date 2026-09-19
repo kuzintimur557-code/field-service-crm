@@ -108,13 +108,13 @@ def main():
         readiness_checks = {
             item["key"]: item for item in readiness["checks"]
         }
-        assert readiness["ok"] is False
+        assert readiness["ok"] is True
         assert readiness_checks["database"]["ok"] is True
         assert readiness_checks["postgresql_connection_check"]["ok"] is True
         assert readiness_checks["required_tables"]["ok"] is True
-        assert readiness_checks["database_release_support"]["ok"] is False
+        assert readiness_checks["database_release_support"]["ok"] is True
         response = asyncio.run(crm.public_ready())
-        assert response.status_code == 503
+        assert response.status_code == 200
         payload = json.loads(response.body)
         serialized = json.dumps(payload)
         assert payload["checks"] == readiness["checks"]

@@ -168,6 +168,12 @@ from app.database import (
     get_database_runtime_config,
     init_db,
 )
+from app.postgresql_backup import (
+    create_postgresql_backup,
+    inspect_postgresql_database,
+    run_postgresql_restore_drill,
+    verify_postgresql_backup,
+)
 from app.telegram_utils import send_message, send_photo, send_message_to_chat
 
 from datetime import datetime, timedelta
@@ -5913,7 +5919,10 @@ def get_production_config_status():
     uploads_writable = uploads_exists and os.access(UPLOAD_DIR, os.W_OK)
     storage_ready = data_dir_writable and uploads_writable
     database_runtime = get_database_runtime_config()
-    database_production_ready = database_runtime["postgresql_ready"]
+    database_production_ready = (
+        database_runtime["active_backend"] == "postgresql"
+        and database_runtime["postgresql_ready"]
+    )
     database_config_status = (
         "critical"
         if not database_runtime["configuration_valid"]
@@ -5943,7 +5952,7 @@ def get_production_config_status():
                 "Конфигурация базы содержит несовместимые параметры."
                 if not database_runtime["configuration_valid"]
                 else (
-                    "PostgreSQL adapter готов к production."
+                    "PostgreSQL готов к production."
                     if database_production_ready
                     else (
                         "SQLite остаётся активной базой на этапе миграции. "
@@ -5955,8 +5964,8 @@ def get_production_config_status():
                 "Устраните конфликт DATABASE_BACKEND и DATABASE_URL."
                 if not database_runtime["configuration_valid"]
                 else (
-                    "Проверяйте миграцию на отдельной PostgreSQL базе; "
-                    "не переключайте production до завершения adapter и smoke."
+                    "Проверьте миграцию и restore drill на отдельной "
+                    "PostgreSQL базе перед production cutover."
                 )
             ),
         ),
@@ -11103,11 +11112,17 @@ def list_database_backup_files():
     if not backup_path.exists():
         return []
 
+    database_runtime = get_database_runtime_config()
+    extensions = (
+        (".dump",)
+        if database_runtime["active_backend"] == "postgresql"
+        else (".db", ".sqlite", ".sqlite3")
+    )
     files = [
         file
         for file in backup_path.iterdir()
         if file.is_file()
-        and file.suffix.lower() in (".db", ".sqlite", ".sqlite3")
+        and file.suffix.lower() in extensions
     ]
     files.sort(
         key=lambda file: file.stat().st_mtime,
@@ -11131,6 +11146,9 @@ def get_backup_cleanup_candidates(files, now=None):
 
 
 def verify_database_backup_file(file_path):
+    if Path(file_path).suffix.lower() == ".dump":
+        return verify_postgresql_backup(file_path, BACKUP_REQUIRED_TABLES)
+
     result = {
         "status": "critical",
         "status_label": "Проблема",
@@ -11195,9 +11213,25 @@ def verify_database_backup_file(file_path):
 
 
 def get_backup_status():
+    database_runtime = get_database_runtime_config()
+    is_postgresql = database_runtime["active_backend"] == "postgresql"
     db_path = DATA_DIR / "crm.db"
     backup_path = DATA_DIR / "backups"
-    db_exists = db_path.exists()
+    if is_postgresql:
+        database_state = inspect_postgresql_database(os.getenv("DATABASE_URL"))
+        db_exists = database_state["ok"]
+        db_size = database_state["size"]
+        db_path_label = "PostgreSQL"
+        backend_label = "PostgreSQL"
+        verification_method = (
+            "Каталог pg_restore, манифест таблиц и количества строк"
+        )
+    else:
+        db_exists = db_path.exists()
+        db_size = db_path.stat().st_size if db_exists else 0
+        db_path_label = str(db_path)
+        backend_label = "SQLite"
+        verification_method = "SQLite quick_check и ключевые таблицы"
     backup_path_exists = backup_path.exists()
     files = list_database_backup_files()
     latest = files[0] if files else None
@@ -11268,8 +11302,8 @@ def get_backup_status():
     if not db_exists:
         status = "critical"
         status_label = "База не найдена"
-        summary = "Невозможно создать резервную копию: файл базы не найден."
-        action = "Проверьте DATA_DIR и запуск базы данных."
+        summary = "Невозможно создать резервную копию: база недоступна."
+        action = "Проверьте подключение к базе данных и её запуск."
     elif not backup_path_exists:
         status = "warning"
         status_label = "Папка не создана"
@@ -11334,6 +11368,11 @@ def get_backup_status():
             "created_at": file_at.strftime("%Y-%m-%d %H:%M"),
             "age_label": format_backup_age(file_age_hours),
             "download_url": f"/backup/download?file={file.name}",
+            "manifest_download_url": (
+                f"/backup/download?file={file.name}.json"
+                if Path(f"{file}.json").exists()
+                else ""
+            ),
             "is_stale": is_stale,
             "stale_label": "старая" if is_stale else "хранится",
             "verification": verification,
@@ -11350,12 +11389,13 @@ def get_backup_status():
         "status_label": status_label,
         "summary": summary,
         "action": action,
+        "backend": database_runtime["active_backend"],
+        "backend_label": backend_label,
+        "verification_method": verification_method,
         "db_exists": db_exists,
-        "db_path": str(db_path),
-        "db_size": db_path.stat().st_size if db_exists else 0,
-        "db_size_label": (
-            format_file_size(db_path.stat().st_size) if db_exists else "0 байт"
-        ),
+        "db_path": db_path_label,
+        "db_size": db_size,
+        "db_size_label": format_file_size(db_size) if db_exists else "0 байт",
         "backup_path": str(backup_path),
         "backup_path_exists": backup_path_exists,
         "count": len(files),
@@ -11393,18 +11433,41 @@ def get_backup_download_path(filename):
     if not filename or Path(filename).name != filename:
         return None, "invalid_backup"
 
-    if Path(filename).suffix.lower() not in (".db", ".sqlite", ".sqlite3"):
+    database_runtime = get_database_runtime_config()
+    is_postgresql = database_runtime["active_backend"] == "postgresql"
+    is_dump = Path(filename).suffix.lower() == ".dump"
+    is_manifest = filename.lower().endswith(".dump.json")
+    is_sqlite = Path(filename).suffix.lower() in (
+        ".db",
+        ".sqlite",
+        ".sqlite3",
+    )
+    if (is_postgresql and not (is_dump or is_manifest)) or (
+        not is_postgresql and not is_sqlite
+    ):
         return None, "invalid_backup"
 
     file_path = DATA_DIR / "backups" / filename
 
     if not file_path.exists() or not file_path.is_file():
         return None, "backup_not_found"
+    if is_manifest:
+        archive_path = Path(str(file_path)[:-5])
+        if not archive_path.is_file():
+            return None, "backup_not_found"
 
     return file_path, ""
 
 
 def create_database_backup(username):
+    database_runtime = get_database_runtime_config()
+    if database_runtime["active_backend"] == "postgresql":
+        return create_postgresql_backup(
+            os.getenv("DATABASE_URL"),
+            DATA_DIR / "backups",
+            BACKUP_REQUIRED_TABLES,
+        )
+
     db_path = DATA_DIR / "crm.db"
 
     if not db_path.exists():
@@ -11429,6 +11492,9 @@ def cleanup_old_database_backups():
             deleted_size += file.stat().st_size
             deleted.append(file.name)
             file.unlink()
+            manifest_path = Path(f"{file}.json")
+            if manifest_path.exists():
+                manifest_path.unlink()
         except OSError:
             continue
 
@@ -11465,6 +11531,13 @@ def run_backup_restore_drill(filename=""):
             "verification": None,
             "error": error,
         }
+
+    if source_path.suffix.lower() == ".dump":
+        return run_postgresql_restore_drill(
+            os.getenv("DATABASE_URL"),
+            source_path,
+            BACKUP_REQUIRED_TABLES,
+        )
 
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -11624,7 +11697,6 @@ def get_platform_release_readiness(
     cron_secret_configured = (
         production_config["automation_cron_secret_configured"]
     )
-    db_path = DATA_DIR / "crm.db"
     backup_status = get_backup_status()
 
     checks = [
@@ -11661,13 +11733,13 @@ def get_platform_release_readiness(
         make_release_readiness_check(
             "database",
             "База данных",
-            "ok" if db_path.exists() else "critical",
+            "ok" if backup_status["db_exists"] else "critical",
             (
-                "SQLite база доступна."
-                if db_path.exists()
-                else "Файл SQLite базы не найден."
+                f"{backup_status['backend_label']} база доступна."
+                if backup_status["db_exists"]
+                else f"{backup_status['backend_label']} база недоступна."
             ),
-            "Проверьте DATA_DIR и запуск init_db.",
+            "Проверьте подключение к базе данных и запуск init_db.",
             "/system",
             12,
             "infrastructure",
@@ -40181,11 +40253,7 @@ def build_system_links():
 
 
 def build_system_diagnostics(role=""):
-    db_path = DATA_DIR / "crm.db"
     uploads_path = UPLOAD_DIR
-
-    db_exists = db_path.exists()
-    db_size = db_path.stat().st_size if db_exists else 0
     uploads_exists = uploads_path.exists()
     uploads_files = (
         len([f for f in uploads_path.rglob("*") if f.is_file()])
@@ -40202,6 +40270,9 @@ def build_system_diagnostics(role=""):
         production_config["automation_cron_secret_configured"]
     )
     backup_status = get_backup_status()
+    db_exists = backup_status["db_exists"]
+    db_size = backup_status["db_size"]
+    db_path_label = backup_status["db_path"]
     public_health_status = get_public_health_status()
     public_readiness_status = get_public_readiness_status()
     build_metadata = get_build_metadata()
@@ -40227,31 +40298,34 @@ def build_system_diagnostics(role=""):
                 if not database_runtime["configuration_valid"]
                 or (
                     production_config["production_mode"]
-                    and not database_runtime["postgresql_ready"]
+                    and database_runtime["active_backend"] != "postgresql"
                 )
-                else "warning" if not database_runtime["postgresql_ready"] else "ok"
+                else (
+                    "ok"
+                    if database_runtime["active_backend"] == "postgresql"
+                    else "warning"
+                )
             ),
             database_runtime["active_backend_label"],
             (
-                "Приложение работает на SQLite; миграция PostgreSQL ещё "
-                "не завершена."
-                if not database_runtime["postgresql_ready"]
-                else "Приложение работает на PostgreSQL."
+                "Приложение работает на PostgreSQL."
+                if database_runtime["active_backend"] == "postgresql"
+                else "Приложение работает на SQLite."
             ),
-            "Завершите PostgreSQL adapter и прогон smoke на новой базе.",
+            "Для production используйте проверенный PostgreSQL backend.",
             "/platform/readiness",
         ),
         make_system_check(
             "database",
             "База данных",
             "ok" if db_exists else "critical",
-            format_file_size(db_size) if db_exists else "нет файла",
+            format_file_size(db_size) if db_exists else "недоступна",
             (
-                "SQLite база доступна."
+                f"{backup_status['backend_label']} база доступна."
                 if db_exists
-                else "Файл SQLite базы не найден."
+                else f"{backup_status['backend_label']} база недоступна."
             ),
-            "Проверьте DATA_DIR и запуск init_db.",
+            "Проверьте подключение к базе данных и запуск init_db.",
             "/debug",
         ),
         make_system_check(
@@ -40273,7 +40347,7 @@ def build_system_diagnostics(role=""):
             public_readiness_status["status"],
             public_readiness_status["status_label"],
             (
-                "Публичный /ready проверяет SQLite, ключевые таблицы "
+                "Публичный /ready проверяет подключение, ключевые таблицы "
                 "и доступность uploads."
             ),
             (
@@ -40459,7 +40533,7 @@ def build_system_diagnostics(role=""):
             "status": public_readiness_status["status"],
             "status_label": public_readiness_status["status_label"],
             "summary": (
-                "Готовность к трафику: SQLite, quick_check, таблицы, uploads."
+                "Готовность к трафику: база, таблицы и uploads."
             ),
             "method": "GET",
         },
@@ -40521,7 +40595,7 @@ def build_system_diagnostics(role=""):
         "db_exists": db_exists,
         "db_size": db_size,
         "db_size_label": format_file_size(db_size),
-        "db_path": str(db_path),
+        "db_path": db_path_label,
         "database_runtime": database_runtime,
         "data_dir": str(DATA_DIR),
         "uploads_exists": uploads_exists,
@@ -41089,12 +41163,21 @@ async def backup_create(request: Request):
     filename, error = create_database_backup(username)
 
     if error:
+        backup_error_details = {
+            "db_missing": "Файл базы данных не найден.",
+            "backup_tool_missing": "Утилита pg_dump недоступна.",
+            "backup_timeout": "Создание PostgreSQL-копии превысило лимит времени.",
+            "backup_schema_incomplete": "В схеме нет части ключевых таблиц.",
+        }
         log_backup_event(
             username,
             "Создание копии",
             "Ошибка",
             "",
-            "Файл базы данных не найден.",
+            backup_error_details.get(
+                error,
+                "Не удалось создать резервную копию базы данных.",
+            ),
         )
         return RedirectResponse(
             f"/backup?error={error}",
@@ -41214,6 +41297,7 @@ async def backup_export(request: Request):
     writer = csv.writer(output)
     writer.writerow(["Резервные копии"])
     writer.writerow(["Статус", backup_status["status_label"]])
+    writer.writerow(["Backend", backup_status["backend_label"]])
     writer.writerow(["Резюме", backup_status["summary"]])
     writer.writerow(["Действие", backup_status["action"]])
     writer.writerow(["База найдена", "да" if backup_status["db_exists"] else "нет"])

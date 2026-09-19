@@ -7,7 +7,7 @@ A3 Ops Center и AI-ready аналитика.
 ## Стек
 
 - FastAPI
-- SQLite (текущий backend; идёт подготовка миграции на PostgreSQL)
+- SQLite для локальной разработки, PostgreSQL для production
 - Jinja2
 - Railway
 - GitHub Actions
@@ -71,8 +71,11 @@ uvicorn app.main:app --reload --port 8011
 Опционально:
 
 - `DATA_DIR`
-- `DATABASE_BACKEND` - сейчас должен оставаться `sqlite`
-- `DATABASE_URL` - будущая строка PostgreSQL; до завершения adapter не включать
+- `DATABASE_BACKEND` - `sqlite` или `postgresql`
+- `DATABASE_URL` - строка подключения PostgreSQL
+- `POSTGRESQL_EXPERIMENTAL=1` - явное подтверждение PostgreSQL cutover
+- `PG_DUMP_BIN`, `PG_RESTORE_BIN` - пути к PostgreSQL client tools при необходимости
+- `POSTGRES_BACKUP_TIMEOUT_SECONDS` - лимит backup/restore, по умолчанию `300`
 - `BOT_TOKEN`
 - `CHAT_ID`
 - `CALENDAR_INCIDENT_RESPONSE_MINUTES` - по умолчанию `30`
@@ -115,14 +118,16 @@ PostgreSQL application smoke в CI. Также добавлен защищённ
 dry-run, согласованный SQLite snapshot, точная сверка строк и проверка
 изоляции компаний. Конкурентные A3, календарные и automation-транзакции
 защищены PostgreSQL advisory locks; partial indexes проверяются двумя
-параллельными сессиями. Текущий релиз продолжает работать с
-`DATABASE_BACKEND=sqlite`.
+параллельными сессиями. PostgreSQL backup создаётся через `pg_dump` из
+согласованного snapshot, а restore drill разворачивает его в одноразовую базу
+и сверяет структуру и количество строк. SQLite остаётся локальным backend по
+умолчанию.
 
-Тестовый запуск PostgreSQL требует явного `POSTGRESQL_EXPERIMENTAL=1`. Боевой
-переход остаётся заблокирован до полного application smoke, миграции данных и
-проверки восстановления. Ошибки конфигурации не выводят строку подключения в
-лог. Текущий статус и следующий шаг видны на страницах `/system` и
-`/platform/readiness`. Подробный порядок: `docs/postgresql_migration.md`.
+PostgreSQL требует явного `POSTGRESQL_EXPERIMENTAL=1`. Боевой переход выполняют
+после репетиции миграции на production-копии и успешного restore drill. Ошибки
+конфигурации не выводят строку подключения в лог. Текущий статус и следующий
+шаг видны на страницах `/system` и `/platform/readiness`. Подробный порядок:
+`docs/postgresql_migration.md`.
 
 Проверка миграции без записи в PostgreSQL:
 
@@ -170,8 +175,8 @@ python3 tests/smoke_security.py
 - `GET /health` - приложение и база отвечают
 - `GET /ready` - конфигурация backend, проверка базы, ключевые таблицы, uploads
 
-В экспериментальном PostgreSQL-режиме `/health` проверяет подключение, а
-`/ready` остаётся красным до завершения полного smoke и миграции данных.
+В PostgreSQL-режиме `/health` проверяет подключение, а `/ready` также проверяет
+конфигурацию, ключевые таблицы и доступность uploads.
 
 Админские:
 
@@ -217,8 +222,8 @@ CI запускает:
 - `tests/smoke_app.py`
 - `tests/smoke_security.py`
 - `tests/smoke_postgresql.py`, `tests/smoke_postgresql_migration.py`,
-  `tests/smoke_postgresql_concurrency.py` и полный `tests/smoke_app.py` на
-  PostgreSQL 16
+  `tests/smoke_postgresql_concurrency.py`,
+  `tests/smoke_postgresql_backup.py` и полный `tests/smoke_app.py` на PostgreSQL 16
 
 ## Документы
 

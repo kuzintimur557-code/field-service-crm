@@ -42,6 +42,7 @@ h1{margin:6px 0 0;font-size:34px}
 .file-tag.stale{background:#fff7ed;color:#9a3412}
 .file-tag.verify-warning{background:#fffbeb;color:#92400e}
 .file-tag.verify-critical{background:#fef2f2;color:#991b1b}
+.file-actions{display:grid;gap:6px}
 .retention{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:white}
 .retention-title{font-size:15px;font-weight:900}
 .retention-text{margin-top:5px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
@@ -115,6 +116,12 @@ h1{font-size:28px}
     {% if error == "db_missing" %}
     <div class="notice error">Файл базы данных не найден. Копию создать нельзя.</div>
     {% endif %}
+    {% if error == "backup_tool_missing" %}
+    <div class="notice error">Утилита pg_dump не найдена. Проверьте конфигурацию PostgreSQL.</div>
+    {% endif %}
+    {% if error in ("backup_failed", "backup_timeout", "backup_schema_incomplete") %}
+    <div class="notice error">Не удалось создать PostgreSQL-копию. Проверьте подключение, схему и журнал системы.</div>
+    {% endif %}
     {% if error == "invalid_backup" %}
     <div class="notice error">Некорректное имя резервной копии.</div>
     {% endif %}
@@ -141,7 +148,7 @@ h1{font-size:28px}
     <section class="grid">
         <div class="metric">
             <div class="metric-label">База данных</div>
-            <div class="metric-value">{{ "есть" if backup_status["db_exists"] else "нет" }}</div>
+            <div class="metric-value">{{ backup_status["backend_label"] }}</div>
         </div>
         <div class="metric">
             <div class="metric-label">Размер базы</div>
@@ -160,7 +167,7 @@ h1{font-size:28px}
     <section class="section">
         <div class="section-head">
             <h2 class="section-title">Проверка целостности</h2>
-            <div class="section-note">SQLite quick_check и ключевые таблицы</div>
+            <div class="section-note">{{ backup_status["verification_method"] }}</div>
         </div>
         <div class="integrity">
             <div class="integrity-card">
@@ -186,8 +193,14 @@ h1{font-size:28px}
             <div>
                 <div class="retention-title">Проверка восстановления</div>
                 <div class="retention-text">
-                    Система копирует последнюю резервную копию во временную папку,
-                    открывает её и проверяет структуру. Рабочая база не изменяется.
+                    {% if backup_status["backend"] == "postgresql" %}
+                    Система восстанавливает копию в одноразовую PostgreSQL-базу,
+                    сверяет структуру и количество строк, затем удаляет тестовую базу.
+                    {% else %}
+                    Система копирует резервную копию во временную папку,
+                    открывает её и проверяет структуру.
+                    {% endif %}
+                    Рабочая база не изменяется.
                     Текущий статус: {{ backup_status["restore_check"]["status_label"] }}.
                     {{ backup_status["restore_check"]["message"] }}
                     {% if backup_status["restore_check"]["created_at"] %}
@@ -242,7 +255,12 @@ h1{font-size:28px}
                 </div>
                 <div class="file-meta">Возраст: {{ item["age_label"] }}</div>
                 <div class="file-meta">{{ item["size_label"] }}</div>
-                <a class="button secondary" href="{{ item['download_url'] }}">Скачать</a>
+                <div class="file-actions">
+                    <a class="button secondary" href="{{ item['download_url'] }}">Скачать</a>
+                    {% if item["manifest_download_url"] %}
+                    <a class="button secondary" href="{{ item['manifest_download_url'] }}">Манифест</a>
+                    {% endif %}
+                </div>
             </div>
             {% endfor %}
         </div>

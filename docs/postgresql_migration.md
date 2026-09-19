@@ -5,7 +5,7 @@
 Move production data from SQLite to PostgreSQL without changing local
 development until the new backend passes the same application smoke checks.
 
-## Current phase: PostgreSQL-native backup and restore
+## Current phase: production rehearsal and cutover preparation
 
 SQLite remains the default runtime. The PostgreSQL foundation now includes:
 
@@ -17,6 +17,10 @@ SQLite remains the default runtime. The PostgreSQL foundation now includes:
 - schema and complete application smoke checks on PostgreSQL 16 in CI;
 - a dry-run-first SQLite-to-PostgreSQL migration command;
 - consistent SQLite snapshots through the SQLite backup API;
+- consistent PostgreSQL custom-format dumps from exported snapshots;
+- archive catalog and manifest validation without exposing connection data;
+- restore drills in disposable PostgreSQL databases with exact table row-count
+  comparison and automatic cleanup;
 - exact table counts, row counts, row checksums, ID bounds and company
   isolation checks before a migration is marked complete;
 - resumable interrupted runs and verification-only repeated runs;
@@ -29,17 +33,19 @@ SQLite remains the default runtime. The PostgreSQL foundation now includes:
 - unsupported, conflicting or incomplete PostgreSQL settings stop startup;
 - diagnostics expose only the backend name and never the URL, host, user or
   password;
-- production readiness remains blocked until the PostgreSQL-native backup and
-  restore drill is complete.
+- `/ready` supports PostgreSQL after schema, migration, concurrency, backup and
+  restore smoke checks pass.
 
-## Known compatibility work
+## Remaining operational work
 
-The application uses direct SQL and depends on SQLite behavior in several
-places. This area remains before cutover:
+The PostgreSQL application compatibility work is complete. Before cutover:
 
-1. Replace the SQLite backup fixture with PostgreSQL-native backup creation and
-   restore drills. The application smoke currently isolates the legacy backup
-   lifecycle in a temporary SQLite database.
+1. Rehearse migration and restore with a recent production copy.
+2. Record duration, row totals, backup size, rollback deadline and responsible
+   operator.
+3. Confirm the production PostgreSQL role can create and drop the disposable
+   restore-drill database, or provide a dedicated maintenance role with those
+   permissions.
 
 ## Safe sequence
 
@@ -106,6 +112,7 @@ export DATABASE_URL=postgresql://user:password@127.0.0.1:5432/field_service_test
 python3 tests/smoke_postgresql.py
 python3 tests/smoke_postgresql_migration.py
 python3 tests/smoke_postgresql_concurrency.py
+python3 tests/smoke_postgresql_backup.py
 ```
 
 It initializes the schema twice, verifies core tables and A3 quality SLA
@@ -116,11 +123,24 @@ comparison, safe repetition, changed-source refusal and tenant-isolation
 refusal. The concurrency smoke opens simultaneous PostgreSQL sessions and
 verifies advisory-lock serialization, independent lock scopes, A3 incident
 deduplication, automation action idempotency and partial-index predicates.
-`/health` must
-pass, while `/ready` remains blocked by `database_release_support` until the
-data migration and PostgreSQL-native backup drill are complete. CI then runs
-the complete application smoke against the same disposable PostgreSQL service;
-only the legacy file-backup lifecycle uses a temporary SQLite fixture.
+The backup smoke creates a custom-format archive, validates its sidecar
+manifest, restores it into a disposable database and compares every table's row
+count. `/health` and `/ready` must both pass. CI then runs the complete
+application smoke, including the native backup lifecycle, against the same
+disposable PostgreSQL service.
+
+## PostgreSQL backup operations
+
+The `/backup` page uses `pg_dump` and `pg_restore` from `PATH`. Override their
+paths with `PG_DUMP_BIN` and `PG_RESTORE_BIN` when the client tools are installed
+elsewhere. `POSTGRES_BACKUP_TIMEOUT_SECONDS` defaults to 300 seconds.
+
+The database role used by the application must have permission to read all
+application tables. A restore drill also needs permission to create and drop a
+temporary database. The dump command receives credentials through libpq
+environment variables; URLs and passwords are not placed in command arguments,
+manifests, status APIs or logs. Keep each `.dump` file together with its
+`.dump.json` manifest; both are downloadable from `/backup`.
 
 ## Exit criteria
 
