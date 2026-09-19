@@ -51,6 +51,9 @@ jobs:
       - name: Run security smoke checks
         run: python tests/smoke_security.py
 
+      - name: Run object storage smoke
+        run: python tests/smoke_object_storage.py
+
   postgres-schema-smoke:
     name: PostgreSQL application smoke
     runs-on: ubuntu-latest

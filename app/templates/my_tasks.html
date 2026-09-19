@@ -82,6 +82,12 @@ textarea,input{width:100%;min-height:44px;padding:12px;border-radius:12px;border
 </div>
 {% endif %}
 
+{% if request.query_params.get("error") == "storage" %}
+<div class="empty" style="background:#fee2e2;color:#991b1b;margin-bottom:14px">
+Фото не сохранено. Проверьте файловое хранилище и повторите.
+</div>
+{% endif %}
+
 <div class="tasks">
 {% if tasks %}
 {% for task in tasks %}

@@ -13,6 +13,8 @@ Set these variables before production deploy:
 - `DATABASE_BACKEND=postgresql` after the rehearsed cutover
 - `DATABASE_URL` for the production PostgreSQL database
 - `POSTGRESQL_EXPERIMENTAL=1` as the explicit cutover guard
+- `OBJECT_STORAGE_BACKEND=s3`
+- `S3_BUCKET`, region or custom endpoint, and provider credentials or IAM role
 
 Keep `DATABASE_BACKEND=sqlite` until the full PostgreSQL application smoke,
 data-migration rehearsal and restore drill are complete. The guardrail stops
@@ -28,6 +30,14 @@ Before a PostgreSQL cutover:
 - run the same `--execute` command again and require
   `"already_migrated": true` with clean verification;
 - keep the SQLite backup until the PostgreSQL-native restore drill succeeds.
+
+Before switching file storage to S3:
+
+- run `scripts/sync_files_to_s3.py` without `--execute`;
+- run it again with `--execute` and require `"ok": true`;
+- create and download a task photo, client file, and call audio;
+- create a database backup and require the external-copy status to be green;
+- keep the local files until `/ready` and `/system` confirm S3 access.
 
 Railway normally sets deployment metadata automatically:
 
@@ -53,6 +63,7 @@ With a disposable PostgreSQL test database configured, also run:
 python3 tests/smoke_postgresql_migration.py
 python3 tests/smoke_postgresql_concurrency.py
 python3 tests/smoke_postgresql_backup.py
+python3 tests/smoke_object_storage.py
 ```
 
 Optional HTTP check against a running server:
@@ -78,6 +89,8 @@ Expected:
 - `/system` shows no critical production blockers
 - `/system` shows the expected database backend and no configuration conflict
 - backups are visible and restore check is available
+- the configured file-storage backend is available
+- the latest backup has a valid external copy when S3 is enabled
 
 ## 4. Automation Cron
 
@@ -104,6 +117,7 @@ Pause rollout if any of these happen:
 - database connection or integrity check fails
 - database backend configuration is invalid or PostgreSQL cutover is incomplete
 - uploads are not writable
+- S3 bucket access or the off-site backup mirror fails
 - login or session checks fail
 - company isolation smoke tests fail
 

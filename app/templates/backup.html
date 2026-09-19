@@ -47,7 +47,7 @@ h1{margin:6px 0 0;font-size:34px}
 .retention-title{font-size:15px;font-weight:900}
 .retention-text{margin-top:5px;color:#6b7280;font-size:12px;font-weight:800;line-height:1.5}
 .retention form{margin:0}
-.integrity{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.integrity{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .integrity-card{padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:white}
 .integrity-label{color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase}
 .integrity-value{margin-top:6px;font-size:18px;font-weight:900}
@@ -122,6 +122,9 @@ h1{font-size:28px}
     {% if error in ("backup_failed", "backup_timeout", "backup_schema_incomplete") %}
     <div class="notice error">Не удалось создать PostgreSQL-копию. Проверьте подключение, схему и журнал системы.</div>
     {% endif %}
+    {% if error == "backup_storage_failed" %}
+    <div class="notice error">Локальная копия создана, но не сохранена в S3. Проверьте bucket и права.</div>
+    {% endif %}
     {% if error == "invalid_backup" %}
     <div class="notice error">Некорректное имя резервной копии.</div>
     {% endif %}
@@ -184,6 +187,11 @@ h1{font-size:28px}
                 <div class="integrity-label">Проблемы</div>
                 <div class="integrity-value">{{ backup_status["verification_problem_count"] }}</div>
                 <div class="integrity-note">Копии с ошибкой чтения или неполной структурой.</div>
+            </div>
+            <div class="integrity-card">
+                <div class="integrity-label">Внешняя копия</div>
+                <div class="integrity-value">{{ backup_status["remote_copy"]["status_label"] }}</div>
+                <div class="integrity-note">{{ backup_status["remote_copy"]["message"] }}</div>
             </div>
         </div>
     </section>

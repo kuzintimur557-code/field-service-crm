@@ -156,7 +156,7 @@ from app.services.workflow_graph import (
     get_rule_workflow_graph,
 )
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -174,13 +174,24 @@ from app.postgresql_backup import (
     run_postgresql_restore_drill,
     verify_postgresql_backup,
 )
+from app.object_storage import (
+    ObjectStorageError,
+    delete_storage_object,
+    get_object_storage_runtime_config,
+    get_object_storage_status,
+    get_storage_object,
+    read_storage_bytes,
+    save_storage_fileobj,
+    save_storage_path,
+    s3_object_exists,
+)
 from app.telegram_utils import send_message, send_photo, send_message_to_chat
 
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import monotonic
 from uuid import uuid4
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
@@ -200,6 +211,7 @@ import io
 import calendar
 import json
 import tempfile
+import mimetypes
 
 
 APP_VERSION = "0.2.2"
@@ -791,12 +803,74 @@ def save_upload_file(upload_file, task_id, prefix):
         return ""
 
     filename = safe_upload_filename(task_id, prefix, upload_file.filename)
-    file_path = UPLOAD_DIR / filename
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(upload_file.file, buffer)
+    save_storage_fileobj(
+        upload_file.file,
+        filename,
+        UPLOAD_DIR,
+        upload_file.content_type or "",
+    )
 
     return filename
+
+
+def storage_file_response(
+    relative_key,
+    local_root,
+    download_name="",
+    media_type="",
+):
+    try:
+        stored = get_storage_object(relative_key, local_root)
+    except (ObjectStorageError, ValueError):
+        stored = None
+    if stored is None:
+        return Response(status_code=404)
+    safe_download_name = Path(download_name or "").name
+    guessed_media_type = mimetypes.guess_type(relative_key)[0] or ""
+    resolved_media_type = (
+        media_type
+        or (
+            ""
+            if stored["content_type"] == "application/octet-stream"
+            else stored["content_type"]
+        )
+        or guessed_media_type
+        or "application/octet-stream"
+    )
+    if stored["backend"] == "local":
+        return FileResponse(
+            str(stored["path"]),
+            filename=safe_download_name or None,
+            media_type=resolved_media_type,
+        )
+
+    body = stored["body"]
+
+    def stream_body():
+        try:
+            while True:
+                chunk = body.read(64 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            try:
+                body.close()
+            except Exception:
+                pass
+
+    headers = {}
+    if stored["content_length"]:
+        headers["Content-Length"] = str(stored["content_length"])
+    if safe_download_name:
+        headers["Content-Disposition"] = (
+            "attachment; filename*=UTF-8''" + quote(safe_download_name)
+        )
+    return StreamingResponse(
+        stream_body(),
+        media_type=resolved_media_type,
+        headers=headers,
+    )
 
 
 def safe_client_file_filename(client_id, original_filename):
@@ -5440,12 +5514,15 @@ def draw_pdf_image(pdf, filename, title, x, y, font_name):
     if not filename:
         return y
 
-    file_path = UPLOAD_DIR / filename
+    try:
+        image_bytes = read_storage_bytes(filename, UPLOAD_DIR)
+    except (ObjectStorageError, ValueError):
+        image_bytes = None
 
-    if not file_path.exists():
+    if image_bytes is None:
         return y
 
-    if file_path.suffix.lower() not in PDF_IMAGE_EXTENSIONS:
+    if Path(filename).suffix.lower() not in PDF_IMAGE_EXTENSIONS:
         pdf.setFont(font_name, 10)
         pdf.drawString(x, y, f"{title}: файл сохранён, но формат не вставляется в PDF")
         return y - 24
@@ -5458,7 +5535,7 @@ def draw_pdf_image(pdf, filename, title, x, y, font_name):
         pdf.setFont(font_name, 11)
         pdf.drawString(x, y, title)
         y -= 16
-        image = ImageReader(str(file_path))
+        image = ImageReader(io.BytesIO(image_bytes))
         pdf.drawImage(
             image,
             x,
@@ -5603,11 +5680,6 @@ async def uploaded_file(request: Request, filename: str):
     if not safe_filename or safe_filename != filename:
         return Response(status_code=404)
 
-    file_path = UPLOAD_DIR / safe_filename
-
-    if not file_path.is_file():
-        return Response(status_code=404)
-
     role = get_role(username)
 
     conn = connect()
@@ -5624,7 +5696,7 @@ async def uploaded_file(request: Request, filename: str):
     if not task or not can_access_task(username, role, task):
         return Response(status_code=404)
 
-    return FileResponse(str(file_path))
+    return storage_file_response(safe_filename, UPLOAD_DIR)
 
 
 def get_request_ip(request):
@@ -5917,7 +5989,19 @@ def get_production_config_status():
     uploads_exists = UPLOAD_DIR.exists()
     data_dir_writable = data_dir_exists and os.access(DATA_DIR, os.W_OK)
     uploads_writable = uploads_exists and os.access(UPLOAD_DIR, os.W_OK)
-    storage_ready = data_dir_writable and uploads_writable
+    object_storage_status = get_object_storage_status(UPLOAD_DIR)
+    object_storage_config = object_storage_status["configuration"]
+    storage_ready = data_dir_writable and object_storage_status["ok"]
+    storage_config_status = (
+        "critical"
+        if not storage_ready
+        else (
+            "warning"
+            if production_mode
+            and object_storage_status["backend"] == "local"
+            else "ok"
+        )
+    )
     database_runtime = get_database_runtime_config()
     database_production_ready = (
         database_runtime["active_backend"] == "postgresql"
@@ -6020,14 +6104,24 @@ def get_production_config_status():
         make_production_config_item(
             "storage",
             "Файловое хранилище",
-            "ok" if storage_ready else "critical",
-            "готово" if storage_ready else "нужна проверка",
+            storage_config_status,
+            object_storage_status["backend_label"],
             (
-                "DATA_DIR и uploads доступны для записи."
-                if storage_ready
-                else "DATA_DIR или uploads недоступны для записи."
+                "S3-совместимое хранилище доступно."
+                if object_storage_status["backend"] == "s3"
+                and storage_ready
+                else (
+                    "Локальное хранилище доступно; для production нужен "
+                    "постоянный диск или S3."
+                    if storage_ready
+                    else object_storage_status["message"]
+                )
             ),
-            "Проверьте DATA_DIR и права на папку uploads.",
+            (
+                "Настройте OBJECT_STORAGE_BACKEND=s3 и S3_BUCKET."
+                if object_storage_status["backend"] == "local"
+                else "Проверьте S3 bucket, endpoint и права приложения."
+            ),
         ),
     ]
     critical_count = sum(1 for item in items if item["status"] == "critical")
@@ -6059,6 +6153,8 @@ def get_production_config_status():
         "data_dir_writable": data_dir_writable,
         "uploads_writable": uploads_writable,
         "storage_ready": storage_ready,
+        "object_storage_status": object_storage_status,
+        "object_storage_config": object_storage_config,
         "database_runtime": database_runtime,
         "database_production_ready": database_production_ready,
         "items": items,
@@ -11214,6 +11310,7 @@ def verify_database_backup_file(file_path):
 
 def get_backup_status():
     database_runtime = get_database_runtime_config()
+    object_storage_config = get_object_storage_runtime_config()
     is_postgresql = database_runtime["active_backend"] == "postgresql"
     db_path = DATA_DIR / "crm.db"
     backup_path = DATA_DIR / "backups"
@@ -11242,6 +11339,39 @@ def get_backup_status():
     if latest:
         latest_at = datetime.fromtimestamp(latest.stat().st_mtime)
         latest_age_hours = (now - latest_at).total_seconds() / 3600
+
+    if object_storage_config["configured_backend"] != "s3":
+        remote_copy = {
+            "status": "ok",
+            "status_label": "Локально",
+            "message": "Внешнее зеркало резервных копий не включено.",
+            "enabled": False,
+        }
+    elif not latest:
+        remote_copy = {
+            "status": "warning",
+            "status_label": "Нет копии",
+            "message": "Для S3-зеркала ещё нет резервной копии.",
+            "enabled": True,
+        }
+    else:
+        archive_remote = s3_object_exists(f"backups/{latest.name}")
+        manifest_remote = (
+            s3_object_exists(f"backups/{latest.name}.json")
+            if latest.suffix.lower() == ".dump"
+            else True
+        )
+        remote_ok = archive_remote and manifest_remote
+        remote_copy = {
+            "status": "ok" if remote_ok else "critical",
+            "status_label": "Синхронизировано" if remote_ok else "Ошибка",
+            "message": (
+                "Последняя резервная копия сохранена во внешнем S3."
+                if remote_ok
+                else "Последняя резервная копия отсутствует в S3-зеркале."
+            ),
+            "enabled": True,
+        }
 
     verifications = {
         file.name: verify_database_backup_file(file)
@@ -11324,6 +11454,11 @@ def get_backup_status():
         status_label = "Копия неполная"
         summary = "Последняя копия читается, но в ней нет части ключевых таблиц."
         action = "Проверьте миграции и создайте новую копию."
+    elif remote_copy["status"] == "critical":
+        status = "critical"
+        status_label = "Нет S3-копии"
+        summary = "Последняя резервная копия не сохранена во внешнем S3."
+        action = "Проверьте S3-конфигурацию и создайте новую копию."
     elif restore_check["status"] == "critical":
         status = "critical"
         status_label = "Восстановление не прошло"
@@ -11412,6 +11547,7 @@ def get_backup_status():
         "latest_age_label": format_backup_age(latest_age_hours),
         "latest_verification": latest_verification,
         "restore_check": restore_check,
+        "remote_copy": remote_copy,
         "verification_checked_count": len(verifications),
         "verification_problem_count": verification_problem_count,
         "retention_days": BACKUP_RETENTION_DAYS,
@@ -11462,11 +11598,15 @@ def get_backup_download_path(filename):
 def create_database_backup(username):
     database_runtime = get_database_runtime_config()
     if database_runtime["active_backend"] == "postgresql":
-        return create_postgresql_backup(
+        filename, error = create_postgresql_backup(
             os.getenv("DATABASE_URL"),
             DATA_DIR / "backups",
             BACKUP_REQUIRED_TABLES,
         )
+        if error:
+            return filename, error
+        mirror_error = mirror_database_backup(filename)
+        return filename, mirror_error
 
     db_path = DATA_DIR / "crm.db"
 
@@ -11478,7 +11618,31 @@ def create_database_backup(username):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     destination = backup_path / f"crm_backup_{timestamp}.db"
     shutil.copy2(db_path, destination)
-    return destination.name, ""
+    mirror_error = mirror_database_backup(destination.name)
+    return destination.name, mirror_error
+
+
+def mirror_database_backup(filename):
+    storage_config = get_object_storage_runtime_config()
+    if storage_config["configured_backend"] != "s3":
+        return ""
+    backup_file = DATA_DIR / "backups" / filename
+    try:
+        save_storage_path(
+            backup_file,
+            f"backups/{filename}",
+            DATA_DIR,
+        )
+        manifest_path = Path(f"{backup_file}.json")
+        if manifest_path.is_file():
+            save_storage_path(
+                manifest_path,
+                f"backups/{filename}.json",
+                DATA_DIR,
+            )
+    except (ObjectStorageError, ValueError):
+        return "backup_storage_failed"
+    return ""
 
 
 def cleanup_old_database_backups():
@@ -11495,6 +11659,14 @@ def cleanup_old_database_backups():
             manifest_path = Path(f"{file}.json")
             if manifest_path.exists():
                 manifest_path.unlink()
+            try:
+                delete_storage_object(f"backups/{file.name}", DATA_DIR)
+                delete_storage_object(
+                    f"backups/{file.name}.json",
+                    DATA_DIR,
+                )
+            except (ObjectStorageError, ValueError):
+                pass
         except OSError:
             continue
 
@@ -11691,6 +11863,7 @@ def get_platform_release_readiness(
         a3_health_summary = get_a3_platform_health()["summary"]
 
     production_config = get_production_config_status()
+    object_storage_status = production_config["object_storage_status"]
     env_name = production_config["environment"]
     telegram_configured = production_config["telegram_configured"]
     default_secret = production_config["secret_is_default"]
@@ -11842,13 +12015,9 @@ def get_platform_release_readiness(
         make_release_readiness_check(
             "uploads",
             "Хранилище файлов",
-            "ok" if UPLOAD_DIR.exists() else "critical",
-            (
-                "Папка uploads доступна."
-                if UPLOAD_DIR.exists()
-                else "Папка uploads недоступна."
-            ),
-            "Проверьте DATA_DIR и права на uploads.",
+            object_storage_status["status"],
+            object_storage_status["message"],
+            "Проверьте backend, bucket и права файлового хранилища.",
             "/system",
             8,
             "infrastructure",
@@ -34256,10 +34425,19 @@ async def upload_call_audio(
         return RedirectResponse(f"/calls/{call_id}?audio_error=type", status_code=302)
 
     stored_filename = safe_call_audio_filename(call_id, audio.filename)
-    file_path = CALL_AUDIO_DIR / stored_filename
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(audio.file, buffer)
+    try:
+        save_storage_fileobj(
+            audio.file,
+            f"call_audio/{stored_filename}",
+            UPLOAD_DIR,
+            audio.content_type or "",
+        )
+    except ObjectStorageError:
+        conn.close()
+        return RedirectResponse(
+            f"/calls/{call_id}?audio_error=storage",
+            status_code=302,
+        )
 
     old_filename = Path(call["audio_filename"] or "").name
 
@@ -34277,13 +34455,13 @@ async def upload_call_audio(
     conn.close()
 
     if old_filename and old_filename != stored_filename:
-        old_path = CALL_AUDIO_DIR / old_filename
-
-        if old_path.is_file():
-            try:
-                old_path.unlink()
-            except OSError:
-                pass
+        try:
+            delete_storage_object(
+                f"call_audio/{old_filename}",
+                UPLOAD_DIR,
+            )
+        except (ObjectStorageError, ValueError):
+            pass
 
     return RedirectResponse(f"/calls/{call_id}?audio_uploaded=1", status_code=302)
 
@@ -34322,12 +34500,11 @@ async def download_call_audio(request: Request, call_id: int):
     if not audio_filename or audio_filename != (call["audio_filename"] or ""):
         return Response(status_code=404)
 
-    file_path = CALL_AUDIO_DIR / audio_filename
-
-    if not file_path.is_file():
-        return Response(status_code=404)
-
-    return FileResponse(str(file_path), filename=audio_filename)
+    return storage_file_response(
+        f"call_audio/{audio_filename}",
+        UPLOAD_DIR,
+        download_name=audio_filename,
+    )
 
 
 @app.post("/calls")
@@ -37663,10 +37840,19 @@ async def upload_client_file(
 
     original_filename = Path(upload.filename).name
     stored_filename = safe_client_file_filename(client_id, original_filename)
-    file_path = CLIENT_FILES_DIR / stored_filename
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(upload.file, buffer)
+    try:
+        save_storage_fileobj(
+            upload.file,
+            f"client_files/{stored_filename}",
+            UPLOAD_DIR,
+            upload.content_type or "",
+        )
+    except ObjectStorageError:
+        conn.close()
+        return RedirectResponse(
+            f"/clients/{client_id}?file_error=storage",
+            status_code=302,
+        )
 
     c.execute("""
     INSERT INTO client_files (
@@ -37736,14 +37922,14 @@ async def download_client_file(request: Request, client_id: int, file_id: int):
         return Response(status_code=404)
 
     stored_filename = Path(client_file["stored_filename"] or "").name
-    file_path = CLIENT_FILES_DIR / stored_filename
-
-    if not stored_filename or not file_path.is_file():
+    if not stored_filename:
         return Response(status_code=404)
 
-    return FileResponse(
-        str(file_path),
-        filename=client_file["original_filename"] or stored_filename
+    return storage_file_response(
+        f"client_files/{stored_filename}",
+        UPLOAD_DIR,
+        download_name=client_file["original_filename"] or stored_filename,
+        media_type=client_file["content_type"] or "",
     )
 
 
@@ -37778,7 +37964,6 @@ async def delete_client_file(request: Request, client_id: int, file_id: int):
         return RedirectResponse(f"/clients/{client_id}", status_code=302)
 
     stored_filename = Path(client_file["stored_filename"] or "").name
-    file_path = CLIENT_FILES_DIR / stored_filename
 
     c.execute("""
     DELETE FROM client_files
@@ -37787,10 +37972,13 @@ async def delete_client_file(request: Request, client_id: int, file_id: int):
     conn.commit()
     conn.close()
 
-    if stored_filename and file_path.is_file():
+    if stored_filename:
         try:
-            file_path.unlink()
-        except Exception:
+            delete_storage_object(
+                f"client_files/{stored_filename}",
+                UPLOAD_DIR,
+            )
+        except (ObjectStorageError, ValueError):
             pass
 
     run_automation_event(
@@ -40254,13 +40442,19 @@ def build_system_links():
 
 def build_system_diagnostics(role=""):
     uploads_path = UPLOAD_DIR
-    uploads_exists = uploads_path.exists()
+    production_config = get_production_config_status()
+    object_storage_status = production_config["object_storage_status"]
+    uploads_exists = object_storage_status["ok"]
     uploads_files = (
         len([f for f in uploads_path.rglob("*") if f.is_file()])
-        if uploads_exists
+        if uploads_path.exists()
         else 0
     )
-    production_config = get_production_config_status()
+    uploads_path_label = (
+        "S3-совместимое хранилище"
+        if object_storage_status["backend"] == "s3"
+        else str(uploads_path)
+    )
     database_runtime = production_config["database_runtime"]
     env_name = production_config["environment"]
     railway_environment = production_config["railway_environment"]
@@ -40331,14 +40525,10 @@ def build_system_diagnostics(role=""):
         make_system_check(
             "uploads",
             "Загруженные файлы",
-            "ok" if uploads_exists else "critical",
-            f"{uploads_files} файлов" if uploads_exists else "папки нет",
-            (
-                "Папка uploads доступна."
-                if uploads_exists
-                else "Папка uploads недоступна."
-            ),
-            "Проверьте DATA_DIR и права на uploads.",
+            object_storage_status["status"],
+            object_storage_status["backend_label"],
+            object_storage_status["message"],
+            "Проверьте backend, bucket и права файлового хранилища.",
             "/debug",
         ),
         make_system_check(
@@ -40600,7 +40790,8 @@ def build_system_diagnostics(role=""):
         "data_dir": str(DATA_DIR),
         "uploads_exists": uploads_exists,
         "uploads_files": uploads_files,
-        "uploads_path": str(uploads_path),
+        "uploads_path": uploads_path_label,
+        "object_storage_status": object_storage_status,
         "app_version": APP_VERSION,
         "build_metadata": build_metadata,
         "env_name": env_name,
@@ -40670,6 +40861,7 @@ def get_public_health_status():
 
 def get_public_readiness_status():
     database_runtime = get_database_runtime_config()
+    object_storage_status = get_object_storage_status(UPLOAD_DIR)
     conn = None
     database_ok = False
     quick_check_ok = False
@@ -40678,7 +40870,7 @@ def get_public_readiness_status():
     backend_check_label = "Проверка не пройдена"
     database_error = ""
     missing_tables = list(BACKUP_REQUIRED_TABLES)
-    uploads_ok = UPLOAD_DIR.exists() and os.access(UPLOAD_DIR, os.W_OK)
+    uploads_ok = object_storage_status["ok"]
 
     try:
         conn = connect()
@@ -40788,10 +40980,11 @@ def get_public_readiness_status():
             "ok": uploads_ok,
             "status": "ok" if uploads_ok else "critical",
             "status_label": (
-                "Доступны для записи"
+                object_storage_status["backend_label"]
                 if uploads_ok
-                else "Недоступны для записи"
+                else "Недоступно"
             ),
+            "backend": object_storage_status["backend"],
         },
     ]
 
@@ -41168,6 +41361,7 @@ async def backup_create(request: Request):
             "backup_tool_missing": "Утилита pg_dump недоступна.",
             "backup_timeout": "Создание PostgreSQL-копии превысило лимит времени.",
             "backup_schema_incomplete": "В схеме нет части ключевых таблиц.",
+            "backup_storage_failed": "Не удалось сохранить копию в S3.",
         }
         log_backup_event(
             username,
@@ -41326,6 +41520,14 @@ async def backup_export(request: Request):
     writer.writerow([
         "Результат проверки восстановления",
         backup_status["restore_check"]["message"],
+    ])
+    writer.writerow([
+        "Внешняя копия",
+        backup_status["remote_copy"]["status_label"],
+    ])
+    writer.writerow([
+        "Результат внешней копии",
+        backup_status["remote_copy"]["message"],
     ])
     writer.writerow(["Хранить минимум копий", backup_status["retention_keep"]])
     writer.writerow(["Срок хранения, дней", backup_status["retention_days"]])
@@ -42383,7 +42585,14 @@ async def create_task(
 
     conn.commit()
 
-    filename = save_upload_file(photo, task_id, "before")
+    try:
+        filename = save_upload_file(photo, task_id, "before")
+    except ObjectStorageError:
+        conn.close()
+        return RedirectResponse(
+            f"/task/{task_id}?file_error=storage",
+            status_code=302,
+        )
 
     if filename:
         c.execute("""
@@ -43642,7 +43851,14 @@ async def complete_task(request: Request, task_id: int):
         conn.close()
         return RedirectResponse("/my-tasks", status_code=302)
 
-    filename = save_upload_file(after_photo, task_id, "after")
+    try:
+        filename = save_upload_file(after_photo, task_id, "after")
+    except ObjectStorageError:
+        conn.close()
+        return RedirectResponse(
+            "/my-tasks?error=storage",
+            status_code=302,
+        )
 
     c.execute("""
     UPDATE tasks
@@ -44735,7 +44951,14 @@ async def update_before_photo(
         conn.close()
         return RedirectResponse("/", status_code=302)
 
-    filename = save_upload_file(before_photo, task_id, "before")
+    try:
+        filename = save_upload_file(before_photo, task_id, "before")
+    except ObjectStorageError:
+        conn.close()
+        return RedirectResponse(
+            f"/task/{task_id}?file_error=storage",
+            status_code=302,
+        )
 
     if filename:
         c.execute("""
@@ -44809,7 +45032,18 @@ async def update_report(
 
     previous_report = str(task["report"] or "")
     after_filename = task["after_photo"] if "after_photo" in task.keys() else ""
-    new_after_filename = save_upload_file(after_photo, task_id, "after")
+    try:
+        new_after_filename = save_upload_file(
+            after_photo,
+            task_id,
+            "after",
+        )
+    except ObjectStorageError:
+        conn.close()
+        return RedirectResponse(
+            f"/task/{task_id}?file_error=storage",
+            status_code=302,
+        )
 
     if new_after_filename:
         after_filename = new_after_filename

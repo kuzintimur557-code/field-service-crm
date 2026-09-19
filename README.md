@@ -76,6 +76,9 @@ uvicorn app.main:app --reload --port 8011
 - `POSTGRESQL_EXPERIMENTAL=1` - явное подтверждение PostgreSQL cutover
 - `PG_DUMP_BIN`, `PG_RESTORE_BIN` - пути к PostgreSQL client tools при необходимости
 - `POSTGRES_BACKUP_TIMEOUT_SECONDS` - лимит backup/restore, по умолчанию `300`
+- `OBJECT_STORAGE_BACKEND` - `local` или `s3`
+- `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`, `S3_PREFIX` - S3-хранилище
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` - ключи, если нет IAM role
 - `BOT_TOKEN`
 - `CHAT_ID`
 - `CALENDAR_INCIDENT_RESPONSE_MINUTES` - по умолчанию `30`
@@ -176,7 +179,15 @@ python3 tests/smoke_security.py
 - `GET /ready` - конфигурация backend, проверка базы, ключевые таблицы, uploads
 
 В PostgreSQL-режиме `/health` проверяет подключение, а `/ready` также проверяет
-конфигурацию, ключевые таблицы и доступность uploads.
+конфигурацию, ключевые таблицы и доступность файлового хранилища.
+
+## S3-хранилище
+
+При `OBJECT_STORAGE_BACKEND=s3` фото заявок, файлы клиентов и аудио звонков
+сохраняются в S3-совместимом bucket. Новые резервные копии автоматически
+зеркалируются в `backups/`; PostgreSQL manifest хранится рядом с dump.
+Существующие локальные файлы переносятся dry-run-first командой
+`scripts/sync_files_to_s3.py`. Подробности: `docs/object_storage.md`.
 
 Админские:
 
@@ -221,6 +232,7 @@ CI запускает:
 - Python compile check
 - `tests/smoke_app.py`
 - `tests/smoke_security.py`
+- `tests/smoke_object_storage.py`
 - `tests/smoke_postgresql.py`, `tests/smoke_postgresql_migration.py`,
   `tests/smoke_postgresql_concurrency.py`,
   `tests/smoke_postgresql_backup.py` и полный `tests/smoke_app.py` на PostgreSQL 16
@@ -228,6 +240,7 @@ CI запускает:
 ## Документы
 
 - [Production Launch Checklist](docs/production_launch_checklist.md)
+- [Object Storage](docs/object_storage.md)
 - [UI Russian Language Guide](docs/ui_language_ru.md)
 - [Changelog](CHANGELOG.md)
 
