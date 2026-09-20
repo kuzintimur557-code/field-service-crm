@@ -232,7 +232,8 @@ def init_db():
         password TEXT,
         role TEXT,
         last_seen TEXT,
-        is_active INTEGER DEFAULT 1
+        is_active INTEGER DEFAULT 1,
+        session_version INTEGER NOT NULL DEFAULT 1
     )
     """)
 
@@ -1285,6 +1286,12 @@ def init_db():
     add_column_if_missing(c, "users", "telegram_chat_id", "TEXT")
     add_column_if_missing(c, "users", "commission_percent", "REAL DEFAULT 0")
     add_column_if_missing(c, "users", "is_active", "INTEGER DEFAULT 1")
+    add_column_if_missing(
+        c,
+        "users",
+        "session_version",
+        "INTEGER NOT NULL DEFAULT 1",
+    )
     add_column_if_missing(c, "users", "disabled_at", "TEXT")
     add_column_if_missing(c, "users", "disabled_reason", "TEXT")
     add_column_if_missing(c, "users", "daily_capacity", "INTEGER DEFAULT 3")

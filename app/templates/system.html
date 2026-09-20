@@ -178,7 +178,7 @@ h1{margin:6px 0 8px;font-size:34px;letter-spacing:0}
         <div class="metric">
             <div class="metric-label">Секрет приложения</div>
             <div class="metric-value {{ 'critical' if secret_is_default else 'ok' }}">
-                {{ "dev" if secret_is_default else "настроен" }}
+                {{ "требует замены" if secret_is_default else "настроен" }}
             </div>
         </div>
         <div class="metric">

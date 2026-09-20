@@ -5,8 +5,11 @@
 Set these variables before production deploy:
 
 - `ENV=production`
-- `SECRET_KEY` with a long random value
+- `SECRET_KEY` with a random value of at least 32 characters
 - `COOKIE_SECURE=1`
+- `TRUSTED_HOSTS` with the production domain or `APP_BASE_URL` with its HTTPS URL
+- `CSRF_TRUSTED_ORIGINS` if browser requests legitimately use another origin
+- `TRUST_PROXY_HEADERS=1` only when direct traffic is blocked by a trusted proxy
 - `AUTOMATION_CRON_SECRET` with a long random value
 - `BOT_TOKEN` and `CHAT_ID` if Telegram alerts are enabled
 - `DATA_DIR` if the server uses a mounted persistent volume
@@ -16,6 +19,7 @@ Set these variables before production deploy:
 - `OBJECT_STORAGE_BACKEND=s3`
 - `S3_BUCKET`, region or custom endpoint, and provider credentials or IAM role
 - background queue policy variables when the defaults do not fit the workload
+- request and upload limits when the defaults do not fit the workload
 
 Keep `DATABASE_BACKEND=sqlite` until the full PostgreSQL application smoke,
 data-migration rehearsal and restore drill are complete. The guardrail stops
@@ -56,6 +60,7 @@ Run:
 ```bash
 ./quick_check.sh
 python3 tests/smoke_security.py
+python3 tests/smoke_production_security.py
 ```
 
 With a disposable PostgreSQL test database configured, also run:
@@ -91,6 +96,9 @@ Expected:
 - `/ready` returns `200`
 - `/system` shows no critical production blockers
 - `/system` shows the expected database backend and no configuration conflict
+- `/docs`, `/redoc` and `/openapi.json` are unavailable in production
+- a POST with an unrelated `Origin` returns `403`
+- a request above `MAX_REQUEST_BYTES` returns `413`
 - backups are visible and restore check is available
 - the configured file-storage backend is available
 - the latest backup has a valid external copy when S3 is enabled

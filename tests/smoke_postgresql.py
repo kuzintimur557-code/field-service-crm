@@ -30,6 +30,7 @@ REQUIRED_QUALITY_SLA_COLUMNS = {
     "last_escalated_at",
     "escalation_count",
 }
+REQUIRED_USER_SECURITY_COLUMNS = {"session_version"}
 
 
 def main():
@@ -68,6 +69,17 @@ def main():
         column_names = {row["column_name"] for row in column_rows}
         assert REQUIRED_QUALITY_SLA_COLUMNS <= column_names, (
             REQUIRED_QUALITY_SLA_COLUMNS - column_names
+        )
+
+        user_column_rows = connection.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema=CURRENT_SCHEMA()
+              AND table_name='users'
+        """).fetchall()
+        user_column_names = {row["column_name"] for row in user_column_rows}
+        assert REQUIRED_USER_SECURITY_COLUMNS <= user_column_names, (
+            REQUIRED_USER_SECURITY_COLUMNS - user_column_names
         )
 
         seeded_users = connection.execute("""

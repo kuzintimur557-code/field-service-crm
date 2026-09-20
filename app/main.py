@@ -160,6 +160,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.database import (
     begin_locked_transaction,
@@ -200,6 +201,12 @@ from app.services.error_monitoring import (
     record_error_incident,
     resolve_error_incident,
 )
+from app.security import (
+    get_cross_site_request_error,
+    get_request_size_error,
+    get_security_runtime_config,
+    require_valid_production_security,
+)
 from app.telegram_utils import send_message, send_photo, send_message_to_chat
 
 from datetime import datetime, timedelta
@@ -227,6 +234,7 @@ import calendar
 import json
 import tempfile
 import mimetypes
+import ipaddress
 
 
 APP_VERSION = "0.2.2"
@@ -236,6 +244,11 @@ BACKUP_REQUIRED_TABLES = ("users", "tasks", "clients")
 SYSTEM_EVENT_RETENTION_DAYS = 90
 SYSTEM_EVENT_RETENTION_KEEP = 200
 SYSTEM_EVENT_ALERT_HOURS = 24
+SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
+SESSION_CLOCK_SKEW_SECONDS = 300
+IMAGE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+CLIENT_FILE_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
+CALL_AUDIO_UPLOAD_MAX_BYTES = 50 * 1024 * 1024
 
 SESSION_COOKIE_NAME = "crm_session"
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -252,15 +265,22 @@ TEAM_ACTIVITY_FILTERS = {
     "billing": ("Счёт платформы создан", "Статус счёта платформы"),
 }
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
-COOKIE_SECURE = (
-    os.getenv("COOKIE_SECURE", "").lower() in ("1", "true", "yes", "on")
-    or bool(os.getenv("RAILWAY_ENVIRONMENT"))
+SECURITY_RUNTIME = require_valid_production_security(
+    get_security_runtime_config(),
 )
+COOKIE_SECURE = SECURITY_RUNTIME["cookie_secure"]
 
-if os.getenv("ENV") == "production" and SECRET_KEY == "dev-secret-change-me":
-    raise RuntimeError("SECRET_KEY must be set in production")
-
-app = FastAPI()
+app = FastAPI(
+    docs_url="/docs" if SECURITY_RUNTIME["docs_enabled"] else None,
+    redoc_url="/redoc" if SECURITY_RUNTIME["docs_enabled"] else None,
+    openapi_url=(
+        "/openapi.json" if SECURITY_RUNTIME["docs_enabled"] else None
+    ),
+)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=SECURITY_RUNTIME["trusted_hosts"] or ["*"],
+)
 
 init_db()
 
@@ -338,6 +358,18 @@ def apply_security_headers(response):
         "Permissions-Policy",
         "camera=(), microphone=(), geolocation=()",
     )
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; base-uri 'self'; object-src 'none'; "
+        "frame-ancestors 'none'; form-action 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; media-src 'self' blob:; "
+        "font-src 'self' data:; connect-src 'self'",
+    )
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
 
     if COOKIE_SECURE:
         response.headers.setdefault(
@@ -362,9 +394,41 @@ def finalize_response_headers(response, request_id="", duration_ms=None):
 async def security_headers_middleware(request: Request, call_next):
     request_id = get_request_id(request)
     started_at = monotonic()
+    request_size_error = get_request_size_error(
+        request.headers,
+        SECURITY_RUNTIME["max_request_bytes"],
+    )
+    cross_site_error = get_cross_site_request_error(
+        request.method,
+        request.headers,
+        SECURITY_RUNTIME["csrf_trusted_origins"],
+    )
+    if request_size_error or cross_site_error:
+        error = request_size_error or cross_site_error
+        status_code = (
+            413
+            if error == "request_too_large"
+            else 400
+            if error == "invalid_content_length"
+            else 403
+        )
+        response = JSONResponse(
+            {
+                "ok": False,
+                "error": error,
+                "request_id": request_id,
+            },
+            status_code=status_code,
+        )
+        duration_ms = int((monotonic() - started_at) * 1000)
+        finalize_response_headers(response, request_id, duration_ms)
+        log_http_request_event(request, response, request_id, duration_ms)
+        return response
     response = await call_next(request)
     duration_ms = int((monotonic() - started_at) * 1000)
     finalize_response_headers(response, request_id, duration_ms)
+    if not request.url.path.startswith("/static/"):
+        response.headers.setdefault("Cache-Control", "no-store")
     log_http_request_event(request, response, request_id, duration_ms)
     return response
 
@@ -433,6 +497,14 @@ ALLOWED_CLIENT_FILE_EXTENSIONS = {
 }
 ALLOWED_CALL_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg", ".webm", ".aac", ".mp4"}
 PDF_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+IMAGE_CONTENT_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+}
 
 AUTOMATION_TRIGGERS = [
     ("new_task", "Новая заявка"),
@@ -803,6 +875,37 @@ INDUSTRY_LABEL_PRESETS = {
 }
 
 
+class UploadValidationError(ObjectStorageError):
+    def __init__(self, code):
+        super().__init__(str(code or "invalid_upload"))
+        self.code = str(code or "invalid_upload")
+
+
+def get_upload_size(upload_file):
+    file_object = getattr(upload_file, "file", None)
+    if file_object is None:
+        raise UploadValidationError("invalid")
+    try:
+        position = file_object.tell()
+        file_object.seek(0, 2)
+        size = file_object.tell()
+        file_object.seek(position)
+    except (AttributeError, OSError, ValueError) as error:
+        raise UploadValidationError("invalid") from error
+    return max(0, int(size))
+
+
+def validate_upload_file(upload_file, allowed_extensions, maximum_bytes):
+    if not upload_file or not getattr(upload_file, "filename", ""):
+        raise UploadValidationError("empty")
+    extension = Path(Path(upload_file.filename).name).suffix.lower()
+    if extension not in allowed_extensions:
+        raise UploadValidationError("type")
+    if get_upload_size(upload_file) > maximum_bytes:
+        raise UploadValidationError("size")
+    return extension
+
+
 def safe_upload_filename(task_id, prefix, original_filename):
     original = Path(original_filename or "photo").name
     extension = Path(original).suffix.lower()
@@ -817,12 +920,17 @@ def save_upload_file(upload_file, task_id, prefix):
     if not upload_file or not upload_file.filename:
         return ""
 
+    extension = validate_upload_file(
+        upload_file,
+        ALLOWED_IMAGE_EXTENSIONS,
+        IMAGE_UPLOAD_MAX_BYTES,
+    )
     filename = safe_upload_filename(task_id, prefix, upload_file.filename)
     save_storage_fileobj(
         upload_file.file,
         filename,
         UPLOAD_DIR,
-        upload_file.content_type or "",
+        IMAGE_CONTENT_TYPES[extension],
     )
 
     return filename
@@ -1438,17 +1546,25 @@ def hash_password(password):
 
 
 def verify_password(password, stored_password):
-    if not stored_password:
+    password = str(password or "")
+    if (
+        not stored_password
+        or not password
+        or len(password.encode("utf-8")) > 72
+    ):
         return False
 
     stored_password = str(stored_password)
 
     if stored_password.startswith("bcrypt$"):
         bcrypt_hash = stored_password.replace("bcrypt$", "", 1)
-        return bcrypt.checkpw(
-            password.encode("utf-8"),
-            bcrypt_hash.encode("utf-8")
-        )
+        try:
+            return bcrypt.checkpw(
+                password.encode("utf-8"),
+                bcrypt_hash.encode("utf-8")
+            )
+        except ValueError:
+            return False
 
     if stored_password.startswith("sha256$"):
         try:
@@ -1466,7 +1582,13 @@ def password_needs_upgrade(stored_password):
 
 
 def is_password_strong(password):
-    return len(password or "") >= 6
+    value = str(password or "")
+    return bool(
+        len(value) >= 8
+        and len(value.encode("utf-8")) <= 72
+        and any(character.isalpha() for character in value)
+        and any(character.isdigit() for character in value)
+    )
 
 
 PLAN_DEFINITIONS = {
@@ -5569,61 +5691,111 @@ def draw_pdf_image(pdf, filename, title, x, y, font_name):
     return y
 
 
-def sign_session_value(username):
-    raw = username.encode("utf-8")
+def get_user_session_version(username):
+    connection = connect()
+    row = connection.execute("""
+        SELECT session_version
+        FROM users
+        WHERE username=?
+    """, (username,)).fetchone()
+    connection.close()
+    return max(1, int(row["session_version"] or 1)) if row else 1
+
+
+def sign_session_value(username, session_version=None, issued_at=None):
+    username = str(username or "").strip()
+    if not username or len(username) > 120:
+        raise ValueError("Invalid session username")
+    if session_version is None:
+        session_version = get_user_session_version(username)
+    session_version = max(1, int(session_version or 1))
+    issued_value = issued_at or datetime.now()
+    issued_timestamp = int(
+        issued_value.timestamp()
+        if hasattr(issued_value, "timestamp")
+        else issued_value
+    )
+    raw = f"{issued_timestamp}:{session_version}:{username}".encode("utf-8")
+    token = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
     signature = hmac.new(
         SECRET_KEY.encode("utf-8"),
-        raw,
+        token.encode("ascii"),
         hashlib.sha256
     ).digest()
-
-    token = base64.urlsafe_b64encode(raw).decode("utf-8")
-    sig = base64.urlsafe_b64encode(signature).decode("utf-8")
-
-    return f"{token}.{sig}"
+    sig = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"v1.{token}.{sig}"
 
 
-def verify_session_value(value):
-    if not value or "." not in value:
+def verify_session_value(value, now=None):
+    if not value or len(str(value)) > 1024:
         return None
 
     try:
-        token, sig = value.split(".", 1)
-        username = base64.urlsafe_b64decode(token.encode("utf-8")).decode("utf-8")
-
+        version, token, sig = str(value).split(".", 2)
+        if version != "v1":
+            return None
         expected_signature = hmac.new(
             SECRET_KEY.encode("utf-8"),
-            username.encode("utf-8"),
+            token.encode("ascii"),
             hashlib.sha256
         ).digest()
-
-        expected_sig = base64.urlsafe_b64encode(expected_signature).decode("utf-8")
-
+        expected_sig = base64.urlsafe_b64encode(
+            expected_signature,
+        ).decode("ascii").rstrip("=")
         if not hmac.compare_digest(sig, expected_sig):
             return None
-
-        return username
-    except Exception:
+        padding = "=" * (-len(token) % 4)
+        payload = base64.urlsafe_b64decode(
+            (token + padding).encode("ascii"),
+        ).decode("utf-8")
+        issued_text, session_version_text, username = payload.split(":", 2)
+        issued_timestamp = int(issued_text)
+        session_version = int(session_version_text)
+        now_timestamp = int(
+            (now or datetime.now()).timestamp()
+            if hasattr(now or datetime.now(), "timestamp")
+            else now
+        )
+        if (
+            not username
+            or len(username) > 120
+            or session_version < 1
+            or issued_timestamp > now_timestamp + SESSION_CLOCK_SKEW_SECONDS
+            or now_timestamp - issued_timestamp > SESSION_COOKIE_MAX_AGE_SECONDS
+        ):
+            return None
+        return {
+            "username": username,
+            "session_version": session_version,
+            "issued_at": issued_timestamp,
+        }
+    except (TypeError, ValueError, UnicodeError, base64.binascii.Error):
         return None
 
 
 def get_user(request: Request):
     signed_value = request.cookies.get(SESSION_COOKIE_NAME)
-    username = verify_session_value(signed_value)
+    session = verify_session_value(signed_value)
 
-    if not username:
+    if not session:
         return None
+
+    username = session["username"]
 
     conn = connect()
     c = conn.cursor()
     user = c.execute("""
-    SELECT is_active
+    SELECT is_active, session_version
     FROM users
     WHERE username=?
     """, (username,)).fetchone()
     conn.close()
 
-    if not user or user["is_active"] == 0:
+    if (
+        not user
+        or user["is_active"] == 0
+        or int(user["session_version"] or 1) != session["session_version"]
+    ):
         return None
 
     return username
@@ -5715,14 +5887,30 @@ async def uploaded_file(request: Request, filename: str):
 
 
 def get_request_ip(request):
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    trust_proxy_headers = bool(
+        str(os.getenv("TRUST_PROXY_HEADERS") or "").strip().lower()
+        in {"1", "true", "yes", "on"}
+        or str(os.getenv("RAILWAY_ENVIRONMENT") or "").strip()
+    )
+    if trust_proxy_headers:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            candidate = forwarded.split(",")[0].strip()
+            try:
+                return str(ipaddress.ip_address(candidate))
+            except ValueError:
+                pass
 
-    return request.client.host if request.client else ""
+    direct_ip = request.client.host if request.client else ""
+    try:
+        return str(ipaddress.ip_address(direct_ip))
+    except ValueError:
+        return ""
 
 
 def is_login_blocked(username, ip):
+    username = str(username or "")[:120]
+    ip = str(ip or "")[:64]
     conn = connect()
     c = conn.cursor()
 
@@ -5745,6 +5933,8 @@ def is_login_blocked(username, ip):
 
 
 def register_failed_login(username, ip):
+    username = str(username or "")[:120]
+    ip = str(ip or "")[:64]
     conn = connect()
     c = conn.cursor()
 
@@ -5796,6 +5986,8 @@ def register_failed_login(username, ip):
 
 
 def clear_failed_logins(username, ip):
+    username = str(username or "")[:120]
+    ip = str(ip or "")[:64]
     conn = connect()
     c = conn.cursor()
 
@@ -5999,7 +6191,9 @@ def get_production_config_status():
     cron_secret_configured = bool(
         (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
     )
+    security_config = get_security_runtime_config()
     secret_is_default = SECRET_KEY == "dev-secret-change-me"
+    secret_is_weak = secret_is_default or len(SECRET_KEY) < 32
     data_dir_exists = DATA_DIR.exists()
     uploads_exists = UPLOAD_DIR.exists()
     data_dir_writable = data_dir_exists and os.access(DATA_DIR, os.W_OK)
@@ -6071,14 +6265,45 @@ def get_production_config_status():
         make_production_config_item(
             "secret_key",
             "Секрет приложения",
-            "critical" if secret_is_default else "ok",
-            "dev" if secret_is_default else "задан",
+            "critical" if secret_is_weak else "ok",
+            "слабый" if secret_is_weak else "задан",
             (
-                "Используется dev SECRET_KEY."
-                if secret_is_default
+                "SECRET_KEY отсутствует или короче 32 символов."
+                if secret_is_weak
                 else "Секрет приложения задан через окружение."
             ),
-            "Перед боевым запуском укажите сильный SECRET_KEY.",
+            "Перед боевым запуском задайте SECRET_KEY длиной от 32 символов.",
+        ),
+        make_production_config_item(
+            "trusted_hosts",
+            "Разрешённые домены",
+            (
+                "ok"
+                if security_config["trusted_hosts_configured"]
+                else "critical" if production_mode else "warning"
+            ),
+            (
+                ", ".join(security_config["trusted_hosts"])
+                if security_config["trusted_hosts"]
+                else "не заданы"
+            ),
+            (
+                "Host-заголовок ограничен списком production-доменов."
+                if security_config["trusted_hosts_configured"]
+                else "В development разрешены все Host-заголовки."
+            ),
+            "Задайте TRUSTED_HOSTS или APP_BASE_URL перед релизом.",
+        ),
+        make_production_config_item(
+            "request_security",
+            "Защита HTTP-запросов",
+            "ok",
+            "включена",
+            (
+                "Межсайтовые изменения, слишком большие запросы и "
+                "небезопасные browser origins блокируются middleware."
+            ),
+            "Проверяйте security smoke после изменения proxy или домена.",
         ),
         make_production_config_item(
             "secure_cookie",
@@ -6161,6 +6386,8 @@ def get_production_config_status():
         "production_mode": production_mode,
         "cookie_secure": COOKIE_SECURE,
         "secret_is_default": secret_is_default,
+        "secret_is_weak": secret_is_weak,
+        "security_config": security_config,
         "bot_token_configured": bot_token_configured,
         "chat_id_configured": chat_id_configured,
         "telegram_configured": telegram_configured,
@@ -12032,10 +12259,11 @@ def get_platform_release_readiness(
     object_storage_status = production_config["object_storage_status"]
     env_name = production_config["environment"]
     telegram_configured = production_config["telegram_configured"]
-    default_secret = production_config["secret_is_default"]
+    default_secret = production_config["secret_is_weak"]
     cron_secret_configured = (
         production_config["automation_cron_secret_configured"]
     )
+    security_config = production_config["security_config"]
     backup_status = get_backup_status()
     background_queue_status = get_background_queue_status()
 
@@ -12045,11 +12273,11 @@ def get_platform_release_readiness(
             "Секрет приложения",
             "critical" if default_secret else "ok",
             (
-                "Используется dev SECRET_KEY."
+                "SECRET_KEY отсутствует или короче 32 символов."
                 if default_secret
                 else "SECRET_KEY настроен."
             ),
-            "Перед боевым запуском укажите сильный SECRET_KEY.",
+            "Перед боевым запуском задайте SECRET_KEY длиной от 32 символов.",
             "/system",
             14,
             "security",
@@ -12065,6 +12293,26 @@ def get_platform_release_readiness(
                 else "Защита cookie не включена в текущем окружении."
             ),
             "Для боевого режима включите COOKIE_SECURE или Railway окружение.",
+            "/system",
+            8,
+            "security",
+            "Безопасность",
+        ),
+        make_release_readiness_check(
+            "trusted_hosts",
+            "Разрешённые домены",
+            (
+                "ok"
+                if security_config["trusted_hosts_configured"]
+                else "critical"
+            ),
+            (
+                "Host-заголовок ограничен: "
+                + ", ".join(security_config["trusted_hosts"])
+                if security_config["trusted_hosts_configured"]
+                else "TRUSTED_HOSTS и APP_BASE_URL не настроены."
+            ),
+            "Задайте production-домены до допуска релиза.",
             "/system",
             8,
             "security",
@@ -34603,19 +34851,30 @@ async def upload_call_audio(
         conn.close()
         return RedirectResponse(f"/calls/{call_id}?audio_error=empty", status_code=302)
 
-    audio_extension = Path(Path(audio.filename).name).suffix.lower()
-
-    if audio_extension not in ALLOWED_CALL_AUDIO_EXTENSIONS:
+    try:
+        validate_upload_file(
+            audio,
+            ALLOWED_CALL_AUDIO_EXTENSIONS,
+            CALL_AUDIO_UPLOAD_MAX_BYTES,
+        )
+    except UploadValidationError as error:
         conn.close()
-        return RedirectResponse(f"/calls/{call_id}?audio_error=type", status_code=302)
+        return RedirectResponse(
+            f"/calls/{call_id}?audio_error={error.code}",
+            status_code=302,
+        )
 
     stored_filename = safe_call_audio_filename(call_id, audio.filename)
+    safe_content_type = (
+        mimetypes.guess_type(stored_filename)[0]
+        or "application/octet-stream"
+    )
     try:
         save_storage_fileobj(
             audio.file,
             f"call_audio/{stored_filename}",
             UPLOAD_DIR,
-            audio.content_type or "",
+            safe_content_type,
         )
     except ObjectStorageError:
         conn.close()
@@ -38023,14 +38282,31 @@ async def upload_client_file(
         conn.close()
         return RedirectResponse(f"/clients/{client_id}?file_error=empty", status_code=302)
 
+    try:
+        validate_upload_file(
+            upload,
+            ALLOWED_CLIENT_FILE_EXTENSIONS,
+            CLIENT_FILE_UPLOAD_MAX_BYTES,
+        )
+    except UploadValidationError as error:
+        conn.close()
+        return RedirectResponse(
+            f"/clients/{client_id}?file_error={error.code}",
+            status_code=302,
+        )
+
     original_filename = Path(upload.filename).name
     stored_filename = safe_client_file_filename(client_id, original_filename)
+    safe_content_type = (
+        mimetypes.guess_type(stored_filename)[0]
+        or "application/octet-stream"
+    )
     try:
         save_storage_fileobj(
             upload.file,
             f"client_files/{stored_filename}",
             UPLOAD_DIR,
-            upload.content_type or "",
+            safe_content_type,
         )
     except ObjectStorageError:
         conn.close()
@@ -38056,7 +38332,7 @@ async def upload_client_file(
         username,
         original_filename,
         stored_filename,
-        upload.content_type or "",
+        safe_content_type,
         datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
@@ -38647,7 +38923,7 @@ async def change_my_password(request: Request):
 
     c.execute("""
     UPDATE users
-    SET password=?
+    SET password=?, session_version=COALESCE(session_version, 1) + 1
     WHERE username=?
     """, (hash_password(new_password), username))
 
@@ -40006,7 +40282,7 @@ async def change_team_user_password(request: Request, user_id: int):
 
     c.execute("""
     UPDATE users
-    SET password=?
+    SET password=?, session_version=COALESCE(session_version, 1) + 1
     WHERE id=? AND company_id=?
     """, (hash_password(new_password), user_id, company_id))
     c.execute("""
@@ -40644,7 +40920,7 @@ def build_system_diagnostics(role=""):
     database_runtime = production_config["database_runtime"]
     env_name = production_config["environment"]
     railway_environment = production_config["railway_environment"]
-    default_secret = production_config["secret_is_default"]
+    default_secret = production_config["secret_is_weak"]
     telegram_configured = production_config["telegram_configured"]
     cron_secret_configured = (
         production_config["automation_cron_secret_configured"]
@@ -40744,11 +41020,11 @@ def build_system_diagnostics(role=""):
             "critical" if default_secret else "ok",
             "dev" if default_secret else "настроен",
             (
-                "Используется dev SECRET_KEY."
+                "SECRET_KEY отсутствует или короче 32 символов."
                 if default_secret
                 else "SECRET_KEY задан через окружение."
             ),
-            "Перед боевым запуском укажите сильный SECRET_KEY.",
+            "Перед боевым запуском задайте SECRET_KEY длиной от 32 символов.",
             "/platform/readiness",
         ),
         make_system_check(
@@ -42201,7 +42477,7 @@ async def login(request: Request):
 
     form = await request.form()
 
-    username = (form.get("username") or "").strip()
+    username = (form.get("username") or "").strip()[:120]
     password = (form.get("password") or "").strip()
 
     ip = get_request_ip(request)
@@ -42244,11 +42520,14 @@ async def login(request: Request):
 
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
-        value=sign_session_value(username),
+        value=sign_session_value(
+            username,
+            user["session_version"] if "session_version" in user.keys() else 1,
+        ),
         httponly=True,
         secure=COOKIE_SECURE,
         samesite="lax",
-        max_age=60 * 60 * 24 * 30,
+        max_age=SESSION_COOKIE_MAX_AGE_SECONDS,
         path="/"
     )
 
@@ -43067,6 +43346,12 @@ async def create_task(
 
     try:
         filename = save_upload_file(photo, task_id, "before")
+    except UploadValidationError as error:
+        conn.close()
+        return RedirectResponse(
+            f"/task/{task_id}?file_error={error.code}",
+            status_code=302,
+        )
     except ObjectStorageError:
         conn.close()
         return RedirectResponse(
@@ -44333,6 +44618,12 @@ async def complete_task(request: Request, task_id: int):
 
     try:
         filename = save_upload_file(after_photo, task_id, "after")
+    except UploadValidationError as error:
+        conn.close()
+        return RedirectResponse(
+            f"/my-tasks?error=file_{error.code}",
+            status_code=302,
+        )
     except ObjectStorageError:
         conn.close()
         return RedirectResponse(
@@ -45433,6 +45724,12 @@ async def update_before_photo(
 
     try:
         filename = save_upload_file(before_photo, task_id, "before")
+    except UploadValidationError as error:
+        conn.close()
+        return RedirectResponse(
+            f"/task/{task_id}?file_error={error.code}",
+            status_code=302,
+        )
     except ObjectStorageError:
         conn.close()
         return RedirectResponse(
@@ -45517,6 +45814,12 @@ async def update_report(
             after_photo,
             task_id,
             "after",
+        )
+    except UploadValidationError as error:
+        conn.close()
+        return RedirectResponse(
+            f"/task/{task_id}?file_error={error.code}",
+            status_code=302,
         )
     except ObjectStorageError:
         conn.close()

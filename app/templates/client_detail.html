@@ -529,6 +529,12 @@ h1{font-size:28px}
 {% if request.query_params.get("file_error") == "storage" %}
 <div class="notice err">Файл не сохранён. Проверьте файловое хранилище.</div>
 {% endif %}
+{% if request.query_params.get("file_error") == "type" %}
+<div class="notice err">Формат файла не поддерживается.</div>
+{% endif %}
+{% if request.query_params.get("file_error") == "size" %}
+<div class="notice err">Размер файла не должен превышать 25 МБ.</div>
+{% endif %}
 
 {% if request.query_params.get("file_deleted") == "1" %}
 <div class="notice ok">Файл удалён</div>

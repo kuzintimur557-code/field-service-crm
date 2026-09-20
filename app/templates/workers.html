@@ -108,7 +108,7 @@ button{border:0;color:white;font-weight:900;cursor:pointer}
 {% endif %}
 
 {% if request.query_params.get("error") == "weak_password" %}
-<div class="notice err">Пароль должен быть минимум 6 символов</div>
+<div class="notice err">Пароль должен содержать минимум 8 символов, букву и цифру</div>
 {% elif request.query_params.get("error") == "empty_credentials" %}
 <div class="notice err">Укажите логин и пароль</div>
 {% elif request.query_params.get("error") == "invalid_role" %}

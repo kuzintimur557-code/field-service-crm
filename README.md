@@ -67,6 +67,7 @@ uvicorn app.main:app --reload --port 8011
 - `SECRET_KEY`
 - `COOKIE_SECURE=1`
 - `AUTOMATION_CRON_SECRET`
+- `TRUSTED_HOSTS` or `APP_BASE_URL` with the production domain
 
 Опционально:
 
@@ -84,6 +85,9 @@ uvicorn app.main:app --reload --port 8011
 - `ERROR_MONITOR_ALERT_THRESHOLD` - число одинаковых ошибок до уведомления, по умолчанию `3`
 - `ERROR_MONITOR_ALERT_COOLDOWN_MINUTES` - пауза между повторными уведомлениями, по умолчанию `60`
 - `ERROR_MONITOR_RECENT_HOURS` - окно недавних ошибок в диагностике, по умолчанию `24`
+- `CSRF_TRUSTED_ORIGINS` - дополнительные разрешённые origins для browser POST
+- `TRUST_PROXY_HEADERS=1` - доверять `X-Forwarded-For` только за Railway или другим доверенным proxy
+- `MAX_REQUEST_BYTES` - общий предел `Content-Length`, по умолчанию `60` МБ
 - `BOT_TOKEN`
 - `CHAT_ID`
 - `CALENDAR_INCIDENT_RESPONSE_MINUTES` - по умолчанию `30`
@@ -160,6 +164,7 @@ python3 scripts/migrate_sqlite_to_postgresql.py --sqlite /path/to/crm.db
 
 ```bash
 python3 tests/smoke_security.py
+python3 tests/smoke_production_security.py
 ```
 
 Проверка поднятого локального сервера:
@@ -244,6 +249,11 @@ python3 scripts/run_background_worker.py --watch
 счётчики и технические идентификаторы без текста исключения. Подробности:
 `docs/error_monitoring.md`.
 
+Production security baseline отключает OpenAPI/Swagger в боевом режиме,
+проверяет `Host` и browser origin, ограничивает размер запросов и загрузок,
+добавляет CSP и другие HTTP-заголовки. Сессия действует 7 дней и отзывается
+после смены пароля. Подробности и результаты аудита: `docs/security_review.md`.
+
 ## CI
 
 GitHub Actions workflow:
@@ -271,6 +281,7 @@ CI запускает:
 - [Object Storage](docs/object_storage.md)
 - [Background Jobs](docs/background_jobs.md)
 - [Error Monitoring](docs/error_monitoring.md)
+- [Security Review](docs/security_review.md)
 - [UI Russian Language Guide](docs/ui_language_ru.md)
 - [Changelog](CHANGELOG.md)
 

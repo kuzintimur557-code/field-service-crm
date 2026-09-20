@@ -493,6 +493,16 @@ button{
 Файл не сохранён. Проверьте файловое хранилище и повторите загрузку.
 </div>
 {% endif %}
+{% if request.query_params.get("file_error") == "type" %}
+<div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+Поддерживаются только изображения JPG, PNG, WebP, HEIC и HEIF.
+</div>
+{% endif %}
+{% if request.query_params.get("file_error") == "size" %}
+<div style="max-width:1100px;margin:18px auto 0;padding:14px 18px;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:900">
+Размер изображения не должен превышать 10 МБ.
+</div>
+{% endif %}
 
 <div class="page">
 
