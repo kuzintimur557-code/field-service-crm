@@ -6,7 +6,7 @@
 }
 </style>
 
-<div class="mobile-nav">
+<nav class="mobile-nav" aria-label="Основная навигация">
 <div class="mobile-nav-grid">
 {% set f = features if features is defined else {} %}
 {% set nav_links = links if links is defined else {} %}
@@ -14,53 +14,53 @@
 {% set nav_client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 
 {% if role == "worker" %}
-<a href="{{ nav_links.get('my_tasks', '/my-tasks') }}" class="{% if request.url.path == '/my-tasks' %}active{% endif %}">
-<div class="mobile-nav-icon">📋</div><div>{{ nav_task_label }}: мои</div>
+<a href="{{ nav_links.get('my_tasks', '/my-tasks') }}"{% if request.url.path == '/my-tasks' %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">📋</span><span>{{ nav_task_label }}: мои</span>
 </a>
 
 {% if f.get("calendar", True) %}
-<a href="{{ nav_links.get('calendar', '/calendar') }}" class="{% if '/calendar' in request.url.path %}active{% endif %}">
-<div class="mobile-nav-icon">📅</div><div>Календарь</div>
+<a href="{{ nav_links.get('calendar', '/calendar') }}"{% if '/calendar' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">📅</span><span>Календарь</span>
 </a>
 {% endif %}
 
-<a href="{{ nav_links.get('profile', '/profile') }}" class="{% if '/profile' in request.url.path %}active{% endif %}">
-<div class="mobile-nav-icon">👤</div><div>Профиль</div>
+<a href="{{ nav_links.get('profile', '/profile') }}"{% if '/profile' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">👤</span><span>Профиль</span>
 </a>
 
-<a href="{{ nav_links.get('more', '/more') }}" class="{% if request.url.path == '/more' %}active{% endif %}">
-<div class="mobile-nav-icon">☰</div><div>Ещё</div>
+<a href="{{ nav_links.get('more', '/more') }}"{% if request.url.path == '/more' %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">☰</span><span>Ещё</span>
 </a>
 
 <a href="{{ nav_links.get('logout', '/logout') }}">
-<div class="mobile-nav-icon">🚪</div><div>Выход</div>
+<span class="mobile-nav-icon" aria-hidden="true">🚪</span><span>Выход</span>
 </a>
 
 {% else %}
-<a href="{{ nav_links.get('home', '/') }}" class="{% if request.url.path == '/' %}active{% endif %}">
-<div class="mobile-nav-icon">🏠</div><div>Главная</div>
+<a href="{{ nav_links.get('home', '/') }}"{% if request.url.path == '/' %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">🏠</span><span>Главная</span>
 </a>
 
-<a href="{{ nav_links.get('create_task', '/create-task') }}" class="{% if '/create-task' in request.url.path %}active{% endif %}">
-<div class="mobile-nav-icon">➕</div><div>{{ nav_task_label }}</div>
+<a href="{{ nav_links.get('create_task', '/create-task') }}"{% if '/create-task' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">➕</span><span>{{ nav_task_label }}</span>
 </a>
 
 {% if f.get("calendar", True) %}
-<a href="{{ nav_links.get('calendar', '/calendar') }}" class="{% if '/calendar' in request.url.path %}active{% endif %}">
-<div class="mobile-nav-icon">📅</div><div>Календарь</div>
+<a href="{{ nav_links.get('calendar', '/calendar') }}"{% if '/calendar' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">📅</span><span>Календарь</span>
 </a>
 {% endif %}
 
 {% if f.get("clients", True) %}
-<a href="{{ nav_links.get('clients', '/clients') }}" class="{% if '/clients' in request.url.path %}active{% endif %}">
-<div class="mobile-nav-icon">👤</div><div>{{ nav_client_label }}</div>
+<a href="{{ nav_links.get('clients', '/clients') }}"{% if '/clients' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">👤</span><span>{{ nav_client_label }}</span>
 </a>
 {% endif %}
 
-<a href="{{ nav_links.get('more', '/more') }}" class="{% if request.url.path == '/more' %}active{% endif %}">
-<div class="mobile-nav-icon">☰</div><div>Ещё</div>
+<a href="{{ nav_links.get('more', '/more') }}"{% if request.url.path == '/more' %} class="active" aria-current="page"{% endif %}>
+<span class="mobile-nav-icon" aria-hidden="true">☰</span><span>Ещё</span>
 </a>
 {% endif %}
 
 </div>
-</div>
+</nav>

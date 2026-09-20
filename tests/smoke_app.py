@@ -5829,14 +5829,22 @@ async def assert_more_page():
     assert response.context["links"]["settings"] == "/settings"
     assert response.context["links"]["logout"] == "/logout"
     assert response.context["links"]["ai_insights"] == "/ai/insights"
+    assert response.context["links"]["workload"] == "/workload"
     html = response.body.decode("utf-8")
     assert "Ещё" in html
     assert "Главная" in html
     assert "Мой профиль" in html
     assert "Уведомления" in html
+    assert "SLA-контроль" in html
+    assert "Загрузка команды" in html
+    assert "Аналитика владельца" in html
+    assert "SLA-аналитика" in html
     assert "ИИ-инсайты" in html
     assert "ИИ-помощник" in html
     assert 'class="mobile-nav"' in html
+    assert 'aria-label="Основная навигация"' in html
+    assert 'class="active" aria-current="page"' in html
+    assert 'aria-hidden="true"' in html
     assert ".container{padding:16px 14px 92px}" in html
     assert "☰ Ещё" not in html
     assert "🏠 Главная" not in html
@@ -5856,8 +5864,12 @@ async def assert_home_page():
     assert "Аналитика владельца" in html
     assert "Уведомления" in html
     assert 'class="mobile-nav"' in html
+    assert 'aria-label="Основная навигация"' in html
+    assert 'href="/" class="active" aria-current="page"' in html
     assert ".container{padding:16px 14px 92px}" in html
     assert ".nav a{display:inline-flex" in html
+    assert ".header .nav{display:none}" in html
+    assert ".stats{grid-template-columns:repeat(2,minmax(0,1fr))" in html
     assert "🚀 Бизнес CRM" not in html
     assert "➕ Новая" not in html
     assert "📅 Календарь" not in html

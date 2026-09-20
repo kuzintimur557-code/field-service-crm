@@ -50,8 +50,12 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .container{padding:16px 14px 92px}
 .header,.card,.stat,.worker-card{border-radius:18px}
 .header,.card,.stat,.worker-card{padding:20px}
-.stats,.filters,.task{grid-template-columns:1fr}
-.nav a{width:100%;text-align:center}
+.header{margin-bottom:16px}
+.header .nav{display:none}
+.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:22px}
+.stat{padding:16px}
+.stat-value{font-size:27px}
+.filters,.task{grid-template-columns:1fr}
 h1{font-size:30px}
 .subtitle{font-size:16px}
 .section-title{font-size:22px}

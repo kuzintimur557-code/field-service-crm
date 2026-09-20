@@ -47,6 +47,9 @@ h1{margin:0 0 8px;font-size:32px}
 {% if f.get("calendar", True) %}
 <a href="{{ links['calendar'] }}">Календарь</a>
 {% endif %}
+{% if f.get("sla", True) %}
+<a href="{{ links['sla'] }}">SLA-контроль</a>
+{% endif %}
 
 {% if role in ["boss", "manager"] %}
 {% if f.get("clients", True) %}
@@ -55,8 +58,17 @@ h1{margin:0 0 8px;font-size:32px}
 {% if f.get("finance", True) %}
 <a href="{{ links['finance'] }}">Финансы</a>
 {% endif %}
+{% if f.get("workload", True) %}
+<a href="{{ links['workload'] }}">Загрузка команды</a>
+{% endif %}
 {% if f.get("payroll", True) %}
 <a href="{{ links['payroll'] }}">Зарплаты</a>
+{% endif %}
+{% if f.get("analytics", True) %}
+<a href="{{ links['owner_dashboard'] }}">Аналитика владельца</a>
+{% endif %}
+{% if f.get("sla", True) %}
+<a href="{{ links['sla_analytics'] }}">SLA-аналитика</a>
 {% endif %}
 {% if f.get("catalog", True) %}
 <a href="{{ links['catalog'] }}">Каталог</a>
