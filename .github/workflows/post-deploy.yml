@@ -1,0 +1,50 @@
+name: Production post-deploy verification
+
+on:
+  deployment_status:
+    states:
+      - success
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-post-deploy
+  cancel-in-progress: true
+
+jobs:
+  verify-production:
+    name: Verify live production
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'production' &&
+      github.event.deployment.sha != '' &&
+      (github.event.deployment_status.environment_url != '' ||
+       vars.PRODUCTION_BASE_URL != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout deployed commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.deployment.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Verify health, readiness and security
+        env:
+          DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url || vars.PRODUCTION_BASE_URL }}
+          DEPLOYMENT_SHA: ${{ github.event.deployment.sha }}
+        run: >-
+          python scripts/check_deployment.py
+          --base-url "$DEPLOYMENT_URL"
+          --expected-commit "$DEPLOYMENT_SHA"
+          --expected-database-backend postgresql
+          --attempts 20
+          --interval 15
+          --timeout 10

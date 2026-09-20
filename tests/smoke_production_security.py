@@ -17,7 +17,7 @@ os.environ.update({
     "COOKIE_SECURE": "1",
     "DATA_DIR": TEMP_DATA.name,
     "ENV": "production",
-    "RAILWAY_ENVIRONMENT": "",
+    "RAILWAY_ENVIRONMENT": "production",
     "SECRET_KEY": "production-security-smoke-secret-32",
     "TRUSTED_HOSTS": "crm.example",
 })
@@ -25,7 +25,7 @@ os.environ.update({
 from app.main import app  # noqa: E402
 
 
-async def get_page(host):
+async def get_page(host, path="/login"):
     sent = []
     request_delivered = False
 
@@ -45,8 +45,8 @@ async def get_page(host):
         "http_version": "1.1",
         "method": "GET",
         "scheme": "https",
-        "path": "/login",
-        "raw_path": b"/login",
+        "path": path,
+        "raw_path": path.encode("ascii"),
         "query_string": b"",
         "root_path": "",
         "headers": [(b"host", host.encode("ascii"))],
@@ -78,6 +78,12 @@ def main():
             "content-security-policy"
     ]
     assert accepted_headers["cache-control"] == "no-store"
+
+    health_status, _ = asyncio.run(get_page(
+        "healthcheck.railway.app",
+        "/health",
+    ))
+    assert health_status == 200
 
     print(
         "OK: production startup smoke passed: docs disabled, trusted hosts "

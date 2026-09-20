@@ -264,16 +264,24 @@ GitHub Actions workflow:
 
 CI запускает:
 
+- аудит production-зависимостей через `pip-audit`
 - установку зависимостей
 - Python compile check
 - `tests/smoke_app.py`
 - `tests/smoke_security.py`
+- `tests/smoke_production_security.py`
+- `tests/smoke_release.py`
 - `tests/smoke_object_storage.py`
 - `tests/smoke_background_jobs.py`
 - `tests/smoke_error_monitoring.py`
 - `tests/smoke_postgresql.py`, `tests/smoke_postgresql_migration.py`,
   `tests/smoke_postgresql_concurrency.py`,
   `tests/smoke_postgresql_backup.py` и полный `tests/smoke_app.py` на PostgreSQL 16
+- единый `Production release gate` после всех обязательных jobs
+
+После успешного Railway production deployment отдельный workflow проверяет публичные
+health/readiness endpoints, deployed commit и security baseline. Настройка:
+`docs/ci_cd.md`.
 
 ## Документы
 
@@ -282,6 +290,7 @@ CI запускает:
 - [Background Jobs](docs/background_jobs.md)
 - [Error Monitoring](docs/error_monitoring.md)
 - [Security Review](docs/security_review.md)
+- [CI/CD and Release Gate](docs/ci_cd.md)
 - [UI Russian Language Guide](docs/ui_language_ru.md)
 - [Changelog](CHANGELOG.md)
 

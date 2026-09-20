@@ -61,6 +61,7 @@ Run:
 ./quick_check.sh
 python3 tests/smoke_security.py
 python3 tests/smoke_production_security.py
+python3 tests/smoke_release.py
 ```
 
 With a disposable PostgreSQL test database configured, also run:
@@ -81,6 +82,10 @@ BASE=http://127.0.0.1:8000 ./quick_check.sh
 ```
 
 ## 3. Deploy Checks
+
+Before the first production deploy, enable Railway **Wait for CI**, set the
+healthcheck path to `/health`, set the timeout to `300` seconds and make
+`Production release gate` a required GitHub check. See `docs/ci_cd.md`.
 
 After deploy, check:
 
@@ -149,6 +154,7 @@ Pause rollout if any of these happen:
 Do not launch a production update unless:
 
 - CI is green
+- `Production release gate` is green
 - local smoke checks pass
 - `SECRET_KEY` is not default
 - backups are available

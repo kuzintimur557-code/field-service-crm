@@ -184,6 +184,34 @@ def test_cross_site_and_request_size_guards():
             "https://crm.example",
         ]
 
+    with patch.dict(os.environ, {
+        "ENV": "production",
+        "SECRET_KEY": "s" * 32,
+        "COOKIE_SECURE": "0",
+        "TRUSTED_HOSTS": "crm.example",
+        "APP_BASE_URL": "https://crm.example",
+        "RAILWAY_ENVIRONMENT": "production",
+    }, clear=False):
+        railway = require_valid_production_security()
+        assert railway["cookie_secure"] is True
+        assert "healthcheck.railway.app" in railway["trusted_hosts"]
+
+    with patch.dict(os.environ, {
+        "ENV": "production",
+        "SECRET_KEY": "s" * 32,
+        "COOKIE_SECURE": "0",
+        "TRUSTED_HOSTS": "",
+        "APP_BASE_URL": "",
+        "RAILWAY_PUBLIC_DOMAIN": "",
+        "RAILWAY_STATIC_URL": "",
+        "RAILWAY_ENVIRONMENT": "production",
+    }, clear=False):
+        railway_without_public_host = get_security_runtime_config()
+        assert "healthcheck.railway.app" in railway_without_public_host[
+            "trusted_hosts"
+        ]
+        assert "trusted_hosts_required" in railway_without_public_host["errors"]
+
 
 def test_security_middleware_and_headers():
     called = {"value": False}

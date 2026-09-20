@@ -14,9 +14,32 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  dependency-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Audit production dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit==2.10.1
+          pip-audit -r requirements.txt
+
   smoke:
     name: Smoke and security checks
     runs-on: ubuntu-latest
@@ -30,6 +53,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -54,6 +79,9 @@ jobs:
 
       - name: Run production security startup smoke
         run: python tests/smoke_production_security.py
+
+      - name: Run release verification smoke
+        run: python tests/smoke_release.py
 
       - name: Run object storage smoke
         run: python tests/smoke_object_storage.py
@@ -95,6 +123,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -125,3 +155,27 @@ jobs:
 
       - name: Run PostgreSQL application smoke
         run: python tests/smoke_app.py
+
+  release-gate:
+    name: Production release gate
+    needs:
+      - dependency-audit
+      - smoke
+      - postgres-schema-smoke
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Require every release check
+        env:
+          DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
+          SQLITE_SMOKE_RESULT: ${{ needs.smoke.result }}
+          POSTGRESQL_SMOKE_RESULT: ${{ needs.postgres-schema-smoke.result }}
+        run: |
+          echo "Dependency audit: $DEPENDENCY_AUDIT_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          echo "SQLite/security smoke: $SQLITE_SMOKE_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          echo "PostgreSQL smoke: $POSTGRESQL_SMOKE_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          test "$DEPENDENCY_AUDIT_RESULT" = "success"
+          test "$SQLITE_SMOKE_RESULT" = "success"
+          test "$POSTGRESQL_SMOKE_RESULT" = "success"

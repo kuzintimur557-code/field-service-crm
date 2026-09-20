@@ -53,14 +53,17 @@ def _normalized_origin(value):
 
 
 def get_security_runtime_config():
+    railway_environment = str(
+        os.getenv("RAILWAY_ENVIRONMENT") or ""
+    ).strip()
     production_mode = bool(
         str(os.getenv("ENV") or "").strip().lower() == "production"
-        or str(os.getenv("RAILWAY_ENVIRONMENT") or "").strip()
+        or railway_environment
     )
     cookie_secure = bool(
         str(os.getenv("COOKIE_SECURE") or "").strip().lower()
         in {"1", "true", "yes", "on"}
-        or str(os.getenv("RAILWAY_ENVIRONMENT") or "").strip()
+        or railway_environment
     )
     trusted_hosts = _split_values(os.getenv("TRUSTED_HOSTS"))
     for source in (
@@ -71,6 +74,9 @@ def get_security_runtime_config():
         host = _hostname_from_url(source)
         if host and host not in trusted_hosts:
             trusted_hosts.append(host)
+    public_trusted_hosts_configured = bool(trusted_hosts)
+    if railway_environment and "healthcheck.railway.app" not in trusted_hosts:
+        trusted_hosts.append("healthcheck.railway.app")
 
     csrf_trusted_origins = []
     for value in (
@@ -82,7 +88,7 @@ def get_security_runtime_config():
             csrf_trusted_origins.append(normalized)
 
     errors = []
-    if production_mode and not trusted_hosts:
+    if production_mode and not public_trusted_hosts_configured:
         errors.append("trusted_hosts_required")
     if any(
         "://" in host or "/" in host or not host
@@ -99,7 +105,7 @@ def get_security_runtime_config():
         "docs_enabled": not production_mode,
         "cookie_secure": cookie_secure,
         "trusted_hosts": trusted_hosts,
-        "trusted_hosts_configured": bool(trusted_hosts),
+        "trusted_hosts_configured": public_trusted_hosts_configured,
         "csrf_trusted_origins": csrf_trusted_origins,
         "csrf_origin_guard_enabled": True,
         "max_request_bytes": _environment_int(
