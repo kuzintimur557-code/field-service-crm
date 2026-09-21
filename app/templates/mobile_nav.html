@@ -12,23 +12,40 @@
 {% set nav_links = links if links is defined else {} %}
 {% set nav_task_label = settings["task_label"] if settings is defined and settings["task_label"] else "Заявка" %}
 {% set nav_client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
+{% set nav_path = request.url.path %}
+{% set nav_more_active = nav_path == '/more'
+    or nav_path.startswith('/notifications')
+    or nav_path.startswith('/finance')
+    or nav_path.startswith('/payroll')
+    or nav_path.startswith('/catalog')
+    or nav_path.startswith('/custom-fields')
+    or nav_path.startswith('/recurring')
+    or nav_path.startswith('/workers')
+    or nav_path.startswith('/archive')
+    or nav_path.startswith('/calls')
+    or nav_path.startswith('/automation')
+    or nav_path.startswith('/ai/')
+    or nav_path.startswith('/owner/dashboard')
+    or nav_path.startswith('/sla/analytics')
+    or nav_path.startswith('/settings')
+    or nav_path.startswith('/admin') %}
 
 {% if role == "worker" %}
-<a href="{{ nav_links.get('my_tasks', '/my-tasks') }}"{% if request.url.path == '/my-tasks' or request.url.path.startswith('/task/') %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('my_tasks', '/my-tasks') }}"{% if nav_path == '/my-tasks' or nav_path.startswith('/task/') %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">📋</span><span>{{ nav_task_label }}: мои</span>
 </a>
 
 {% if f.get("calendar", True) %}
-<a href="{{ nav_links.get('calendar', '/calendar') }}"{% if '/calendar' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('calendar', '/calendar') }}"{% if '/calendar' in nav_path %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">📅</span><span>Календарь</span>
 </a>
 {% endif %}
 
-<a href="{{ nav_links.get('profile', '/profile') }}"{% if '/profile' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('profile', '/profile') }}"{% if '/profile' in nav_path %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">👤</span><span>Профиль</span>
 </a>
 
-<a href="{{ nav_links.get('more', '/more') }}"{% if request.url.path == '/more' %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('more', '/more') }}"{% if nav_more_active %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">☰</span><span>Ещё</span>
 </a>
 
@@ -37,27 +54,27 @@
 </a>
 
 {% else %}
-<a href="{{ nav_links.get('home', '/') }}"{% if request.url.path == '/' or request.url.path.startswith('/task/') %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('home', '/') }}"{% if nav_path == '/' or nav_path.startswith('/task/') or nav_path in ['/today', '/overdue', '/sla', '/workload'] %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">🏠</span><span>Главная</span>
 </a>
 
-<a href="{{ nav_links.get('create_task', '/create-task') }}"{% if '/create-task' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('create_task', '/create-task') }}"{% if '/create-task' in nav_path %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">➕</span><span>{{ nav_task_label }}</span>
 </a>
 
 {% if f.get("calendar", True) %}
-<a href="{{ nav_links.get('calendar', '/calendar') }}"{% if '/calendar' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('calendar', '/calendar') }}"{% if '/calendar' in nav_path %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">📅</span><span>Календарь</span>
 </a>
 {% endif %}
 
 {% if f.get("clients", True) %}
-<a href="{{ nav_links.get('clients', '/clients') }}"{% if '/clients' in request.url.path %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('clients', '/clients') }}"{% if '/clients' in nav_path %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">👤</span><span>{{ nav_client_label }}</span>
 </a>
 {% endif %}
 
-<a href="{{ nav_links.get('more', '/more') }}"{% if request.url.path == '/more' %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('more', '/more') }}"{% if nav_more_active or nav_path.startswith('/profile') %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">☰</span><span>Ещё</span>
 </a>
 {% endif %}

@@ -525,6 +525,59 @@ def assert_session_cookie_auth():
     ) is None
 
 
+def assert_mobile_navigation_context():
+    template = crm.templates.env.get_template("mobile_nav.html")
+    settings = {
+        "task_label": "Заявка",
+        "client_label": "Клиент",
+    }
+    features = {
+        "calendar": True,
+        "clients": True,
+    }
+
+    def render(path, role):
+        return template.render(
+            request=SimpleNamespace(url=SimpleNamespace(path=path)),
+            role=role,
+            settings=settings,
+            features=features,
+            links=crm.build_dashboard_links(),
+        )
+
+    boss_routes = [
+        ("/", "/"),
+        ("/task/7", "/"),
+        ("/today", "/"),
+        ("/overdue", "/"),
+        ("/sla", "/"),
+        ("/workload", "/"),
+        ("/calendar", "/calendar"),
+        ("/clients/7", "/clients"),
+        ("/finance", "/more"),
+        ("/profile", "/more"),
+        ("/notifications", "/more"),
+        ("/sla/analytics", "/more"),
+    ]
+    worker_routes = [
+        ("/my-tasks", "/my-tasks"),
+        ("/task/7", "/my-tasks"),
+        ("/calendar", "/calendar"),
+        ("/profile", "/profile"),
+        ("/more", "/more"),
+        ("/notifications", "/more"),
+    ]
+
+    for role, routes in (("boss", boss_routes), ("worker", worker_routes)):
+        for path, expected_href in routes:
+            html = render(path, role)
+            assert html.count('aria-current="page"') == 1
+            assert (
+                f'href="{expected_href}" class="active" aria-current="page"'
+                in html
+            )
+
+
 def assert_task_access(task):
     assert crm.can_access_task("super", "superadmin", task)
     assert crm.can_access_task("owner2", "boss", task)
@@ -31112,6 +31165,7 @@ def main():
         assert_database_runtime_configuration()
         assert_postgres_adapter_foundation()
         assert_session_cookie_auth()
+        assert_mobile_navigation_context()
         assert_task_access(task)
         assert_automation_foundation()
         assert_calls_foundation()
