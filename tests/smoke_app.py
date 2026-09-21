@@ -25675,23 +25675,75 @@ async def assert_client_card(task):
     assert 'class="active">С анализом</a>' in call_content_html
     assert "call_filter=follow_up&call_content=analysis#calls" in call_content_html
 
+    conn = connect()
+    c = conn.cursor()
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, task_date, worker, workers,
+        priority, price, status, archived
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2, "Worker active smoke", "2099-12-31", "worker2", "worker2",
+        "high", "100", "В работе", 0,
+    ))
+    active_worker_task_id = c.lastrowid
+    c.execute("""
+    INSERT INTO tasks (
+        company_id, client, task_date, worker, workers,
+        priority, price, status, archived
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2, "Worker new smoke", "2099-01-01", "worker2", "worker2",
+        "normal", "100", "Новая", 0,
+    ))
+    new_worker_task_id = c.lastrowid
+    conn.commit()
+    conn.close()
+
     worker_tasks_response = await crm.my_tasks_page(
         make_asgi_request("worker2", "/my-tasks")
     )
     assert worker_tasks_response.status_code == 200
     worker_tasks_html = worker_tasks_response.body.decode("utf-8")
+    rendered_worker_task_ids = [
+        item["id"] for item in worker_tasks_response.context["tasks"]
+    ]
+    assert (
+        rendered_worker_task_ids.index(active_worker_task_id)
+        < rendered_worker_task_ids.index(new_worker_task_id)
+    )
     assert "Заявка: рабочий список" in worker_tasks_html
     assert ">Активные</a>" in worker_tasks_html
     assert ">Завершённые</a>" in worker_tasks_html
     assert "badge " in worker_tasks_html
     assert 'class="mobile-nav"' in worker_tasks_html
     assert ".container{padding:14px 14px 92px}" in worker_tasks_html
+    assert ".header .nav{display:none}" in worker_tasks_html
+    assert ".info,.actions{grid-template-columns:repeat(2,minmax(0,1fr))" in worker_tasks_html
+    assert ".actions>:only-child{grid-column:1/-1}" in worker_tasks_html
+    assert 'aria-label="Фильтр по статусу"' in worker_tasks_html
+    assert 'aria-current="page">Активные</a>' in worker_tasks_html
+    assert 'class="completion"' in worker_tasks_html
+    assert f'id="report-{active_worker_task_id}"' in worker_tasks_html
+    assert f'id="after-photo-{active_worker_task_id}"' in worker_tasks_html
+    assert "Подтвердить завершение" in worker_tasks_html
     assert "Мои заявки" not in worker_tasks_html
     assert "📋 Мои заявки" not in worker_tasks_html
     assert "👤 Профиль" not in worker_tasks_html
     assert "❌ Перед завершением" not in worker_tasks_html
     assert "▶️ Взять в работу" not in worker_tasks_html
     assert "✅ Завершить" not in worker_tasks_html
+
+    conn = connect()
+    c = conn.cursor()
+    c.execute(
+        "DELETE FROM tasks WHERE id IN (?, ?)",
+        (active_worker_task_id, new_worker_task_id),
+    )
+    conn.commit()
+    conn.close()
 
     conn = connect()
     c = conn.cursor()

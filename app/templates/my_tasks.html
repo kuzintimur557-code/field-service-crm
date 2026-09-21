@@ -36,6 +36,7 @@ h1{margin:0 0 8px;font-size:34px}
 .value{font-weight:900;overflow-wrap:anywhere}
 .description{margin-top:14px;padding:12px;border-radius:14px;background:#f9fafb;color:#374151;font-weight:800;line-height:1.45;overflow-wrap:anywhere}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.actions>:only-child{grid-column:1/-1}
 button,.btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;padding:13px;border-radius:14px;border:0;text-align:center;text-decoration:none;font-weight:900;color:white;background:#2563eb;cursor:pointer}
 .green{background:#16a34a}
 .dark{background:#111827}
@@ -44,13 +45,26 @@ textarea,input{width:100%;min-height:44px;padding:12px;border-radius:12px;border
 .filter-tabs{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}
 .filter-tabs a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 14px;border-radius:999px;background:white;color:#374151;text-decoration:none;font-weight:900;box-shadow:0 6px 16px rgba(0,0,0,.05);white-space:nowrap}
 .filter-tabs a.active{background:#2563eb;color:white}
+.completion{margin-top:12px;border:1px solid #bbf7d0;border-radius:16px;overflow:hidden;background:#f0fdf4}
+.completion summary{display:flex;align-items:center;justify-content:space-between;min-height:46px;padding:13px 15px;background:#16a34a;color:white;font-weight:900;cursor:pointer;list-style:none}
+.completion summary::-webkit-details-marker{display:none}
+.completion summary::after{content:"＋";font-size:20px;line-height:1}
+.completion[open] summary::after{content:"−"}
+.completion form{padding:14px}
+.completion label{display:block;margin-top:12px;font-weight:900;color:#374151}
+.completion label:first-child{margin-top:0}
+.completion input[type="file"]{background:white}
+.completion .btn{margin-top:12px}
 @media(max-width:700px){
     .container{padding:14px 14px 92px}
     .header,.task,.empty{border-radius:18px}
-    h1{font-size:28px}
-    .info,.actions{grid-template-columns:1fr}
+    .header{padding:18px}
+    .header .nav{display:none}
+    h1{font-size:27px}
+    .task{padding:16px}
+    .info,.actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .item{padding:10px}
     .top{flex-direction:column}
-    .nav a{flex:1}
     .filter-tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
     .filter-tabs a{flex:0 0 auto}
 }
@@ -69,12 +83,12 @@ textarea,input{width:100%;min-height:44px;padding:12px;border-radius:12px;border
 </div>
 </div>
 
-<div class="filter-tabs">
-<a href="/my-tasks" class="{% if not selected_status %}active{% endif %}">Активные</a>
-<a href="/my-tasks?status=Новая" class="{% if selected_status == 'Новая' %}active{% endif %}">Новые</a>
-<a href="/my-tasks?status=В работе" class="{% if selected_status == 'В работе' %}active{% endif %}">В работе</a>
-<a href="/my-tasks?status=Завершено" class="{% if selected_status == 'Завершено' %}active{% endif %}">Завершённые</a>
-</div>
+<nav class="filter-tabs" aria-label="Фильтр по статусу">
+<a href="/my-tasks" class="{% if not selected_status %}active{% endif %}"{% if not selected_status %} aria-current="page"{% endif %}>Активные</a>
+<a href="/my-tasks?status=Новая" class="{% if selected_status == 'Новая' %}active{% endif %}"{% if selected_status == 'Новая' %} aria-current="page"{% endif %}>Новые</a>
+<a href="/my-tasks?status=В работе" class="{% if selected_status == 'В работе' %}active{% endif %}"{% if selected_status == 'В работе' %} aria-current="page"{% endif %}>В работе</a>
+<a href="/my-tasks?status=Завершено" class="{% if selected_status == 'Завершено' %}active{% endif %}"{% if selected_status == 'Завершено' %} aria-current="page"{% endif %}>Завершённые</a>
+</nav>
 
 {% if request.query_params.get("error") == "report_required" %}
 <div class="empty" style="background:#fee2e2;color:#991b1b;margin-bottom:14px">
@@ -133,14 +147,19 @@ textarea,input{width:100%;min-height:44px;padding:12px;border-radius:12px;border
     <a class="btn dark" href="/task/{{ task['id'] }}">Открыть</a>
 </form>
 {% elif task["status"] == "В работе" %}
+<details class="completion">
+<summary>Завершить работу</summary>
 <form method="post" action="/task/{{ task['id'] }}/complete" enctype="multipart/form-data">
-    <textarea name="report" placeholder="Краткий отчёт по работе" required></textarea>
-    <input type="file" name="after_photo" accept="image/*" capture="environment">
-    <div class="actions">
-        <button class="green" type="submit">Завершить</button>
-        <a class="btn dark" href="/task/{{ task['id'] }}">Открыть</a>
-    </div>
+    <label for="report-{{ task['id'] }}">Краткий отчёт</label>
+    <textarea id="report-{{ task['id'] }}" name="report" placeholder="Что выполнено" required></textarea>
+    <label for="after-photo-{{ task['id'] }}">Фото после работы</label>
+    <input id="after-photo-{{ task['id'] }}" type="file" name="after_photo" accept="image/*" capture="environment">
+    <button class="btn green" type="submit">Подтвердить завершение</button>
 </form>
+</details>
+<div class="actions">
+    <a class="btn dark" href="/task/{{ task['id'] }}">Открыть</a>
+</div>
 {% else %}
 <div class="actions">
     <a class="btn dark" href="/task/{{ task['id'] }}">Открыть</a>

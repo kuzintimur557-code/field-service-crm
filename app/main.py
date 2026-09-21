@@ -19076,10 +19076,20 @@ async def my_tasks_page(request: Request, status: str = ""):
     if status:
         query += " AND status=?"
         params.append(status)
+        query += " ORDER BY task_date DESC, id DESC"
     else:
         query += " AND status!='Завершено'"
-
-    query += " ORDER BY task_date DESC"
+        query += """
+        ORDER BY
+            CASE status
+                WHEN 'В работе' THEN 0
+                WHEN 'Новая' THEN 1
+                ELSE 2
+            END,
+            CASE WHEN task_date IS NULL OR task_date='' THEN 1 ELSE 0 END,
+            task_date ASC,
+            id DESC
+        """
 
     tasks = c.execute(query, params).fetchall()
 
