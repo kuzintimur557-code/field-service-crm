@@ -23830,6 +23830,18 @@ async def assert_finance_margin(task):
     assert "Загрузка команды после переноса:" in task_detail_html
     assert "max-height:90vh" in task_detail_html
     assert "grid-template-columns:30px minmax(0,1fr) 48px" in task_detail_html
+    assert 'class="primary-column"' in task_detail_html
+    assert 'class="side-column"' in task_detail_html
+    assert 'class="card actions-card"' in task_detail_html
+    assert ".actions-card{order:1}" in task_detail_html
+    assert ".information-card{order:2}" in task_detail_html
+    assert ".history-card{order:11}" in task_detail_html
+    assert 'class="archive-action"' in task_detail_html
+    assert 'href="/" class="active" aria-current="page"' in task_detail_html
+    assert (
+        task_detail_html.index('class="quick"')
+        < task_detail_html.index('class="archive-action"')
+    )
     assert task_detail_response.context["smart_reschedule_items"]
     assert len(task_detail_response.context["smart_reschedule_items"]) <= 5
     assert all(

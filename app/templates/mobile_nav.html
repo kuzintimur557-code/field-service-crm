@@ -14,7 +14,7 @@
 {% set nav_client_label = settings["client_label"] if settings is defined and settings["client_label"] else "Клиент" %}
 
 {% if role == "worker" %}
-<a href="{{ nav_links.get('my_tasks', '/my-tasks') }}"{% if request.url.path == '/my-tasks' %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('my_tasks', '/my-tasks') }}"{% if request.url.path == '/my-tasks' or request.url.path.startswith('/task/') %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">📋</span><span>{{ nav_task_label }}: мои</span>
 </a>
 
@@ -37,7 +37,7 @@
 </a>
 
 {% else %}
-<a href="{{ nav_links.get('home', '/') }}"{% if request.url.path == '/' %} class="active" aria-current="page"{% endif %}>
+<a href="{{ nav_links.get('home', '/') }}"{% if request.url.path == '/' or request.url.path.startswith('/task/') %} class="active" aria-current="page"{% endif %}>
 <span class="mobile-nav-icon" aria-hidden="true">🏠</span><span>Главная</span>
 </a>
 

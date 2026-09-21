@@ -455,12 +455,29 @@ button{
 @media(max-width:700px){
     .page{padding:14px}
     .card{padding:18px;border-radius:18px}
+    .topbar{margin-bottom:16px}
     .title{display:block;font-size:32px;line-height:1.08}
     .badge{margin-left:0;margin-right:6px;padding:8px 12px;font-size:13px}
     .section-title{font-size:26px}
     .mini-value{font-size:18px}
     .timeline-item{grid-template-columns:42px minmax(0,1fr);gap:10px;margin-bottom:20px}
     .timeline-date{grid-column:2;text-align:left;font-size:13px}
+    .layout>.primary-column,
+    .layout>.side-column{display:contents}
+    .actions-card{order:1}
+    .information-card{order:2}
+    .management-card{order:3}
+    .reschedule-card{order:4}
+    .payment-card{order:5}
+    .source-call-card{order:6}
+    .photo-card{order:7}
+    .report-card{order:8}
+    .estimate-card{order:9}
+    .comments-card{order:10}
+    .history-card{order:11}
+    .actions-card .section-title{margin-bottom:8px}
+    .archive-action{margin-top:12px}
+    .archive-action .btn{margin-top:0}
     .modal{padding:12px}
     .modal-content{padding:20px;border-radius:18px}
     .modal h3{font-size:24px}
@@ -549,9 +566,9 @@ button{
 
 <div class="layout">
 
-<div>
+<div class="primary-column">
 
-<div class="card">
+<div class="card information-card">
 
 <div class="section-title">Информация</div>
 
@@ -660,7 +677,7 @@ button{
 	</div>
 
 {% if source_call %}
-<div class="card">
+<div class="card source-call-card">
 <div class="section-title">Источник заявки</div>
 
 <div class="grid2">
@@ -704,7 +721,7 @@ button{
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card photo-card">
 
 <div class="section-title">Фото</div>
 
@@ -735,7 +752,7 @@ button{
 </div>
 
 {% if task["report"] %}
-<div class="card">
+<div class="card report-card">
 
 <div class="section-title">Отчёт сотрудника</div>
 
@@ -746,7 +763,7 @@ button{
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card estimate-card">
 
 <div class="section-title">Смета</div>
 
@@ -885,7 +902,7 @@ button{
 
 </div>
 
-<div class="card">
+<div class="card comments-card">
 
 <div class="section-title">Комментарии</div>
 
@@ -918,9 +935,9 @@ button{
 
 </div>
 
-<div>
+<div class="side-column">
 
-<div class="card">
+<div class="card management-card">
 
 <div class="section-title">Управление</div>
 
@@ -957,7 +974,7 @@ button{
 </div>
 
 {% if role in ["boss", "manager"] and task_workers and task["status"] not in ["Завершено", "Отменено"] %}
-<div class="card">
+<div class="card reschedule-card">
 <div class="section-title">Умный перенос</div>
 
 <div class="meta" style="margin-bottom:14px">
@@ -995,7 +1012,7 @@ button{
 {% endif %}
 
 {% if role in ["boss", "manager"] %}
-<div class="card">
+<div class="card payment-card">
 <div class="section-title">Оплата</div>
 
 <form method="post" action="/task/{{ task['id'] }}/payment">
@@ -1010,7 +1027,7 @@ button{
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card history-card">
 
 <div class="section-title">История изменений</div>
 
@@ -1043,21 +1060,9 @@ button{
 
 </div>
 
-<div class="card">
+<div class="card actions-card">
 
 <div class="section-title">Быстрые действия</div>
-
-{% if role in ["boss", "manager"] %}
-{% if task["archived"] == 1 %}
-<form method="post" action="/task/{{ task['id'] }}/unarchive" onsubmit="return confirm('Восстановить {{ task_label_lower }} #{{ task['id'] }} из архива?')">
-<button class="btn green" type="submit">🗄 Восстановить из архива</button>
-</form>
-{% else %}
-<form method="post" action="/task/{{ task['id'] }}/delete" onsubmit="return confirm('Отправить {{ task_label_lower }} #{{ task['id'] }} в архив?')">
-<button class="btn red" type="submit">🗄 В архив</button>
-</form>
-{% endif %}
-{% endif %}
 
 <div class="quick">
 
@@ -1084,6 +1089,18 @@ button{
 <a href="/task/{{ task['id'] }}/invoice" class="btn gray">🧾 Счёт</a>
 
 </div>
+
+{% if role in ["boss", "manager"] %}
+{% if task["archived"] == 1 %}
+<form class="archive-action" method="post" action="/task/{{ task['id'] }}/unarchive" onsubmit="return confirm('Восстановить {{ task_label_lower }} #{{ task['id'] }} из архива?')">
+<button class="btn green" type="submit">🗄 Восстановить из архива</button>
+</form>
+{% else %}
+<form class="archive-action" method="post" action="/task/{{ task['id'] }}/delete" onsubmit="return confirm('Отправить {{ task_label_lower }} #{{ task['id'] }} в архив?')">
+<button class="btn red" type="submit">🗄 В архив</button>
+</form>
+{% endif %}
+{% endif %}
 
 </div>
 
