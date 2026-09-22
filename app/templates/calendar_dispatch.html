@@ -135,9 +135,16 @@ h1{margin:0;font-size:32px}
 .task-flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
 .flag{padding:4px 6px;border-radius:6px;background:#fee2e2;color:#991b1b;font-size:10px;font-weight:900}
 .task-link{display:inline-flex;margin-top:8px;color:#1d4ed8;text-decoration:none;font-size:12px;font-weight:900}
-.mobile-move{display:none;margin-top:9px;padding-top:9px;border-top:1px solid #e5e7eb}
-.mobile-move select{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:7px;background:white;font-weight:800}
-.mobile-move button{width:100%;margin-top:6px;padding:8px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900}
+.board-help{margin:0 0 10px;padding:10px 12px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#1e3a8a;font-size:12px;font-weight:800}
+.task-move{margin-top:9px;padding-top:9px;border-top:1px solid #e5e7eb}
+.task-move summary{display:inline-flex;align-items:center;min-height:44px;padding:8px 10px;border-radius:7px;background:#eef2ff;color:#3730a3;font-size:12px;font-weight:900;cursor:pointer;list-style:none}
+.task-move summary::-webkit-details-marker{display:none}
+.task-move summary::after{margin-left:7px;content:"▾"}
+.task-move[open] summary::after{content:"▴"}
+.task-move-fields{margin-top:8px}
+.task-move label{display:block;margin-bottom:5px;color:#6b7280;font-size:11px;font-weight:900}
+.task-move select{width:100%;min-height:44px;padding:8px;border:1px solid #d1d5db;border-radius:7px;background:white;font-weight:800}
+.task-move button{width:100%;min-height:44px;margin-top:6px;padding:8px;border:0;border-radius:7px;background:#2563eb;color:white;font-weight:900}
 .empty{padding:16px 8px;color:#6b7280;text-align:center;font-size:12px;font-weight:800}
 .toast{position:fixed;right:18px;bottom:82px;z-index:1000;max-width:390px;padding:14px 16px;border-radius:8px;background:#111827;color:white;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.22)}
 .toast.error{background:#991b1b}
@@ -202,7 +209,7 @@ h1{margin:0;font-size:32px}
     .column{min-height:0}
     .column.past{display:none}
     .task-card{cursor:default}
-    .mobile-move{display:block}
+    .task-move summary{width:100%;justify-content:center}
     .planner-head{padding:16px}
     .planner-body{padding:14px}
     .planner-controls,.planner-controls>div,.planner-controls input,.planner-controls select,.planner-controls button{width:100%}
@@ -571,6 +578,9 @@ h1{margin:0;font-size:32px}
         </div>
     </section>
 
+    <p class="board-help" id="board-move-help">
+        Перетащите карточку в нужный день или откройте «Переместить» для управления с клавиатуры и touch-экрана.
+    </p>
     <div class="board-scroll">
         <section class="board">
             {% for column in board_columns %}
@@ -616,16 +626,20 @@ h1{margin:0;font-size:32px}
                         <div class="task-flags"><span class="flag">Конфликт расписания</span></div>
                         {% endif %}
                         <a class="task-link" href="/task/{{ task['id'] }}">Открыть</a>
-                        <div class="mobile-move">
-                            <select aria-label="Новая дата: {{ task_label|lower }} #{{ task['id'] }}">
+                        <details class="task-move">
+                            <summary>Переместить</summary>
+                            <div class="task-move-fields">
+                            <label for="task-move-date-{{ task['id'] }}">Новая дата</label>
+                            <select id="task-move-date-{{ task['id'] }}" aria-label="Новая дата: {{ task_label|lower }} #{{ task['id'] }}">
                                 {% for target in board_columns %}
                                 {% if not target["is_past"] %}
                                 <option value="{{ target['date'] }}" {% if target['date'] == (task['task_date'] or '')[:10] %}selected{% endif %}>{{ target["day_label"] }} · {{ target["date_label"] }}</option>
                                 {% endif %}
                                 {% endfor %}
                             </select>
-                            <button type="button">Перенести</button>
-                        </div>
+                            <button type="button" aria-label="Перенести карточку #{{ task['id'] }}">Перенести</button>
+                            </div>
+                        </details>
                     </div>
                     {% else %}
                     <div class="empty">{{ task_label }} нет</div>
@@ -697,7 +711,7 @@ h1{margin:0;font-size:32px}
         <button class="button success" id="planner-apply" type="button" disabled>Применить выбранное</button>
     </footer>
 </dialog>
-<div id="dispatch-toast" class="toast" hidden></div>
+<div id="dispatch-toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 {% include 'mobile_nav.html' %}
 <script>
 (() => {
@@ -1079,7 +1093,11 @@ h1{margin:0;font-size:32px}
     }
 
     async function moveTask(card, targetDate) {
-        if (!card || card.dataset.expectedDate === targetDate) {
+        if (!card) {
+            return;
+        }
+        if (card.dataset.expectedDate === targetDate) {
+            showToast("Выберите другую дату.", true);
             return;
         }
 
@@ -1110,6 +1128,10 @@ h1{margin:0;font-size:32px}
 
     document.querySelectorAll(".task-card").forEach(card => {
         card.addEventListener("dragstart", event => {
+            if (event.target.closest(".task-move")) {
+                event.preventDefault();
+                return;
+            }
             draggedCard = card;
             card.classList.add("dragging");
             event.dataTransfer.effectAllowed = "move";
@@ -1123,11 +1145,11 @@ h1{margin:0;font-size:32px}
             });
         });
 
-        const mobileMove = card.querySelector(".mobile-move");
-        const mobileButton = mobileMove.querySelector("button");
-        const mobileSelect = mobileMove.querySelector("select");
-        mobileButton.addEventListener("click", () => {
-            moveTask(card, mobileSelect.value);
+        const taskMove = card.querySelector(".task-move");
+        const taskMoveButton = taskMove.querySelector("button");
+        const taskMoveSelect = taskMove.querySelector("select");
+        taskMoveButton.addEventListener("click", () => {
+            moveTask(card, taskMoveSelect.value);
         });
     });
 

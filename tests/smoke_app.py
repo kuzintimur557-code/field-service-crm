@@ -8973,6 +8973,13 @@ async def assert_dispatch_board():
     assert 'draggable="true"' in page_html
     assert "/api/calendar/dispatch/move" in page_html
     assert "Новая дата: заявка" in page_html
+    assert 'class="task-move"' in page_html
+    assert "<summary>Переместить</summary>" in page_html
+    assert f'id="task-move-date-{mover_id}"' in page_html
+    assert "для управления с клавиатуры и touch-экрана" in page_html
+    assert 'role="status" aria-live="polite"' in page_html
+    assert 'showToast("Выберите другую дату.", true)' in page_html
+    assert 'event.target.closest(".task-move")' in page_html
     assert "Открыть заявку" not in page_html
     assert len(page.context["board_columns"]) == 8
     assert page.context["summary"]["tasks"] == 3
