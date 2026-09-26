@@ -7720,6 +7720,35 @@ async def assert_upload_access():
 
 async def assert_calendar_access():
     fixed_team_start = datetime.now().date()
+    fixed_team_date = fixed_team_start.strftime("%Y-%m-%d")
+    timed_team_items = crm.add_time_slots_to_recommendations(
+        [{
+            "date": fixed_team_date,
+            "worker_names": ["worker_a", "worker_b"],
+        }],
+        [
+            {
+                "task_id": 1,
+                "date": fixed_team_date,
+                "workers": ["worker_a"],
+                "time_from": "08:00",
+                "time_to": "09:00",
+            },
+            {
+                "task_id": 2,
+                "date": fixed_team_date,
+                "workers": ["worker_b"],
+                "time_from": "09:00",
+                "time_to": "10:00",
+            },
+        ],
+        duration_minutes=60,
+    )
+    assert timed_team_items[0]["primary_time_slot"]["label"] == "10:00–11:00"
+    assert timed_team_items[0]["available_time_slot_count"] == 19
+    assert [
+        slot["label"] for slot in timed_team_items[0]["time_slots"]
+    ] == ["10:00–11:00", "10:30–11:30", "11:00–12:00"]
     fixed_team_result = crm.build_scheduling_recommendations(
         worker_capacities={"worker_a": 1, "worker_b": 1},
         assignments=[{
@@ -7802,6 +7831,10 @@ async def assert_calendar_access():
     assert "Сбросить фильтры" in manager_html
     assert "Проверено дней:" in manager_html
     assert "Дней с нужной командой:" in manager_html
+    assert "Длительность" in manager_html
+    assert "Свободных интервалов:" in manager_html
+    assert "Ближайшее время" in manager_html
+    assert "Другие свободные интервалы" in manager_html
     assert "Средняя загрузка после назначения:" in manager_html
     assert "Обязательный сотрудник: helper2" in manager_html
     assert "week-cell" in manager_html
@@ -7870,6 +7903,7 @@ async def assert_calendar_access():
     )
     assert manager_response.context["selected_schedule_days"] == 14
     assert manager_response.context["selected_schedule_workers"] == 1
+    assert manager_response.context["selected_schedule_duration"] == 60
     assert manager_response.context["smart_schedule_items"]
     assert (
         manager_response.context["smart_schedule_items"][0]["date"]
@@ -7878,6 +7912,14 @@ async def assert_calendar_access():
     assert (
         manager_response.context["smart_schedule_items"][0]["worker_names"]
         == ["helper2"]
+    )
+    assert (
+        manager_response.context["smart_schedule_items"][0]
+        ["primary_time_slot"]["label"]
+        == "08:00–09:00"
+    )
+    assert "time_from=08%3A00" in (
+        manager_response.context["smart_schedule_items"][0]["create_url"]
     )
     assert all(
         "outsider_worker" not in item["worker_names"]
@@ -7905,11 +7947,14 @@ async def assert_calendar_access():
         schedule_start="2026-05-17",
         schedule_days=7,
         schedule_workers=2,
+        schedule_duration=90,
     )
     assert team_schedule_response.status_code == 200
     team_schedule_html = team_schedule_response.body.decode("utf-8")
     assert '<option value="7" selected>7 дней</option>' in team_schedule_html
     assert '<option value="2" selected>2</option>' in team_schedule_html
+    assert '<option value="90" selected>1 ч 30 мин</option>' in team_schedule_html
+    assert "08:00–09:30" in team_schedule_html
     assert "Заявка: создать" in team_schedule_html
     assert "Создать заявку" not in team_schedule_html
     assert team_schedule_response.context["smart_schedule_summary"] == {
@@ -7918,16 +7963,27 @@ async def assert_calendar_access():
         "days_with_capacity": 7,
         "total_open_slots": 35,
         "found": 7,
+        "time_slots_found": 154,
     }
     best_team_slot = team_schedule_response.context["smart_schedule_items"][0]
     assert best_team_slot["date"] == today_value.strftime("%Y-%m-%d")
     assert best_team_slot["worker_names"] == ["free2", "helper2"]
+    assert best_team_slot["primary_time_slot"] == {
+        "time_from": "08:00",
+        "time_to": "09:30",
+        "label": "08:00–09:30",
+        "duration_minutes": 90,
+    }
     assert "workers_csv=free2%2Chelper2" in best_team_slot["create_url"]
+    assert "time_from=08%3A00" in best_team_slot["create_url"]
+    assert "time_to=09%3A30" in best_team_slot["create_url"]
     assert "outsider_worker" not in best_team_slot["worker_names"]
 
     team_create_response = await crm.create_task_page(
         make_asgi_request("owner2", "/create-task"),
         task_date=best_team_slot["date"],
+        time_from=best_team_slot["primary_time_slot"]["time_from"],
+        time_to=best_team_slot["primary_time_slot"]["time_to"],
         worker=best_team_slot["worker_names"][0],
         workers_csv=",".join(best_team_slot["worker_names"]),
         return_to="calendar",
@@ -7937,6 +7993,8 @@ async def assert_calendar_access():
         "free2",
         "helper2",
     ]
+    assert team_create_response.context["selected_time_from"] == "08:00"
+    assert team_create_response.context["selected_time_to"] == "09:30"
     team_create_html = team_create_response.body.decode("utf-8")
     assert 'value="free2" data-at-capacity="0" checked' in team_create_html
     assert 'value="helper2" data-at-capacity="0" checked' in team_create_html
@@ -7946,6 +8004,7 @@ async def assert_calendar_access():
         start="2026-05-17",
         days=7,
         workers=2,
+        duration=120,
     )
     assert schedule_api["ok"] is True
     assert schedule_api["company_id"] == 2
@@ -7953,7 +8012,9 @@ async def assert_calendar_access():
     assert schedule_api["end"] == (
         today_value + timedelta(days=6)
     ).strftime("%Y-%m-%d")
+    assert schedule_api["duration_minutes"] == 120
     assert schedule_api["summary"]["required_workers"] == 2
+    assert schedule_api["summary"]["time_slots_found"] == 147
     assert schedule_api["items"][0]["worker_names"] == [
         "free2",
         "helper2",
@@ -7964,6 +8025,9 @@ async def assert_calendar_access():
     )
     assert "workers_csv=free2%2Chelper2" in (
         schedule_api["items"][0]["create_url"]
+    )
+    assert schedule_api["items"][0]["primary_time_slot"]["label"] == (
+        "08:00–10:00"
     )
 
     invalid_worker_api = crm.api_calendar_smart_schedule(

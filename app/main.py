@@ -122,7 +122,10 @@ from app.services.system_health import (
     calculate_system_health,
     get_system_health_history,
 )
-from app.services.smart_scheduling import build_scheduling_recommendations
+from app.services.smart_scheduling import (
+    add_time_slots_to_recommendations,
+    build_scheduling_recommendations,
+)
 from app.services.schedule_conflicts import (
     build_conflict_recommendations,
     detect_schedule_conflicts,
@@ -30308,6 +30311,7 @@ async def calendar_page(
     schedule_start: str = "",
     schedule_days: int = 14,
     schedule_workers: int = 1,
+    schedule_duration: int = 60,
 ):
 
     username = get_user(request)
@@ -30353,6 +30357,7 @@ async def calendar_page(
         "days_with_capacity": 0,
         "total_open_slots": 0,
         "found": 0,
+        "time_slots_found": 0,
     }
     availability_summary = {
         "total": 0,
@@ -30392,6 +30397,11 @@ async def calendar_page(
         schedule_days if schedule_days in (7, 14, 30) else 14
     )
     selected_schedule_workers = min(max(int(schedule_workers or 1), 1), 5)
+    selected_schedule_duration = (
+        schedule_duration
+        if schedule_duration in (30, 60, 90, 120)
+        else 60
+    )
     selected_week_start = str(week_start or "").strip()
 
     try:
@@ -30802,7 +30812,9 @@ async def calendar_page(
             )
 
         schedule_rows = c.execute("""
-        SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+        SELECT id, worker, workers,
+               substr(task_date, 1, 10) AS work_date,
+               time_from, time_to
         FROM tasks
         WHERE archived=0
           AND company_id=?
@@ -30815,27 +30827,45 @@ async def calendar_page(
             selected_schedule_start,
             schedule_end_date.strftime("%Y-%m-%d"),
         )).fetchall()
+        schedule_assignments = [
+            {
+                "task_id": row["id"],
+                "date": row["work_date"],
+                "workers": get_task_worker_names(row),
+                "time_from": row["time_from"],
+                "time_to": row["time_to"],
+            }
+            for row in schedule_rows
+        ]
         scheduling_result = build_scheduling_recommendations(
             worker_capacities=worker_capacity_map,
-            assignments=[
-                {
-                    "date": row["work_date"],
-                    "workers": get_task_worker_names(row),
-                }
-                for row in schedule_rows
-            ],
+            assignments=schedule_assignments,
             start_date=schedule_start_date,
             search_days=selected_schedule_days,
             required_workers=selected_schedule_workers,
             preferred_worker=worker if worker in worker_names else "",
             unavailable_dates=unavailable_dates,
+            limit=selected_schedule_days,
         )
-        smart_schedule_items = scheduling_result["items"]
-        smart_schedule_summary = scheduling_result["summary"]
+        actionable_schedule_items = add_time_slots_to_recommendations(
+            scheduling_result["items"],
+            schedule_assignments,
+            duration_minutes=selected_schedule_duration,
+        )
+        smart_schedule_items = actionable_schedule_items[:12]
+        smart_schedule_summary = dict(scheduling_result["summary"])
+        smart_schedule_summary["found"] = len(actionable_schedule_items)
+        smart_schedule_summary["time_slots_found"] = sum(
+            item["available_time_slot_count"]
+            for item in actionable_schedule_items
+        )
 
         for item in smart_schedule_items:
+            primary_time_slot = item["primary_time_slot"]
             item["create_url"] = "/create-task?" + urlencode({
                 "task_date": item["date"],
+                "time_from": primary_time_slot["time_from"],
+                "time_to": primary_time_slot["time_to"],
                 "worker": item["worker_names"][0],
                 "workers_csv": ",".join(item["worker_names"]),
                 "return_to": "calendar",
@@ -30958,6 +30988,7 @@ async def calendar_page(
             "selected_schedule_start": selected_schedule_start,
             "selected_schedule_days": selected_schedule_days,
             "selected_schedule_workers": selected_schedule_workers,
+            "selected_schedule_duration": selected_schedule_duration,
             "previous_day_url": previous_day_url,
             "today_day_url": today_day_url,
             "next_day_url": next_day_url,
@@ -30978,6 +31009,7 @@ def api_calendar_smart_schedule(
     days: int = 14,
     workers: int = 1,
     worker: str = "",
+    duration: int = 60,
 ):
     username = get_user(request)
 
@@ -31019,6 +31051,7 @@ def api_calendar_smart_schedule(
 
     search_days = days if days in (7, 14, 30) else 14
     required_workers = min(max(int(workers or 1), 1), 5)
+    selected_duration = duration if duration in (30, 60, 90, 120) else 60
     preferred_worker = str(worker or "").strip()
     conn = connect()
     c = conn.cursor()
@@ -31044,7 +31077,9 @@ def api_calendar_smart_schedule(
 
     end_date = start_date + timedelta(days=search_days - 1)
     assignment_rows = c.execute("""
-    SELECT worker, workers, substr(task_date, 1, 10) AS work_date
+    SELECT id, worker, workers,
+           substr(task_date, 1, 10) AS work_date,
+           time_from, time_to
     FROM tasks
     WHERE archived=0
       AND company_id=?
@@ -31065,25 +31100,44 @@ def api_calendar_smart_schedule(
         end_date.strftime("%Y-%m-%d"),
     )
     conn.close()
+    schedule_assignments = [
+        {
+            "task_id": row["id"],
+            "date": row["work_date"],
+            "workers": get_task_worker_names(row),
+            "time_from": row["time_from"],
+            "time_to": row["time_to"],
+        }
+        for row in assignment_rows
+    ]
     result = build_scheduling_recommendations(
         worker_capacities=worker_capacities,
-        assignments=[
-            {
-                "date": row["work_date"],
-                "workers": get_task_worker_names(row),
-            }
-            for row in assignment_rows
-        ],
+        assignments=schedule_assignments,
         start_date=start_date,
         search_days=search_days,
         required_workers=required_workers,
         preferred_worker=preferred_worker,
         unavailable_dates=unavailable_dates,
+        limit=search_days,
+    )
+    actionable_items = add_time_slots_to_recommendations(
+        result["items"],
+        schedule_assignments,
+        duration_minutes=selected_duration,
+    )
+    result["items"] = actionable_items[:12]
+    result["summary"]["found"] = len(actionable_items)
+    result["summary"]["time_slots_found"] = sum(
+        item["available_time_slot_count"]
+        for item in actionable_items
     )
 
     for item in result["items"]:
+        primary_time_slot = item["primary_time_slot"]
         item["create_url"] = "/create-task?" + urlencode({
             "task_date": item["date"],
+            "time_from": primary_time_slot["time_from"],
+            "time_to": primary_time_slot["time_to"],
             "worker": item["worker_names"][0],
             "workers_csv": ",".join(item["worker_names"]),
             "return_to": "calendar",
@@ -31095,6 +31149,7 @@ def api_calendar_smart_schedule(
         "start": start_date.strftime("%Y-%m-%d"),
         "end": end_date.strftime("%Y-%m-%d"),
         "preferred_worker": preferred_worker,
+        "duration_minutes": selected_duration,
         "summary": result["summary"],
         "items": result["items"],
     }

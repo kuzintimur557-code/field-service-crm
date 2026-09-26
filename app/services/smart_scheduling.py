@@ -1,5 +1,35 @@
 from datetime import timedelta
 
+from app.services.daily_schedule import list_common_time_slots
+
+
+def add_time_slots_to_recommendations(
+    recommendations,
+    assignments,
+    duration_minutes=60,
+    visible_slots=3,
+):
+    actionable_items = []
+
+    for recommendation in recommendations:
+        time_slots = list_common_time_slots(
+            assignments=assignments,
+            target_date=recommendation.get("date"),
+            target_workers=recommendation.get("worker_names") or [],
+            duration_minutes=duration_minutes,
+        )
+
+        if not time_slots:
+            continue
+
+        item = dict(recommendation)
+        item["primary_time_slot"] = time_slots[0]
+        item["time_slots"] = time_slots[:max(1, int(visible_slots or 1))]
+        item["available_time_slot_count"] = len(time_slots)
+        actionable_items.append(item)
+
+    return actionable_items
+
 
 def build_scheduling_recommendations(
     worker_capacities,

@@ -128,6 +128,10 @@ h1{font-size:32px;margin:0}
 	.smart-worker{padding:6px 8px;border-radius:10px;background:white;border:1px solid #e5e7eb;font-size:12px;font-weight:900}
 	.smart-worker small{display:block;margin-top:2px;color:#6b7280;font-size:10px}
 	.smart-result-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;color:#4b5563;font-size:11px;font-weight:800}
+	.smart-time{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:11px;padding:10px 11px;border-radius:12px;background:#e0f2fe;color:#0c4a6e;font-size:12px;font-weight:900}
+	.smart-time strong{font-size:13px}
+	.smart-time-slots{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+	.smart-time-slot{padding:6px 8px;border-radius:9px;background:white;border:1px solid #bae6fd;color:#075985;font-size:11px;font-weight:900}
 	.smart-actions{display:flex;gap:7px;margin-top:11px}
 	.smart-actions a{display:inline-flex;justify-content:center;align-items:center;padding:9px 11px;border-radius:11px;background:#111827;color:white;text-decoration:none;font-size:12px;font-weight:900}
 	.smart-actions a.primary{background:#2563eb}
@@ -211,7 +215,7 @@ h1{font-size:32px;margin:0}
 		        <div>
 		            <div class="smart-title">Умный подбор окна</div>
 		            <div class="smart-subtitle">
-		                Подбирает ближайшую дату и наименее загруженную команду.
+		                Подбирает ближайшие дату, время и наименее загруженную команду.
 		                {% if selected_worker %}Обязательный сотрудник: {{ selected_worker }}.{% endif %}
 		            </div>
 		        </div>
@@ -236,6 +240,15 @@ h1{font-size:32px;margin:0}
 		                    {% endfor %}
 		                </select>
 		            </div>
+		            <div>
+		                <label>Длительность</label>
+		                <select name="schedule_duration">
+		                    <option value="30" {% if selected_schedule_duration == 30 %}selected{% endif %}>30 мин</option>
+		                    <option value="60" {% if selected_schedule_duration == 60 %}selected{% endif %}>1 час</option>
+		                    <option value="90" {% if selected_schedule_duration == 90 %}selected{% endif %}>1 ч 30 мин</option>
+		                    <option value="120" {% if selected_schedule_duration == 120 %}selected{% endif %}>2 часа</option>
+		                </select>
+		            </div>
 		            {% if selected_worker %}
 		            <input type="hidden" name="worker" value="{{ selected_worker }}">
 		            {% endif %}
@@ -248,7 +261,8 @@ h1{font-size:32px;margin:0}
 		        <span>Проверено дней: {{ smart_schedule_summary["search_days"] }}</span>
 		        <span>Дней с нужной командой: {{ smart_schedule_summary["days_with_capacity"] }}</span>
 		        <span>Свободных мест: {{ smart_schedule_summary["total_open_slots"] }}</span>
-		        <span>Подходящих вариантов: {{ smart_schedule_summary["found"] }}</span>
+		        <span>Подходящих дат: {{ smart_schedule_summary["found"] }}</span>
+		        <span>Свободных интервалов: {{ smart_schedule_summary["time_slots_found"] }}</span>
 		    </div>
 
 		    {% if smart_schedule_items %}
@@ -272,6 +286,15 @@ h1{font-size:32px;margin:0}
 		                <span>Средняя загрузка после назначения: {{ item["average_load_percent"] }}%</span>
 		                <span>Резерв мест: {{ item["available_after"] }}</span>
 		            </div>
+		            <div class="smart-time">
+		                <strong>Ближайшее время</strong>
+		                <span>{{ item["primary_time_slot"]["label"] }}</span>
+		            </div>
+		            <div class="smart-time-slots" aria-label="Другие свободные интервалы">
+		                {% for slot in item["time_slots"] %}
+		                <span class="smart-time-slot">{{ slot["label"] }}</span>
+		                {% endfor %}
+		            </div>
 		            <div class="smart-actions">
 		                <a class="primary" href="{{ item['create_url'] }}">{{ task_label }}: создать</a>
 		                <a href="{{ item['calendar_url'] }}">Открыть день</a>
@@ -281,8 +304,9 @@ h1{font-size:32px;margin:0}
 		    </div>
 		    {% else %}
 		    <div class="smart-no-results">
-		        На выбранный период нет окна для команды из {{ selected_schedule_workers }} исполнителей.
-		        Увеличьте период или уменьшите размер команды.
+		        На выбранный период нет общего свободного окна длительностью
+		        {{ selected_schedule_duration }} минут для команды из {{ selected_schedule_workers }} исполнителей.
+		        Увеличьте период, сократите длительность или уменьшите размер команды.
 		    </div>
 		    {% endif %}
 		</section>
