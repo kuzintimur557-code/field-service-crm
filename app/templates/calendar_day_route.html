@@ -449,7 +449,7 @@ h1{margin:0;font-size:30px}
             <div>
                 <div class="auto-plan-title">Автозаполнение дня</div>
                 <div class="auto-plan-subtitle">
-                    Распределяет задачи без сотрудника и подбирает время задачам без окна.
+                    Назначает свободных сотрудников, подбирает время и заменяет недоступных или перегруженных исполнителей.
                 </div>
             </div>
             {% if day_auto_plan["items"] %}
@@ -467,6 +467,9 @@ h1{margin:0;font-size:30px}
         <div class="auto-plan-summary">
             <span>Нужно спланировать: {{ day_auto_plan["summary"]["eligible"] }}</span>
             <span>Готово к применению: {{ day_auto_plan["summary"]["planned"] }}</span>
+            {% if day_auto_plan["summary"]["reassignments"] %}
+            <span>Переназначений: {{ day_auto_plan["summary"]["reassignments"] }}</span>
+            {% endif %}
             {% if day_auto_plan["summary"]["unscheduled"] %}
             <span>Без решения: {{ day_auto_plan["summary"]["unscheduled"] }}</span>
             {% endif %}

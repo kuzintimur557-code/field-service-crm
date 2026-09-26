@@ -27742,6 +27742,7 @@ async def calendar_day_route_page(
         "summary": {
             "eligible": 0,
             "planned": 0,
+            "reassignments": 0,
             "unscheduled": 0,
             "limited": 0,
         },

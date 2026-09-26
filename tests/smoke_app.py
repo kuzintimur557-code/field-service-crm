@@ -21172,6 +21172,86 @@ async def assert_daily_route_schedule():
         "time_to": "11:30",
         "duration_minutes": 60,
     }
+    replacement_plan = crm.build_daily_auto_plan(
+        tasks=[
+            {
+                "id": 9001,
+                "client": "Unavailable worker task",
+                "task_date": route_date,
+                "worker": "worker_a",
+                "workers": "worker_a",
+                "time_from": "11:00",
+                "time_to": "12:00",
+                "priority": "Обычный",
+                "status": "Новая",
+            },
+            {
+                "id": 9002,
+                "client": "Existing worker task",
+                "task_date": route_date,
+                "worker": "worker_b",
+                "workers": "worker_b",
+                "time_from": "08:00",
+                "time_to": "09:00",
+                "priority": "Обычный",
+                "status": "Новая",
+            },
+        ],
+        worker_names=["worker_a", "worker_b"],
+        worker_capacities={"worker_a": 3, "worker_b": 3},
+        unavailable_worker_names={"worker_a"},
+        target_date=route_date,
+    )
+    assert replacement_plan["summary"] == {
+        "eligible": 1,
+        "planned": 1,
+        "reassignments": 1,
+        "unscheduled": 0,
+        "limited": 0,
+    }
+    replacement_item = replacement_plan["items"][0]
+    assert replacement_item["task_id"] == 9001
+    assert replacement_item["target_workers"] == ["worker_b"]
+    assert replacement_item["target_time_label"] == "11:00–12:00"
+    assert replacement_item["change_type"] == "reassignment"
+    assert replacement_item["change_label"] == "Переназначить исполнителя"
+    assert "Исполнитель недоступен: worker_a" in replacement_item["reason"]
+    assert "текущее время сохранено" in replacement_item["reason"]
+    overload_plan = crm.build_daily_auto_plan(
+        tasks=[
+            {
+                "id": 9011,
+                "client": "Keep urgent worker task",
+                "task_date": route_date,
+                "worker": "worker_a",
+                "workers": "worker_a",
+                "time_from": "09:00",
+                "time_to": "10:00",
+                "priority": "Срочно",
+                "status": "Новая",
+            },
+            {
+                "id": 9012,
+                "client": "Move normal worker task",
+                "task_date": route_date,
+                "worker": "worker_a",
+                "workers": "worker_a",
+                "time_from": "10:00",
+                "time_to": "11:00",
+                "priority": "Обычный",
+                "status": "Новая",
+            },
+        ],
+        worker_names=["worker_a", "worker_b"],
+        worker_capacities={"worker_a": 1, "worker_b": 3},
+        target_date=route_date,
+    )
+    assert overload_plan["summary"]["reassignments"] == 1
+    overload_item = overload_plan["items"][0]
+    assert overload_item["task_id"] == 9012
+    assert overload_item["target_workers"] == ["worker_b"]
+    assert overload_item["target_time_label"] == "10:00–11:00"
+    assert "Превышен дневной лимит: worker_a" in overload_item["reason"]
 
     anonymous_page = await crm.calendar_day_route_page(
         make_public_asgi_request("/calendar/day"),
@@ -21204,6 +21284,7 @@ async def assert_daily_route_schedule():
     assert "Рекомендуем:" in owner_html
     assert "Назначить" in owner_html
     assert "Автозаполнение дня" in owner_html
+    assert "заменяет недоступных или перегруженных исполнителей" in owner_html
     assert "Применить план (2)" in owner_html
     assert "Автоисправление пересечений" in owner_html
     assert "Исправить пересечения (1)" in owner_html
@@ -21269,6 +21350,7 @@ async def assert_daily_route_schedule():
     assert day_auto_plan["summary"] == {
         "eligible": 2,
         "planned": 2,
+        "reassignments": 0,
         "unscheduled": 0,
         "limited": 0,
     }
