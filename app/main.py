@@ -261,7 +261,7 @@ import mimetypes
 import ipaddress
 
 
-APP_VERSION = "0.2.2"
+APP_VERSION = "0.3.0"
 BACKUP_RETENTION_DAYS = 30
 BACKUP_RETENTION_KEEP = 3
 BACKUP_REQUIRED_TABLES = ("users", "tasks", "clients")
