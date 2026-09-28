@@ -98,6 +98,9 @@ h2{margin:0 0 16px;font-size:22px}
 
 <div class="card">
 <h1>Тарифы</h1>
+{% if request.query_params.get("subscription_closed") == "1" %}
+<div style="margin-bottom:14px;padding:14px;border-radius:16px;font-weight:900;background:#fee2e2;color:#991b1b">Подписка просрочена — изменения временно недоступны. Продлите подписку.</div>
+{% endif %}
 <div class="small">
 Подписка: <span class="badge">{{ subscription["label"] }}</span>
 {% if subscription["status"] == "trial" %}

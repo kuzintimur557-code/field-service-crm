@@ -243,6 +243,70 @@ def main():
             )
             assert response["ok"] and "summary" in response
 
+        # access middleware: closed subscription blocks mutations
+        from starlette.responses import JSONResponse as StarletteJSONResponse
+
+        async def call_next(request):
+            return StarletteJSONResponse({"ok": True})
+
+        def middleware_request(path, method="POST", username="boss"):
+            return StarletteRequest({
+                "type": "http",
+                "method": method,
+                "path": path,
+                "headers": [(
+                    b"cookie",
+                    f"{crm.SESSION_COOKIE_NAME}="
+                    f"{crm.sign_session_value(username)}".encode(),
+                )],
+                "query_string": b"",
+                "scheme": "http",
+                "client": ("127.0.0.1", 50000),
+                "server": ("testserver", 80),
+            })
+
+        # closed company: boss mutations redirect to billing
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        UPDATE company_settings
+        SET subscription_status='past_due'
+        WHERE company_id=1
+        """)
+        conn.commit()
+        conn.close()
+
+        response = asyncio.run(crm.subscription_access_middleware(
+            middleware_request("/task/1/status"), call_next
+        ))
+        assert response.status_code == 302
+        assert response.headers["location"].startswith("/billing")
+
+        # API mutation returns 403
+        response = asyncio.run(crm.subscription_access_middleware(
+            middleware_request("/api/tasks"), call_next
+        ))
+        assert response.status_code == 403
+
+        # GET pages stay readable
+        response = asyncio.run(crm.subscription_access_middleware(
+            middleware_request("/", method="GET"), call_next
+        ))
+        assert response.status_code == 200
+
+        # exempt paths pass through
+        response = asyncio.run(crm.subscription_access_middleware(
+            middleware_request("/logout"), call_next
+        ))
+        assert response.status_code == 200
+
+        # open subscription passes through
+        activate_company_subscription(1, days=30)
+        response = asyncio.run(crm.subscription_access_middleware(
+            middleware_request("/task/1/status"), call_next
+        ))
+        assert response.status_code == 200
+
     print("Subscription smoke passed.")
 
 

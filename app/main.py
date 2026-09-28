@@ -457,6 +457,54 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 
+SUBSCRIPTION_EXEMPT_PREFIXES = (
+    "/login",
+    "/logout",
+    "/billing",
+    "/static/",
+    "/health",
+    "/ready",
+    "/api/inbox/",
+    "/api/billing",
+    "/automation/cron/",
+)
+
+
+@app.middleware("http")
+async def subscription_access_middleware(request: Request, call_next):
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return await call_next(request)
+
+    path = request.url.path
+
+    if any(path.startswith(prefix) for prefix in SUBSCRIPTION_EXEMPT_PREFIXES):
+        return await call_next(request)
+
+    username = get_user(request)
+
+    if not username:
+        return await call_next(request)
+
+    role = get_role(username)
+
+    if role == "superadmin":
+        return await call_next(request)
+
+    company_id = get_user_company_id(username)
+    subscription = get_company_subscription(company_id)
+
+    if subscription["is_open"]:
+        return await call_next(request)
+
+    if path.startswith("/api/"):
+        return JSONResponse(
+            {"ok": False, "error": "subscription_closed"},
+            status_code=403,
+        )
+
+    return RedirectResponse("/billing?subscription_closed=1", status_code=302)
+
+
 def role_label(role):
     labels = {
         "superadmin": "Суперадмин",
