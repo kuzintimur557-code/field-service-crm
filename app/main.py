@@ -19148,6 +19148,7 @@ def build_dashboard_links():
         "archive": "/archive",
         "calls": "/calls",
         "calls_follow_up": "/calls?status=follow_up",
+        "inbox": "/inbox",
         "automation": "/automation",
         "ai_insights": "/ai/insights",
         "ai_assistant": "/ai/assistant",
@@ -42880,6 +42881,47 @@ async def run_database_backup_cron(request: Request):
     if not payload["ok"]:
         return JSONResponse(payload, status_code=503)
     return payload
+
+
+@app.get("/inbox", response_class=HTMLResponse)
+async def inbox_page(request: Request, status: str = ""):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "inbox")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+
+    if status not in ("", "new"):
+        status = ""
+
+    messages = get_email_messages(company_id, status=status, limit=100)
+
+    return templates.TemplateResponse(
+        request,
+        "inbox.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "links": build_dashboard_links(),
+            "messages": messages,
+            "selected_status": status,
+        }
+    )
 
 
 @app.post("/api/inbox/email")

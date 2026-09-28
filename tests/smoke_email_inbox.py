@@ -18,6 +18,7 @@ class FakeInboxRequest:
         self._payload = payload
         self._broken_json = broken_json
         self.headers = {}
+        self.cookies = {}
         if token:
             self.headers["x-inbox-secret"] = token
 
@@ -153,6 +154,28 @@ def main():
         result = save_email_message(normalize_inbox_payload(valid_payload()))
         assert not result["created"]
         assert result["message"]["id"] == message_id
+
+        # inbox page: unauthenticated -> redirect to login
+        anon_request = FakeInboxRequest({}, token="")
+        anon_request.scope_path = "/inbox"
+        page_response = asyncio.run(crm.inbox_page(anon_request))
+        assert page_response.status_code == 302
+
+        # inbox template renders with real messages
+        from types import SimpleNamespace
+
+        template = crm.templates.get_template("inbox.html")
+        html = template.render(
+            request=SimpleNamespace(url=SimpleNamespace(path="/inbox")),
+            username="boss",
+            role="boss",
+            settings={"task_label": "Заявка", "client_label": "Клиент"},
+            links=crm.build_dashboard_links(),
+            messages=messages,
+            selected_status="",
+        )
+        assert "Нужен ремонт стиральной машины" in html
+        assert "client@example.com" in html
 
         # missing secret configuration -> 503
         with patch.dict(os.environ, {"INBOX_WEBHOOK_SECRET": ""}, clear=False):

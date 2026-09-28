@@ -86,6 +86,9 @@ h1{margin:0 0 8px;font-size:32px}
 {% if f.get("calls", True) %}
 <a href="{{ links['calls'] }}">Звонки</a>
 {% endif %}
+{% if f.get("inbox", True) %}
+<a href="{{ links['inbox'] }}">Почта</a>
+{% endif %}
 {% if f.get("automation", True) %}
 <a href="{{ links['automation'] }}">Автоматизация</a>
 {% endif %}

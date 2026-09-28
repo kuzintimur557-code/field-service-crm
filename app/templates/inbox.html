@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Почта{% endblock %}
+
+{% block head %}
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:760px;width:100%;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:22px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:16px}
+h1{margin:0 0 6px;font-size:30px}
+.meta{font-size:15px;color:#6b7280;font-weight:800}
+.filters{display:flex;gap:10px;margin:16px 0 20px}
+.filters a{display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;border-radius:14px;background:white;border:1px solid #e5e7eb;color:#374151;text-decoration:none;font-weight:900}
+.filters a.active{background:#2563eb;border-color:#2563eb;color:white}
+.msg-subject{font-size:18px;font-weight:900;margin-bottom:6px;word-break:break-word}
+.msg-from{font-size:14px;color:#374151;font-weight:800;margin-bottom:6px;word-break:break-word}
+.msg-date{font-size:13px;color:#9ca3af;font-weight:700}
+.msg-text{margin-top:10px;font-size:15px;color:#4b5563;white-space:pre-wrap;word-break:break-word}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:900;background:#dbeafe;color:#1d4ed8}
+.empty{padding:36px 22px;text-align:center;color:#6b7280;font-weight:800}
+@media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:26px}.card{padding:16px;border-radius:18px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+<a href="/" class="back">← Назад</a>
+
+<div class="card">
+<h1>Почта</h1>
+<div class="meta">Письма от клиентов. Из письма можно будет создать заявку.</div>
+</div>
+
+<div class="filters">
+<a href="/inbox"{% if selected_status == "" %} class="active"{% endif %}>Все</a>
+<a href="/inbox?status=new"{% if selected_status == "new" %} class="active"{% endif %}>Новые</a>
+</div>
+
+{% if messages %}
+{% for message in messages %}
+<div class="card">
+<div class="msg-subject">{{ message["subject"] or "(без темы)" }}</div>
+<div class="msg-from">
+{{ message["from_name"] or message["from_email"] or "Неизвестный отправитель" }}
+{% if message["from_name"] and message["from_email"] %} · {{ message["from_email"] }}{% endif %}
+</div>
+<div class="msg-date">{{ message["received_at"] or message["created_at"] }} {% if message["status"] == "new" %}· <span class="badge">Новое</span>{% endif %}</div>
+{% if message["body_text"] %}
+<div class="msg-text">{{ message["body_text"][:300] }}{% if message["body_text"]|length > 300 %}…{% endif %}</div>
+{% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="card empty">Писем пока нет. Настройте пересылку почты на адрес приёма заявок.</div>
+{% endif %}
+
+</div>
+{% endblock %}
