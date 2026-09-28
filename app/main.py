@@ -197,6 +197,10 @@ from app.services.background_jobs import (
     process_background_jobs,
 )
 from app.services.call_analysis import analyze_call_text
+from app.services.subscriptions import (
+    activate_company_subscription,
+    get_company_subscription,
+)
 from app.services.email_inbox import (
     EMAIL_STATUSES,
     MAX_RAW_LENGTH,
@@ -35308,6 +35312,7 @@ async def billing_page(request: Request):
         plan_key: get_plan_price_label(plan_key)
         for plan_key in PLAN_DEFINITIONS
     }
+    subscription = get_company_subscription(company_id)
 
     return templates.TemplateResponse(
         request,
@@ -35324,6 +35329,7 @@ async def billing_page(request: Request):
             "recommended_plan": recommended_plan,
             "plan_names": plan_names,
             "plan_prices": plan_prices,
+            "subscription": subscription,
             "plan_history": plan_history,
             "billing_invoice_summary": billing_invoice_summary,
             "billing_risk_summary": billing_risk_summary,

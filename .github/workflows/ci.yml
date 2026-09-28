@@ -95,6 +95,9 @@ jobs:
       - name: Run call analysis smoke
         run: python tests/smoke_call_analysis.py
 
+      - name: Run subscription smoke
+        run: python tests/smoke_subscriptions.py
+
       - name: Run error monitoring smoke
         run: python tests/smoke_error_monitoring.py
 

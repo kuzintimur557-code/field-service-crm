@@ -99,6 +99,24 @@ h2{margin:0 0 16px;font-size:22px}
 <div class="card">
 <h1>Тарифы</h1>
 <div class="small">
+Подписка: <span class="badge">{{ subscription["label"] }}</span>
+{% if subscription["status"] == "trial" %}
+{% if subscription["trial_ends_at"] %}
+<br>Пробный период до {{ subscription["trial_ends_at"] }}
+{% if subscription["days_left"] is not none %}
+· осталось дней: {{ subscription["days_left"] }}
+{% endif %}
+{% endif %}
+{% elif subscription["status"] == "active" %}
+{% if subscription["subscription_ends_at"] %}
+<br>Оплачена до {{ subscription["subscription_ends_at"] }}
+{% endif %}
+{% elif subscription["status"] == "past_due" %}
+<br><span style="color:#991b1b;font-weight:900">Оплата просрочена. Продлите подписку, чтобы сохранить доступ.</span>
+{% elif subscription["status"] == "canceled" %}
+<br><span style="color:#991b1b;font-weight:900">Подписка отменена.</span>
+{% endif %}
+<br>
 Текущий тариф: <span class="badge">{{ plan_names.get(plan, plan) }}</span><br>
 Лимит пользователей:
 {% if user_limit %}
