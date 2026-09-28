@@ -205,6 +205,7 @@ from app.services.email_inbox import (
     parse_extracted_fields,
     save_email_message,
     set_email_message_status,
+    suggest_inbox_slots,
 )
 from app.services.error_monitoring import (
     acknowledge_error_incident,
@@ -42959,6 +42960,13 @@ async def inbox_detail_page(request: Request, message_id: int):
     message["extracted"] = parse_extracted_fields(message.get("extracted_json"))
     settings = get_company_settings(company_id)
 
+    slot_suggestions = []
+    if message["status"] == "new":
+        slot_suggestions = suggest_inbox_slots(
+            company_id,
+            start_date=message["extracted"].get("date", ""),
+        )
+
     return templates.TemplateResponse(
         request,
         "inbox_detail.html",
@@ -42969,6 +42977,7 @@ async def inbox_detail_page(request: Request, message_id: int):
             "settings": settings,
             "links": build_dashboard_links(),
             "message": message,
+            "slot_suggestions": slot_suggestions,
             "error": request.query_params.get("error", ""),
         }
     )

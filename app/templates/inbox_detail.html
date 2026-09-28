@@ -20,6 +20,8 @@ button,.btn{display:inline-flex;align-items:center;justify-content:center;width:
 .btn-gray{background:#f3f4f6;color:#991b1b;border:1px solid #e5e7eb}
 .notice{margin-bottom:16px;padding:14px;border-radius:16px;font-weight:900;background:#fee2e2;color:#991b1b}
 .done{padding:16px;border-radius:16px;font-weight:900;background:#dcfce7;color:#166534}
+.slots{margin-top:10px}
+.slot{display:inline-flex;width:auto;min-height:44px;margin:6px 8px 0 0;padding:10px 14px;background:#f0f9ff;color:#075985;border:1px solid #bae6fd;font-size:14px}
 @media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:22px}.card{padding:16px;border-radius:18px}}
 </style>
 {% endblock %}
@@ -76,7 +78,16 @@ button,.btn{display:inline-flex;align-items:center;justify-content:center;width:
 <input type="text" name="address" value="{{ ex.get('address', '') }}">
 
 <label>Дата</label>
-<input type="date" name="task_date" value="{{ ex.get('date', '') }}">
+<input type="date" name="task_date" id="task_date_input" value="{{ ex.get('date', '') }}">
+
+{% if slot_suggestions %}
+<div class="slots">
+<div class="meta" style="margin-bottom:8px">Свободные окна:</div>
+{% for slot in slot_suggestions %}
+<button type="button" class="slot" onclick="document.getElementById('task_date_input').value='{{ slot['date'] }}'">{{ slot["date"] }} · {{ slot["worker"] }} · свободно: {{ slot["free_slots"] }}</button>
+{% endfor %}
+</div>
+{% endif %}
 
 <label>Описание</label>
 <textarea name="description">{{ (message["subject"] or "") }}{% if message["body_text"] %}

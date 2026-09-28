@@ -69,6 +69,7 @@ def main():
             normalize_inbox_payload,
             parse_extracted_fields,
             save_email_message,
+            suggest_inbox_slots,
         )
 
         def call(payload, token=INBOX_SECRET, broken_json=False):
@@ -230,6 +231,7 @@ def main():
         ))
         assert detail.status_code == 200
         assert "Нужен ремонт стиральной машины" in detail.body.decode()
+        assert "Свободные окна" in detail.body.decode()
 
         # worker cannot open inbox detail
         forbidden = asyncio.run(crm.inbox_detail_page(
@@ -334,6 +336,28 @@ def main():
         ).fetchone()
         conn.close()
         assert rejected_message["status"] == "rejected"
+
+        # free slot suggestions respect worker capacity
+        slots = suggest_inbox_slots(1, "2026-09-28")
+        assert slots
+        assert slots[0]["date"] == "2026-09-28"
+        assert slots[0]["worker"] == "worker"
+        assert slots[0]["free_slots"] == 3
+
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        INSERT INTO tasks (company_id, worker, task_date, status)
+        VALUES (1, 'worker', '2026-10-02', 'Новая')
+        """)
+        conn.commit()
+        conn.close()
+
+        slots = suggest_inbox_slots(1, "2026-10-02")
+        assert slots[0]["date"] == "2026-10-02"
+        assert slots[0]["free_slots"] == 2
+
+        assert suggest_inbox_slots(999999, "2026-10-02") == []
 
         # inbox page: unauthenticated -> redirect to login
         anon_request = FakeInboxRequest({}, token="")

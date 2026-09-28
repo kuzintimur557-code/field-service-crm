@@ -176,6 +176,106 @@ def get_email_message(company_id, message_id):
         conn.close()
 
 
+def suggest_inbox_slots(company_id, start_date="", days=7, limit=3):
+    try:
+        start = (
+            datetime.strptime(start_date, "%Y-%m-%d")
+            if start_date else datetime.now()
+        )
+    except ValueError:
+        start = datetime.now()
+
+    conn = connect()
+
+    try:
+        c = conn.cursor()
+        workers = c.execute("""
+        SELECT id, username, COALESCE(daily_capacity, 5) AS daily_capacity
+        FROM users
+        WHERE company_id=? AND role='worker' AND COALESCE(is_active, 1)=1
+        ORDER BY username
+        """, (company_id,)).fetchall()
+
+        if not workers:
+            return []
+
+        start_text = start.strftime("%Y-%m-%d")
+        end_text = (start + timedelta(days=days - 1)).strftime("%Y-%m-%d")
+
+        busy = {}
+        rows = c.execute("""
+        SELECT substr(task_date, 1, 10) AS day, worker, workers
+        FROM tasks
+        WHERE archived=0 AND company_id=?
+          AND substr(task_date, 1, 10) >= ?
+          AND substr(task_date, 1, 10) <= ?
+          AND status NOT IN ('Завершено', 'Отменено')
+        """, (company_id, start_text, end_text)).fetchall()
+
+        worker_names = {worker["username"] for worker in workers}
+        for row in rows:
+            for field in ("worker", "workers"):
+                for name in str(row[field] or "").split(","):
+                    name = name.strip()
+                    if name in worker_names:
+                        key = (name, row["day"])
+                        busy[key] = busy.get(key, 0) + 1
+
+        unavail_by_worker = {}
+        unavail_rows = c.execute("""
+        SELECT worker_id, date_from, date_to
+        FROM worker_unavailability
+        WHERE company_id=? AND date_to >= ? AND date_from <= ?
+        """, (company_id, start_text, end_text)).fetchall()
+
+        worker_id_to_name = {worker["id"]: worker["username"] for worker in workers}
+        for row in unavail_rows:
+            name = worker_id_to_name.get(row["worker_id"])
+            if name:
+                unavail_by_worker.setdefault(name, []).append(
+                    (row["date_from"], row["date_to"])
+                )
+
+        suggestions = []
+        for offset in range(days):
+            day = (start + timedelta(days=offset)).strftime("%Y-%m-%d")
+            best = None
+
+            for worker in workers:
+                name = worker["username"]
+                capacity = max(int(worker["daily_capacity"] or 1), 1)
+
+                if any(
+                    date_from <= day <= date_to
+                    for date_from, date_to in unavail_by_worker.get(name, [])
+                ):
+                    continue
+
+                busy_count = busy.get((name, day), 0)
+                free_slots = capacity - busy_count
+
+                if free_slots <= 0:
+                    continue
+
+                load = busy_count / capacity
+                if best is None or load < best[2]:
+                    best = (name, free_slots, load)
+
+            if best:
+                suggestions.append({
+                    "date": day,
+                    "worker": best[0],
+                    "free_slots": best[1],
+                })
+
+            if len(suggestions) >= limit:
+                break
+
+        return suggestions
+    finally:
+        conn.close()
+
+
 def find_or_create_inbox_client(company_id, name, phone, email, address):
     conn = connect()
 
