@@ -19227,7 +19227,7 @@ async def home(
             search_pattern,
         ])
 
-    query += " ORDER BY id DESC"
+    query += " ORDER BY id DESC LIMIT 500"
 
     tasks = c.execute(query, params).fetchall()
 
@@ -37526,6 +37526,8 @@ def get_clients_with_metrics(
         clients = sorted(clients, key=lambda client: client["active_task_count"] or 0, reverse=True)
     elif selected_client_sort == "overdue":
         clients = sorted(clients, key=lambda client: client["overdue_task_count"] or 0, reverse=True)
+
+    clients = clients[:1000]
 
     return {
         "clients": clients,
