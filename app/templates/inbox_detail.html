@@ -15,6 +15,7 @@ h2{margin:0 0 12px;font-size:20px}
 .letter{margin-top:12px;font-size:15px;color:#374151;white-space:pre-wrap;word-break:break-word}
 label{display:block;margin-top:14px;font-weight:900;color:#374151}
 input,textarea{width:100%;min-height:44px;padding:12px;border-radius:14px;font-size:16px;margin-top:6px;border:1px solid #d1d5db;background:white;font-family:inherit}
+select{width:100%;min-height:48px;padding:12px;border-radius:14px;font-size:16px;margin-top:6px;border:1px solid #d1d5db;background:white;font-family:inherit}
 textarea{min-height:120px;resize:vertical}
 button,.btn{display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:48px;padding:14px;border-radius:14px;font-size:16px;margin-top:14px;border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;text-decoration:none}
 .btn-gray{background:#f3f4f6;color:#991b1b;border:1px solid #e5e7eb}
@@ -84,9 +85,19 @@ button,.btn{display:inline-flex;align-items:center;justify-content:center;width:
 <div class="slots">
 <div class="meta" style="margin-bottom:8px">Свободные окна:</div>
 {% for slot in slot_suggestions %}
-<button type="button" class="slot" onclick="document.getElementById('task_date_input').value='{{ slot['date'] }}'">{{ slot["date"] }} · {{ slot["worker"] }} · свободно: {{ slot["free_slots"] }}</button>
+<button type="button" class="slot" onclick="document.getElementById('task_date_input').value='{{ slot['date'] }}';var s=document.getElementById('worker_select');if(s){s.value='{{ slot['worker'] }}'}">{{ slot["date"] }} · {{ slot["worker"] }} · свободно: {{ slot["free_slots"] }}</button>
 {% endfor %}
 </div>
+{% endif %}
+
+{% if workers %}
+<label>{{ settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" }}</label>
+<select name="worker" id="worker_select">
+<option value="">— Не назначать —</option>
+{% for worker in workers %}
+<option value="{{ worker['username'] }}"{% if worker['username'] == recommended_worker %} selected{% endif %}>{{ worker["username"] }}{% if worker['username'] == recommended_worker %} — рекомендуем{% endif %}</option>
+{% endfor %}
+</select>
 {% endif %}
 
 <label>Описание</label>

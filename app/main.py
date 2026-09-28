@@ -42963,11 +42963,27 @@ async def inbox_detail_page(request: Request, message_id: int):
     settings = get_company_settings(company_id)
 
     slot_suggestions = []
+    workers = []
+    recommended_worker = ""
+
     if message["status"] == "new":
         slot_suggestions = suggest_inbox_slots(
             company_id,
             start_date=message["extracted"].get("date", ""),
         )
+
+        conn = connect()
+        c = conn.cursor()
+        workers = c.execute("""
+        SELECT username
+        FROM users
+        WHERE company_id=? AND role='worker' AND COALESCE(is_active, 1)=1
+        ORDER BY username
+        """, (company_id,)).fetchall()
+        conn.close()
+
+        if slot_suggestions:
+            recommended_worker = slot_suggestions[0]["worker"]
 
     return templates.TemplateResponse(
         request,
@@ -42980,6 +42996,8 @@ async def inbox_detail_page(request: Request, message_id: int):
             "links": build_dashboard_links(),
             "message": message,
             "slot_suggestions": slot_suggestions,
+            "workers": workers,
+            "recommended_worker": recommended_worker,
             "error": request.query_params.get("error", ""),
         }
     )
@@ -43021,6 +43039,21 @@ async def inbox_confirm(request: Request, message_id: int):
     task_date = (form.get("task_date") or "").strip()[:10]
     description = (form.get("description") or "").strip()[:5000]
     price = (form.get("price") or "").strip()[:40]
+    selected_worker = (form.get("worker") or "").strip()[:120]
+
+    if selected_worker:
+        conn = connect()
+        c = conn.cursor()
+        worker_user = c.execute("""
+        SELECT username
+        FROM users
+        WHERE company_id=? AND role='worker'
+          AND COALESCE(is_active, 1)=1 AND username=?
+        """, (company_id, selected_worker)).fetchone()
+        conn.close()
+
+        if not worker_user:
+            selected_worker = ""
 
     if not client_name:
         return RedirectResponse(
@@ -43054,12 +43087,14 @@ async def inbox_confirm(request: Request, message_id: int):
             address,
             description,
             task_date,
+            worker,
+            workers,
             priority,
             price,
             status,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             company_id,
             client_id,
@@ -43068,6 +43103,8 @@ async def inbox_confirm(request: Request, message_id: int):
             address,
             description,
             task_date,
+            selected_worker,
+            selected_worker,
             "Обычный",
             price,
             "Новая",
@@ -43081,6 +43118,18 @@ async def inbox_confirm(request: Request, message_id: int):
         raise
     finally:
         conn.close()
+
+    if selected_worker:
+        create_notification(
+            company_id,
+            selected_worker,
+            f"Назначена новая заявка #{task_id}",
+            (
+                f"Клиент: {client_name}. "
+                f"Дата: {task_date or 'не указана'}."
+            ),
+            f"/task/{task_id}",
+        )
 
     set_email_message_status(
         company_id,

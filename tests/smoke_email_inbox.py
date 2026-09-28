@@ -379,6 +379,55 @@ def main():
             1, "Тест Клиент", "+79001112233", "", ""
         ) == client_id
 
+        # worker assignment on confirm
+        assigned = call(valid_payload(message_id="<msg-004@test>"))
+        assign_id = assigned["id"]
+        assigned_response = asyncio.run(crm.inbox_confirm(
+            authed_request(f"/inbox/{assign_id}/confirm", form={
+                "client_name": "Тест Клиент",
+                "phone": "+79001112233",
+                "worker": "worker",
+            }),
+            assign_id,
+        ))
+        assert assigned_response.status_code == 302
+        assigned_task_id = int(
+            assigned_response.headers["location"].rsplit("/", 1)[1]
+        )
+        conn = connect()
+        c = conn.cursor()
+        assigned_task = c.execute(
+            "SELECT worker, workers FROM tasks WHERE id=?", (assigned_task_id,)
+        ).fetchone()
+        worker_notification = c.execute("""
+        SELECT * FROM notifications
+        WHERE company_id=1 AND username='worker' AND link=?
+        """, (f"/task/{assigned_task_id}",)).fetchone()
+        conn.close()
+        assert assigned_task["worker"] == "worker"
+        assert assigned_task["workers"] == "worker"
+        assert worker_notification is not None
+
+        # non-worker usernames are ignored
+        unknown = call(valid_payload(message_id="<msg-005@test>"))
+        unknown_response = asyncio.run(crm.inbox_confirm(
+            authed_request(f"/inbox/{unknown['id']}/confirm", form={
+                "client_name": "Тест Клиент",
+                "worker": "boss",
+            }),
+            unknown["id"],
+        ))
+        unknown_task_id = int(
+            unknown_response.headers["location"].rsplit("/", 1)[1]
+        )
+        conn = connect()
+        c = conn.cursor()
+        unknown_task = c.execute(
+            "SELECT worker FROM tasks WHERE id=?", (unknown_task_id,)
+        ).fetchone()
+        conn.close()
+        assert unknown_task["worker"] == ""
+
         # reject flow
         rejected = call(valid_payload(message_id="<msg-003@test>"))
         reject_id = rejected["id"]
