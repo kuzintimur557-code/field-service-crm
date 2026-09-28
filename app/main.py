@@ -37740,7 +37740,14 @@ async def client_detail(
     WHERE client_id=? AND company_id=?
     ORDER BY id DESC
     """, (client_id, company_id)).fetchall()
-    selected_task_filter = task_filter if task_filter in ("active", "completed", "overdue") else ""
+    selected_task_filter = task_filter if task_filter in (
+        "active",
+        "completed",
+        "overdue",
+        "sla_overdue",
+        "sla_soon",
+        "unassigned",
+    ) else ""
     selected_task_search = str(task_search or "").strip()[:100]
     selected_task_sort = task_sort if task_sort in ("oldest", "date_asc", "date_desc") else "newest"
     selected_activity_filter = activity_filter if activity_filter in ("status", "date", "comment") else ""
@@ -37856,12 +37863,28 @@ async def client_detail(
         task_status = task["status"] or ""
         is_archived = "archived" in task.keys() and task["archived"] == 1
         task_date = str(task["task_date"] or "")[:10]
-        is_overdue = (
+        deadline_at = str(task["deadline_at"] or "") if "deadline_at" in task.keys() else ""
+        task_workers = client_task_workers.get(task["id"], "Не назначены")
+        is_open_task = (
             not is_archived
-            and task_date
-            and task_date < today
             and task_status not in ("Завершено", "Отменено")
         )
+        is_overdue = (
+            is_open_task
+            and task_date
+            and task_date < today
+        )
+        is_sla_overdue = (
+            is_open_task
+            and deadline_at
+            and deadline_at < client_now_value
+        )
+        is_sla_due_soon = (
+            is_open_task
+            and deadline_at
+            and client_now_value <= deadline_at <= client_sla_soon_value
+        )
+        is_unassigned = is_open_task and task_workers == "Не назначены"
 
         if selected_task_filter == "active" and (is_archived or task_status not in ("Новая", "В работе")):
             continue
@@ -37870,6 +37893,15 @@ async def client_detail(
             continue
 
         if selected_task_filter == "overdue" and not is_overdue:
+            continue
+
+        if selected_task_filter == "sla_overdue" and not is_sla_overdue:
+            continue
+
+        if selected_task_filter == "sla_soon" and not is_sla_due_soon:
+            continue
+
+        if selected_task_filter == "unassigned" and not is_unassigned:
             continue
 
         if search_value:
@@ -38065,14 +38097,14 @@ async def client_detail(
         client_health_score -= min(35, client_sla_overdue_tasks * 20)
         client_health_reasons.append({
             "label": f"SLA просрочен: {client_sla_overdue_tasks}",
-            "link": f"/clients/{client_id}?task_sort=date_asc",
+            "link": f"/clients/{client_id}?task_filter=sla_overdue&task_sort=date_asc",
         })
 
     if client_sla_due_soon_tasks:
         client_health_score -= min(15, client_sla_due_soon_tasks * 7)
         client_health_reasons.append({
             "label": f"SLA в ближайшие 24 часа: {client_sla_due_soon_tasks}",
-            "link": f"/clients/{client_id}?task_sort=date_asc",
+            "link": f"/clients/{client_id}?task_filter=sla_soon&task_sort=date_asc",
         })
 
     if client_call_stats["follow_up"]:
@@ -38093,7 +38125,7 @@ async def client_detail(
         client_health_score -= min(15, client_unassigned_tasks * 5)
         client_health_reasons.append({
             "label": f"Без исполнителя: {client_unassigned_tasks}",
-            "link": f"/clients/{client_id}?task_filter=active",
+            "link": f"/clients/{client_id}?task_filter=unassigned",
         })
 
     if last_contact_age_days is None:

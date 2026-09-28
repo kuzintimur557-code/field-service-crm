@@ -25760,6 +25760,11 @@ async def assert_client_card(task):
     assert "SLA просрочен: 0 / SLA 24 часа: 1" in html
     assert "SLA в ближайшие 24 часа: 1" in html
     assert "Нужен контакт по звонкам: 1" in html
+    assert "task_filter=sla_overdue" in html
+    assert "task_filter=sla_soon" in html
+    assert "task_filter=unassigned" in html
+    assert "SLA 24 часа" in html
+    assert f'href="/clients/{task["client_id"]}?task_filter=sla_soon&amp;task_sort=date_asc"' in html
     assert f'href="/clients/{task["client_id"]}?call_filter=follow_up#calls"' in html
     assert "Заявка #" in html
     assert "Smoke latest client note" in html
@@ -25931,6 +25936,22 @@ async def assert_client_card(task):
     assert "Звонков: 1 из" in call_content_html
     assert 'class="active">С анализом</a>' in call_content_html
     assert "call_filter=follow_up&call_content=analysis#calls" in call_content_html
+
+    sla_soon_response = await crm.client_detail(
+        make_asgi_request(
+            "owner2",
+            f"/clients/{task['client_id']}",
+            "task_filter=sla_soon",
+        ),
+        task["client_id"],
+        task_filter="sla_soon",
+    )
+    assert sla_soon_response.status_code == 200
+    sla_soon_html = sla_soon_response.body.decode("utf-8")
+    assert 'class="active">SLA 24 часа</a>' in sla_soon_html
+    assert f"#{task['id']}" in sla_soon_html
+    assert "SLA:" in sla_soon_html
+    assert "По выбранным условиям ничего не найдено: Заявка" not in sla_soon_html
 
     conn = connect()
     c = conn.cursor()

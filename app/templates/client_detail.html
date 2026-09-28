@@ -688,6 +688,9 @@ h1{font-size:28px}
     <a href="/clients/{{ client['id'] }}?task_filter=active&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'active' %}active{% endif %}">Активные</a>
     <a href="/clients/{{ client['id'] }}?task_filter=completed&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'completed' %}active{% endif %}">Завершённые</a>
     <a href="/clients/{{ client['id'] }}?task_filter=overdue&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'overdue' %}active{% endif %}">Просроченные</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=sla_overdue&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'sla_overdue' %}active{% endif %}">SLA просрочен</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=sla_soon&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'sla_soon' %}active{% endif %}">SLA 24 часа</a>
+    <a href="/clients/{{ client['id'] }}?task_filter=unassigned&task_sort={{ selected_task_sort }}{% if selected_task_search %}&task_search={{ selected_task_search }}{% endif %}" class="{% if selected_task_filter == 'unassigned' %}active{% endif %}">Без исполнителя</a>
 </div>
 
 <div class="task-count">Показано: {{ shown_task_count }} из {{ client_total_tasks }}</div>
