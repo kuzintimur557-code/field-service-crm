@@ -1,12 +1,8 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Профиль</title>
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<link rel="stylesheet" href="/static/app.css">
+{% extends "base.html" %}
 
+{% block title %}Профиль{% endblock %}
+
+{% block head %}
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
@@ -25,9 +21,9 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .err{background:#fee2e2;color:#991b1b}
 @media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:28px}.card{padding:20px;border-radius:18px}}
 </style>
-</head>
+{% endblock %}
 
-<body>
+{% block content %}
 <div class="container">
 
 <a href="/" class="back">← Назад</a>
@@ -69,6 +65,4 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 </div>
 
 </div>
-{% include 'mobile_nav.html' %}
-</body>
-</html>
+{% endblock %}
