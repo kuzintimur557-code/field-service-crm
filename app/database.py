@@ -139,6 +139,8 @@ def connect():
 
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=10000")
     return conn
 
 
@@ -1555,6 +1557,66 @@ def init_db():
     c.execute("""
     CREATE UNIQUE INDEX IF NOT EXISTS idx_payroll_payouts_company_worker_month
     ON payroll_payouts(company_id, worker_id, month)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_tasks_company_status
+    ON tasks(company_id, archived, status)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_tasks_company_date
+    ON tasks(company_id, task_date)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_tasks_client
+    ON tasks(client_id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_tasks_photo
+    ON tasks(photo)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_tasks_after_photo
+    ON tasks(after_photo)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_task_items_task
+    ON task_items(task_id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_task_expenses_task
+    ON task_expenses(task_id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_task_activity_task
+    ON task_activity(task_id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_client_notes_client
+    ON client_notes(client_id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_client_files_client
+    ON client_files(client_id)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_notifications_company_user_read
+    ON notifications(company_id, username, is_read)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_clients_company
+    ON clients(company_id)
     """)
 
     c.execute("""
