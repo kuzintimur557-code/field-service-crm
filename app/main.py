@@ -6035,12 +6035,24 @@ def update_last_seen(username):
     conn = connect()
     c = conn.cursor()
 
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    row = c.execute("""
+    SELECT last_seen
+    FROM users
+    WHERE username=?
+    """, (username,)).fetchone()
+
+    if row and row["last_seen"] == now:
+        conn.close()
+        return
+
     c.execute("""
     UPDATE users
     SET last_seen=?
     WHERE username=?
     """, (
-        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        now,
         username
     ))
 
