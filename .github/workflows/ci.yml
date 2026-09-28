@@ -98,6 +98,9 @@ jobs:
       - name: Run subscription smoke
         run: python tests/smoke_subscriptions.py
 
+      - name: Run master mode smoke
+        run: python tests/smoke_master_mode.py
+
       - name: Run error monitoring smoke
         run: python tests/smoke_error_monitoring.py
 

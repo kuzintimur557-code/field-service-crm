@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Сегодня{% endblock %}
+
+{% block head %}
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:760px;width:100%;margin:auto;padding:28px}
+h1{margin:0 0 4px;font-size:30px}
+.meta{font-size:14px;color:#6b7280;font-weight:800}
+.card{background:white;padding:20px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:16px}
+.stats{display:flex;gap:12px}
+.stat{flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:14px}
+.stat b{display:block;font-size:22px}
+.stat span{font-size:13px;color:#6b7280;font-weight:800}
+.task{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid #f3f4f6;align-items:flex-start}
+.task:last-child{border-bottom:0}
+.task-time{min-width:64px;font-weight:900;font-size:15px}
+.task-body{flex:1}
+.task-client{font-weight:900;font-size:16px}
+.task-status{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:900;background:#dbeafe;color:#1d4ed8}
+.task-status-done{background:#dcfce7;color:#166534}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.action{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:96px;border-radius:18px;background:#2563eb;color:#fff;text-decoration:none;font-weight:900;font-size:17px;gap:6px}
+.action .ico{font-size:28px}
+.action.alt{background:#111827}
+.action.money{background:#065f46}
+.action.voice{background:#7c3aed}
+.empty{padding:24px;text-align:center;color:#6b7280;font-weight:800}
+@media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:26px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+<div class="card">
+<h1>Сегодня</h1>
+<div class="meta">{{ today }} · {{ username }}</div>
+</div>
+
+<div class="card stats">
+<div class="stat"><b>{{ tasks_today|length }}</b><span>записей сегодня</span></div>
+<div class="stat"><b>{{ "%.0f"|format(revenue_today) }} ₽</b><span>выручка сегодня</span></div>
+<div class="stat"><b>{{ "%.0f"|format(revenue_month) }} ₽</b><span>выручка за месяц</span></div>
+</div>
+
+<div class="card">
+{% if tasks_today %}
+{% for task in tasks_today %}
+<div class="task">
+<div class="task-time">{{ task["time_from"] or "—" }}</div>
+<div class="task-body">
+<div class="task-client">{{ task["client"] or "Без клиента" }}</div>
+<div class="meta">{{ task["address"] or task["description"] or "" }}</div>
+<span class="task-status{% if task["status"] == "Завершено" %} task-status-done{% endif %}">{{ task["status"] or "Новая" }}</span>
+</div>
+<a href="/task/{{ task['id'] }}" style="color:#2563eb;font-weight:900;text-decoration:none">→</a>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">На сегодня записей нет.</div>
+{% endif %}
+</div>
+
+<div class="actions">
+<a class="action" href="/create-task"><span class="ico">➕</span>Новая запись</a>
+<a class="action voice" href="/master/voice"><span class="ico">🎙</span>Голос</a>
+<a class="action alt" href="/clients"><span class="ico">👤</span>Клиенты</a>
+<a class="action money" href="/finance"><span class="ico">💰</span>Деньги</a>
+</div>
+
+</div>
+{% endblock %}

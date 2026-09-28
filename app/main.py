@@ -2842,6 +2842,12 @@ def ensure_company_features(company_id):
     conn.close()
 
 
+def get_company_mode(settings):
+    keys = settings.keys() if settings and hasattr(settings, "keys") else []
+    mode = str(settings["mode"] or "company") if "mode" in keys else "company"
+    return mode if mode in ("company", "master") else "company"
+
+
 def get_company_features(company_id):
     company_id = require_company_id_value(company_id)
     ensure_company_features(company_id)
@@ -36924,6 +36930,10 @@ async def update_settings(request: Request):
     worker_label = (form.get("worker_label") or "Исполнитель").strip()
     client_label = (form.get("client_label") or "Клиент").strip()
     service_label = (form.get("service_label") or "Услуга").strip()
+    mode = (form.get("mode") or "company").strip()
+
+    if mode not in ("company", "master"):
+        mode = "company"
 
     allowed_industries = [industry_key for industry_key, _ in INDUSTRY_OPTIONS]
 
@@ -37004,7 +37014,7 @@ async def update_settings(request: Request):
     UPDATE company_settings
     SET company_name=?, phone=?, email=?, address=?, tax_number=?, bank_details=?,
         plan=?, industry=?, task_label=?, worker_label=?, client_label=?, service_label=?,
-        one_c_enabled=?, calls_enabled=?, ai_calls_enabled=?, updated_at=?
+        one_c_enabled=?, calls_enabled=?, ai_calls_enabled=?, mode=?, updated_at=?
     WHERE company_id=?
     """, (
         company_name,
@@ -37022,6 +37032,7 @@ async def update_settings(request: Request):
         one_c_enabled,
         calls_enabled,
         ai_calls_enabled,
+        mode,
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         company_id
     ))
@@ -43015,6 +43026,107 @@ async def run_database_backup_cron(request: Request):
     return payload
 
 
+@app.get("/master", response_class=HTMLResponse)
+async def master_today_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    month = today[:7]
+
+    conn = connect()
+    c = conn.cursor()
+
+    tasks_today = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE company_id=?
+      AND COALESCE(archived, 0)=0
+      AND task_date LIKE ?
+    ORDER BY COALESCE(time_from, ''), id
+    """, (company_id, f"{today}%")).fetchall()
+
+    revenue_today = c.execute("""
+    SELECT COALESCE(SUM(
+        CAST(REPLACE(COALESCE(price, '0'), ',', '.') AS REAL)
+    ), 0)
+    FROM tasks
+    WHERE company_id=?
+      AND COALESCE(archived, 0)=0
+      AND status='Завершено'
+      AND task_date LIKE ?
+    """, (company_id, f"{today}%")).fetchone()[0]
+
+    revenue_month = c.execute("""
+    SELECT COALESCE(SUM(
+        CAST(REPLACE(COALESCE(price, '0'), ',', '.') AS REAL)
+    ), 0)
+    FROM tasks
+    WHERE company_id=?
+      AND COALESCE(archived, 0)=0
+      AND status='Завершено'
+      AND substr(task_date, 1, 7)=?
+    """, (company_id, month)).fetchone()[0]
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "master.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "links": build_dashboard_links(),
+            "tasks_today": tasks_today,
+            "revenue_today": revenue_today,
+            "revenue_month": revenue_month,
+            "today": today,
+        }
+    )
+
+
+@app.get("/master/voice", response_class=HTMLResponse)
+async def master_voice_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
+
+    return templates.TemplateResponse(
+        request,
+        "master_voice.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "links": build_dashboard_links(),
+        }
+    )
+
+
 @app.get("/inbox", response_class=HTMLResponse)
 async def inbox_page(request: Request, status: str = ""):
 
@@ -43564,7 +43676,20 @@ async def login(request: Request):
 
     update_last_seen(username)
 
-    response = RedirectResponse("/", status_code=302)
+    login_redirect = "/"
+
+    if user["role"] in ("boss", "manager"):
+        user_company_id = (
+            user["company_id"] if "company_id" in user.keys() else None
+        )
+
+        if user_company_id:
+            company_settings = get_company_settings(user_company_id)
+
+            if get_company_mode(company_settings) == "master":
+                login_redirect = "/master"
+
+    response = RedirectResponse(login_redirect, status_code=302)
     response.delete_cookie("user")
 
     response.set_cookie(

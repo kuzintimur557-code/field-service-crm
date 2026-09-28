@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Голос{% endblock %}
+
+{% block head %}
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:760px;width:100%;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:22px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:16px}
+h1{margin:0 0 6px;font-size:30px}
+.meta{font-size:14px;color:#6b7280;font-weight:800}
+.mic{display:flex;align-items:center;justify-content:center;width:100%;min-height:72px;border:0;border-radius:18px;background:#7c3aed;color:#fff;font-size:20px;font-weight:900;cursor:pointer}
+.mic.recording{background:#dc2626}
+textarea{width:100%;min-height:160px;padding:14px;border-radius:16px;border:1px solid #d1d5db;font-size:17px;margin-top:14px;font-family:inherit}
+button.save{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;margin-top:14px;border:0;border-radius:16px;background:#2563eb;color:#fff;font-size:17px;font-weight:900;cursor:pointer}
+.status{margin-top:10px;font-size:14px;font-weight:800;color:#6b7280;min-height:20px}
+@media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:26px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+<a href="/master" class="back">← Сегодня</a>
+
+<div class="card">
+<h1>Голос</h1>
+<div class="meta">Нажмите кнопку и скажите, что нужно сделать. Текст сохранится как заметка помощника — из неё можно создать запись.</div>
+
+<button type="button" class="mic" id="micButton">🎙 Говорить</button>
+<div class="status" id="voiceStatus">Голосовой ввод работает в Chrome и Safari на русском языке.</div>
+
+<form method="post" action="/ai/assistant/notes">
+<textarea name="note" id="voiceText" placeholder="Текст появится здесь..."></textarea>
+<input type="hidden" name="priority" value="normal">
+<button type="submit" class="save">Сохранить заметку</button>
+</form>
+</div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var button = document.getElementById("micButton");
+    var status = document.getElementById("voiceStatus");
+    var textarea = document.getElementById("voiceText");
+    var recognition = null;
+    var recording = false;
+
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        button.disabled = true;
+        button.style.background = "#9ca3af";
+        status.textContent = "Голосовой ввод не поддерживается в этом браузере. Введите текст вручную.";
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = "ru-RU";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    recognition.onresult = function (event) {
+        var text = "";
+        for (var i = 0; i < event.results.length; i++) {
+            text += event.results[i][0].transcript;
+        }
+        var prefix = textarea.value ? textarea.value + " " : "";
+        textarea.value = (prefix + text).trim();
+        status.textContent = "Распознано. Можно продолжить или сохранить.";
+    };
+
+    recognition.onerror = function (event) {
+        recording = false;
+        button.classList.remove("recording");
+        button.textContent = "🎙 Говорить";
+        status.textContent = "Ошибка распознавания: " + (event.error || "неизвестно");
+    };
+
+    recognition.onend = function () {
+        recording = false;
+        button.classList.remove("recording");
+        button.textContent = "🎙 Говорить";
+    };
+
+    button.addEventListener("click", function () {
+        if (recording) {
+            recognition.stop();
+            return;
+        }
+        recording = true;
+        button.classList.add("recording");
+        button.textContent = "■ Остановить";
+        status.textContent = "Слушаю...";
+        try {
+            recognition.start();
+        } catch (e) {
+            recording = false;
+            button.classList.remove("recording");
+            button.textContent = "🎙 Говорить";
+        }
+    });
+})();
+</script>
+{% endblock %}

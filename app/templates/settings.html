@@ -118,6 +118,13 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
         {% endfor %}
 	</select>
 
+	<label style="margin-top:14px">Режим интерфейса</label>
+	<select name="mode">
+	    <option value="company" {% if (settings["mode"] or "company") == "company" %}selected{% endif %}>Компания — полный интерфейс</option>
+	    <option value="master" {% if (settings["mode"] or "company") == "master" %}selected{% endif %}>Частный мастер — упрощённый</option>
+	</select>
+	<div class="meta" style="margin-top:6px">Мастеру после входа открывается экран «Сегодня» с крупными кнопками.</div>
+
     <label class="module-card" style="margin-top:12px">
         <input type="checkbox" name="apply_business_preset" value="1">
         <span>

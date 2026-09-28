@@ -1382,6 +1382,7 @@ def init_db():
     add_column_if_missing(c, "company_settings", "service_label", "TEXT DEFAULT 'Услуга'")
     add_column_if_missing(c, "company_settings", "one_c_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calls_enabled", "INTEGER DEFAULT 0")
+    add_column_if_missing(c, "company_settings", "mode", "TEXT DEFAULT 'company'")
     add_column_if_missing(c, "company_settings", "ai_calls_enabled", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calendar_auto_publish", "INTEGER DEFAULT 0")
     add_column_if_missing(c, "company_settings", "calendar_auto_remind", "INTEGER DEFAULT 0")
