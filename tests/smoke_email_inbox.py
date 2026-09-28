@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -59,8 +60,10 @@ def main():
         from app.database import connect
         from app.services.email_inbox import (
             build_email_dedupe_key,
+            extract_email_fields,
             get_email_messages,
             normalize_inbox_payload,
+            parse_extracted_fields,
             save_email_message,
         )
 
@@ -115,6 +118,36 @@ def main():
         assert messages[0]["status"] == "new"
         assert messages[0]["subject"] == "Нужен ремонт стиральной машины"
         assert messages[0]["raw_source"]
+
+        extracted = parse_extracted_fields(messages[0]["extracted_json"])
+        assert extracted["phone"] == "+79001112233"
+        assert "Ленина 10" in extracted["address"]
+
+        # extraction rules
+        fields = extract_email_fields(
+            "Здравствуйте! Меня зовут Анна. Нужна уборка квартиры завтра. "
+            "Адрес: ул. Мира, д. 5, кв. 12. Мой телефон 8 900 111-22-33",
+            "Уборка",
+            "",
+            ["Уборка квартиры", "Химчистка"],
+            now=datetime(2026, 9, 28),
+        )
+        assert fields["phone"] == "+79001112233"
+        assert fields["name"] == "Анна"
+        assert "Мира" in fields["address"]
+        assert fields["date"] == "2026-09-29"
+        assert fields["service"] == "Уборка квартиры"
+
+        assert extract_email_fields(
+            "приедете 05.10?", "", "", [], now=datetime(2026, 9, 28)
+        )["date"] == "2026-10-05"
+        assert extract_email_fields(
+            "жду в пятницу", "", "", [], now=datetime(2026, 9, 28)
+        )["date"] == "2026-10-02"
+        assert extract_email_fields(
+            "жду 12 декабря", "", "", [], now=datetime(2026, 9, 28)
+        )["date"] == "2026-12-12"
+        assert extract_email_fields("просто вопрос", "", "", [])["date"] == ""
 
         # notifications for boss/manager of the company
         conn = connect()

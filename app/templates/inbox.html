@@ -19,6 +19,8 @@ h1{margin:0 0 6px;font-size:30px}
 .msg-date{font-size:13px;color:#9ca3af;font-weight:700}
 .msg-text{margin-top:10px;font-size:15px;color:#4b5563;white-space:pre-wrap;word-break:break-word}
 .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:900;background:#dbeafe;color:#1d4ed8}
+.extract{margin-top:10px;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;font-size:14px;font-weight:700;color:#111827}
+.extract span{color:#6b7280;font-weight:800}
 .empty{padding:36px 22px;text-align:center;color:#6b7280;font-weight:800}
 @media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:26px}.card{padding:16px;border-radius:18px}}
 </style>
@@ -48,6 +50,16 @@ h1{margin:0 0 6px;font-size:30px}
 {% if message["from_name"] and message["from_email"] %} · {{ message["from_email"] }}{% endif %}
 </div>
 <div class="msg-date">{{ message["received_at"] or message["created_at"] }} {% if message["status"] == "new" %}· <span class="badge">Новое</span>{% endif %}</div>
+{% set ex = message["extracted"] %}
+{% if ex and (ex.get("name") or ex.get("phone") or ex.get("address") or ex.get("service") or ex.get("date")) %}
+<div class="extract">
+{% if ex.get("name") %}<div><span>Имя:</span> {{ ex["name"] }}</div>{% endif %}
+{% if ex.get("phone") %}<div><span>Телефон:</span> {{ ex["phone"] }}</div>{% endif %}
+{% if ex.get("address") %}<div><span>Адрес:</span> {{ ex["address"] }}</div>{% endif %}
+{% if ex.get("service") %}<div><span>{{ settings["service_label"] if settings is defined and settings["service_label"] else "Услуга" }}:</span> {{ ex["service"] }}</div>{% endif %}
+{% if ex.get("date") %}<div><span>Дата:</span> {{ ex["date"] }}</div>{% endif %}
+</div>
+{% endif %}
 {% if message["body_text"] %}
 <div class="msg-text">{{ message["body_text"][:300] }}{% if message["body_text"]|length > 300 %}…{% endif %}</div>
 {% endif %}

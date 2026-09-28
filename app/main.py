@@ -199,6 +199,7 @@ from app.services.background_jobs import (
 from app.services.email_inbox import (
     get_email_messages,
     normalize_inbox_payload,
+    parse_extracted_fields,
     save_email_message,
 )
 from app.services.error_monitoring import (
@@ -42908,6 +42909,9 @@ async def inbox_page(request: Request, status: str = ""):
         status = ""
 
     messages = get_email_messages(company_id, status=status, limit=100)
+
+    for message in messages:
+        message["extracted"] = parse_extracted_fields(message.get("extracted_json"))
 
     return templates.TemplateResponse(
         request,
