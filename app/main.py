@@ -200,6 +200,7 @@ from app.services.call_analysis import analyze_call_text
 from app.services.subscriptions import (
     activate_company_subscription,
     get_company_subscription,
+    run_subscription_reminders,
 )
 from app.services.email_inbox import (
     EMAIL_STATUSES,
@@ -42913,6 +42914,26 @@ async def run_background_jobs_cron(request: Request):
     if not payload["ok"]:
         return JSONResponse(payload, status_code=503)
     return payload
+
+
+@app.post("/automation/cron/subscription-reminders")
+async def run_subscription_reminders_cron(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
+            status_code=503,
+        )
+    token = (request.headers.get("x-automation-secret") or "").strip()
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    summary = run_subscription_reminders()
+    return {"ok": True, "summary": summary}
 
 
 @app.post("/automation/cron/database-backup")

@@ -32,6 +32,7 @@ def main():
             activate_company_subscription,
             ensure_company_subscription,
             get_company_subscription,
+            run_subscription_reminders,
         )
 
         # trial starts automatically for a company without subscription
@@ -139,6 +140,108 @@ def main():
         html = page.body.decode()
         assert "Подписка" in html
         assert "Активна" in html
+
+        # reminder cron: trial ending soon notifies boss once per day
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        UPDATE company_settings
+        SET subscription_status='trial',
+            trial_ends_at=?,
+            subscription_ends_at=''
+        WHERE company_id=1
+        """, ((datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d"),))
+        conn.commit()
+        conn.close()
+
+        summary = run_subscription_reminders()
+        assert summary["sent"] >= 1
+
+        conn = connect()
+        c = conn.cursor()
+        reminder_count = c.execute("""
+        SELECT COUNT(*) AS count
+        FROM notifications
+        WHERE company_id=1 AND title='Пробный период заканчивается'
+        """).fetchone()["count"]
+        conn.close()
+        assert reminder_count >= 1
+
+        # same-day second run does not duplicate
+        summary = run_subscription_reminders()
+        conn = connect()
+        c = conn.cursor()
+        reminder_count_again = c.execute("""
+        SELECT COUNT(*) AS count
+        FROM notifications
+        WHERE company_id=1 AND title='Пробный период заканчивается'
+        """).fetchone()["count"]
+        conn.close()
+        assert reminder_count_again == reminder_count
+
+        # past due owners get the overdue reminder
+        conn = connect()
+        c = conn.cursor()
+        c.execute("""
+        UPDATE company_settings
+        SET subscription_status='past_due'
+        WHERE company_id=1
+        """)
+        conn.commit()
+        conn.close()
+
+        summary = run_subscription_reminders()
+        assert summary["sent"] >= 1
+
+        conn = connect()
+        c = conn.cursor()
+        overdue_count = c.execute("""
+        SELECT COUNT(*) AS count
+        FROM notifications
+        WHERE company_id=1 AND title='Подписка просрочена'
+        """).fetchone()["count"]
+        conn.close()
+        assert overdue_count == 1
+
+        # cron endpoint guard
+        from starlette.requests import Request as StarletteRequest
+
+        def cron_request(token=""):
+            headers = []
+            if token:
+                headers.append((b"x-automation-secret", token.encode()))
+            return StarletteRequest({
+                "type": "http",
+                "method": "POST",
+                "path": "/automation/cron/subscription-reminders",
+                "headers": headers,
+                "query_string": b"",
+                "scheme": "http",
+                "client": ("127.0.0.1", 50000),
+                "server": ("testserver", 80),
+            })
+
+        with patch.dict(
+            os.environ,
+            {"AUTOMATION_CRON_SECRET": "cron-smoke-secret"},
+            clear=False,
+        ):
+            response = asyncio.run(
+                crm.run_subscription_reminders_cron(cron_request("wrong"))
+            )
+            assert response.status_code == 403
+
+            response = asyncio.run(
+                crm.run_subscription_reminders_cron(cron_request(""))
+            )
+            assert response.status_code == 403
+
+            response = asyncio.run(
+                crm.run_subscription_reminders_cron(
+                    cron_request("cron-smoke-secret")
+                )
+            )
+            assert response["ok"] and "summary" in response
 
     print("Subscription smoke passed.")
 

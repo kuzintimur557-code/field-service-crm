@@ -150,6 +150,154 @@ def get_company_subscription(company_id, _connection=None):
             conn.close()
 
 
+def get_company_subscription_reminders(company_id, now=None):
+    now = now or datetime.now()
+    subscription = get_company_subscription(company_id)
+
+    if not subscription["is_open"]:
+        if subscription["status"] == SUBSCRIPTION_PAST_DUE:
+            return [{
+                "title": "Подписка просрочена",
+                "message": "Продлите подписку, чтобы сохранить доступ к платформе.",
+                "link": "/billing",
+            }]
+        return []
+
+    if subscription["status"] != SUBSCRIPTION_TRIAL:
+        return []
+
+    days_left = subscription["days_left"]
+    if days_left is None or days_left not in (7, 3, 1, 0):
+        return []
+
+    if days_left == 0:
+        return [{
+            "title": "Пробный период закончился",
+            "message": (
+                "Сегодня завершается пробный период. "
+                "Выберите тариф и продлите доступ на странице оплаты."
+            ),
+            "link": "/billing",
+        }]
+
+    return [{
+        "title": "Пробный период заканчивается",
+        "message": (
+            f"Осталось дней: {days_left}. "
+            "Выберите тариф на странице оплаты, чтобы продолжить работу."
+        ),
+        "link": "/billing",
+    }]
+
+
+def send_company_subscription_reminders(company_id, now=None):
+    now = now or datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    reminders = get_company_subscription_reminders(company_id, now)
+
+    if not reminders:
+        return []
+
+    conn = connect()
+    c = conn.cursor()
+    owners = c.execute("""
+    SELECT username
+    FROM users
+    WHERE company_id=? AND role='boss' AND COALESCE(is_active, 1)=1
+    """, (company_id,)).fetchall()
+    conn.close()
+
+    sent = []
+
+    for reminder in reminders:
+        for owner in owners:
+            username = owner["username"]
+
+            conn = connect()
+            c = conn.cursor()
+            already = c.execute("""
+            SELECT id
+            FROM notifications
+            WHERE company_id=? AND username=?
+              AND title=? AND COALESCE(created_at, '') LIKE ?
+            LIMIT 1
+            """, (
+                company_id,
+                username,
+                reminder["title"],
+                f"{today}%",
+            )).fetchone()
+            conn.close()
+
+            if already:
+                continue
+
+            _create_notification(
+                company_id,
+                username,
+                reminder["title"],
+                reminder["message"],
+                reminder["link"],
+            )
+            sent.append({
+                "username": username,
+                "title": reminder["title"],
+            })
+
+    return sent
+
+
+def run_subscription_reminders(now=None):
+    now = now or datetime.now()
+    conn = connect()
+    c = conn.cursor()
+    companies = c.execute("""
+    SELECT DISTINCT company_id
+    FROM company_settings
+    WHERE company_id IS NOT NULL
+    ORDER BY company_id
+    """).fetchall()
+    conn.close()
+
+    summary = {"companies": 0, "sent": 0}
+
+    for company in companies:
+        company_id = company["company_id"]
+        if not company_id:
+            continue
+        summary["companies"] += 1
+        sent = send_company_subscription_reminders(company_id, now)
+        summary["sent"] += len(sent)
+
+    return summary
+
+
+def _create_notification(company_id, username, title, message, link):
+    conn = connect()
+
+    try:
+        c = conn.cursor()
+        c.execute("""
+        INSERT INTO notifications (
+            company_id, username, title, message, link, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            username,
+            title,
+            message,
+            link,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def activate_company_subscription(company_id, days=SUBSCRIPTION_ACTIVE_DAYS):
     days = max(1, int(days or SUBSCRIPTION_ACTIVE_DAYS))
     ends_at = (_today() + timedelta(days=days)).strftime(DATE_FORMAT)

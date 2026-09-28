@@ -217,6 +217,7 @@ python3 tests/smoke_security.py
 - `POST /automation/cron/a3-watchdog` - независимо контролирует запуски A3
 - `POST /automation/cron/background-jobs` - выполняет задания постоянной очереди
 - `POST /automation/cron/database-backup` - ставит и сразу выполняет задание резервной копии
+- `POST /automation/cron/subscription-reminders` - напоминания владельцам о завершении trial и просрочке
 
 Для A3 настройте два задания: основной цикл и watchdog. Watchdog должен
 вызываться отдельным внешним расписанием, чтобы сообщить об остановке
