@@ -197,10 +197,14 @@ from app.services.background_jobs import (
     process_background_jobs,
 )
 from app.services.email_inbox import (
+    EMAIL_STATUSES,
+    find_or_create_inbox_client,
+    get_email_message,
     get_email_messages,
     normalize_inbox_payload,
     parse_extracted_fields,
     save_email_message,
+    set_email_message_status,
 )
 from app.services.error_monitoring import (
     acknowledge_error_incident,
@@ -42905,7 +42909,7 @@ async def inbox_page(request: Request, status: str = ""):
 
     settings = get_company_settings(company_id)
 
-    if status not in ("", "new"):
+    if status not in EMAIL_STATUSES:
         status = ""
 
     messages = get_email_messages(company_id, status=status, limit=100)
@@ -42926,6 +42930,191 @@ async def inbox_page(request: Request, status: str = ""):
             "selected_status": status,
         }
     )
+
+
+@app.get("/inbox/{message_id}", response_class=HTMLResponse)
+async def inbox_detail_page(request: Request, message_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "inbox")
+
+    if disabled_response:
+        return disabled_response
+
+    message = get_email_message(company_id, message_id)
+
+    if not message:
+        return RedirectResponse("/inbox", status_code=302)
+
+    message["extracted"] = parse_extracted_fields(message.get("extracted_json"))
+    settings = get_company_settings(company_id)
+
+    return templates.TemplateResponse(
+        request,
+        "inbox_detail.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "links": build_dashboard_links(),
+            "message": message,
+            "error": request.query_params.get("error", ""),
+        }
+    )
+
+
+@app.post("/inbox/{message_id}/confirm")
+async def inbox_confirm(request: Request, message_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "inbox")
+
+    if disabled_response:
+        return disabled_response
+
+    message = get_email_message(company_id, message_id)
+
+    if not message:
+        return RedirectResponse("/inbox", status_code=302)
+
+    if message["status"] != "new":
+        return RedirectResponse("/inbox", status_code=302)
+
+    form = await request.form()
+
+    client_name = (form.get("client_name") or "").strip()[:200]
+    phone = (form.get("phone") or "").strip()[:60]
+    email = (form.get("email") or "").strip()[:200]
+    address = (form.get("address") or "").strip()[:300]
+    task_date = (form.get("task_date") or "").strip()[:10]
+    description = (form.get("description") or "").strip()[:5000]
+    price = (form.get("price") or "").strip()[:40]
+
+    if not client_name:
+        return RedirectResponse(
+            f"/inbox/{message_id}?error=client_required",
+            status_code=302,
+        )
+
+    if task_date:
+        try:
+            datetime.strptime(task_date, "%Y-%m-%d")
+        except ValueError:
+            return RedirectResponse(
+                f"/inbox/{message_id}?error=invalid_date",
+                status_code=302,
+            )
+
+    client_id = find_or_create_inbox_client(
+        company_id, client_name, phone, email, address
+    )
+
+    conn = connect()
+    c = conn.cursor()
+
+    try:
+        c.execute("""
+        INSERT INTO tasks (
+            company_id,
+            client_id,
+            client,
+            phone,
+            address,
+            description,
+            task_date,
+            priority,
+            price,
+            status,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            client_id,
+            client_name,
+            phone,
+            address,
+            description,
+            task_date,
+            "Обычный",
+            price,
+            "Новая",
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+
+        task_id = c.lastrowid
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    set_email_message_status(
+        company_id,
+        message_id,
+        "confirmed",
+        task_id=task_id,
+        client_id=client_id,
+    )
+
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        "Создано из письма",
+        f"Письмо №{message_id}: {message['subject'] or '(без темы)'}"[:200],
+    )
+
+    return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
+@app.post("/inbox/{message_id}/reject")
+async def inbox_reject(request: Request, message_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    disabled_response = require_feature(company_id, "inbox")
+
+    if disabled_response:
+        return disabled_response
+
+    message = get_email_message(company_id, message_id)
+
+    if message and message["status"] == "new":
+        set_email_message_status(company_id, message_id, "rejected")
+
+    return RedirectResponse("/inbox", status_code=302)
 
 
 @app.post("/api/inbox/email")

@@ -5,6 +5,9 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import urlencode
+
+from starlette.requests import Request
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +64,7 @@ def main():
         from app.services.email_inbox import (
             build_email_dedupe_key,
             extract_email_fields,
+            find_or_create_inbox_client,
             get_email_messages,
             normalize_inbox_payload,
             parse_extracted_fields,
@@ -187,6 +191,149 @@ def main():
         result = save_email_message(normalize_inbox_payload(valid_payload()))
         assert not result["created"]
         assert result["message"]["id"] == message_id
+
+        # --- draft confirmation flow ---
+
+        def authed_request(path, username="boss", form=None):
+            body = urlencode(form).encode() if form is not None else b""
+            headers = [(
+                b"cookie",
+                f"{crm.SESSION_COOKIE_NAME}={crm.sign_session_value(username)}".encode(),
+            )]
+            if form is not None:
+                headers.append((
+                    b"content-type",
+                    b"application/x-www-form-urlencoded",
+                ))
+            scope = {
+                "type": "http",
+                "method": "POST" if form is not None else "GET",
+                "path": path,
+                "headers": headers,
+                "query_string": b"",
+                "scheme": "http",
+                "client": ("127.0.0.1", 50000),
+                "server": ("testserver", 80),
+            }
+
+            async def receive():
+                return {
+                    "type": "http.request",
+                    "body": body,
+                    "more_body": False,
+                }
+
+            return Request(scope, receive)
+
+        detail = asyncio.run(crm.inbox_detail_page(
+            authed_request(f"/inbox/{message_id}"), message_id
+        ))
+        assert detail.status_code == 200
+        assert "Нужен ремонт стиральной машины" in detail.body.decode()
+
+        # worker cannot open inbox detail
+        forbidden = asyncio.run(crm.inbox_detail_page(
+            authed_request(f"/inbox/{message_id}", username="worker"), message_id
+        ))
+        assert forbidden.status_code == 302
+        assert forbidden.headers["location"] == "/"
+
+        # unknown message -> back to inbox
+        missing = asyncio.run(crm.inbox_detail_page(
+            authed_request("/inbox/999999"), 999999
+        ))
+        assert missing.status_code == 302
+        assert missing.headers["location"] == "/inbox"
+
+        # client name is required
+        empty_client = asyncio.run(crm.inbox_confirm(
+            authed_request(f"/inbox/{message_id}/confirm", form={
+                "client_name": "",
+                "phone": "+79001112233",
+            }),
+            message_id,
+        ))
+        assert empty_client.status_code == 302
+        assert "error=client_required" in empty_client.headers["location"]
+
+        # invalid date rejected
+        bad_date = asyncio.run(crm.inbox_confirm(
+            authed_request(f"/inbox/{message_id}/confirm", form={
+                "client_name": "Тест Клиент",
+                "task_date": "32.13.2026",
+            }),
+            message_id,
+        ))
+        assert "error=invalid_date" in bad_date.headers["location"]
+
+        # confirm creates client + task only after manager approval
+        confirmed = asyncio.run(crm.inbox_confirm(
+            authed_request(f"/inbox/{message_id}/confirm", form={
+                "client_name": "Тест Клиент",
+                "phone": "+79001112233",
+                "email": "client@example.com",
+                "address": "Ленина 10",
+                "task_date": "2026-10-01",
+                "description": "Ремонт стиральной машины",
+                "price": "1500",
+            }),
+            message_id,
+        ))
+        assert confirmed.status_code == 302
+        location = confirmed.headers["location"]
+        assert location.startswith("/task/")
+        task_id = int(location.rsplit("/", 1)[1])
+
+        conn = connect()
+        c = conn.cursor()
+        task = c.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        saved_message = c.execute(
+            "SELECT * FROM email_messages WHERE id=?", (message_id,)
+        ).fetchone()
+        activity = c.execute("""
+        SELECT * FROM task_activity WHERE task_id=? AND action='Создано из письма'
+        """, (task_id,)).fetchone()
+        conn.close()
+
+        assert task["company_id"] == 1
+        assert task["client"] == "Тест Клиент"
+        assert task["status"] == "Новая"
+        assert task["task_date"] == "2026-10-01"
+        assert saved_message["status"] == "confirmed"
+        assert saved_message["task_id"] == task_id
+        assert saved_message["client_id"] == task["client_id"]
+        assert activity is not None
+
+        # already processed -> no duplicate task
+        again = asyncio.run(crm.inbox_confirm(
+            authed_request(f"/inbox/{message_id}/confirm", form={
+                "client_name": "Тест Клиент",
+            }),
+            message_id,
+        ))
+        assert again.headers["location"] == "/inbox"
+
+        # same phone -> same client, no duplicates
+        client_id = task["client_id"]
+        assert find_or_create_inbox_client(
+            1, "Тест Клиент", "+79001112233", "", ""
+        ) == client_id
+
+        # reject flow
+        rejected = call(valid_payload(message_id="<msg-003@test>"))
+        reject_id = rejected["id"]
+        reject_response = asyncio.run(crm.inbox_reject(
+            authed_request(f"/inbox/{reject_id}/reject", form={}),
+            reject_id,
+        ))
+        assert reject_response.status_code == 302
+        conn = connect()
+        c = conn.cursor()
+        rejected_message = c.execute(
+            "SELECT status FROM email_messages WHERE id=?", (reject_id,)
+        ).fetchone()
+        conn.close()
+        assert rejected_message["status"] == "rejected"
 
         # inbox page: unauthenticated -> redirect to login
         anon_request = FakeInboxRequest({}, token="")

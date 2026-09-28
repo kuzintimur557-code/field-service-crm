@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Письмо №{{ message["id"] }}{% endblock %}
+
+{% block head %}
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:760px;width:100%;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:22px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:16px}
+h1{margin:0 0 6px;font-size:26px;word-break:break-word}
+h2{margin:0 0 12px;font-size:20px}
+.meta{font-size:14px;color:#6b7280;font-weight:800}
+.letter{margin-top:12px;font-size:15px;color:#374151;white-space:pre-wrap;word-break:break-word}
+label{display:block;margin-top:14px;font-weight:900;color:#374151}
+input,textarea{width:100%;min-height:44px;padding:12px;border-radius:14px;font-size:16px;margin-top:6px;border:1px solid #d1d5db;background:white;font-family:inherit}
+textarea{min-height:120px;resize:vertical}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:48px;padding:14px;border-radius:14px;font-size:16px;margin-top:14px;border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;text-decoration:none}
+.btn-gray{background:#f3f4f6;color:#991b1b;border:1px solid #e5e7eb}
+.notice{margin-bottom:16px;padding:14px;border-radius:16px;font-weight:900;background:#fee2e2;color:#991b1b}
+.done{padding:16px;border-radius:16px;font-weight:900;background:#dcfce7;color:#166534}
+@media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:22px}.card{padding:16px;border-radius:18px}}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set ex = message["extracted"] %}
+<div class="container">
+
+<a href="/inbox" class="back">← Почта</a>
+
+<div class="card">
+<h1>{{ message["subject"] or "(без темы)" }}</h1>
+<div class="meta">
+{{ message["from_name"] or message["from_email"] or "Неизвестный отправитель" }}
+{% if message["from_name"] and message["from_email"] %} · {{ message["from_email"] }}{% endif %}
+ · {{ message["received_at"] or message["created_at"] }}
+</div>
+{% if message["body_text"] %}
+<div class="letter">{{ message["body_text"] }}</div>
+{% endif %}
+</div>
+
+{% if message["status"] == "confirmed" %}
+<div class="card done">
+Письмо подтверждено.
+{% if message["task_id"] %}<a href="/task/{{ message["task_id"] }}" style="color:#166534">Открыть заявку №{{ message["task_id"] }}</a>{% endif %}
+</div>
+{% elif message["status"] == "rejected" %}
+<div class="card done" style="background:#f3f4f6;color:#6b7280">Письмо отклонено.</div>
+{% else %}
+
+{% if error == "client_required" %}
+<div class="notice">Укажите имя клиента</div>
+{% endif %}
+{% if error == "invalid_date" %}
+<div class="notice">Дата должна быть в формате ГГГГ-ММ-ДД</div>
+{% endif %}
+
+<div class="card">
+<h2>Создать {{ (settings["task_label"] or "заявку")|lower }}</h2>
+<div class="meta">Проверьте данные из письма — заявка будет создана только после подтверждения.</div>
+
+<form method="post" action="/inbox/{{ message['id'] }}/confirm">
+<label>Клиент</label>
+<input type="text" name="client_name" value="{{ ex.get('name') or message['from_name'] or '' }}" required>
+
+<label>Телефон</label>
+<input type="text" name="phone" value="{{ ex.get('phone', '') }}">
+
+<label>Email</label>
+<input type="text" name="email" value="{{ message['from_email'] or '' }}">
+
+<label>Адрес</label>
+<input type="text" name="address" value="{{ ex.get('address', '') }}">
+
+<label>Дата</label>
+<input type="date" name="task_date" value="{{ ex.get('date', '') }}">
+
+<label>Описание</label>
+<textarea name="description">{{ (message["subject"] or "") }}{% if message["body_text"] %}
+{{ message["body_text"][:2000] }}{% endif %}</textarea>
+
+<label>Цена</label>
+<input type="text" name="price" value="">
+
+<button type="submit">Подтвердить и создать</button>
+</form>
+
+<form method="post" action="/inbox/{{ message['id'] }}/reject">
+<button type="submit" class="btn-gray">Отклонить письмо</button>
+</form>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

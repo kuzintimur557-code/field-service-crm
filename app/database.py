@@ -1347,6 +1347,8 @@ def init_db():
     add_column_if_missing(c, "tasks", "source_call_id", "INTEGER")
 
     add_column_if_missing(c, "email_messages", "extracted_json", "TEXT")
+    add_column_if_missing(c, "email_messages", "task_id", "INTEGER")
+    add_column_if_missing(c, "email_messages", "client_id", "INTEGER")
 
     add_column_if_missing(c, "recurring_jobs", "company_id", "INTEGER DEFAULT 1")
     add_column_if_missing(c, "recurring_jobs", "client_id", "INTEGER")

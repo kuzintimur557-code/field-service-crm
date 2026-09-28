@@ -22,6 +22,7 @@ h1{margin:0 0 6px;font-size:30px}
 .extract{margin-top:10px;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;font-size:14px;font-weight:700;color:#111827}
 .extract span{color:#6b7280;font-weight:800}
 .empty{padding:36px 22px;text-align:center;color:#6b7280;font-weight:800}
+.btn-open{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:12px;padding:10px 18px;border-radius:14px;background:#2563eb;color:#fff;text-decoration:none;font-weight:900}
 @media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:26px}.card{padding:16px;border-radius:18px}}
 </style>
 {% endblock %}
@@ -39,6 +40,8 @@ h1{margin:0 0 6px;font-size:30px}
 <div class="filters">
 <a href="/inbox"{% if selected_status == "" %} class="active"{% endif %}>Все</a>
 <a href="/inbox?status=new"{% if selected_status == "new" %} class="active"{% endif %}>Новые</a>
+<a href="/inbox?status=confirmed"{% if selected_status == "confirmed" %} class="active"{% endif %}>Подтверждённые</a>
+<a href="/inbox?status=rejected"{% if selected_status == "rejected" %} class="active"{% endif %}>Отклонённые</a>
 </div>
 
 {% if messages %}
@@ -49,7 +52,11 @@ h1{margin:0 0 6px;font-size:30px}
 {{ message["from_name"] or message["from_email"] or "Неизвестный отправитель" }}
 {% if message["from_name"] and message["from_email"] %} · {{ message["from_email"] }}{% endif %}
 </div>
-<div class="msg-date">{{ message["received_at"] or message["created_at"] }} {% if message["status"] == "new" %}· <span class="badge">Новое</span>{% endif %}</div>
+<div class="msg-date">{{ message["received_at"] or message["created_at"] }}
+{% if message["status"] == "new" %}· <span class="badge">Новое</span>{% endif %}
+{% if message["status"] == "confirmed" %}· <span class="badge" style="background:#dcfce7;color:#166534">Подтверждено{% if message["task_id"] %} · заявка №{{ message["task_id"] }}{% endif %}</span>{% endif %}
+{% if message["status"] == "rejected" %}· <span class="badge" style="background:#f3f4f6;color:#6b7280">Отклонено</span>{% endif %}
+</div>
 {% set ex = message["extracted"] %}
 {% if ex and (ex.get("name") or ex.get("phone") or ex.get("address") or ex.get("service") or ex.get("date")) %}
 <div class="extract">
@@ -63,6 +70,7 @@ h1{margin:0 0 6px;font-size:30px}
 {% if message["body_text"] %}
 <div class="msg-text">{{ message["body_text"][:300] }}{% if message["body_text"]|length > 300 %}…{% endif %}</div>
 {% endif %}
+<a class="btn-open" href="/inbox/{{ message['id'] }}">Разобрать →</a>
 </div>
 {% endfor %}
 {% else %}

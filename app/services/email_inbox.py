@@ -13,6 +13,13 @@ MAX_BODY_LENGTH = 100000
 MAX_RAW_LENGTH = 200000
 
 EMAIL_STATUS_NEW = "new"
+EMAIL_STATUS_CONFIRMED = "confirmed"
+EMAIL_STATUS_REJECTED = "rejected"
+EMAIL_STATUSES = {
+    EMAIL_STATUS_NEW,
+    EMAIL_STATUS_CONFIRMED,
+    EMAIL_STATUS_REJECTED,
+}
 
 PHONE_RE = re.compile(
     r"(?:\+7|8)[\s\-\(]*\d{3}[\)\s\-]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2}"
@@ -153,6 +160,89 @@ def parse_extracted_fields(raw_json):
     except (TypeError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def get_email_message(company_id, message_id):
+    conn = connect()
+
+    try:
+        row = conn.cursor().execute("""
+        SELECT *
+        FROM email_messages
+        WHERE company_id=? AND id=?
+        """, (company_id, message_id)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def find_or_create_inbox_client(company_id, name, phone, email, address):
+    conn = connect()
+
+    try:
+        c = conn.cursor()
+        existing = None
+
+        if phone:
+            existing = c.execute("""
+            SELECT id
+            FROM clients
+            WHERE company_id=? AND phone=?
+            LIMIT 1
+            """, (company_id, phone)).fetchone()
+
+        if not existing and email:
+            existing = c.execute("""
+            SELECT id
+            FROM clients
+            WHERE company_id=? AND email=? AND email<>''
+            LIMIT 1
+            """, (company_id, email)).fetchone()
+
+        if existing:
+            return existing["id"]
+
+        c.execute("""
+        INSERT INTO clients (company_id, name, phone, email, address, created_at)
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+        """, (company_id, name, phone, email, address))
+        client_id = c.lastrowid
+        conn.commit()
+        return client_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def set_email_message_status(
+    company_id,
+    message_id,
+    status,
+    task_id=None,
+    client_id=None,
+):
+    if status not in EMAIL_STATUSES:
+        raise ValueError("invalid_status")
+
+    conn = connect()
+
+    try:
+        c = conn.cursor()
+        c.execute("""
+        UPDATE email_messages
+        SET status=?,
+            task_id=COALESCE(?, task_id),
+            client_id=COALESCE(?, client_id)
+        WHERE company_id=? AND id=?
+        """, (status, task_id, client_id, company_id, message_id))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _clip(value, limit):
