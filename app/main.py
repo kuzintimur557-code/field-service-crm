@@ -196,6 +196,11 @@ from app.services.background_jobs import (
     get_recent_background_jobs,
     process_background_jobs,
 )
+from app.services.email_inbox import (
+    get_email_messages,
+    normalize_inbox_payload,
+    save_email_message,
+)
 from app.services.error_monitoring import (
     acknowledge_error_incident,
     get_error_incidents,
@@ -707,6 +712,7 @@ FEATURE_DEFINITIONS = [
     ("automation", "Автоматизация", "Правила, триггеры и действия"),
     ("ai_insights", "ИИ-инсайты", "ИИ-рекомендации и бизнес-инсайты"),
     ("calls", "Звонки", "История и будущая телефония"),
+    ("inbox", "Почта", "Приём заявок из email-писем"),
     ("one_c", "1С", "Интеграция с 1С"),
     ("custom_fields", "Поля компании", "Настраиваемые поля")
 ]
@@ -42874,6 +42880,92 @@ async def run_database_backup_cron(request: Request):
     if not payload["ok"]:
         return JSONResponse(payload, status_code=503)
     return payload
+
+
+@app.post("/api/inbox/email")
+async def receive_inbox_email(request: Request):
+    inbox_secret = (os.getenv("INBOX_WEBHOOK_SECRET") or "").strip()
+
+    if not inbox_secret:
+        return JSONResponse(
+            {"ok": False, "error": "INBOX_WEBHOOK_SECRET is not configured"},
+            status_code=503,
+        )
+    token = (request.headers.get("x-inbox-secret") or "").strip()
+    if not token or not hmac.compare_digest(token, inbox_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "invalid_json"},
+            status_code=400,
+        )
+
+    try:
+        payload = normalize_inbox_payload(data)
+    except ValueError as e:
+        return JSONResponse(
+            {"ok": False, "error": str(e)},
+            status_code=400,
+        )
+
+    company_id = payload["company_id"]
+
+    conn = connect()
+    c = conn.cursor()
+    company = c.execute(
+        "SELECT id FROM companies WHERE id=?",
+        (company_id,),
+    ).fetchone()
+
+    if not company:
+        conn.close()
+        return JSONResponse(
+            {"ok": False, "error": "company_not_found"},
+            status_code=404,
+        )
+    conn.close()
+
+    if not has_feature(company_id, "inbox"):
+        return JSONResponse(
+            {"ok": False, "error": "feature_disabled"},
+            status_code=403,
+        )
+
+    result = save_email_message(payload)
+
+    if result["created"]:
+        conn = connect()
+        c = conn.cursor()
+        recipients = c.execute("""
+        SELECT username
+        FROM users
+        WHERE company_id=? AND role IN ('boss', 'manager')
+        """, (company_id,)).fetchall()
+        conn.close()
+
+        subject = payload["subject"] or "(без темы)"
+        for recipient in recipients:
+            create_notification(
+                company_id,
+                recipient["username"],
+                "Новое письмо в почте",
+                subject[:200],
+                "/inbox",
+            )
+
+    message = result["message"]
+    return {
+        "ok": True,
+        "created": result["created"],
+        "duplicate": not result["created"],
+        "id": message["id"],
+    }
 
 
 def build_debug_links():

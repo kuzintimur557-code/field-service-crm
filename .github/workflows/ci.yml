@@ -89,6 +89,9 @@ jobs:
       - name: Run background job smoke
         run: python tests/smoke_background_jobs.py
 
+      - name: Run email inbox smoke
+        run: python tests/smoke_email_inbox.py
+
       - name: Run error monitoring smoke
         run: python tests/smoke_error_monitoring.py
 

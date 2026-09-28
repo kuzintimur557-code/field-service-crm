@@ -487,6 +487,24 @@ def init_db():
     """)
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS email_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        provider TEXT,
+        dedupe_key TEXT,
+        message_id TEXT,
+        from_email TEXT,
+        from_name TEXT,
+        subject TEXT,
+        body_text TEXT,
+        raw_source TEXT,
+        status TEXT DEFAULT 'new',
+        received_at TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS calendar_day_publications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_id INTEGER NOT NULL,
@@ -1617,6 +1635,16 @@ def init_db():
     c.execute("""
     CREATE INDEX IF NOT EXISTS idx_clients_company
     ON clients(company_id)
+    """)
+
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_email_messages_company_dedupe
+    ON email_messages(company_id, dedupe_key)
+    """)
+
+    c.execute("""
+    CREATE INDEX IF NOT EXISTS idx_email_messages_company_status
+    ON email_messages(company_id, status, created_at)
     """)
 
     c.execute("""

@@ -68,7 +68,6 @@ uvicorn app.main:app --reload --port 8011
 - `COOKIE_SECURE=1`
 - `AUTOMATION_CRON_SECRET`
 - `TRUSTED_HOSTS` or `APP_BASE_URL` with the production domain
-
 Опционально:
 
 - `DATA_DIR`
@@ -90,6 +89,7 @@ uvicorn app.main:app --reload --port 8011
 - `MAX_REQUEST_BYTES` - общий предел `Content-Length`, по умолчанию `60` МБ
 - `BOT_TOKEN`
 - `CHAT_ID`
+- `INBOX_WEBHOOK_SECRET` - секрет приёма писем `POST /api/inbox/email` (заголовок `x-inbox-secret`)
 - `CALENDAR_INCIDENT_RESPONSE_MINUTES` - по умолчанию `30`
 - `CALENDAR_INCIDENT_ESCALATION_MINUTES` - по умолчанию `30`
 - `CALENDAR_INCIDENT_RECOVERY_MINUTES` - по умолчанию `120`
@@ -216,6 +216,7 @@ python3 tests/smoke_security.py
 - `POST /automation/cron/a3-autonomous` - выполняет автономный цикл A3
 - `POST /automation/cron/a3-watchdog` - независимо контролирует запуски A3
 - `POST /automation/cron/background-jobs` - выполняет задания постоянной очереди
+- `POST /automation/cron/database-backup` - ставит и сразу выполняет задание резервной копии
 
 Для A3 настройте два задания: основной цикл и watchdog. Watchdog должен
 вызываться отдельным внешним расписанием, чтобы сообщить об остановке
