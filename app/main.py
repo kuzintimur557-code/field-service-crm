@@ -37753,12 +37753,17 @@ async def client_detail(
     latest_task = tasks[0] if tasks else None
     client_task_workers = {task["id"]: format_task_workers(task) for task in tasks}
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    client_now_value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    now_dt = datetime.now()
+    today = now_dt.strftime("%Y-%m-%d")
+    client_now_value = now_dt.strftime("%Y-%m-%dT%H:%M")
+    client_sla_soon_value = (now_dt + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
     client_total_tasks = len(tasks)
     client_active_tasks = 0
     client_completed_tasks = 0
     client_overdue_tasks = 0
+    client_sla_overdue_tasks = 0
+    client_sla_due_soon_tasks = 0
+    client_unassigned_tasks = 0
     client_revenue = 0
     upcoming_tasks = []
 
@@ -37766,15 +37771,18 @@ async def client_detail(
         task_status = task["status"] or ""
         is_archived = "archived" in task.keys() and task["archived"] == 1
         task_date = str(task["task_date"] or "")[:10]
+        is_open_task = (
+            not is_archived
+            and task_status not in ("Завершено", "Отменено")
+        )
 
         if not is_archived and task_status in ("Новая", "В работе"):
             client_active_tasks += 1
 
         if (
-            not is_archived
+            is_open_task
             and task_date
             and task_date >= today
-            and task_status not in ("Завершено", "Отменено")
         ):
             upcoming_tasks.append(task)
 
@@ -37787,12 +37795,23 @@ async def client_detail(
                 pass
 
         if (
-            not is_archived
+            is_open_task
             and task_date
             and task_date < today
-            and task_status not in ("Завершено", "Отменено")
         ):
             client_overdue_tasks += 1
+
+        if is_open_task:
+            deadline_at = str(task["deadline_at"] or "") if "deadline_at" in task.keys() else ""
+
+            if deadline_at:
+                if deadline_at < client_now_value:
+                    client_sla_overdue_tasks += 1
+                elif deadline_at <= client_sla_soon_value:
+                    client_sla_due_soon_tasks += 1
+
+            if client_task_workers.get(task["id"], "Не назначены") == "Не назначены":
+                client_unassigned_tasks += 1
 
     upcoming_task = None
 
@@ -37971,6 +37990,27 @@ async def client_detail(
         "with_analysis": client_call_stats_row["with_analysis"] or 0,
     }
 
+    def parse_client_health_datetime(value):
+        raw_value = str(value or "").strip()
+
+        if not raw_value:
+            return None
+
+        normalized_value = raw_value.replace("T", " ")
+        formats = (
+            ("%Y-%m-%d %H:%M:%S", normalized_value[:19]),
+            ("%Y-%m-%d %H:%M", normalized_value[:16]),
+            ("%Y-%m-%d", normalized_value[:10]),
+        )
+
+        for date_format, candidate in formats:
+            try:
+                return datetime.strptime(candidate, date_format)
+            except Exception:
+                pass
+
+        return None
+
     last_contact = None
 
     if latest_client_note:
@@ -38002,6 +38042,99 @@ async def client_detail(
                 "date": latest_call_date,
                 "text": latest_client_call["summary"] or latest_client_call["phone"] or ""
             }
+
+    last_contact_age_days = None
+
+    if last_contact:
+        last_contact_dt = parse_client_health_datetime(last_contact["date"])
+
+        if last_contact_dt:
+            last_contact_age_days = max(0, (now_dt - last_contact_dt).days)
+
+    client_health_reasons = []
+    client_health_score = 100
+
+    if client_overdue_tasks:
+        client_health_score -= min(35, client_overdue_tasks * 15)
+        client_health_reasons.append({
+            "label": f"Просроченных работ: {client_overdue_tasks}",
+            "link": f"/clients/{client_id}?task_filter=overdue",
+        })
+
+    if client_sla_overdue_tasks:
+        client_health_score -= min(35, client_sla_overdue_tasks * 20)
+        client_health_reasons.append({
+            "label": f"SLA просрочен: {client_sla_overdue_tasks}",
+            "link": f"/clients/{client_id}?task_sort=date_asc",
+        })
+
+    if client_sla_due_soon_tasks:
+        client_health_score -= min(15, client_sla_due_soon_tasks * 7)
+        client_health_reasons.append({
+            "label": f"SLA в ближайшие 24 часа: {client_sla_due_soon_tasks}",
+            "link": f"/clients/{client_id}?task_sort=date_asc",
+        })
+
+    if client_call_stats["follow_up"]:
+        client_health_score -= min(20, client_call_stats["follow_up"] * 10)
+        client_health_reasons.append({
+            "label": f"Нужен контакт по звонкам: {client_call_stats['follow_up']}",
+            "link": f"/clients/{client_id}?call_filter=follow_up#calls",
+        })
+
+    if client_call_stats["missed"]:
+        client_health_score -= min(15, client_call_stats["missed"] * 7)
+        client_health_reasons.append({
+            "label": f"Пропущенных звонков: {client_call_stats['missed']}",
+            "link": f"/clients/{client_id}?call_filter=missed#calls",
+        })
+
+    if client_unassigned_tasks:
+        client_health_score -= min(15, client_unassigned_tasks * 5)
+        client_health_reasons.append({
+            "label": f"Без исполнителя: {client_unassigned_tasks}",
+            "link": f"/clients/{client_id}?task_filter=active",
+        })
+
+    if last_contact_age_days is None:
+        client_health_score -= 10
+        client_health_reasons.append({
+            "label": "Контактов ещё не было",
+            "link": f"/clients/{client_id}#calls",
+        })
+    elif last_contact_age_days >= 30:
+        client_health_score -= 10
+        client_health_reasons.append({
+            "label": f"Последний контакт {last_contact_age_days} дн. назад",
+            "link": f"/clients/{client_id}#calls",
+        })
+
+    client_health_score = max(0, min(100, client_health_score))
+
+    if client_overdue_tasks or client_sla_overdue_tasks:
+        client_health_status_key = "risk"
+        client_health_status_label = "Риск"
+        client_health_summary = "Есть просрочки или нарушенный SLA. Начните с проблемных работ."
+    elif client_health_reasons:
+        client_health_status_key = "attention"
+        client_health_status_label = "Нужна реакция"
+        client_health_summary = "Есть сигналы, которые лучше обработать до следующего визита."
+    else:
+        client_health_status_key = "stable"
+        client_health_status_label = "Стабильно"
+        client_health_summary = "Критичных сигналов по клиенту нет."
+
+    client_health = {
+        "score": client_health_score,
+        "status_key": client_health_status_key,
+        "status_label": client_health_status_label,
+        "summary": client_health_summary,
+        "reasons": client_health_reasons,
+        "last_contact_age_days": last_contact_age_days,
+        "sla_overdue_tasks": client_sla_overdue_tasks,
+        "sla_due_soon_tasks": client_sla_due_soon_tasks,
+        "unassigned_tasks": client_unassigned_tasks,
+    }
 
     if selected_activity_filter:
         filtered_timeline = []
@@ -38097,6 +38230,7 @@ async def client_detail(
             "client_active_tasks": client_active_tasks,
             "client_completed_tasks": client_completed_tasks,
             "client_overdue_tasks": client_overdue_tasks,
+            "client_health": client_health,
             "client_revenue": client_revenue,
             "client_timeline": client_timeline,
             "client_custom_fields": client_custom_fields,

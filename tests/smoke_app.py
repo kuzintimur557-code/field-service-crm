@@ -25754,6 +25754,13 @@ async def assert_client_card(task):
     assert "Последняя заметка" in html
     assert "Последний звонок" in html
     assert "Следующее действие" in html
+    assert "Здоровье клиента" in html
+    assert "Индекс клиента" in html
+    assert "Нужна реакция" in html
+    assert "SLA просрочен: 0 / SLA 24 часа: 1" in html
+    assert "SLA в ближайшие 24 часа: 1" in html
+    assert "Нужен контакт по звонкам: 1" in html
+    assert f'href="/clients/{task["client_id"]}?call_filter=follow_up#calls"' in html
     assert "Заявка #" in html
     assert "Smoke latest client note" in html
     assert "Звонки: Клиент" in html

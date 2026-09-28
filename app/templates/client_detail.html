@@ -31,6 +31,18 @@ h2{margin:0 0 16px;font-size:22px}
 .latest-note{background:#fff7ed;border:1px solid #fed7aa;border-radius:18px;padding:16px;margin-top:18px}
 .latest-note-text{white-space:pre-wrap;line-height:1.45;font-weight:800;color:#4b5563;overflow-wrap:anywhere}
 .last-contact{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:18px;padding:16px;margin-top:18px}
+.client-health{display:grid;grid-template-columns:140px 1fr;gap:16px;align-items:start;border-radius:18px;padding:16px;margin-top:18px;border:1px solid #cbd5e1;background:#f8fafc}
+.client-health.risk{border-color:#fecaca;background:#fef2f2}
+.client-health.attention{border-color:#fed7aa;background:#fff7ed}
+.client-health.stable{border-color:#bbf7d0;background:#f0fdf4}
+.health-score{display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:112px;border-radius:16px;background:white;border:1px solid rgba(148,163,184,.45)}
+.health-score strong{font-size:32px;line-height:1;font-weight:900}
+.health-score span{margin-top:6px;color:#6b7280;font-size:12px;font-weight:900;text-align:center}
+.health-status{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.health-status .badge{background:#111827;color:white}
+.health-summary{font-weight:800;color:#4b5563;line-height:1.45;overflow-wrap:anywhere}
+.health-reasons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.health-reasons a,.health-reasons span{display:inline-flex;align-items:center;min-height:36px;padding:8px 10px;border-radius:12px;background:white;border:1px solid #e5e7eb;color:#1f2937;text-decoration:none;font-size:13px;font-weight:900}
 .next-action{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#f8fafc;border:1px solid #cbd5e1;border-radius:18px;padding:16px;margin-top:18px}
 .task{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:18px;background:#f9fafb;margin-bottom:10px}
 .task-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
@@ -75,7 +87,7 @@ textarea{height:110px;resize:vertical}
 button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 @media(max-width:800px){
 .container{padding:16px 14px 92px}
-.grid,.task,.timeline-item,.latest-task,.file-item,.next-action{grid-template-columns:1fr}
+.grid,.task,.timeline-item,.latest-task,.file-item,.next-action,.client-health{grid-template-columns:1fr}
 .card{padding:18px;border-radius:18px}
 .task-search{display:grid;grid-template-columns:1fr}
 .task-search div{min-width:0}
@@ -86,6 +98,7 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .task-actions .btn,.file-actions .btn,.file-actions form{flex:1 1 100%}
 .contact-actions{display:grid;grid-template-columns:1fr}
 .note-head{display:grid;grid-template-columns:1fr;gap:4px}
+.health-score{align-items:flex-start;padding:14px;min-height:0}
 h1{font-size:28px}
 .stats{grid-template-columns:1fr 1fr}
 .btn{width:100%}
@@ -200,6 +213,37 @@ h1{font-size:28px}
 	    <div class="latest-note-text">{{ latest_client_call["summary"] or "Заметка по звонку не заполнена" }}</div>
 	</div>
 	{% endif %}
+
+	<div class="client-health {{ client_health['status_key'] }}">
+	    <div class="health-score">
+	        <strong>{{ client_health["score"] }}</strong>
+	        <span>Индекс клиента</span>
+	    </div>
+	    <div>
+	        <div class="health-status">
+	            <div class="latest-title">Здоровье клиента</div>
+	            <span class="badge">{{ client_health["status_label"] }}</span>
+	        </div>
+	        <div class="health-summary">{{ client_health["summary"] }}</div>
+	        <div class="latest-meta" style="margin-top:8px">
+	            SLA просрочен: {{ client_health["sla_overdue_tasks"] }} / SLA 24 часа: {{ client_health["sla_due_soon_tasks"] }}
+	            {% if client_health["last_contact_age_days"] is not none %}
+	            / Последний контакт: {{ client_health["last_contact_age_days"] }} дн. назад
+	            {% else %}
+	            / Последний контакт: нет
+	            {% endif %}
+	        </div>
+	        <div class="health-reasons">
+	            {% if client_health["reasons"] %}
+	            {% for reason in client_health["reasons"] %}
+	            <a href="{{ reason['link'] }}">{{ reason["label"] }}</a>
+	            {% endfor %}
+	            {% else %}
+	            <span>Критичных сигналов нет</span>
+	            {% endif %}
+	        </div>
+	    </div>
+	</div>
 
 	<div class="next-action">
 	    <div>
