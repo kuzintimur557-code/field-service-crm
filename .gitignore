@@ -34,3 +34,6 @@ htmlcov/
 # Local output and OS files
 output/
 .DS_Store
+
+# Local server logs
+logs.txt

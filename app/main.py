@@ -42859,7 +42859,7 @@ async def debug_page(request: Request):
 
     role = get_role(username)
 
-    if role not in ("boss", "superadmin"):
+    if role != "superadmin":
         return RedirectResponse("/", status_code=302)
 
     conn = connect()

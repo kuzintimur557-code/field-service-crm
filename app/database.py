@@ -1922,13 +1922,26 @@ def init_db():
     )
     """)
 
-    if os.getenv("ENV") != "production":
+    production_mode = bool(
+        os.getenv("ENV") == "production"
+        or str(os.getenv("RAILWAY_ENVIRONMENT") or "").strip()
+    )
+
+    if not production_mode:
+        import bcrypt
+
+        def seed_password_hash(password):
+            return "bcrypt$" + bcrypt.hashpw(
+                password.encode("utf-8"),
+                bcrypt.gensalt()
+            ).decode("utf-8")
+
         c.execute("""
         INSERT OR IGNORE INTO users (username, password, role, last_seen)
         VALUES (?, ?, ?, ?)
         """, (
             "boss",
-            "boss123",
+            seed_password_hash("boss123"),
             "boss",
             datetime.now().strftime("%Y-%m-%d %H:%M")
         ))
@@ -1938,7 +1951,7 @@ def init_db():
         VALUES (?, ?, ?, ?)
         """, (
             "manager",
-            "manager123",
+            seed_password_hash("manager123"),
             "manager",
             datetime.now().strftime("%Y-%m-%d %H:%M")
         ))
@@ -1948,7 +1961,7 @@ def init_db():
         VALUES (?, ?, ?, ?)
         """, (
             "worker",
-            "worker123",
+            seed_password_hash("worker123"),
             "worker",
             datetime.now().strftime("%Y-%m-%d %H:%M")
         ))
