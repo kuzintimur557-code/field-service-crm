@@ -21077,6 +21077,7 @@ async def assert_daily_route_schedule():
             2,
             "Route morning",
             "Daily route smoke",
+            "Москва, Тверская улица, 1",
             route_date,
             "worker2",
             "worker2",
@@ -21087,6 +21088,7 @@ async def assert_daily_route_schedule():
             2,
             "Route overlap",
             "Daily route smoke",
+            "Москва, улица Арбат, 10",
             route_date,
             "worker2",
             "worker2,helper2",
@@ -21097,6 +21099,7 @@ async def assert_daily_route_schedule():
             2,
             "Route without time",
             "Daily route smoke",
+            "",
             route_date,
             "helper2",
             "helper2",
@@ -21107,6 +21110,7 @@ async def assert_daily_route_schedule():
             2,
             "Route unassigned",
             "Daily route smoke",
+            "Москва, Ленинский проспект, 5",
             route_date,
             "",
             "",
@@ -21117,6 +21121,7 @@ async def assert_daily_route_schedule():
             1,
             "Route outsider",
             "Other company",
+            "Санкт-Петербург, Невский проспект, 1",
             route_date,
             "outsider_worker",
             "outsider_worker",
@@ -21129,11 +21134,11 @@ async def assert_daily_route_schedule():
     for values in task_values:
         c.execute("""
         INSERT INTO tasks (
-            company_id, client, description, task_date,
+            company_id, client, description, address, task_date,
             worker, workers, time_from, time_to,
             priority, status, archived, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Обычный', 'Новая', 0, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Обычный', 'Новая', 0, ?)
         """, (*values, created_at))
         task_ids.append(c.lastrowid)
 
@@ -21281,6 +21286,11 @@ async def assert_daily_route_schedule():
     assert "/api/calendar/dispatch/plan/apply" in owner_html
     assert 'draggable="true"' in owner_html
     assert "Свободное окно" in owner_html
+    assert "Открыть маршрут" in owner_html
+    assert "Точек с адресом:" in owner_html
+    assert "На объектах:" in owner_html
+    assert "📍 Москва, Тверская улица, 1" in owner_html
+    assert "https://yandex.ru/maps/?" in owner_html
     assert "Рекомендуем:" in owner_html
     assert "Назначить" in owner_html
     assert "Автозаполнение дня" in owner_html
@@ -21319,6 +21329,17 @@ async def assert_daily_route_schedule():
         for item in owner_page.context["schedule"]["workers"]
         if item["username"] == "worker2"
     )
+    route_summary = worker2_schedule["route_summary"]
+    assert route_summary["stops"] == 2
+    assert route_summary["addressed_stops"] == 2
+    assert route_summary["missing_addresses"] == 0
+    assert route_summary["first_time"] == "09:00"
+    assert route_summary["last_time"] == "10:30"
+    assert route_summary["service_minutes"] == 120
+    assert route_summary["route_url"].startswith(
+        "https://yandex.ru/maps/?rtext="
+    )
+    assert "rtt=auto" in route_summary["route_url"]
     assert len(worker2_schedule["timeline"]["slots"]) == 24
     assert worker2_schedule["timeline"]["free_windows"][0]["label"] == (
         "08:00–09:00"
@@ -21333,6 +21354,29 @@ async def assert_daily_route_schedule():
         for worker_schedule in owner_page.context["schedule"]["workers"]
         for item in worker_schedule["items"]
         if item["task_id"] == without_time_id
+    )
+    morning_item = next(
+        item
+        for item in worker2_schedule["items"]
+        if item["task_id"] == morning_id
+    )
+    assert morning_item["navigation_url"].startswith(
+        "https://yandex.ru/maps/?text="
+    )
+    helper_schedule = next(
+        item
+        for item in owner_page.context["schedule"]["workers"]
+        if item["username"] == "helper2"
+    )
+    overlap_item = next(
+        item
+        for item in helper_schedule["items"]
+        if item["task_id"] == overlap_id
+    )
+    assert helper_schedule["route_summary"]["addressed_stops"] == 1
+    assert helper_schedule["route_summary"]["missing_addresses"] == 1
+    assert helper_schedule["route_summary"]["route_url"] == (
+        overlap_item["navigation_url"]
     )
     assert without_time_item["duration_minutes"] == 60
     assert without_time_item["available_slots"]

@@ -98,8 +98,12 @@ h1{margin:0;font-size:30px}
 .conflict-time-new{color:#166534}
 .worker-section{margin-top:14px;border-top:4px solid #111827;background:white}
 .worker-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid #e5e7eb}
-.worker-name{font-size:18px;font-weight:900}
+.worker-name{color:#111827;font-size:18px;font-weight:900}
 .worker-stats{color:#6b7280;font-size:12px;font-weight:900}
+.worker-route-summary{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.worker-route-summary span{padding:5px 7px;border-radius:6px;background:#f3f4f6;color:#374151;font-size:10px;font-weight:900}
+.worker-route-summary .warning{background:#fff7ed;color:#9a3412}
+.worker-route-link{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;padding:9px 11px;border-radius:7px;background:#2563eb;color:white;text-decoration:none;font-size:12px;font-weight:900}
 .timeline-panel{padding:14px 16px;border-bottom:1px solid #e5e7eb;background:#f9fafb}
 .timeline-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
 .timeline-title{font-size:13px;font-weight:900}
@@ -137,6 +141,8 @@ h1{margin:0;font-size:30px}
 .route-time.empty{color:#9a3412}
 .task-title{color:#111827;text-decoration:none;font-size:16px;font-weight:900}
 .task-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;color:#6b7280;font-size:12px;font-weight:800}
+.route-address{color:#1d4ed8;text-decoration:none}
+.route-address:hover{text-decoration:underline}
 .conflict-label{display:inline-flex;margin-top:7px;padding:4px 7px;border-radius:6px;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:900}
 .quick-slots{display:flex;gap:6px;align-items:center;margin-top:9px}
 .quick-slots select{min-width:150px;padding:8px;border:1px solid #d1d5db;border-radius:7px;background:white;font-weight:800}
@@ -175,6 +181,7 @@ h1{margin:0;font-size:30px}
     .auto-plan-target{grid-column:2}
     .worker-head{align-items:flex-start;flex-direction:column}
     .worker-stats{line-height:1.5}
+    .worker-route-link{width:100%}
     .timeline-top{display:block}
     .free-windows{margin-top:8px}
     .route-item{grid-template-columns:52px minmax(0,1fr)}
@@ -527,13 +534,28 @@ h1{margin:0;font-size:30px}
     {% if worker["items"] %}
     <section class="worker-section" data-worker="{{ worker['username'] }}">
         <header class="worker-head">
-            <div class="worker-name">{{ worker["username"] }}</div>
             <div class="worker-stats">
-                По времени: {{ worker["scheduled_count"] }} ·
-                без времени: {{ worker["unscheduled_count"] }} ·
-                конфликтов: {{ worker["conflict_count"] }} ·
-                занятость: {{ worker["timeline"]["utilization_percent"] }}%
+                <div class="worker-name">{{ worker["username"] }}</div>
+                <div>
+                    По времени: {{ worker["scheduled_count"] }} ·
+                    без времени: {{ worker["unscheduled_count"] }} ·
+                    конфликтов: {{ worker["conflict_count"] }} ·
+                    занятость: {{ worker["timeline"]["utilization_percent"] }}%
+                </div>
+                <div class="worker-route-summary">
+                    <span>Точек с адресом: {{ worker["route_summary"]["addressed_stops"] }}/{{ worker["route_summary"]["stops"] }}</span>
+                    {% if worker["route_summary"]["first_time"] %}
+                    <span>Работы: {{ worker["route_summary"]["first_time"] }}–{{ worker["route_summary"]["last_time"] }}</span>
+                    {% endif %}
+                    <span>На объектах: {{ worker["route_summary"]["service_minutes"] }} мин.</span>
+                    {% if worker["route_summary"]["missing_addresses"] %}
+                    <span class="warning">Без адреса: {{ worker["route_summary"]["missing_addresses"] }}</span>
+                    {% endif %}
+                </div>
             </div>
+            {% if worker["route_summary"]["route_url"] %}
+            <a class="worker-route-link" href="{{ worker['route_summary']['route_url'] }}" target="_blank" rel="noopener noreferrer">Открыть маршрут</a>
+            {% endif %}
         </header>
 
         <div class="timeline-panel">
@@ -603,7 +625,11 @@ h1{margin:0;font-size:30px}
                 <div>
                     <a class="task-title" href="/task/{{ item['task_id'] }}">#{{ item["task_id"] }} · {{ item["client"] or client_label ~ " не указан" }}</a>
                     <div class="task-meta">
-                        <span>{{ item["address"] or "Адрес не указан" }}</span>
+                        {% if item["navigation_url"] %}
+                        <a class="route-address" href="{{ item['navigation_url'] }}" target="_blank" rel="noopener noreferrer">📍 {{ item["address"] }}</a>
+                        {% else %}
+                        <span>Адрес не указан</span>
+                        {% endif %}
                         <span>{{ item["status"] }}</span>
                         <span>{{ item["priority"] }}</span>
                         <span>{{ item["duration_minutes"] }} мин.</span>

@@ -1,5 +1,6 @@
 from datetime import datetime
 from itertools import combinations
+from urllib.parse import urlencode
 
 
 WORKDAY_START = 8 * 60
@@ -1673,6 +1674,13 @@ def build_daily_schedule(
                 exclude_task_id=int(_value(task, "id", 0) or 0),
             ) if workers and _task_blocks_time(task) else [],
         }
+        item["navigation_url"] = (
+            "https://yandex.ru/maps/?" + urlencode({
+                "text": item["address"],
+            })
+            if item["address"]
+            else ""
+        )
 
         if not workers:
             unassigned.append(item)
@@ -1741,6 +1749,43 @@ def build_daily_schedule(
 
         for route_order, item in enumerate(items, start=1):
             item["route_order"] = route_order
+
+        addressed_items = [item for item in items if item["address"]]
+        timed_items = [item for item in items if item["has_time"]]
+        route_url = ""
+
+        if len(addressed_items) == 1:
+            route_url = addressed_items[0]["navigation_url"]
+        elif addressed_items:
+            route_url = "https://yandex.ru/maps/?" + urlencode({
+                "rtext": "~".join(
+                    item["address"] for item in addressed_items
+                ),
+                "rtt": "auto",
+            })
+
+        worker_schedule["route_summary"] = {
+            "stops": len(items),
+            "addressed_stops": len(addressed_items),
+            "missing_addresses": len(items) - len(addressed_items),
+            "first_time": (
+                min(item["time_from"] for item in timed_items)
+                if timed_items
+                else ""
+            ),
+            "last_time": (
+                format_time_value(max(
+                    parse_time_value(item["time_to"])
+                    for item in timed_items
+                ))
+                if timed_items
+                else ""
+            ),
+            "service_minutes": sum(
+                item["duration_minutes"] for item in items
+            ),
+            "route_url": route_url,
+        }
 
     ordered_workers = sorted(
         schedule_workers.values(),
