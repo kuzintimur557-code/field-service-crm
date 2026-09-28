@@ -198,11 +198,13 @@ from app.services.background_jobs import (
 )
 from app.services.email_inbox import (
     EMAIL_STATUSES,
+    MAX_RAW_LENGTH,
     find_or_create_inbox_client,
     get_email_message,
     get_email_messages,
     normalize_inbox_payload,
     parse_extracted_fields,
+    parse_raw_email,
     save_email_message,
     set_email_message_status,
     suggest_inbox_slots,
@@ -43142,13 +43144,44 @@ async def receive_inbox_email(request: Request):
             status_code=403,
         )
 
-    try:
-        data = await request.json()
-    except Exception:
-        return JSONResponse(
-            {"ok": False, "error": "invalid_json"},
-            status_code=400,
-        )
+    content_type = (
+        (request.headers.get("content-type") or "")
+        .split(";")[0]
+        .strip()
+        .lower()
+    )
+
+    if content_type == "application/json":
+        try:
+            data = await request.json()
+        except Exception:
+            return JSONResponse(
+                {"ok": False, "error": "invalid_json"},
+                status_code=400,
+            )
+    else:
+        raw_body = await request.body()
+
+        if len(raw_body) > MAX_RAW_LENGTH:
+            return JSONResponse(
+                {"ok": False, "error": "message_too_large"},
+                status_code=413,
+            )
+
+        try:
+            data = parse_raw_email(raw_body)
+        except ValueError as e:
+            return JSONResponse(
+                {"ok": False, "error": str(e)},
+                status_code=400,
+            )
+
+        try:
+            data["company_id"] = int(
+                request.query_params.get("company_id") or 0
+            )
+        except (TypeError, ValueError):
+            data["company_id"] = 0
 
     try:
         payload = normalize_inbox_payload(data)

@@ -21,7 +21,7 @@ class FakeInboxRequest:
     def __init__(self, payload, token=INBOX_SECRET, broken_json=False):
         self._payload = payload
         self._broken_json = broken_json
-        self.headers = {}
+        self.headers = {"content-type": "application/json"}
         self.cookies = {}
         if token:
             self.headers["x-inbox-secret"] = token
@@ -118,13 +118,71 @@ def main():
         assert response["ok"] and not response["created"]
         assert response["duplicate"] and response["id"] == message_id
 
-        messages = get_email_messages(1)
-        assert len(messages) == 1
-        assert messages[0]["status"] == "new"
-        assert messages[0]["subject"] == "Нужен ремонт стиральной машины"
-        assert messages[0]["raw_source"]
+        # raw .eml intake
+        def raw_request(body, token=INBOX_SECRET, query=b"company_id=1"):
+            headers = [(b"content-type", b"message/rfc822")]
+            if token:
+                headers.append((b"x-inbox-secret", token.encode()))
+            scope = {
+                "type": "http",
+                "method": "POST",
+                "path": "/api/inbox/email",
+                "headers": headers,
+                "query_string": query,
+                "scheme": "http",
+                "client": ("127.0.0.1", 50000),
+                "server": ("testserver", 80),
+            }
 
-        extracted = parse_extracted_fields(messages[0]["extracted_json"])
+            async def receive():
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            return Request(scope, receive)
+
+        eml = (
+            "From: Иван Петров <ivan@example.com>\r\n"
+            "Message-ID: <raw-001@test>\r\n"
+            "Subject: Sanтехника\r\n"
+            "Date: Mon, 28 Sep 2026 10:00:00 +0300\r\n"
+            "Content-Type: text/plain; charset=utf-8\r\n"
+            "\r\n"
+            "Здравствуйте! Нужен сантехник. Телефон +79005556677\r\n"
+        ).encode("utf-8")
+
+        response = asyncio.run(crm.receive_inbox_email(raw_request(eml)))
+        assert response["ok"] and response["created"]
+        raw_message_id = response["id"]
+
+        response = asyncio.run(crm.receive_inbox_email(raw_request(eml)))
+        assert response["ok"] and response["duplicate"]
+        assert response["id"] == raw_message_id
+
+        conn = connect()
+        c = conn.cursor()
+        raw_message = c.execute(
+            "SELECT * FROM email_messages WHERE id=?", (raw_message_id,)
+        ).fetchone()
+        conn.close()
+        assert raw_message["from_email"] == "ivan@example.com"
+        assert raw_message["from_name"] == "Иван Петров"
+        assert "Иван Петров" in raw_message["raw_source"]
+        assert parse_extracted_fields(
+            raw_message["extracted_json"]
+        )["phone"] == "+79005556677"
+
+        # invalid raw email and missing company rejected
+        response = asyncio.run(crm.receive_inbox_email(raw_request(b"")))
+        assert response.status_code == 400
+        response = asyncio.run(crm.receive_inbox_email(raw_request(eml, query=b"")))
+        assert response.status_code == 400
+
+        messages = get_email_messages(1)
+        assert len(messages) == 2
+        assert messages[1]["status"] == "new"
+        assert messages[1]["subject"] == "Нужен ремонт стиральной машины"
+        assert messages[1]["raw_source"]
+
+        extracted = parse_extracted_fields(messages[1]["extracted_json"])
         assert extracted["phone"] == "+79001112233"
         assert "Ленина 10" in extracted["address"]
 

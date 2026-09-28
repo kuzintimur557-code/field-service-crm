@@ -2,6 +2,9 @@ import hashlib
 import json
 import re
 from datetime import datetime, timedelta
+from email import policy
+from email.parser import BytesParser
+from email.utils import parseaddr
 
 from app.database import begin_locked_transaction, connect
 
@@ -381,6 +384,46 @@ def normalize_inbox_payload(data):
 
     payload["dedupe_key"] = build_email_dedupe_key(payload)
     return payload
+
+
+def parse_raw_email(raw_bytes):
+    try:
+        message = BytesParser(policy=policy.default).parsebytes(raw_bytes)
+    except Exception:
+        raise ValueError("invalid_email")
+
+    from_name, from_email = parseaddr(str(message.get("From", "") or ""))
+    subject = str(message.get("Subject", "") or "")
+    message_id = str(message.get("Message-ID", "") or "").strip()
+    received_at = str(message.get("Date", "") or "")
+
+    body_text = ""
+    body_part = message.get_body(preferencelist=("plain", "html"))
+    if body_part is not None:
+        try:
+            content = str(body_part.get_content() or "")
+        except Exception:
+            content = ""
+        if body_part.get_content_type() == "text/html":
+            content = re.sub(r"<br\s*/?>", "\n", content, flags=re.IGNORECASE)
+            content = re.sub(r"</p>", "\n", content, flags=re.IGNORECASE)
+            content = re.sub(r"<[^>]+>", " ", content)
+            content = re.sub(r"[ \t]+", " ", content)
+        body_text = content.strip()
+
+    if not from_email and not subject and not body_text:
+        raise ValueError("invalid_email")
+
+    return {
+        "provider": "eml",
+        "message_id": message_id,
+        "from_email": from_email,
+        "from_name": from_name,
+        "subject": subject,
+        "text": body_text,
+        "raw": raw_bytes.decode("utf-8", errors="replace"),
+        "received_at": received_at,
+    }
 
 
 def build_email_dedupe_key(payload):
