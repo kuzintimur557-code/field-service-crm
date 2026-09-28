@@ -101,6 +101,9 @@ jobs:
       - name: Run master mode smoke
         run: python tests/smoke_master_mode.py
 
+      - name: Run onboarding smoke
+        run: python tests/smoke_onboarding.py
+
       - name: Run error monitoring smoke
         run: python tests/smoke_error_monitoring.py
 

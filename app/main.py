@@ -43026,6 +43026,93 @@ async def run_database_backup_cron(request: Request):
     return payload
 
 
+@app.get("/onboarding", response_class=HTMLResponse)
+async def onboarding_page(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
+    subscription = get_company_subscription(company_id)
+
+    conn = connect()
+    c = conn.cursor()
+
+    clients_count = c.execute(
+        "SELECT COUNT(*) FROM clients WHERE company_id=?",
+        (company_id,),
+    ).fetchone()[0]
+    tasks_count = c.execute(
+        "SELECT COUNT(*) FROM tasks WHERE company_id=?",
+        (company_id,),
+    ).fetchone()[0]
+    workers_count = c.execute("""
+    SELECT COUNT(*)
+    FROM users
+    WHERE company_id=? AND role='worker' AND COALESCE(is_active, 1)=1
+    """, (company_id,)).fetchone()[0]
+
+    conn.close()
+
+    profile_done = bool(
+        (settings["company_name"] or "").strip()
+        or (settings["phone"] or "").strip()
+    )
+
+    steps = [
+        {
+            "title": "Заполнить профиль компании",
+            "done": profile_done,
+            "link": "/settings",
+        },
+        {
+            "title": "Добавить первого клиента",
+            "done": clients_count > 0,
+            "link": "/clients",
+        },
+        {
+            "title": f"Создать первую {(settings['task_label'] or 'заявку').lower()}",
+            "done": tasks_count > 0,
+            "link": "/create-task",
+        },
+        {
+            "title": f"Пригласить {(settings['worker_label'] or 'исполнителя').lower()}",
+            "done": workers_count > 0,
+            "link": "/workers",
+        },
+        {
+            "title": "Выбрать тариф и активировать подписку",
+            "done": subscription["status"] == "active",
+            "link": "/billing",
+        },
+    ]
+
+    done_count = sum(1 for step in steps if step["done"])
+
+    return templates.TemplateResponse(
+        request,
+        "onboarding.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "links": build_dashboard_links(),
+            "steps": steps,
+            "done_count": done_count,
+            "total_count": len(steps),
+        }
+    )
+
+
 @app.get("/master", response_class=HTMLResponse)
 async def master_today_page(request: Request):
 
