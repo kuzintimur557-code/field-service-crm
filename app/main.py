@@ -19431,32 +19431,24 @@ async def home(
             worker_condition = worker_task_condition()
             worker_params = worker_task_params(worker_name)
 
-            completed = c.execute(f"""
-            SELECT COUNT(*) FROM tasks
+            stats = c.execute(f"""
+            SELECT
+                COALESCE(SUM(CASE WHEN status='Завершено' THEN 1 ELSE 0 END), 0)
+                    AS completed,
+                COALESCE(SUM(CASE WHEN status='В работе' THEN 1 ELSE 0 END), 0)
+                    AS active,
+                COALESCE(SUM(CASE WHEN status='Завершено'
+                    THEN CAST(REPLACE(COALESCE(price, '0'), ',', '.') AS REAL)
+                    ELSE 0 END), 0) AS revenue
+            FROM tasks
             WHERE archived=0 AND company_id=? AND {worker_condition}
-              AND status='Завершено'
-            """, [company_id] + worker_params).fetchone()[0]
-
-            active = c.execute(f"""
-            SELECT COUNT(*) FROM tasks
-            WHERE archived=0 AND company_id=? AND {worker_condition}
-              AND status='В работе'
-            """, [company_id] + worker_params).fetchone()[0]
-
-            worker_revenue = c.execute(f"""
-            SELECT SUM(price) FROM tasks
-            WHERE archived=0 AND company_id=? AND {worker_condition}
-              AND status='Завершено'
-            """, [company_id] + worker_params).fetchone()[0]
-
-            if worker_revenue is None:
-                worker_revenue = 0
+            """, [company_id] + worker_params).fetchone()
 
             worker_stats.append({
                 "username": worker_name,
-                "completed": completed,
-                "active": active,
-                "revenue": worker_revenue,
+                "completed": stats["completed"],
+                "active": stats["active"],
+                "revenue": round(stats["revenue"], 2),
                 "last_seen": w["last_seen"]
             })
 
