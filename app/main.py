@@ -33212,6 +33212,34 @@ async def finance_page(
     if selected_worker not in worker_names:
         selected_worker = ""
 
+    finance_items_map = {
+        row["task_id"]: {
+            "total": row["items_total"] or 0,
+            "profit": row["items_profit"] or 0,
+        }
+        for row in c.execute("""
+        SELECT task_id, SUM(total) AS items_total, SUM(profit) AS items_profit
+        FROM task_items
+        WHERE task_id IN (
+            SELECT id FROM tasks
+            WHERE archived=0 AND company_id=? AND task_date LIKE ?
+        )
+        GROUP BY task_id
+        """, (company_id, f"{month}%")).fetchall()
+    }
+    finance_expenses_map = {
+        row["task_id"]: row["expenses_total"] or 0
+        for row in c.execute("""
+        SELECT task_id, SUM(amount) AS expenses_total
+        FROM task_expenses
+        WHERE task_id IN (
+            SELECT id FROM tasks
+            WHERE archived=0 AND company_id=? AND task_date LIKE ?
+        )
+        GROUP BY task_id
+        """, (company_id, f"{month}%")).fetchall()
+    }
+
     total_estimate = 0
     total_profit = 0
     total_expenses = 0
@@ -33227,23 +33255,15 @@ async def finance_page(
         if selected_worker and selected_worker not in get_task_worker_names(task):
             continue
 
-        items = c.execute("""
-        SELECT *
-        FROM task_items
-        WHERE task_id=?
-        """, (task["id"],)).fetchall()
-        expenses = c.execute("""
-        SELECT *
-        FROM task_expenses
-        WHERE task_id=?
-        """, (task["id"],)).fetchall()
+        has_items = task["id"] in finance_items_map
+        items_totals = finance_items_map.get(task["id"], {"total": 0, "profit": 0})
 
-        task_total = sum(item["total"] for item in items)
-        task_profit = sum(item["profit"] for item in items)
+        task_total = items_totals["total"]
+        task_profit = items_totals["profit"]
         discount_amount = float(task["discount_amount"] or 0) if "discount_amount" in task.keys() else 0
-        task_expenses_total = sum(expense["amount"] for expense in expenses)
+        task_expenses_total = finance_expenses_map.get(task["id"], 0)
 
-        if not items:
+        if not has_items:
             try:
                 task_total = float(task["price"] or 0)
             except Exception:
