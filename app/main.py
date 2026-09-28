@@ -42845,6 +42845,37 @@ async def run_background_jobs_cron(request: Request):
     return payload
 
 
+@app.post("/automation/cron/database-backup")
+async def run_database_backup_cron(request: Request):
+    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
+
+    if not cron_secret:
+        return JSONResponse(
+            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
+            status_code=503,
+        )
+    token = (request.headers.get("x-automation-secret") or "").strip()
+    if not token or not hmac.compare_digest(token, cron_secret):
+        return JSONResponse(
+            {"ok": False, "error": "forbidden"},
+            status_code=403,
+        )
+
+    queued = enqueue_database_backup_job("cron")
+    summary = run_background_job_batch(
+        worker_id=f"cron-backup-{uuid4().hex[:12]}",
+    )
+    payload = {
+        "ok": not summary["failed"] and not summary["stale_failed"],
+        "job_created": queued["created"],
+        "job_id": queued["job"]["id"],
+        "summary": summary,
+    }
+    if not payload["ok"]:
+        return JSONResponse(payload, status_code=503)
+    return payload
+
+
 def build_debug_links():
     return {
         "clear_login_attempts": "/debug/login-attempts/clear",
