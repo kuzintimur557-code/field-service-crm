@@ -25808,6 +25808,8 @@ async def assert_client_card(task):
     assert "активен" in html
     assert f"/calendar?date={upcoming_task_date}" in html
     assert f"/create-task?client_id={task['client_id']}&return_to=client" in html
+    assert f'href="/clients/{task["client_id"]}/export"' in html
+    assert "Экспорт карточки клиента" in html
     assert f"/create-task?client_id={task['client_id']}&source_task_id={task['id']}&return_to=client" in html
     assert f"#{task['id']}" in html
     assert 'class="mobile-nav"' in html
@@ -25821,6 +25823,29 @@ async def assert_client_card(task):
     assert 'input[type="hidden"]{display:none}' in html
     assert "💾 Сохранить изменения" not in html
     assert "📝 Добавить заметку" not in html
+
+    export_response = await crm.client_detail_export(
+        make_asgi_request("owner2", f"/clients/{task['client_id']}/export"),
+        task["client_id"],
+    )
+    assert export_response.status_code == 200
+    assert export_response.media_type == "text/csv; charset=utf-8"
+    assert (
+        f"client_{task['client_id']}_card.csv"
+        in export_response.headers["Content-Disposition"]
+    )
+    export_csv = export_response.body.decode("utf-8")
+    assert export_csv.startswith("\ufeff")
+    assert "Карточка: Клиент" in export_csv
+    assert "Client 2" in export_csv
+    assert "Заявка: история" in export_csv
+    assert "Smoke task" in export_csv
+    assert "Smoke latest client note" in export_csv
+    assert "Smoke client call note" in export_csv
+    assert "Smoke client call transcript" in export_csv
+    assert "client-contract.txt" in export_csv
+    assert "Smoke client timeline" in export_csv
+    assert "Timeline details" in export_csv
 
     empty_notes_response = await crm.client_detail(
         make_asgi_request(

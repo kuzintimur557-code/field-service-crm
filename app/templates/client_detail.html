@@ -278,6 +278,7 @@ h1{font-size:28px}
 	</div>
 	<div style="margin-top:18px">
 	    <a class="btn" href="/create-task?client_id={{ client['id'] }}&return_to=client">Создать: {{ task_label }}</a>
+	    <a class="btn" style="background:#111827;margin-top:10px" href="/clients/{{ client['id'] }}/export">Экспорт карточки клиента</a>
 	</div>
 	{% if latest_task %}
 	<div class="latest-task">

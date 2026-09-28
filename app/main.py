@@ -38271,6 +38271,236 @@ async def client_detail(
     )
 
 
+@app.get("/clients/{client_id}/export")
+async def client_detail_export(request: Request, client_id: int):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id, missing_company_response = require_route_company_context(username, role)
+
+    if missing_company_response:
+        return missing_company_response
+
+    disabled_response = require_feature(company_id, "clients")
+
+    if disabled_response:
+        return disabled_response
+
+    settings = get_company_settings(company_id)
+    task_label = settings["task_label"] or "Заявка"
+    worker_label = settings["worker_label"] or "Исполнитель"
+    client_label = settings["client_label"] or "Клиент"
+
+    conn = connect()
+    c = conn.cursor()
+
+    client = c.execute("""
+    SELECT *
+    FROM clients
+    WHERE id=? AND company_id=?
+    """, (client_id, company_id)).fetchone()
+
+    if not client:
+        conn.close()
+        return RedirectResponse("/clients", status_code=302)
+
+    tasks = c.execute("""
+    SELECT *
+    FROM tasks
+    WHERE client_id=? AND company_id=?
+    ORDER BY id DESC
+    """, (client_id, company_id)).fetchall()
+
+    client_notes = c.execute("""
+    SELECT *
+    FROM client_notes
+    WHERE client_id=? AND company_id=?
+    ORDER BY id DESC
+    """, (client_id, company_id)).fetchall()
+
+    client_files = c.execute("""
+    SELECT *
+    FROM client_files
+    WHERE client_id=? AND company_id=?
+    ORDER BY id DESC
+    """, (client_id, company_id)).fetchall()
+
+    client_calls = c.execute("""
+    SELECT *
+    FROM call_records
+    WHERE client_id=? AND company_id=?
+    ORDER BY COALESCE(call_at, created_at) DESC, id DESC
+    """, (client_id, company_id)).fetchall()
+
+    client_timeline = c.execute("""
+    SELECT
+        task_activity.*,
+        tasks.id AS task_id,
+        tasks.status AS task_status
+    FROM task_activity
+    JOIN tasks ON tasks.id=task_activity.task_id
+    WHERE tasks.client_id=?
+      AND tasks.company_id=?
+    ORDER BY task_activity.id DESC
+    """, (client_id, company_id)).fetchall()
+
+    client_custom_fields = c.execute("""
+    SELECT custom_fields.label, custom_field_values.value
+    FROM custom_fields
+    LEFT JOIN custom_field_values
+      ON custom_field_values.field_id=custom_fields.id
+      AND custom_field_values.company_id=custom_fields.company_id
+      AND custom_field_values.entity_type='client'
+      AND custom_field_values.entity_id=?
+    WHERE custom_fields.company_id=?
+      AND custom_fields.entity_type='client'
+      AND custom_fields.active=1
+    ORDER BY custom_fields.sort_order, custom_fields.id
+    """, (client_id, company_id)).fetchall()
+
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([f"Карточка: {client_label}"])
+    writer.writerow(["ID", client["id"]])
+    writer.writerow([client_label, client["name"] or ""])
+    writer.writerow(["Телефон", client["phone"] or ""])
+    writer.writerow(["Электронная почта", client["email"] or ""])
+    writer.writerow(["Адрес", client["address"] or ""])
+    writer.writerow(["Заметки", client["notes"] or ""])
+    writer.writerow(["Создан", client["created_at"] or ""])
+    writer.writerow(["Экспортировано", datetime.now().strftime("%Y-%m-%d %H:%M")])
+
+    if client_custom_fields:
+        writer.writerow([])
+        writer.writerow(["Дополнительные поля"])
+        writer.writerow(["Поле", "Значение"])
+
+        for field in client_custom_fields:
+            writer.writerow([
+                field["label"] or "",
+                field["value"] or "",
+            ])
+
+    writer.writerow([])
+    writer.writerow([f"{task_label}: история"])
+    writer.writerow([
+        "ID",
+        "Дата",
+        "Статус",
+        worker_label,
+        "Приоритет",
+        "Стоимость",
+        "SLA",
+        "Описание",
+        "Адрес",
+    ])
+
+    for task in tasks:
+        writer.writerow([
+            task["id"],
+            task["task_date"] or "",
+            task["status"] or "",
+            format_task_workers(task),
+            task["priority"] or "",
+            task["price"] or "",
+            task["deadline_at"] or "",
+            task["description"] or "",
+            task["address"] or "",
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Заметки"])
+    writer.writerow(["Дата", "Автор", "Роль", "Текст"])
+
+    for note in client_notes:
+        writer.writerow([
+            note["created_at"] or "",
+            note["username"] or "",
+            role_label(note["role"]),
+            note["note"] or "",
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Звонки"])
+    writer.writerow([
+        "Дата",
+        "Направление",
+        "Статус",
+        "Телефон",
+        "Длительность, минут",
+        "Заметка",
+        "Расшифровка",
+        "ИИ-резюме",
+        "Автор",
+    ])
+
+    call_direction_labels = {
+        "incoming": "Входящий",
+        "outgoing": "Исходящий",
+    }
+    call_status_labels = {
+        "completed": "Состоялся",
+        "missed": "Пропущен",
+        "follow_up": "Нужен контакт",
+    }
+
+    for call in client_calls:
+        writer.writerow([
+            call["call_at"] or call["created_at"] or "",
+            call_direction_labels.get(call["direction"], call["direction"] or ""),
+            call_status_labels.get(call["status"], call["status"] or ""),
+            call["phone"] or "",
+            call["duration_minutes"] or 0,
+            call["summary"] or "",
+            call["transcript"] or "",
+            call["ai_summary"] or "",
+            call["username"] or "",
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Файлы"])
+    writer.writerow(["Дата", "Файл", "Тип", "Автор"])
+
+    for client_file in client_files:
+        writer.writerow([
+            client_file["created_at"] or "",
+            client_file["original_filename"] or "",
+            client_file["content_type"] or "",
+            client_file["username"] or "",
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Лента активности"])
+    writer.writerow(["Дата", task_label, "Действие", "Детали"])
+
+    for item in client_timeline:
+        writer.writerow([
+            item["created_at"] or "",
+            item["task_id"] or "",
+            ui_text(item["action"] or ""),
+            ui_text(item["details"] or ""),
+        ])
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=client_{client_id}_card.csv"
+        }
+    )
+
+
 @app.post("/clients/{client_id}/calls")
 async def add_client_call(request: Request, client_id: int):
 
