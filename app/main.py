@@ -196,10 +196,13 @@ from app.services.background_jobs import (
     get_recent_background_jobs,
     process_background_jobs,
 )
+from app.services.call_analysis import analyze_call_text
 from app.services.email_inbox import (
     EMAIL_STATUSES,
     MAX_RAW_LENGTH,
+    extract_email_fields,
     find_or_create_inbox_client,
+    get_company_service_names,
     get_email_message,
     get_email_messages,
     normalize_inbox_payload,
@@ -34749,6 +34752,23 @@ async def call_detail(request: Request, call_id: int):
 
     conn.close()
 
+    call_text_parts = [
+        call["summary"],
+        call["transcript"],
+        call["ai_summary"],
+    ]
+    call_text = "\n".join(
+        str(part or "") for part in call_text_parts if str(part or "").strip()
+    )
+    call_extracted = {}
+    if call_text:
+        call_extracted = extract_email_fields(
+            call_text,
+            "",
+            "",
+            get_company_service_names(company_id),
+        )
+
     return templates.TemplateResponse(
         request,
         "call_detail.html",
@@ -34758,7 +34778,8 @@ async def call_detail(request: Request, call_id: int):
             "role": role,
             "settings": settings,
             "call": call,
-            "linked_tasks": linked_tasks
+            "linked_tasks": linked_tasks,
+            "call_extracted": call_extracted,
         }
     )
 
@@ -34795,7 +34816,8 @@ async def update_call_analysis(request: Request, call_id: int):
     c = conn.cursor()
 
     call = c.execute("""
-    SELECT id, ai_summary
+    SELECT id, ai_summary, summary, status,
+           ai_sentiment, ai_sale_detected, ai_follow_up_detected
     FROM call_records
     WHERE id=? AND company_id=?
     """, (call_id, company_id)).fetchone()
@@ -34804,16 +34826,43 @@ async def update_call_analysis(request: Request, call_id: int):
         conn.close()
         return RedirectResponse("/calls", status_code=302)
 
-    ai_summary = requested_ai_summary if settings["ai_calls_enabled"] else (call["ai_summary"] or "")
+    ai_calls_enabled = bool(settings["ai_calls_enabled"])
+    ai_summary = requested_ai_summary if ai_calls_enabled else (call["ai_summary"] or "")
+
+    analysis_sentiment = call["ai_sentiment"] or ""
+    analysis_sale = int(call["ai_sale_detected"] or 0)
+    analysis_follow_up = int(call["ai_follow_up_detected"] or 0)
+    new_status = call["status"]
+
+    if ai_calls_enabled:
+        analysis = analyze_call_text(
+            call["summary"],
+            transcript,
+            ai_summary,
+        )
+        analysis_sentiment = analysis["sentiment"]
+        analysis_sale = int(analysis["sale_detected"])
+        analysis_follow_up = int(analysis["follow_up_detected"])
+
+        if analysis_follow_up and call["status"] == "completed":
+            new_status = "follow_up"
 
     c.execute("""
     UPDATE call_records
     SET transcript=?,
-        ai_summary=?
+        ai_summary=?,
+        ai_sentiment=?,
+        ai_sale_detected=?,
+        ai_follow_up_detected=?,
+        status=?
     WHERE id=? AND company_id=?
     """, (
         transcript,
         ai_summary,
+        analysis_sentiment,
+        analysis_sale,
+        analysis_follow_up,
+        new_status,
         call_id,
         company_id
     ))

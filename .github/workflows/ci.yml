@@ -92,6 +92,9 @@ jobs:
       - name: Run email inbox smoke
         run: python tests/smoke_email_inbox.py
 
+      - name: Run call analysis smoke
+        run: python tests/smoke_call_analysis.py
+
       - name: Run error monitoring smoke
         run: python tests/smoke_error_monitoring.py
 
