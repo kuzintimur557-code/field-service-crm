@@ -104,6 +104,9 @@ jobs:
       - name: Run onboarding smoke
         run: python tests/smoke_onboarding.py
 
+      - name: Run migrations smoke
+        run: python tests/smoke_migrations.py
+
       - name: Run error monitoring smoke
         run: python tests/smoke_error_monitoring.py
 
@@ -170,6 +173,9 @@ jobs:
 
       - name: Run PostgreSQL application smoke
         run: python tests/smoke_app.py
+
+      - name: Run Alembic migrations on PostgreSQL
+        run: alembic stamp 0001 && alembic upgrade head
 
   release-gate:
     name: Production release gate

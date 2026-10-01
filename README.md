@@ -128,8 +128,15 @@ Railway metadata обычно задаётся автоматически:
 - `RAILWAY_DEPLOYMENT_ID`
 - `RAILWAY_SERVICE_NAME`
 
-## Миграция на PostgreSQL
+## Миграции схемы
 
+Изменения схемы БД выполняются через Alembic: `alembic revision -m "..."`,
+миграции — переносимым SQL (`op.execute`), работают и на SQLite, и на
+PostgreSQL. `init_db()` — замороженный bootstrap для свежих баз; существующие
+базы переводятся командой `alembic stamp 0001`. Подробности:
+[docs/migrations.md](docs/migrations.md).
+
+## Миграция на PostgreSQL
 Переход выполняется по этапам, чтобы не потерять данные и не сломать текущую
 SQLite-версию. Добавлены psycopg adapter, перенос общей схемы и полный
 PostgreSQL application smoke в CI. Также добавлен защищённый перенос данных:
