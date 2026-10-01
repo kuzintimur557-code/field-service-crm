@@ -240,15 +240,18 @@ def get_storage_object(relative_key, local_root):
                 "body": response["Body"],
                 "content_type": response.get("ContentType") or "",
                 "content_length": int(response.get("ContentLength") or 0),
+                "etag": str(response.get("ETag") or "").strip(),
             }
         except Exception:
             pass
     if local_path.is_file():
+        stat = local_path.stat()
         return {
             "backend": LOCAL_BACKEND,
             "path": local_path,
             "content_type": "",
-            "content_length": local_path.stat().st_size,
+            "content_length": stat.st_size,
+            "etag": f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"',
         }
     return None
 

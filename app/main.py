@@ -1014,6 +1014,7 @@ def storage_file_response(
     local_root,
     download_name="",
     media_type="",
+    request=None,
 ):
     try:
         stored = get_storage_object(relative_key, local_root)
@@ -1021,6 +1022,19 @@ def storage_file_response(
         stored = None
     if stored is None:
         return Response(status_code=404)
+
+    etag = str(stored.get("etag") or "").strip()
+    cache_headers = {"Cache-Control": "private, max-age=86400"}
+    if etag:
+        cache_headers["ETag"] = etag
+
+    if etag and request is not None:
+        client_etags = (
+            request.headers.get("if-none-match") or ""
+        ).split(",")
+        if any(client_tag.strip() == etag for client_tag in client_etags):
+            return Response(status_code=304, headers=cache_headers)
+
     safe_download_name = Path(download_name or "").name
     guessed_media_type = mimetypes.guess_type(relative_key)[0] or ""
     resolved_media_type = (
@@ -1038,6 +1052,7 @@ def storage_file_response(
             str(stored["path"]),
             filename=safe_download_name or None,
             media_type=resolved_media_type,
+            headers=cache_headers,
         )
 
     body = stored["body"]
@@ -1055,7 +1070,7 @@ def storage_file_response(
             except Exception:
                 pass
 
-    headers = {}
+    headers = dict(cache_headers)
     if stored["content_length"]:
         headers["Content-Length"] = str(stored["content_length"])
     if safe_download_name:
@@ -5962,7 +5977,7 @@ async def uploaded_file(request: Request, filename: str):
     if not task or not can_access_task(username, role, task):
         return Response(status_code=404)
 
-    return storage_file_response(safe_filename, UPLOAD_DIR)
+    return storage_file_response(safe_filename, UPLOAD_DIR, request=request)
 
 
 def get_request_ip(request):
@@ -35161,6 +35176,7 @@ async def download_call_audio(request: Request, call_id: int):
         f"call_audio/{audio_filename}",
         UPLOAD_DIR,
         download_name=audio_filename,
+        request=request,
     )
 
 
@@ -39009,6 +39025,7 @@ async def download_client_file(request: Request, client_id: int, file_id: int):
         UPLOAD_DIR,
         download_name=client_file["original_filename"] or stored_filename,
         media_type=client_file["content_type"] or "",
+        request=request,
     )
 
 
