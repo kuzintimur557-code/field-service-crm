@@ -11497,18 +11497,19 @@ async def assert_platform_companies_page():
     assert list_invoice_company["billing_invoice_summary"]["count"] == 1
     assert list_invoice_company["billing_status_tone"] in {"warning", "danger"}
 
+    billing_tone = list_invoice_company["billing_status_tone"]
     billing_warning_filter_api = await crm.api_platform_companies(
         make_asgi_request(
             "super",
             (
                 "/api/platform/companies?search=Smoke%20Logistics"
-                "&billing=warning"
+                f"&billing={billing_tone}"
             ),
         ),
         search="Smoke Logistics",
-        billing="warning",
+        billing=billing_tone,
     )
-    assert billing_warning_filter_api["filters"]["billing"] == "warning"
+    assert billing_warning_filter_api["filters"]["billing"] == billing_tone
     assert any(
         company["id"] == logistics_company_id
         for company in billing_warning_filter_api["companies"]
