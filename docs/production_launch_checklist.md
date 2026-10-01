@@ -11,6 +11,7 @@ Set these variables before production deploy:
 - `CSRF_TRUSTED_ORIGINS` if browser requests legitimately use another origin
 - `TRUST_PROXY_HEADERS=1` only when direct traffic is blocked by a trusted proxy
 - `AUTOMATION_CRON_SECRET` with a long random value
+- `INBOX_WEBHOOK_SECRET` with a long random value if email intake is enabled
 - `BOT_TOKEN` and `CHAT_ID` if Telegram alerts are enabled
 - `DATA_DIR` if the server uses a mounted persistent volume
 - `DATABASE_BACKEND=postgresql` after the rehearsed cutover
@@ -117,6 +118,8 @@ Protected cron endpoints require the `x-automation-secret` header:
 - `POST /automation/cron/calendar-plans`
 - `POST /automation/cron/calendar-plans/watchdog`
 - `POST /automation/cron/background-jobs` every minute
+- `POST /automation/cron/database-backup` daily
+- `POST /automation/cron/subscription-reminders` daily
 
 Example:
 

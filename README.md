@@ -31,6 +31,12 @@ A3 Ops Center и AI-ready аналитика.
 - A3 automation engine
 - workflow runtime, timeline, replay
 - system diagnostics, backups, readiness checks
+- AI Inbox: приём писем (включая сырые .eml), разбор и заявки с подтверждением менеджером
+- AI Calls: анализ звонков (настроение, продажа, follow-up)
+- SaaS: тарифы, лимиты, подписки и пробный период
+- A3 Мастер: упрощённый режим частного мастера с голосовым вводом
+- onboarding первого запуска
+- PWA: установка на телефон, офлайн-кэш
 
 ## Локальный запуск
 
@@ -288,6 +294,9 @@ health/readiness endpoints, deployed commit и security baseline. Настрой
 ## Документы
 
 - [Production Launch Checklist](docs/production_launch_checklist.md)
+- [Email Inbox](docs/email_inbox.md)
+- [AI Calls](docs/ai_calls.md)
+- [A3 Master Mode](docs/a3_master.md)
 - [Object Storage](docs/object_storage.md)
 - [Background Jobs](docs/background_jobs.md)
 - [Error Monitoring](docs/error_monitoring.md)
