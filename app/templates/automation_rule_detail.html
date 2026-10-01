@@ -589,6 +589,15 @@ if (actionKeySelect) {
 </script>
 
 <script>
+function a3WorkflowEscapeHtml(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 function a3WorkflowNodeLabel(type) {
     const labels = {
         trigger: "Триггер",
@@ -636,7 +645,7 @@ async function loadA3WorkflowBuilderPreview() {
 
         if (!response.ok || !data.ok) {
             const message = data.message || "Граф недоступен";
-            container.innerHTML = `<div class="pill" style="background:#fee2e2;color:#991b1b;">${message}</div>`;
+            container.innerHTML = `<div class="pill" style="background:#fee2e2;color:#991b1b;">${a3WorkflowEscapeHtml(message)}</div>`;
             status.textContent = message;
             status.className = "pill off";
             return;
@@ -659,9 +668,9 @@ async function loadA3WorkflowBuilderPreview() {
             item.style.overflowWrap = "anywhere";
 
             item.innerHTML = `
-                <div class="label">${a3WorkflowNodeLabel(node.type)}</div>
-                <div style="font-weight:900;margin-top:6px;line-height:1.3;">${node.label}</div>
-                <div class="pill" style="margin-top:10px;">${node.status_label || a3WorkflowStatusLabel(node.status)}</div>
+                <div class="label">${a3WorkflowEscapeHtml(a3WorkflowNodeLabel(node.type))}</div>
+                <div style="font-weight:900;margin-top:6px;line-height:1.3;">${a3WorkflowEscapeHtml(node.label)}</div>
+                <div class="pill" style="margin-top:10px;">${a3WorkflowEscapeHtml(node.status_label || a3WorkflowStatusLabel(node.status))}</div>
             `;
 
             container.appendChild(item);

@@ -6009,14 +6009,16 @@ def is_login_blocked(username, ip):
     c = conn.cursor()
 
     row = c.execute("""
-    SELECT *
+    SELECT blocked_until
     FROM login_attempts
-    WHERE username=? AND ip=?
-    """, (username, ip)).fetchone()
+    WHERE username=? AND COALESCE(blocked_until, '')<>''
+    ORDER BY blocked_until DESC
+    LIMIT 1
+    """, (username,)).fetchone()
 
     conn.close()
 
-    if not row or not row["blocked_until"]:
+    if not row:
         return False
 
     try:
@@ -6043,9 +6045,6 @@ def register_failed_login(username, ip):
 
     if row:
         attempts = int(row["attempts"] or 0) + 1
-
-        if attempts >= 5:
-            blocked_until = (now + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
 
         c.execute("""
         UPDATE login_attempts
@@ -6075,6 +6074,26 @@ def register_failed_login(username, ip):
             now.strftime("%Y-%m-%d %H:%M:%S")
         ))
 
+    total_attempts = c.execute("""
+    SELECT COALESCE(SUM(attempts), 0) AS total
+    FROM login_attempts
+    WHERE username=?
+    """, (username,)).fetchone()["total"]
+
+    if int(total_attempts or 0) >= 5:
+        blocked_until = (now + timedelta(minutes=10)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        c.execute("""
+        UPDATE login_attempts
+        SET blocked_until=?, updated_at=?
+        WHERE username=?
+        """, (
+            blocked_until,
+            now.strftime("%Y-%m-%d %H:%M:%S"),
+            username
+        ))
+
     conn.commit()
     conn.close()
 
@@ -6087,8 +6106,8 @@ def clear_failed_logins(username, ip):
 
     c.execute("""
     DELETE FROM login_attempts
-    WHERE username=? AND ip=?
-    """, (username, ip))
+    WHERE username=?
+    """, (username,))
 
     conn.commit()
     conn.close()
