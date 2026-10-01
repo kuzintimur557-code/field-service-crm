@@ -43640,7 +43640,7 @@ async def receive_inbox_email(request: Request):
         conn = connect()
         c = conn.cursor()
         recipients = c.execute("""
-        SELECT username
+        SELECT username, telegram_chat_id
         FROM users
         WHERE company_id=? AND role IN ('boss', 'manager')
         """, (company_id,)).fetchall()
@@ -43655,6 +43655,13 @@ async def receive_inbox_email(request: Request):
                 subject[:200],
                 "/inbox",
             )
+
+            recipient_chat_id = (recipient["telegram_chat_id"] or "").strip()
+            if recipient_chat_id:
+                send_message_to_chat(
+                    recipient_chat_id,
+                    f"📩 Новое письмо: {subject[:300]}",
+                )
 
     message = result["message"]
     return {
