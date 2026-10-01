@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Бизнес CRM{% endblock %}</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="/static/app.css">
 {% block head %}{% endblock %}
 </head>
@@ -12,6 +17,12 @@
 <body>
 {% block content %}{% endblock %}
 {% block nav %}{% include 'mobile_nav.html' %}{% endblock %}
-{% block scripts %}{% endblock %}
+{% block scripts %}
+<script>
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/static/sw.js");
+}
+</script>
+{% endblock %}
 </body>
 </html>
