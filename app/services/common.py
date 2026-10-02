@@ -443,3 +443,160 @@ def get_role_title(role):
         "worker": "Исполнитель"
     }
     return titles.get(role, role)
+
+
+def get_workers_for_company(
+    company_id: int,
+    status: str = "active",
+    search: str = "",
+):
+    if status not in ("active", "inactive", "all"):
+        status = "active"
+
+    selected_search = str(search or "").strip()[:100]
+
+    status_condition = ""
+    if status == "active":
+        status_condition = "AND COALESCE(is_active, 1)=1"
+    elif status == "inactive":
+        status_condition = "AND is_active=0"
+
+    search_condition = ""
+    worker_params = [company_id]
+
+    if selected_search:
+        search_pattern = f"%{selected_search.lower()}%"
+        search_condition = """
+      AND (
+          LOWER(COALESCE(username, '')) LIKE ?
+          OR LOWER(COALESCE(full_name, '')) LIKE ?
+          OR LOWER(COALESCE(position, '')) LIKE ?
+          OR LOWER(COALESCE(phone, '')) LIKE ?
+          OR LOWER(COALESCE(email, '')) LIKE ?
+          OR LOWER(COALESCE(telegram_chat_id, '')) LIKE ?
+      )
+        """
+        worker_params.extend([
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+        ])
+
+    conn = connect()
+    c = conn.cursor()
+
+    workers = c.execute(f"""
+    SELECT * FROM users
+    WHERE role IN ('manager', 'worker') AND company_id=?
+      {status_condition}
+      {search_condition}
+    ORDER BY role, is_active DESC, username
+    """, worker_params).fetchall()
+
+    conn.close()
+
+    return {
+        "workers": workers,
+        "status": status,
+        "search": selected_search,
+    }
+
+
+TEAM_ACTIVITY_FILTERS = {
+    "all": None,
+    "membership": ("Пользователь создан", "Пользователь удалён"),
+    "access": ("Пользователь отключён", "Пользователь включён"),
+    "password": ("Пароль обновлён",),
+    "commission": ("Процент обновлён",),
+    "limits": ("Лимит тарифа",),
+    "billing": ("Счёт платформы создан", "Статус счёта платформы"),
+}
+
+
+INDUSTRY_OPTIONS = [
+    ("field_service", "Сервис / выездные работы"),
+    ("beauty", "Бьюти"),
+    ("cleaning", "Клининг"),
+    ("repair", "Ремонт"),
+    ("auto_service", "Автосервис"),
+    ("logistics", "Грузоперевозки"),
+    ("agency", "Агентство"),
+    ("medical", "Медицина"),
+    ("education", "Обучение"),
+    ("restaurant", "Ресторан / кафе"),
+    ("ecommerce", "Интернет-магазин"),
+    ("other", "Другая сфера"),
+    ("custom", "Своя сфера")
+]
+
+
+def get_industry_label(industry):
+    return dict(INDUSTRY_OPTIONS).get(
+        str(industry or "field_service"),
+        "Сфера не указана",
+    )
+
+
+BUSINESS_PRESETS = {
+    "field_service": {
+        "calendar", "clients", "catalog", "recurring", "finance", "payroll",
+        "analytics", "ai_insights", "sla", "archive", "workload", "notifications", "automation", "calls",
+        "custom_fields"
+    },
+    "beauty": {
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
+        "notifications", "automation", "calls", "custom_fields"
+    },
+    "cleaning": {
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics", "ai_insights",
+        "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
+    },
+    "repair": {
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
+        "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
+    },
+    "auto_service": {
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
+        "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
+    },
+    "logistics": {
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics", "ai_insights",
+        "sla", "archive", "workload", "notifications", "automation", "calls", "custom_fields"
+    },
+    "agency": {
+        "clients", "finance", "payroll", "analytics", "ai_insights", "archive",
+        "notifications", "automation", "calls", "custom_fields"
+    },
+    "medical": {
+        "calendar", "clients", "finance", "payroll", "analytics", "ai_insights",
+        "notifications", "automation", "calls", "custom_fields"
+    },
+    "education": {
+        "calendar", "clients", "recurring", "finance", "payroll", "analytics", "ai_insights",
+        "notifications", "automation", "custom_fields"
+    },
+    "restaurant": {
+        "calendar", "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
+        "notifications", "automation", "custom_fields"
+    },
+    "ecommerce": {
+        "clients", "catalog", "finance", "payroll", "analytics", "ai_insights",
+        "archive", "notifications", "automation", "custom_fields"
+    },
+    "other": {
+        "calendar", "clients", "catalog", "recurring", "finance", "payroll",
+        "analytics", "ai_insights", "sla", "archive", "workload", "notifications", "automation", "calls",
+        "custom_fields"
+    },
+    "custom": {
+        "calendar", "clients", "catalog", "recurring", "finance", "payroll",
+        "analytics", "ai_insights", "sla", "archive", "workload", "notifications", "automation", "calls",
+        "custom_fields"
+    }
+}
+
+def get_industry_label(industry):
+    return dict(INDUSTRY_OPTIONS).get(industry, industry or "")
