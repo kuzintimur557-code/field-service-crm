@@ -188,6 +188,27 @@ from app.deps import (
     update_last_seen,
     verify_session_value,
 )
+from app.services.common import (
+    CORE_FEATURES,
+    FEATURE_DEFINITIONS,
+    build_dashboard_links,
+    create_notification,
+    ensure_company_features,
+    get_company_features,
+    get_company_settings,
+    has_feature,
+    log_task_activity,
+    require_company_id_value,
+    require_feature,
+)
+from app.routes.inbox import (
+    router as inbox_router,
+    inbox_page,
+    inbox_detail_page,
+    inbox_confirm,
+    inbox_reject,
+    receive_inbox_email,
+)
 from app.postgresql_backup import (
     create_postgresql_backup,
     inspect_postgresql_database,
@@ -318,13 +339,15 @@ app.add_middleware(
     allowed_hosts=SECURITY_RUNTIME["trusted_hosts"] or ["*"],
 )
 
+app.include_router(inbox_router)
+
 init_db()
 
 os.makedirs("uploads/docs", exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 def normalize_request_id(value=""):
@@ -772,28 +795,6 @@ AUTOMATION_STATUS_LABELS = {
     "failed": "Ошибка"
 }
 
-FEATURE_DEFINITIONS = [
-    ("tasks", "Заявки", "Создание и ведение заявок"),
-    ("calendar", "Календарь", "Планирование работ по дням"),
-    ("clients", "Клиенты", "База клиентов и карточки"),
-    ("catalog", "Каталог", "Услуги, товары и материалы"),
-    ("recurring", "Регулярные работы", "Повторяющиеся заявки"),
-    ("finance", "Финансы", "Выручка, расходы и прибыль"),
-    ("payroll", "Зарплаты", "Выплаты и комиссии исполнителей"),
-    ("analytics", "Аналитика", "Панель владельца и графики"),
-    ("sla", "SLA", "Сроки, просрочки и качество сервиса"),
-    ("archive", "Архив", "Архивированные заявки"),
-    ("workload", "Загрузка", "Загрузка исполнителей"),
-    ("notifications", "Уведомления", "Центр уведомлений"),
-    ("automation", "Автоматизация", "Правила, триггеры и действия"),
-    ("ai_insights", "ИИ-инсайты", "ИИ-рекомендации и бизнес-инсайты"),
-    ("calls", "Звонки", "История и будущая телефония"),
-    ("inbox", "Почта", "Приём заявок из email-писем"),
-    ("one_c", "1С", "Интеграция с 1С"),
-    ("custom_fields", "Поля компании", "Настраиваемые поля")
-]
-
-CORE_FEATURES = {"tasks", "notifications"}
 
 INDUSTRY_OPTIONS = [
     ("field_service", "Сервис / выездные работы"),
@@ -2806,102 +2807,10 @@ def get_recommended_user_limit_plan(plan, active_users_count):
     return None
 
 
-def require_company_id_value(company_id):
-    if not company_id:
-        raise ValueError("company_id is required")
-
-    return company_id
-
-
-def get_company_settings(company_id):
-    company_id = require_company_id_value(company_id)
-
-    conn = connect()
-    c = conn.cursor()
-
-    c.execute("""
-    INSERT OR IGNORE INTO company_settings (
-        company_id, company_name, phone, email, address, tax_number, bank_details,
-        plan, industry, task_label, worker_label, client_label, service_label,
-        one_c_enabled, calls_enabled, ai_calls_enabled, updated_at
-    )
-    VALUES (?, '', '', '', '', '', '', 'basic', 'field_service',
-            'Заявка', 'Исполнитель', 'Клиент', 'Услуга', 0, 0, 0, '')
-    """, (company_id,))
-
-    conn.commit()
-
-    settings = c.execute("""
-    SELECT *
-    FROM company_settings
-    WHERE company_id=?
-    """, (company_id,)).fetchone()
-
-    conn.close()
-
-    return settings
-
-
-def ensure_company_features(company_id):
-    company_id = require_company_id_value(company_id)
-
-    conn = connect()
-    c = conn.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    for feature_key, _, _ in FEATURE_DEFINITIONS:
-        c.execute("""
-        INSERT OR IGNORE INTO company_features (
-            company_id,
-            feature_key,
-            enabled,
-            updated_at
-        )
-        VALUES (?, ?, ?, ?)
-        """, (
-            company_id,
-            feature_key,
-            1,
-            now
-        ))
-
-    conn.commit()
-    conn.close()
-
-
 def get_company_mode(settings):
     keys = settings.keys() if settings and hasattr(settings, "keys") else []
     mode = str(settings["mode"] or "company") if "mode" in keys else "company"
     return mode if mode in ("company", "master") else "company"
-
-
-def get_company_features(company_id):
-    company_id = require_company_id_value(company_id)
-    ensure_company_features(company_id)
-
-    features = {
-        feature_key: True
-        for feature_key, _, _ in FEATURE_DEFINITIONS
-    }
-
-    conn = connect()
-    c = conn.cursor()
-
-    rows = c.execute("""
-    SELECT feature_key, enabled
-    FROM company_features
-    WHERE company_id=?
-    """, (company_id,)).fetchall()
-
-    conn.close()
-
-    for row in rows:
-        features[row["feature_key"]] = bool(row["enabled"])
-
-    for feature_key in CORE_FEATURES:
-        features[feature_key] = True
-
-    return features
 
 
 COMPANY_CONTEXT_DIAGNOSTIC_TABLES = [
@@ -2961,20 +2870,6 @@ def get_company_context_diagnostics(cursor):
         "total_issues": total_issues,
         "ok": total_issues == 0,
     }
-
-
-def has_feature(company_id, feature_key):
-    if not company_id:
-        return False
-
-    return get_company_features(company_id).get(feature_key, True)
-
-
-def require_feature(company_id, feature_key):
-    if has_feature(company_id, feature_key):
-        return None
-
-    return RedirectResponse("/", status_code=302)
 
 
 def update_company_features(company_id, form):
@@ -3055,40 +2950,6 @@ def apply_business_preset(company_id, industry):
         labels["service_label"],
         now,
         company_id
-    ))
-
-    conn.commit()
-    conn.close()
-
-
-def create_notification(
-    company_id,
-    username,
-    title,
-    message="",
-    link=""
-):
-
-    conn = connect()
-    c = conn.cursor()
-
-    c.execute("""
-    INSERT INTO notifications (
-        company_id,
-        username,
-        title,
-        message,
-        link,
-        created_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        username,
-        title,
-        message,
-        link,
-        datetime.now().strftime("%Y-%m-%d %H:%M")
     ))
 
     conn.commit()
@@ -5667,33 +5528,6 @@ def ensure_ai_digest_automation_rules(company_id, username):
     conn.close()
 
     return created_count
-
-
-def log_task_activity(task_id, username, role, action, details=""):
-    conn = connect()
-    c = conn.cursor()
-
-    c.execute("""
-    INSERT INTO task_activity (
-        task_id,
-        username,
-        role,
-        action,
-        details,
-        created_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        task_id,
-        username,
-        role,
-        action,
-        details,
-        datetime.now().strftime("%Y-%m-%d %H:%M")
-    ))
-
-    conn.commit()
-    conn.close()
 
 
 def register_pdf_font():
@@ -19064,41 +18898,6 @@ async def my_tasks_page(request: Request, status: str = ""):
     )
 
 
-def build_dashboard_links():
-    return {
-        "home": "/",
-        "my_tasks": "/my-tasks",
-        "create_task": "/create-task",
-        "calendar": "/calendar",
-        "sla": "/sla",
-        "clients": "/clients",
-        "catalog": "/catalog",
-        "custom_fields": "/custom-fields",
-        "recurring": "/recurring",
-        "finance": "/finance",
-        "payroll": "/payroll",
-        "owner_dashboard": "/owner/dashboard",
-        "sla_analytics": "/sla/analytics",
-        "archive": "/archive",
-        "calls": "/calls",
-        "calls_follow_up": "/calls?status=follow_up",
-        "inbox": "/inbox",
-        "automation": "/automation",
-        "ai_insights": "/ai/insights",
-        "ai_assistant": "/ai/assistant",
-        "workers": "/workers",
-        "admin": "/admin",
-        "settings": "/settings",
-        "notifications": "/notifications",
-        "profile": "/profile",
-        "more": "/more",
-        "logout": "/logout",
-        "today": "/today",
-        "overdue": "/overdue",
-        "sla_overdue": "/sla?filter=overdue",
-        "sla_soon": "/sla?filter=soon",
-        "workload": "/workload",
-    }
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -43090,416 +42889,6 @@ async def master_voice_page(request: Request):
             "links": build_dashboard_links(),
         }
     )
-
-
-@app.get("/inbox", response_class=HTMLResponse)
-async def inbox_page(request: Request, status: str = ""):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    disabled_response = require_feature(company_id, "inbox")
-
-    if disabled_response:
-        return disabled_response
-
-    settings = get_company_settings(company_id)
-
-    if status not in EMAIL_STATUSES:
-        status = ""
-
-    messages = get_email_messages(company_id, status=status, limit=100)
-
-    for message in messages:
-        message["extracted"] = parse_extracted_fields(message.get("extracted_json"))
-
-    return templates.TemplateResponse(
-        request,
-        "inbox.html",
-        {
-            "request": request,
-            "username": username,
-            "role": role,
-            "settings": settings,
-            "links": build_dashboard_links(),
-            "messages": messages,
-            "selected_status": status,
-        }
-    )
-
-
-@app.get("/inbox/{message_id}", response_class=HTMLResponse)
-async def inbox_detail_page(request: Request, message_id: int):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    disabled_response = require_feature(company_id, "inbox")
-
-    if disabled_response:
-        return disabled_response
-
-    message = get_email_message(company_id, message_id)
-
-    if not message:
-        return RedirectResponse("/inbox", status_code=302)
-
-    message["extracted"] = parse_extracted_fields(message.get("extracted_json"))
-    settings = get_company_settings(company_id)
-
-    slot_suggestions = []
-    workers = []
-    recommended_worker = ""
-
-    if message["status"] == "new":
-        slot_suggestions = suggest_inbox_slots(
-            company_id,
-            start_date=message["extracted"].get("date", ""),
-        )
-
-        conn = connect()
-        c = conn.cursor()
-        workers = c.execute("""
-        SELECT username
-        FROM users
-        WHERE company_id=? AND role='worker' AND COALESCE(is_active, 1)=1
-        ORDER BY username
-        """, (company_id,)).fetchall()
-        conn.close()
-
-        if slot_suggestions:
-            recommended_worker = slot_suggestions[0]["worker"]
-
-    return templates.TemplateResponse(
-        request,
-        "inbox_detail.html",
-        {
-            "request": request,
-            "username": username,
-            "role": role,
-            "settings": settings,
-            "links": build_dashboard_links(),
-            "message": message,
-            "slot_suggestions": slot_suggestions,
-            "workers": workers,
-            "recommended_worker": recommended_worker,
-            "error": request.query_params.get("error", ""),
-        }
-    )
-
-
-@app.post("/inbox/{message_id}/confirm")
-async def inbox_confirm(request: Request, message_id: int):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    disabled_response = require_feature(company_id, "inbox")
-
-    if disabled_response:
-        return disabled_response
-
-    message = get_email_message(company_id, message_id)
-
-    if not message:
-        return RedirectResponse("/inbox", status_code=302)
-
-    if message["status"] != "new":
-        return RedirectResponse("/inbox", status_code=302)
-
-    form = await request.form()
-
-    client_name = (form.get("client_name") or "").strip()[:200]
-    phone = (form.get("phone") or "").strip()[:60]
-    email = (form.get("email") or "").strip()[:200]
-    address = (form.get("address") or "").strip()[:300]
-    task_date = (form.get("task_date") or "").strip()[:10]
-    description = (form.get("description") or "").strip()[:5000]
-    price = (form.get("price") or "").strip()[:40]
-    selected_worker = (form.get("worker") or "").strip()[:120]
-
-    if selected_worker:
-        conn = connect()
-        c = conn.cursor()
-        worker_user = c.execute("""
-        SELECT username
-        FROM users
-        WHERE company_id=? AND role='worker'
-          AND COALESCE(is_active, 1)=1 AND username=?
-        """, (company_id, selected_worker)).fetchone()
-        conn.close()
-
-        if not worker_user:
-            selected_worker = ""
-
-    if not client_name:
-        return RedirectResponse(
-            f"/inbox/{message_id}?error=client_required",
-            status_code=302,
-        )
-
-    if task_date:
-        try:
-            datetime.strptime(task_date, "%Y-%m-%d")
-        except ValueError:
-            return RedirectResponse(
-                f"/inbox/{message_id}?error=invalid_date",
-                status_code=302,
-            )
-
-    client_id = find_or_create_inbox_client(
-        company_id, client_name, phone, email, address
-    )
-
-    conn = connect()
-    c = conn.cursor()
-
-    try:
-        c.execute("""
-        INSERT INTO tasks (
-            company_id,
-            client_id,
-            client,
-            phone,
-            address,
-            description,
-            task_date,
-            worker,
-            workers,
-            priority,
-            price,
-            status,
-            created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            company_id,
-            client_id,
-            client_name,
-            phone,
-            address,
-            description,
-            task_date,
-            selected_worker,
-            selected_worker,
-            "Обычный",
-            price,
-            "Новая",
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-        ))
-
-        task_id = c.lastrowid
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-    if selected_worker:
-        create_notification(
-            company_id,
-            selected_worker,
-            f"Назначена новая заявка #{task_id}",
-            (
-                f"Клиент: {client_name}. "
-                f"Дата: {task_date or 'не указана'}."
-            ),
-            f"/task/{task_id}",
-        )
-
-    set_email_message_status(
-        company_id,
-        message_id,
-        "confirmed",
-        task_id=task_id,
-        client_id=client_id,
-    )
-
-    log_task_activity(
-        task_id,
-        username,
-        role,
-        "Создано из письма",
-        f"Письмо №{message_id}: {message['subject'] or '(без темы)'}"[:200],
-    )
-
-    return RedirectResponse(f"/task/{task_id}", status_code=302)
-
-
-@app.post("/inbox/{message_id}/reject")
-async def inbox_reject(request: Request, message_id: int):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    disabled_response = require_feature(company_id, "inbox")
-
-    if disabled_response:
-        return disabled_response
-
-    message = get_email_message(company_id, message_id)
-
-    if message and message["status"] == "new":
-        set_email_message_status(company_id, message_id, "rejected")
-
-    return RedirectResponse("/inbox", status_code=302)
-
-
-@app.post("/api/inbox/email")
-async def receive_inbox_email(request: Request):
-    inbox_secret = (os.getenv("INBOX_WEBHOOK_SECRET") or "").strip()
-
-    if not inbox_secret:
-        return JSONResponse(
-            {"ok": False, "error": "INBOX_WEBHOOK_SECRET is not configured"},
-            status_code=503,
-        )
-    token = (request.headers.get("x-inbox-secret") or "").strip()
-    if not token or not hmac.compare_digest(token, inbox_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    content_type = (
-        (request.headers.get("content-type") or "")
-        .split(";")[0]
-        .strip()
-        .lower()
-    )
-
-    if content_type == "application/json":
-        try:
-            data = await request.json()
-        except Exception:
-            return JSONResponse(
-                {"ok": False, "error": "invalid_json"},
-                status_code=400,
-            )
-    else:
-        raw_body = await request.body()
-
-        if len(raw_body) > MAX_RAW_LENGTH:
-            return JSONResponse(
-                {"ok": False, "error": "message_too_large"},
-                status_code=413,
-            )
-
-        try:
-            data = parse_raw_email(raw_body)
-        except ValueError as e:
-            return JSONResponse(
-                {"ok": False, "error": str(e)},
-                status_code=400,
-            )
-
-        try:
-            data["company_id"] = int(
-                request.query_params.get("company_id") or 0
-            )
-        except (TypeError, ValueError):
-            data["company_id"] = 0
-
-    try:
-        payload = normalize_inbox_payload(data)
-    except ValueError as e:
-        return JSONResponse(
-            {"ok": False, "error": str(e)},
-            status_code=400,
-        )
-
-    company_id = payload["company_id"]
-
-    conn = connect()
-    c = conn.cursor()
-    company = c.execute(
-        "SELECT id FROM companies WHERE id=?",
-        (company_id,),
-    ).fetchone()
-
-    if not company:
-        conn.close()
-        return JSONResponse(
-            {"ok": False, "error": "company_not_found"},
-            status_code=404,
-        )
-    conn.close()
-
-    if not has_feature(company_id, "inbox"):
-        return JSONResponse(
-            {"ok": False, "error": "feature_disabled"},
-            status_code=403,
-        )
-
-    result = save_email_message(payload)
-
-    if result["created"]:
-        conn = connect()
-        c = conn.cursor()
-        recipients = c.execute("""
-        SELECT username, telegram_chat_id
-        FROM users
-        WHERE company_id=? AND role IN ('boss', 'manager')
-        """, (company_id,)).fetchall()
-        conn.close()
-
-        subject = payload["subject"] or "(без темы)"
-        for recipient in recipients:
-            create_notification(
-                company_id,
-                recipient["username"],
-                "Новое письмо в почте",
-                subject[:200],
-                "/inbox",
-            )
-
-            recipient_chat_id = (recipient["telegram_chat_id"] or "").strip()
-            if recipient_chat_id:
-                send_message_to_chat(
-                    recipient_chat_id,
-                    f"📩 Новое письмо: {subject[:300]}",
-                )
-
-    message = result["message"]
-    return {
-        "ok": True,
-        "created": result["created"],
-        "duplicate": not result["created"],
-        "id": message["id"],
-    }
 
 
 def build_debug_links():
