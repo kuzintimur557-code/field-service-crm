@@ -340,6 +340,7 @@ from app.services.call_analysis import analyze_call_text
 from app.services.subscriptions import (
     activate_company_subscription,
     get_company_subscription,
+    get_company_subscription_fast,
     run_subscription_reminders,
 )
 from app.services.email_inbox import (
@@ -629,7 +630,7 @@ async def subscription_access_middleware(request: Request, call_next):
         return await call_next(request)
 
     company_id = get_user_company_id(username)
-    subscription = get_company_subscription(company_id)
+    subscription = get_company_subscription_fast(company_id)
 
     if subscription["is_open"]:
         return await call_next(request)

@@ -18,6 +18,33 @@ SUBSCRIPTION_STATUSES = {
 
 DATE_FORMAT = "%Y-%m-%d"
 
+_SUBSCRIPTION_STATUS_CACHE = {}
+_SUBSCRIPTION_STATUS_CACHE_TTL_SECONDS = 60
+
+
+def invalidate_company_subscription_cache(company_id=None):
+    if company_id is None:
+        _SUBSCRIPTION_STATUS_CACHE.clear()
+    else:
+        _SUBSCRIPTION_STATUS_CACHE.pop(int(company_id), None)
+
+
+def get_company_subscription_fast(company_id, now=None):
+    company_id = int(company_id)
+    now = now or datetime.now()
+    cached = _SUBSCRIPTION_STATUS_CACHE.get(company_id)
+
+    if (
+        cached
+        and (now - cached[0]).total_seconds()
+        < _SUBSCRIPTION_STATUS_CACHE_TTL_SECONDS
+    ):
+        return cached[1]
+
+    subscription = get_company_subscription(company_id)
+    _SUBSCRIPTION_STATUS_CACHE[company_id] = (now, subscription)
+    return subscription
+
 
 def normalize_subscription_status(status):
     status = str(status or "").strip()
@@ -325,4 +352,5 @@ def activate_company_subscription(company_id, days=SUBSCRIPTION_ACTIVE_DAYS):
     finally:
         conn.close()
 
+    invalidate_company_subscription_cache(company_id)
     return get_company_subscription(company_id)

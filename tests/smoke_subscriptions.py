@@ -32,6 +32,7 @@ def main():
             activate_company_subscription,
             ensure_company_subscription,
             get_company_subscription,
+            invalidate_company_subscription_cache,
             run_subscription_reminders,
         )
 
@@ -275,6 +276,7 @@ def main():
         """)
         conn.commit()
         conn.close()
+        invalidate_company_subscription_cache(1)
 
         response = asyncio.run(crm.subscription_access_middleware(
             middleware_request("/task/1/status"), call_next
