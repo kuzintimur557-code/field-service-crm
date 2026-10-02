@@ -312,6 +312,18 @@ from app.routes.billing import (
     billing_invoice_detail_page,
     run_subscription_reminders_cron,
 )
+from app.routes.cron import (
+    router as cron_router,
+    run_platform_billing_reminders_cron,
+    run_ai_digest_scheduler_cron,
+    run_calendar_plan_scheduler_cron,
+    run_calendar_plan_scheduler_watchdog,
+    run_background_jobs_cron,
+    run_database_backup_cron,
+    run_a3_autonomous_cron,
+    run_a3_scheduler_watchdog_cron,
+    run_a3_incident_action_monitor_cron,
+)
 from app.postgresql_backup import (
     create_postgresql_backup,
     inspect_postgresql_database,
@@ -444,6 +456,7 @@ app.include_router(inbox_router)
 app.include_router(master_router)
 app.include_router(calls_router)
 app.include_router(billing_router)
+app.include_router(cron_router)
 
 init_db()
 
@@ -13521,37 +13534,6 @@ async def sync_platform_billing_overdue(request: Request):
     )
 
 
-@app.post("/automation/cron/platform-billing-reminders")
-async def run_platform_billing_reminders_cron(request: Request):
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "AUTOMATION_CRON_SECRET is not configured",
-            },
-            status_code=503,
-        )
-
-    token = (
-        request.headers.get("x-automation-secret")
-        or request.query_params.get("token")
-        or ""
-    ).strip()
-
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    return JSONResponse({
-        "ok": True,
-        "summary": create_platform_billing_reminders("all"),
-    })
-
-
 @app.get("/api/platform/billing")
 async def api_platform_billing(
     request: Request,
@@ -19784,37 +19766,6 @@ async def run_ai_digest_scheduler_page(request: Request):
         f"/automation?scheduler=1&daily={result['daily']}&weekly={result['weekly']}&follow_ups={result['follow_ups']}&skipped={result['skipped']}",
         status_code=302
     )
-
-
-@app.post("/automation/cron/ai-digest")
-async def run_ai_digest_scheduler_cron(request: Request):
-
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
-            status_code=503
-        )
-
-    token = (
-        request.headers.get("x-automation-secret")
-        or request.query_params.get("token")
-        or ""
-    ).strip()
-
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403
-        )
-
-    summary = run_ai_digest_scheduler_for_all_companies()
-
-    return JSONResponse({
-        "ok": True,
-        "summary": summary
-    })
 
 
 @app.post("/automation/rules")
@@ -26073,68 +26024,6 @@ async def run_calendar_plan_scheduler_for_all_companies(now_dt=None):
         ),
         "errors": sum(1 for item in results if item["error"]),
         "results": results,
-    }
-
-
-@app.post("/automation/cron/calendar-plans")
-async def run_calendar_plan_scheduler_cron(request: Request):
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "AUTOMATION_CRON_SECRET is not configured",
-            },
-            status_code=503,
-        )
-
-    token = (
-        request.headers.get("x-automation-secret")
-        or request.query_params.get("token")
-        or ""
-    ).strip()
-
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    return {
-        "ok": True,
-        "summary": await run_calendar_plan_scheduler_for_all_companies(),
-    }
-
-
-@app.post("/automation/cron/calendar-plans/watchdog")
-async def run_calendar_plan_scheduler_watchdog(request: Request):
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "AUTOMATION_CRON_SECRET is not configured",
-            },
-            status_code=503,
-        )
-
-    token = (
-        request.headers.get("x-automation-secret")
-        or request.query_params.get("token")
-        or ""
-    ).strip()
-
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    return {
-        "ok": True,
-        "summary": monitor_calendar_plan_schedulers(),
     }
 
 
@@ -39971,65 +39860,6 @@ async def api_platform_run_background_jobs(request: Request):
     }
 
 
-@app.post("/automation/cron/background-jobs")
-async def run_background_jobs_cron(request: Request):
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
-            status_code=503,
-        )
-    token = (request.headers.get("x-automation-secret") or "").strip()
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    summary = run_background_job_batch(
-        worker_id=f"cron-{uuid4().hex[:12]}",
-    )
-    payload = {
-        "ok": not summary["failed"] and not summary["stale_failed"],
-        "summary": summary,
-    }
-    if not payload["ok"]:
-        return JSONResponse(payload, status_code=503)
-    return payload
-
-
-@app.post("/automation/cron/database-backup")
-async def run_database_backup_cron(request: Request):
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
-            status_code=503,
-        )
-    token = (request.headers.get("x-automation-secret") or "").strip()
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    queued = enqueue_database_backup_job("cron")
-    summary = run_background_job_batch(
-        worker_id=f"cron-backup-{uuid4().hex[:12]}",
-    )
-    payload = {
-        "ok": not summary["failed"] and not summary["stale_failed"],
-        "job_created": queued["created"],
-        "job_id": queued["job"]["id"],
-        "summary": summary,
-    }
-    if not payload["ok"]:
-        return JSONResponse(payload, status_code=503)
-    return payload
-
-
 def build_debug_links():
     return {
         "clear_login_attempts": "/debug/login-attempts/clear",
@@ -45186,92 +45016,6 @@ def api_a3_process_autonomous_actions(request: Request):
         "queue_capacity_remaining": cycle["queue_capacity_remaining"],
         "health": health,
         "result": result,
-    }
-
-
-@app.post("/automation/cron/a3-autonomous")
-async def run_a3_autonomous_cron(request: Request):
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
-            status_code=503,
-        )
-
-    token = (
-        request.headers.get("x-automation-secret")
-        or request.query_params.get("token")
-        or ""
-    ).strip()
-
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    return {
-        "ok": True,
-        "summary": run_a3_autonomous_cycle_for_all_companies(),
-    }
-
-
-@app.post("/automation/cron/a3-watchdog")
-async def run_a3_scheduler_watchdog_cron(request: Request):
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
-            status_code=503,
-        )
-
-    token = (
-        request.headers.get("x-automation-secret")
-        or request.query_params.get("token")
-        or ""
-    ).strip()
-
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    return {
-        "ok": True,
-        "summary": run_a3_scheduler_watchdog_for_all_companies(),
-    }
-
-
-@app.post("/automation/cron/a3-incident-actions")
-async def run_a3_incident_action_monitor_cron(request: Request):
-    cron_secret = (os.getenv("AUTOMATION_CRON_SECRET") or "").strip()
-
-    if not cron_secret:
-        return JSONResponse(
-            {"ok": False, "error": "AUTOMATION_CRON_SECRET is not configured"},
-            status_code=503,
-        )
-
-    token = (
-        request.headers.get("x-automation-secret")
-        or request.query_params.get("token")
-        or ""
-    ).strip()
-
-    if not token or not hmac.compare_digest(token, cron_secret):
-        return JSONResponse(
-            {"ok": False, "error": "forbidden"},
-            status_code=403,
-        )
-
-    return {
-        "ok": True,
-        "summary": run_a3_incident_followup_monitor(),
-        "quality_summary": run_a3_followup_quality_monitor(),
-        "quality_sla_summary": run_a3_followup_quality_sla_monitor(),
     }
 
 
