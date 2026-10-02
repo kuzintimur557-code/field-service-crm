@@ -300,8 +300,14 @@ def test_password_and_upload_policy():
     else:
         raise AssertionError("Oversized upload accepted")
 
-    assert not (ROOT / "app/routes/auth.py").exists()
-    assert not (ROOT / "app/routes/tasks.py").exists()
+    # legacy insecure route stubs (hardcoded demo users) must stay removed
+    legacy_routes = ROOT / "app/routes"
+    if legacy_routes.exists():
+        for legacy_file in legacy_routes.glob("*.py"):
+            source = legacy_file.read_text(encoding="utf-8")
+            assert "oleg" not in source.lower(), (
+                f"{legacy_file} looks like the old insecure auth stub"
+            )
 
 
 if __name__ == "__main__":

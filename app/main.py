@@ -173,16 +173,22 @@ from app.database import (
     init_db,
 )
 from app.deps import (
+    COOKIE_SECURE,
     SESSION_CLOCK_SKEW_SECONDS,
     SESSION_COOKIE_MAX_AGE_SECONDS,
     SESSION_COOKIE_NAME,
     SECRET_KEY,
+    clear_failed_logins,
+    get_request_ip,
     get_role,
     get_user,
     get_user_company_id,
     get_user_session_version,
+    is_login_blocked,
     is_superadmin,
+    log_login_event,
     missing_company_context_response,
+    register_failed_login,
     require_route_company_context,
     sign_session_value,
     update_last_seen,
@@ -339,6 +345,12 @@ from app.routes.profile import (
     profile_page,
     change_my_password,
 )
+from app.routes.auth import (
+    router as auth_router,
+    login_page,
+    login,
+    logout,
+)
 from app.postgresql_backup import (
     create_postgresql_backup,
     inspect_postgresql_database,
@@ -453,7 +465,6 @@ TEAM_ACTIVITY_FILTERS = {
 SECURITY_RUNTIME = require_valid_production_security(
     get_security_runtime_config(),
 )
-COOKIE_SECURE = SECURITY_RUNTIME["cookie_secure"]
 
 app = FastAPI(
     docs_url="/docs" if SECURITY_RUNTIME["docs_enabled"] else None,
@@ -474,6 +485,7 @@ app.include_router(billing_router)
 app.include_router(cron_router)
 app.include_router(notifications_router)
 app.include_router(profile_router)
+app.include_router(auth_router)
 
 init_db()
 
@@ -1643,12 +1655,6 @@ def is_password_strong(password):
         and any(character.isalpha() for character in value)
         and any(character.isdigit() for character in value)
     )
-
-
-def get_company_mode(settings):
-    keys = settings.keys() if settings and hasattr(settings, "keys") else []
-    mode = str(settings["mode"] or "company") if "mode" in keys else "company"
-    return mode if mode in ("company", "master") else "company"
 
 
 COMPANY_CONTEXT_DIAGNOSTIC_TABLES = [
@@ -4485,169 +4491,6 @@ async def uploaded_file(request: Request, filename: str):
         return Response(status_code=404)
 
     return storage_file_response(safe_filename, UPLOAD_DIR, request=request)
-
-
-def get_request_ip(request):
-    trust_proxy_headers = bool(
-        str(os.getenv("TRUST_PROXY_HEADERS") or "").strip().lower()
-        in {"1", "true", "yes", "on"}
-        or str(os.getenv("RAILWAY_ENVIRONMENT") or "").strip()
-    )
-    if trust_proxy_headers:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            candidate = forwarded.split(",")[0].strip()
-            try:
-                return str(ipaddress.ip_address(candidate))
-            except ValueError:
-                pass
-
-    direct_ip = request.client.host if request.client else ""
-    try:
-        return str(ipaddress.ip_address(direct_ip))
-    except ValueError:
-        return ""
-
-
-def is_login_blocked(username, ip):
-    username = str(username or "")[:120]
-    ip = str(ip or "")[:64]
-    conn = connect()
-    c = conn.cursor()
-
-    row = c.execute("""
-    SELECT blocked_until
-    FROM login_attempts
-    WHERE username=? AND COALESCE(blocked_until, '')<>''
-    ORDER BY blocked_until DESC
-    LIMIT 1
-    """, (username,)).fetchone()
-
-    conn.close()
-
-    if not row:
-        return False
-
-    try:
-        blocked_until = datetime.strptime(row["blocked_until"], "%Y-%m-%d %H:%M:%S")
-        return datetime.now() < blocked_until
-    except Exception:
-        return False
-
-
-def register_failed_login(username, ip):
-    username = str(username or "")[:120]
-    ip = str(ip or "")[:64]
-    conn = connect()
-    c = conn.cursor()
-
-    row = c.execute("""
-    SELECT *
-    FROM login_attempts
-    WHERE username=? AND ip=?
-    """, (username, ip)).fetchone()
-
-    now = datetime.now()
-    blocked_until = ""
-
-    if row:
-        attempts = int(row["attempts"] or 0) + 1
-
-        c.execute("""
-        UPDATE login_attempts
-        SET attempts=?, blocked_until=?, updated_at=?
-        WHERE id=?
-        """, (
-            attempts,
-            blocked_until,
-            now.strftime("%Y-%m-%d %H:%M:%S"),
-            row["id"]
-        ))
-    else:
-        c.execute("""
-        INSERT INTO login_attempts (
-            username,
-            ip,
-            attempts,
-            blocked_until,
-            updated_at
-        )
-        VALUES (?, ?, ?, ?, ?)
-        """, (
-            username,
-            ip,
-            1,
-            "",
-            now.strftime("%Y-%m-%d %H:%M:%S")
-        ))
-
-    total_attempts = c.execute("""
-    SELECT COALESCE(SUM(attempts), 0) AS total
-    FROM login_attempts
-    WHERE username=?
-    """, (username,)).fetchone()["total"]
-
-    if int(total_attempts or 0) >= 5:
-        blocked_until = (now + timedelta(minutes=10)).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-        c.execute("""
-        UPDATE login_attempts
-        SET blocked_until=?, updated_at=?
-        WHERE username=?
-        """, (
-            blocked_until,
-            now.strftime("%Y-%m-%d %H:%M:%S"),
-            username
-        ))
-
-    conn.commit()
-    conn.close()
-
-
-def clear_failed_logins(username, ip):
-    username = str(username or "")[:120]
-    ip = str(ip or "")[:64]
-    conn = connect()
-    c = conn.cursor()
-
-    c.execute("""
-    DELETE FROM login_attempts
-    WHERE username=?
-    """, (username,))
-
-    conn.commit()
-    conn.close()
-
-
-def log_login_event(request, username, role):
-    conn = connect()
-    c = conn.cursor()
-
-    ip = request.client.host if request.client else ""
-    user_agent = request.headers.get("user-agent", "")
-
-    c.execute("""
-    INSERT INTO login_events (
-        username,
-        role,
-        ip,
-        user_agent,
-        created_at
-    )
-    VALUES (?, ?, ?, ?, ?)
-    """, (
-        username,
-        role,
-        ip,
-        user_agent,
-        datetime.now().strftime("%Y-%m-%d %H:%M")
-    ))
-
-    conn.commit()
-    conn.close()
-
-
 
 
 def format_calendar_incident_age(age_minutes):
@@ -39498,101 +39341,6 @@ async def debug_page(request: Request):
 @app.get("/favicon.ico")
 async def favicon():
     return FileResponse("app/static/favicon.svg", media_type="image/svg+xml")
-
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={}
-    )
-
-
-@app.post("/login")
-async def login(request: Request):
-
-    form = await request.form()
-
-    username = (form.get("username") or "").strip()[:120]
-    password = (form.get("password") or "").strip()
-
-    ip = get_request_ip(request)
-
-    if is_login_blocked(username, ip):
-        return RedirectResponse("/login?error=blocked", status_code=302)
-
-    conn = connect()
-    c = conn.cursor()
-
-    user = c.execute("""
-    SELECT *
-    FROM users
-    WHERE username=?
-    """, (username,)).fetchone()
-
-    if not user or not verify_password(password, user["password"]):
-        conn.close()
-        register_failed_login(username, ip)
-        return RedirectResponse("/login?error=invalid", status_code=302)
-
-    if user["is_active"] == 0:
-        conn.close()
-        return RedirectResponse("/login?error=disabled", status_code=302)
-
-    if password_needs_upgrade(user["password"]):
-        c.execute("""
-        UPDATE users
-        SET password=?
-        WHERE username=?
-        """, (hash_password(password), username))
-        conn.commit()
-
-    conn.close()
-
-    update_last_seen(username)
-
-    login_redirect = "/"
-
-    if user["role"] in ("boss", "manager"):
-        user_company_id = (
-            user["company_id"] if "company_id" in user.keys() else None
-        )
-
-        if user_company_id:
-            company_settings = get_company_settings(user_company_id)
-
-            if get_company_mode(company_settings) == "master":
-                login_redirect = "/master"
-
-    response = RedirectResponse(login_redirect, status_code=302)
-    response.delete_cookie("user")
-
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=sign_session_value(
-            username,
-            user["session_version"] if "session_version" in user.keys() else 1,
-        ),
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=SESSION_COOKIE_MAX_AGE_SECONDS,
-        path="/"
-    )
-
-    return response
-
-
-@app.get("/logout")
-async def logout():
-
-    response = RedirectResponse("/login", status_code=302)
-    response.delete_cookie("user")
-    response.delete_cookie(SESSION_COOKIE_NAME)
-
-    return response
 
 
 @app.get("/create-task", response_class=HTMLResponse)

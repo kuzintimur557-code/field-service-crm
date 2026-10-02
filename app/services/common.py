@@ -252,3 +252,9 @@ def create_call_follow_up_notification(
         f"{client_part}{details}",
         link,
     )
+
+
+def get_company_mode(settings):
+    keys = settings.keys() if settings and hasattr(settings, "keys") else []
+    mode = str(settings["mode"] or "company") if "mode" in keys else "company"
+    return mode if mode in ("company", "master") else "company"
