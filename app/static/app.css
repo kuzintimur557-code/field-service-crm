@@ -244,3 +244,19 @@ textarea{
         font-size:20px;
     }
 }
+
+/* --- mobile polish: tables, filters, overflow --- */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.table-wrap table{width:auto;min-width:100%}
+
+@media(max-width:800px){
+    .filters{flex-wrap:nowrap!important;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+    .filters>*{flex:0 0 auto}
+    input,select,textarea{max-width:100%}
+    form>*{min-width:0}
+    .container{overflow-x:hidden}
+}
+
+/* --- unified back button --- */
+.mobile-back{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:10px 16px;margin:12px 0 0;color:#2563eb;text-decoration:none;font-weight:900;font-size:16px;border-radius:14px;background:transparent}
+.mobile-back:hover{background:#eff6ff}

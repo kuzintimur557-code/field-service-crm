@@ -6,6 +6,57 @@
 }
 </style>
 
+<script>
+(function () {
+    function ready(fn) {
+        if (document.readyState !== "loading") {
+            fn();
+        } else {
+            document.addEventListener("DOMContentLoaded", fn);
+        }
+    }
+
+    ready(function () {
+        if (!document.querySelector(".table-wrap") && window.innerWidth <= 900) {
+            var tables = document.querySelectorAll("table");
+            for (var i = 0; i < tables.length; i++) {
+                var table = tables[i];
+                if (table.closest(".table-wrap")) {
+                    continue;
+                }
+                var wrap = document.createElement("div");
+                wrap.className = "table-wrap";
+                table.parentNode.insertBefore(wrap, table);
+                wrap.appendChild(table);
+            }
+        }
+
+        var path = window.location.pathname;
+        var hasBack = document.querySelector(".back, .mobile-back, a[href^='javascript:history']");
+        var isAuthPage = path === "/login" || path === "/logout";
+        var hasHistory = window.history.length > 1;
+
+        if (!hasBack && !isAuthPage && hasHistory) {
+            var back = document.createElement("a");
+            back.className = "mobile-back";
+            back.href = "#";
+            back.textContent = "\u2190 Назад";
+            back.addEventListener("click", function (event) {
+                event.preventDefault();
+                window.history.back();
+            });
+
+            var container = document.querySelector(".container");
+            if (container && container.firstChild) {
+                container.insertBefore(back, container.firstChild);
+            } else {
+                document.body.insertBefore(back, document.body.firstChild);
+            }
+        }
+    });
+})();
+</script>
+
 <nav class="mobile-nav" aria-label="Основная навигация">
 <div class="mobile-nav-grid">
 {% set f = features if features is defined else {} %}
