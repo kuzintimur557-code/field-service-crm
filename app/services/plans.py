@@ -1,5 +1,11 @@
 """Subscription plan definitions and plan helpers."""
 
+from app.database import connect
+from app.services.common import (
+    get_company_settings,
+    require_company_id_value,
+)
+
 PLAN_DEFINITIONS = {
     "basic": {
         "label": "Базовый",
@@ -105,3 +111,104 @@ def format_rub_amount(amount):
         return f"{int(value)} ₽"
 
     return f"{value:.2f} ₽"
+
+
+def get_user_limit_status(active_users_count, user_limit):
+    active_users_count = int(active_users_count or 0)
+
+    if user_limit is None:
+        return {
+            "label": "Без лимита",
+            "tone": "ok",
+            "remaining": None,
+        }
+
+    user_limit = int(user_limit or 0)
+
+    if active_users_count > user_limit:
+        return {
+            "label": f"Превышен лимит на {active_users_count - user_limit}",
+            "tone": "danger",
+            "remaining": 0,
+        }
+
+    if active_users_count == user_limit:
+        return {
+            "label": "Лимит заполнен",
+            "tone": "warning",
+            "remaining": 0,
+        }
+
+    return {
+        "label": f"Осталось мест: {user_limit - active_users_count}",
+        "tone": "ok",
+        "remaining": user_limit - active_users_count,
+    }
+
+
+def get_company_user_limit_usage(company_id, settings=None):
+    company_id = require_company_id_value(company_id)
+    settings = settings or get_company_settings(company_id)
+    plan = normalize_plan(
+        settings["plan"] if settings and "plan" in settings.keys() else "basic"
+    )
+    user_limit = get_plan_user_limit(plan)
+
+    conn = connect()
+    c = conn.cursor()
+    row = c.execute("""
+    SELECT
+        COUNT(*) AS users_count,
+        SUM(CASE WHEN COALESCE(is_active, 1)=1 THEN 1 ELSE 0 END)
+            AS active_users_count
+    FROM users
+    WHERE company_id=?
+      AND role!='superadmin'
+    """, (company_id,)).fetchone()
+    conn.close()
+
+    users_count = int(row["users_count"] or 0) if row else 0
+    active_users_count = (
+        int(row["active_users_count"] or 0) if row else 0
+    )
+    status = get_user_limit_status(active_users_count, user_limit)
+
+    return {
+        "plan": plan,
+        "plan_label": get_plan_label(plan),
+        "user_limit": user_limit,
+        "user_limit_label": str(user_limit) if user_limit else "без лимита",
+        "users_count": users_count,
+        "active_users_count": active_users_count,
+        "status": status["label"],
+        "tone": status["tone"],
+        "remaining": status["remaining"],
+    }
+
+
+def get_recommended_user_limit_plan(plan, active_users_count):
+    current_plan = normalize_plan(plan)
+    active_users_count = int(active_users_count or 0)
+    plan_keys = list(PLAN_DEFINITIONS.keys())
+    start_index = plan_keys.index(current_plan) + 1
+
+    for plan_key in plan_keys[start_index:]:
+        definition = PLAN_DEFINITIONS[plan_key]
+        user_limit = definition["user_limit"]
+
+        if user_limit is None or active_users_count < int(user_limit):
+            return {
+                "plan": plan_key,
+                "label": definition["label"],
+                "settings_label": definition["settings_label"],
+                "user_limit": user_limit,
+                "user_limit_label": (
+                    str(user_limit) if user_limit else "без лимита"
+                ),
+                "available_slots": (
+                    None if user_limit is None
+                    else max(int(user_limit) - active_users_count, 0)
+                ),
+            }
+
+    return None
