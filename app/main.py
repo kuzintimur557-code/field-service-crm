@@ -209,6 +209,12 @@ from app.routes.inbox import (
     inbox_reject,
     receive_inbox_email,
 )
+from app.routes.master import (
+    router as master_router,
+    master_today_page,
+    master_voice_page,
+    onboarding_page,
+)
 from app.postgresql_backup import (
     create_postgresql_backup,
     inspect_postgresql_database,
@@ -340,6 +346,7 @@ app.add_middleware(
 )
 
 app.include_router(inbox_router)
+app.include_router(master_router)
 
 init_db()
 
@@ -42701,194 +42708,6 @@ async def run_database_backup_cron(request: Request):
     if not payload["ok"]:
         return JSONResponse(payload, status_code=503)
     return payload
-
-
-@app.get("/onboarding", response_class=HTMLResponse)
-async def onboarding_page(request: Request):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    settings = get_company_settings(company_id)
-    subscription = get_company_subscription(company_id)
-
-    conn = connect()
-    c = conn.cursor()
-
-    clients_count = c.execute(
-        "SELECT COUNT(*) FROM clients WHERE company_id=?",
-        (company_id,),
-    ).fetchone()[0]
-    tasks_count = c.execute(
-        "SELECT COUNT(*) FROM tasks WHERE company_id=?",
-        (company_id,),
-    ).fetchone()[0]
-    workers_count = c.execute("""
-    SELECT COUNT(*)
-    FROM users
-    WHERE company_id=? AND role='worker' AND COALESCE(is_active, 1)=1
-    """, (company_id,)).fetchone()[0]
-
-    conn.close()
-
-    profile_done = bool(
-        (settings["company_name"] or "").strip()
-        or (settings["phone"] or "").strip()
-    )
-
-    steps = [
-        {
-            "title": "Заполнить профиль компании",
-            "done": profile_done,
-            "link": "/settings",
-        },
-        {
-            "title": "Добавить первого клиента",
-            "done": clients_count > 0,
-            "link": "/clients",
-        },
-        {
-            "title": f"Создать первую {(settings['task_label'] or 'заявку').lower()}",
-            "done": tasks_count > 0,
-            "link": "/create-task",
-        },
-        {
-            "title": f"Пригласить {(settings['worker_label'] or 'исполнителя').lower()}",
-            "done": workers_count > 0,
-            "link": "/workers",
-        },
-        {
-            "title": "Выбрать тариф и активировать подписку",
-            "done": subscription["status"] == "active",
-            "link": "/billing",
-        },
-    ]
-
-    done_count = sum(1 for step in steps if step["done"])
-
-    return templates.TemplateResponse(
-        request,
-        "onboarding.html",
-        {
-            "request": request,
-            "username": username,
-            "role": role,
-            "settings": settings,
-            "links": build_dashboard_links(),
-            "steps": steps,
-            "done_count": done_count,
-            "total_count": len(steps),
-        }
-    )
-
-
-@app.get("/master", response_class=HTMLResponse)
-async def master_today_page(request: Request):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    settings = get_company_settings(company_id)
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    month = today[:7]
-
-    conn = connect()
-    c = conn.cursor()
-
-    tasks_today = c.execute("""
-    SELECT *
-    FROM tasks
-    WHERE company_id=?
-      AND COALESCE(archived, 0)=0
-      AND task_date LIKE ?
-    ORDER BY COALESCE(time_from, ''), id
-    """, (company_id, f"{today}%")).fetchall()
-
-    revenue_today = c.execute("""
-    SELECT COALESCE(SUM(
-        CAST(REPLACE(COALESCE(price, '0'), ',', '.') AS REAL)
-    ), 0)
-    FROM tasks
-    WHERE company_id=?
-      AND COALESCE(archived, 0)=0
-      AND status='Завершено'
-      AND task_date LIKE ?
-    """, (company_id, f"{today}%")).fetchone()[0]
-
-    revenue_month = c.execute("""
-    SELECT COALESCE(SUM(
-        CAST(REPLACE(COALESCE(price, '0'), ',', '.') AS REAL)
-    ), 0)
-    FROM tasks
-    WHERE company_id=?
-      AND COALESCE(archived, 0)=0
-      AND status='Завершено'
-      AND substr(task_date, 1, 7)=?
-    """, (company_id, month)).fetchone()[0]
-
-    conn.close()
-
-    return templates.TemplateResponse(
-        request,
-        "master.html",
-        {
-            "request": request,
-            "username": username,
-            "role": role,
-            "settings": settings,
-            "links": build_dashboard_links(),
-            "tasks_today": tasks_today,
-            "revenue_today": revenue_today,
-            "revenue_month": revenue_month,
-            "today": today,
-        }
-    )
-
-
-@app.get("/master/voice", response_class=HTMLResponse)
-async def master_voice_page(request: Request):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    settings = get_company_settings(company_id)
-
-    return templates.TemplateResponse(
-        request,
-        "master_voice.html",
-        {
-            "request": request,
-            "username": username,
-            "role": role,
-            "settings": settings,
-            "links": build_dashboard_links(),
-        }
-    )
 
 
 def build_debug_links():
