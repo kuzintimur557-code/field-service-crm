@@ -230,3 +230,25 @@ def build_dashboard_links():
         "sla_soon": "/sla?filter=soon",
         "workload": "/workload",
     }
+
+
+def create_call_follow_up_notification(
+    company_id,
+    username,
+    client_name="",
+    client_id=None,
+    summary="",
+    phone="",
+    call_id=None
+):
+    link = f"/calls/{call_id}" if call_id else (f"/clients/{client_id}" if client_id else "/calls")
+    details = summary or phone or "Проверьте звонок и запланируйте следующий контакт."
+    client_part = f"Клиент: {client_name}. " if client_name else ""
+
+    create_notification(
+        company_id,
+        username,
+        "Нужен контакт по звонку",
+        f"{client_part}{details}",
+        link,
+    )
