@@ -258,3 +258,53 @@ def get_company_mode(settings):
     keys = settings.keys() if settings and hasattr(settings, "keys") else []
     mode = str(settings["mode"] or "company") if "mode" in keys else "company"
     return mode if mode in ("company", "master") else "company"
+
+
+def get_task_worker_names(task):
+    names = []
+
+    if not task:
+        return names
+
+    task_keys = task.keys() if hasattr(task, "keys") else []
+
+    for field in ("worker", "workers"):
+        if field not in task_keys:
+            continue
+
+        for name in str(task[field] or "").split(","):
+            name = name.strip()
+
+            if name and name not in names:
+                names.append(name)
+
+    return names
+
+
+def format_task_workers(task):
+    names = get_task_worker_names(task)
+    return ", ".join(names) if names else "Не назначены"
+
+
+def role_label(role):
+    labels = {
+        "superadmin": "Суперадмин",
+        "boss": "Владелец",
+        "manager": "Менеджер",
+        "worker": "Исполнитель",
+    }
+    return labels.get(role, role or "")
+
+
+def ui_text(value):
+    text = str(value or "")
+    replacements = {
+        "Automation:": "Автоматизация:",
+        "AI daily digest": "Ежедневная ИИ-сводка",
+        "AI weekly digest": "Еженедельная ИИ-сводка",
+        "Deadline": "Срок",
+        "deadline": "срок",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
