@@ -4,11 +4,13 @@ Extracted from app.main so domain routers can import them without a
 circular dependency on the application module.
 """
 
+import calendar
 from datetime import datetime
 
 from fastapi.responses import RedirectResponse
 
 from app.database import connect
+from app.deps import get_user_company_id
 
 FEATURE_DEFINITIONS = [
     ("tasks", "Заявки", "Создание и ведение заявок"),
@@ -308,3 +310,136 @@ def ui_text(value):
     for old, new in replacements.items():
         text = text.replace(old, new)
     return text
+
+
+def worker_task_condition():
+    return """
+    (
+        worker=?
+        OR worker LIKE ?
+        OR worker LIKE ?
+        OR worker LIKE ?
+        OR workers=?
+        OR workers LIKE ?
+        OR workers LIKE ?
+        OR workers LIKE ?
+    )
+    """
+
+
+def worker_task_params(username):
+    return [
+        username,
+        f"{username},%",
+        f"%,{username},%",
+        f"%,{username}",
+        username,
+        f"{username},%",
+        f"%,{username},%",
+        f"%,{username}"
+    ]
+
+
+def task_has_worker(username, task):
+    return username in get_task_worker_names(task)
+
+
+def get_task_company_id(task):
+    if not task:
+        return None
+
+    task_keys = task.keys() if hasattr(task, "keys") else []
+
+    if "company_id" not in task_keys:
+        return None
+
+    return task["company_id"]
+
+
+def get_overdue_days(task_date, today=None):
+    task_day = str(task_date or "")[:10]
+
+    if not task_day:
+        return 0
+
+    try:
+        current_day = today or datetime.now().date()
+        due_day = datetime.strptime(task_day, "%Y-%m-%d").date()
+        return max((current_day - due_day).days, 0)
+    except Exception:
+        return 0
+
+
+def add_months(source_date, months):
+    month = source_date.month - 1 + months
+    year = source_date.year + month // 12
+    month = month % 12 + 1
+    day = min(source_date.day, calendar.monthrange(year, month)[1])
+    return source_date.replace(year=year, month=month, day=day)
+
+
+def get_next_recurring_date(current_date, interval_type):
+    try:
+        due_date = datetime.strptime(str(current_date or "")[:10], "%Y-%m-%d").date()
+    except Exception:
+        return current_date
+
+    if interval_type == "weekly":
+        next_date = due_date + timedelta(weeks=1)
+    elif interval_type == "quarterly":
+        next_date = add_months(due_date, 3)
+    elif interval_type == "yearly":
+        next_date = add_months(due_date, 12)
+    else:
+        next_date = add_months(due_date, 1)
+
+    return next_date.strftime("%Y-%m-%d")
+
+
+def get_task_worker_chat_ids(cursor, task):
+    chat_ids = []
+    task_company_id = get_task_company_id(task)
+
+    if not task_company_id:
+        return chat_ids
+
+    for worker_name in get_task_worker_names(task):
+        worker = cursor.execute("""
+        SELECT telegram_chat_id
+        FROM users
+        WHERE username=? AND role='worker' AND company_id=?
+        """, (worker_name, task_company_id)).fetchone()
+
+        if worker and worker["telegram_chat_id"] and worker["telegram_chat_id"] not in chat_ids:
+            chat_ids.append(worker["telegram_chat_id"])
+
+    return chat_ids
+
+
+def can_access_task(username, role, task):
+    if not task:
+        return False
+
+    task_company_id = get_task_company_id(task)
+
+    if not task_company_id:
+        return False
+
+    user_company_id = get_user_company_id(username)
+
+    if role == "superadmin":
+        return True
+
+    if role in ("boss", "manager"):
+        return task_company_id == user_company_id
+
+    return task_company_id == user_company_id and task_has_worker(username, task)
+
+
+def get_role_title(role):
+    titles = {
+        "boss": "Босс",
+        "manager": "Менеджер",
+        "worker": "Исполнитель"
+    }
+    return titles.get(role, role)
