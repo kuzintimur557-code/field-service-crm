@@ -1,0 +1,27 @@
+{
+    "name": "field-service-crm",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "forwardPorts": [8000],
+    "portsAttributes": {
+        "8000": {
+            "label": "A3 CRM",
+            "onAutoForward": "notify"
+        }
+    },
+    "postStartCommand": "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "remoteEnv": {
+        "ENV": "development",
+        "SECRET_KEY": "codespace-dev-secret-change-me-32ch",
+        "DATABASE_BACKEND": "sqlite"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python"
+            ]
+        }
+    }
+}
