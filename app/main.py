@@ -310,6 +310,8 @@ from app.routes.master import (
     router as master_router,
     master_today_page,
     master_voice_page,
+    master_voice_preview,
+    master_voice_confirm,
     onboarding_page,
 )
 from app.routes.calls import (

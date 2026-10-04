@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Новая запись из голоса{% endblock %}
+
+{% block head %}
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;overflow-x:hidden}
+.container{max-width:760px;width:100%;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-bottom:18px;color:#2563eb;text-decoration:none;font-weight:900}
+.card{background:white;padding:22px;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:16px}
+h1{margin:0 0 6px;font-size:28px;word-break:break-word}
+h2{margin:0 0 12px;font-size:20px}
+.meta{font-size:14px;color:#6b7280;font-weight:800}
+.letter{margin-top:12px;font-size:15px;color:#374151;white-space:pre-wrap;word-break:break-word}
+label{display:block;margin-top:14px;font-weight:900;color:#374151}
+input,textarea,select{width:100%;min-height:48px;padding:12px;border-radius:14px;font-size:16px;margin-top:6px;border:1px solid #d1d5db;background:white;font-family:inherit}
+textarea{min-height:110px;resize:vertical}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:52px;padding:14px;border-radius:14px;font-size:17px;margin-top:14px;border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer;text-decoration:none}
+.slots{margin-top:10px}
+.slot{display:inline-flex;width:auto;min-height:44px;margin:6px 8px 0 0;padding:10px 14px;background:#f0f9ff;color:#075985;border:1px solid #bae6fd;font-size:14px}
+@media(max-width:700px){.container{padding:16px 14px 92px}h1{font-size:24px}.card{padding:16px;border-radius:18px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+<a href="/master/voice" class="back">← Голос</a>
+
+<div class="card">
+<h1>Новая запись</h1>
+<div class="meta">Проверьте данные из голосового текста — запись будет создана после подтверждения.</div>
+{% if text %}
+<div class="letter">{{ text }}</div>
+{% endif %}
+</div>
+
+<div class="card">
+<form method="post" action="/master/voice/confirm">
+<input type="hidden" name="source_text" value="{{ text }}">
+
+<label>Клиент</label>
+<input type="text" name="client_name" value="{{ parsed.get('name', '') }}" required>
+
+<label>Телефон</label>
+<input type="text" name="phone" value="{{ parsed.get('phone', '') }}">
+
+<label>Адрес</label>
+<input type="text" name="address" value="{{ parsed.get('address', '') }}">
+
+<label>Дата</label>
+<input type="date" name="task_date" id="task_date_input" value="{{ parsed.get('date', '') }}">
+
+{% if slot_suggestions %}
+<div class="slots">
+{% for slot in slot_suggestions %}
+<button type="button" class="slot" onclick="document.getElementById('task_date_input').value='{{ slot['date'] }}';var s=document.getElementById('worker_select');if(s){s.value='{{ slot['worker'] }}'}">{{ slot["date"] }} · {{ slot["worker"] }} · свободно: {{ slot["free_slots"] }}</button>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if workers %}
+<label>{{ settings["worker_label"] if settings is defined and settings["worker_label"] else "Исполнитель" }}</label>
+<select name="worker" id="worker_select">
+<option value="">— Не назначать —</option>
+{% for worker in workers %}
+<option value="{{ worker['username'] }}"{% if worker['username'] == recommended_worker %} selected{% endif %}>{{ worker["username"] }}{% if worker['username'] == recommended_worker %} — рекомендуем{% endif %}</option>
+{% endfor %}
+</select>
+{% endif %}
+
+<label>Описание</label>
+<textarea name="description">{{ text }}</textarea>
+
+<label>Цена</label>
+<input type="text" name="price" value="">
+
+<button type="submit">Подтвердить и создать</button>
+</form>
+</div>
+
+</div>
+{% endblock %}

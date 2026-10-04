@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse
 
 from app.database import connect
 from app.deps import get_user_company_id
+from app.services.email_inbox import find_or_create_inbox_client
 
 FEATURE_DEFINITIONS = [
     ("tasks", "Заявки", "Создание и ведение заявок"),
@@ -610,3 +611,94 @@ def build_settings_links():
         "custom_fields": "/custom-fields",
         "history": "/settings/history",
     }
+
+
+def create_task_from_draft(
+    company_id,
+    username,
+    role,
+    client_name,
+    phone="",
+    email="",
+    address="",
+    task_date="",
+    description="",
+    price="",
+    worker="",
+    source_kind="",
+    details="",
+):
+    client_id = find_or_create_inbox_client(
+        company_id, client_name, phone, email, address
+    )
+
+    conn = connect()
+    c = conn.cursor()
+
+    try:
+        c.execute("""
+        INSERT INTO tasks (
+            company_id,
+            client_id,
+            client,
+            phone,
+            address,
+            description,
+            task_date,
+            worker,
+            workers,
+            priority,
+            price,
+            status,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            client_id,
+            client_name,
+            phone,
+            address,
+            description,
+            task_date,
+            worker,
+            worker,
+            "Обычный",
+            price,
+            "Новая",
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+
+        task_id = c.lastrowid
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    if worker:
+        create_notification(
+            company_id,
+            worker,
+            f"Назначена новая заявка #{task_id}",
+            (
+                f"Клиент: {client_name}. "
+                f"Дата: {task_date or 'не указана'}."
+            ),
+            f"/task/{task_id}",
+        )
+
+    action_labels = {
+        "voice": "Создано из голосового ввода",
+        "email": "Создано из письма",
+    }
+    log_task_activity(
+        task_id,
+        username,
+        role,
+        action_labels.get(source_kind, "Создано из черновика"),
+        details[:200],
+    )
+
+    return task_id, client_id

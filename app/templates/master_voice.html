@@ -29,6 +29,16 @@ button.save{display:flex;align-items:center;justify-content:center;width:100%;mi
 <h1>Голос</h1>
 <div class="meta">Нажмите кнопку и скажите, что нужно сделать. Текст сохранится как заметка помощника — из неё можно создать запись.</div>
 
+{% if request.query_params.get("error") == "empty" %}
+<div class="status" style="color:#991b1b">Сначала произнесите или введите текст.</div>
+{% endif %}
+{% if request.query_params.get("error") == "client_required" %}
+<div class="status" style="color:#991b1b">Укажите имя клиента в форме записи.</div>
+{% endif %}
+{% if request.query_params.get("error") == "invalid_date" %}
+<div class="status" style="color:#991b1b">Дата должна быть в формате ГГГГ-ММ-ДД.</div>
+{% endif %}
+
 <button type="button" class="mic" id="micButton">🎙 Говорить</button>
 <div class="status" id="voiceStatus">Голосовой ввод работает в Chrome и Safari на русском языке.</div>
 
@@ -36,6 +46,11 @@ button.save{display:flex;align-items:center;justify-content:center;width:100%;mi
 <textarea name="note" id="voiceText" placeholder="Текст появится здесь..."></textarea>
 <input type="hidden" name="priority" value="normal">
 <button type="submit" class="save">Сохранить заметку</button>
+</form>
+
+<form method="post" action="/master/voice/preview">
+<textarea name="note" id="voiceDraftText" style="display:none"></textarea>
+<button type="submit" class="save" style="background:#7c3aed" onclick="document.getElementById('voiceDraftText').value=document.getElementById('voiceText').value">🎙 Разобрать в запись</button>
 </form>
 </div>
 

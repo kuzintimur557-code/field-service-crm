@@ -179,6 +179,88 @@ def main():
         conn.close()
         assert mode == "company"
 
+        # --- voice to task flow ---
+
+        voice_text = (
+            "Запиши клиента Анну на уборку квартиры завтра. "
+            "Адрес: ул. Мира, д. 5. Телефон 8 900 111-22-33."
+        )
+
+        # empty text -> back to voice page
+        response = asyncio.run(crm.master_voice_preview(
+            request_with_user("/master/voice/preview", username="boss", form={
+                "note": "",
+            })
+        ))
+        assert response.status_code == 302
+        assert "error=empty" in response.headers["location"]
+
+        # preview parses the spoken text into draft fields
+        preview = asyncio.run(crm.master_voice_preview(
+            request_with_user("/master/voice/preview", username="boss", form={
+                "note": voice_text,
+            })
+        ))
+        assert preview.status_code == 200
+        html = preview.body.decode()
+        assert "Анну" in html or "Анна" in html
+        assert "+79001112233" in html
+        assert "Мира" in html
+
+        # no task is created before confirmation
+        conn = connect()
+        c = conn.cursor()
+        before_count = c.execute(
+            "SELECT COUNT(*) AS count FROM tasks WHERE company_id=1"
+        ).fetchone()["count"]
+        conn.close()
+
+        # confirm creates client + task only after approval
+        confirmed = asyncio.run(crm.master_voice_confirm(
+            request_with_user("/master/voice/confirm", username="boss", form={
+                "client_name": "Анна",
+                "phone": "+79001112233",
+                "address": "ул. Мира, д. 5",
+                "task_date": "",
+                "description": voice_text,
+                "price": "2000",
+                "worker": "worker",
+                "source_text": voice_text,
+            })
+        ))
+        assert confirmed.status_code == 302
+        location = confirmed.headers["location"]
+        assert location.startswith("/task/")
+        voice_task_id = int(location.rsplit("/", 1)[1])
+
+        conn = connect()
+        c = conn.cursor()
+        voice_task = c.execute(
+            "SELECT * FROM tasks WHERE id=?", (voice_task_id,)
+        ).fetchone()
+        after_count = c.execute(
+            "SELECT COUNT(*) AS count FROM tasks WHERE company_id=1"
+        ).fetchone()["count"]
+        voice_activity = c.execute("""
+        SELECT * FROM task_activity
+        WHERE task_id=? AND action='Создано из голосового ввода'
+        """, (voice_task_id,)).fetchone()
+        conn.close()
+
+        assert after_count == before_count + 1
+        assert voice_task["client"] == "Анна"
+        assert voice_task["worker"] == "worker"
+        assert voice_task["price"] == "2000"
+        assert voice_activity is not None
+
+        # client name is required
+        rejected = asyncio.run(crm.master_voice_confirm(
+            request_with_user("/master/voice/confirm", username="boss", form={
+                "client_name": "",
+            })
+        ))
+        assert "error=client_required" in rejected.headers["location"]
+
     print("Master mode smoke passed.")
 
 
