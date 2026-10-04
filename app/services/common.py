@@ -600,3 +600,13 @@ BUSINESS_PRESETS = {
 
 def get_industry_label(industry):
     return dict(INDUSTRY_OPTIONS).get(industry, industry or "")
+
+
+def build_settings_links():
+    return {
+        "home": "/",
+        "debug": "/debug",
+        "billing": "/billing",
+        "custom_fields": "/custom-fields",
+        "history": "/settings/history",
+    }

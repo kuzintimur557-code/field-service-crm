@@ -21,6 +21,7 @@ from app.services.common import (
     get_company_settings,
     get_company_mode,
     get_industry_label,
+    build_settings_links,
     get_role_title,
 )
 from app.services.plans import (
@@ -51,12 +52,6 @@ def send_message(*args, **kwargs):
 
 def apply_business_preset(*args, **kwargs):
     from app.main import apply_business_preset as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def build_settings_links(*args, **kwargs):
-    from app.main import build_settings_links as _impl
 
     return _impl(*args, **kwargs)
 
