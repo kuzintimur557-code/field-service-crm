@@ -52,6 +52,16 @@ button.save{display:flex;align-items:center;justify-content:center;width:100%;mi
 <textarea name="note" id="voiceDraftText" style="display:none"></textarea>
 <button type="submit" class="save" style="background:#7c3aed" onclick="document.getElementById('voiceDraftText').value=document.getElementById('voiceText').value">🎙 Разобрать в запись</button>
 </form>
+
+<form method="post" action="/master/voice/search">
+<textarea name="note" id="voiceSearchText" style="display:none"></textarea>
+<button type="submit" class="save" style="background:#0f766e" onclick="document.getElementById('voiceSearchText').value=document.getElementById('voiceText').value">🔍 Найти заявку</button>
+</form>
+
+<form method="post" action="/master/voice/remind">
+<textarea name="note" id="voiceRemindText" style="display:none"></textarea>
+<button type="submit" class="save" style="background:#b45309" onclick="document.getElementById('voiceRemindText').value=document.getElementById('voiceText').value">⏰ Напомнить</button>
+</form>
 </div>
 
 </div>

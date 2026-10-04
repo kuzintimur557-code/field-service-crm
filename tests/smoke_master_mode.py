@@ -261,6 +261,55 @@ def main():
         ))
         assert "error=client_required" in rejected.headers["location"]
 
+        # --- voice search ---
+
+        search_page = asyncio.run(crm.master_voice_search(
+            request_with_user("/master/voice/search", username="boss", form={
+                "note": "Найди заявку Анна",
+            })
+        ))
+        assert search_page.status_code == 200
+        search_html = search_page.body.decode()
+        assert "Анна" in search_html
+        assert f"/task/{voice_task_id}" in search_html
+
+        empty_search = asyncio.run(crm.master_voice_search(
+            request_with_user("/master/voice/search", username="boss", form={
+                "note": "",
+            })
+        ))
+        assert "error=empty" in empty_search.headers["location"]
+
+        # --- voice reminders ---
+
+        reminder = asyncio.run(crm.master_voice_remind(
+            request_with_user("/master/voice/remind", username="boss", form={
+                "note": "Срочно напомни перезвонить Анне завтра",
+            })
+        ))
+        assert reminder.status_code == 302
+        assert "/ai/assistant" in reminder.headers["location"]
+
+        conn = connect()
+        c = conn.cursor()
+        voice_note = c.execute("""
+        SELECT * FROM ai_assistant_notes
+        WHERE company_id=1 AND note LIKE '%перезвонить Анне%'
+        ORDER BY id DESC LIMIT 1
+        """).fetchone()
+        conn.close()
+
+        assert voice_note is not None
+        assert voice_note["priority"] == "urgent"
+        assert voice_note["follow_up_date"] != ""
+
+        empty_remind = asyncio.run(crm.master_voice_remind(
+            request_with_user("/master/voice/remind", username="boss", form={
+                "note": "",
+            })
+        ))
+        assert "error=empty" in empty_remind.headers["location"]
+
     print("Master mode smoke passed.")
 
 

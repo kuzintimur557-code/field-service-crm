@@ -1,6 +1,6 @@
 """Private master mode and first-launch onboarding routes."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -19,6 +19,12 @@ from app.services.email_inbox import (
 )
 from app.services.subscriptions import get_company_subscription
 from app.templating import templates
+
+
+def _main_attr(name):
+    from app import main
+
+    return getattr(main, name)
 
 router = APIRouter()
 
@@ -348,3 +354,178 @@ async def master_voice_confirm(request: Request):
     )
 
     return RedirectResponse(f"/task/{task_id}", status_code=302)
+
+
+@router.post("/master/voice/search")
+async def master_voice_search(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
+
+    form = await request.form()
+    text = str(form.get("note") or "").strip()[:300]
+
+    if not text:
+        return RedirectResponse("/master/voice?error=empty", status_code=302)
+
+    parsed = extract_email_fields(text, "", "", [])
+
+    name_guess = ""
+    stopwords = {
+        "найди", "найти", "заявку", "заявка", "напомни", "напомнить",
+        "завтра", "послезавтра", "сегодня", "клиент", "клиента",
+        "запиши", "записать", "покажи", "показать", "где", "моя",
+        "мои", "по", "на", "в", "у", "с", "для",
+    }
+    candidates = [
+        word.strip(",.!?:;")
+        for word in text.split()
+        if len(word.strip(",.!?:;")) >= 3
+        and word.strip(",.!?:;")[0].isupper()
+        and word.strip(",.!?:;").lower() not in stopwords
+    ]
+    if candidates:
+        name_guess = candidates[-1]
+
+    search_parts = [
+        part for part in [
+            parsed.get("phone"),
+            parsed.get("name") or name_guess,
+            parsed.get("address"),
+        ]
+        if part
+    ]
+    if not search_parts:
+        search_parts = [text]
+
+    results = []
+    conn = connect()
+    c = conn.cursor()
+
+    for part in search_parts[:2]:
+        pattern = f"%{part[:60]}%"
+        rows = c.execute("""
+        SELECT id, client, phone, address, task_date, status
+        FROM tasks
+        WHERE company_id=?
+          AND COALESCE(archived, 0)=0
+          AND (
+            client LIKE ?
+            OR phone LIKE ?
+            OR address LIKE ?
+            OR description LIKE ?
+          )
+        ORDER BY id DESC
+        LIMIT 10
+        """, (company_id, pattern, pattern, pattern, pattern)).fetchall()
+
+        for row in rows:
+            if row["id"] not in {item["id"] for item in results}:
+                results.append(dict(row))
+
+        if results:
+            break
+
+    parsed_date = parsed.get("date", "")
+    if parsed_date:
+        results = [
+            item for item in results
+            if not item.get("task_date")
+            or str(item["task_date"] or "").startswith(parsed_date)
+        ] or results
+
+    conn.close()
+
+    return templates.TemplateResponse(
+        request,
+        "master_voice_search.html",
+        {
+            "request": request,
+            "username": username,
+            "role": role,
+            "settings": settings,
+            "links": build_dashboard_links(),
+            "text": text,
+            "results": results[:10],
+        }
+    )
+
+
+@router.post("/master/voice/remind")
+async def master_voice_remind(request: Request):
+
+    username = get_user(request)
+
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+
+    form = await request.form()
+    text = str(form.get("note") or "").strip()[:1000]
+
+    if not text:
+        return RedirectResponse("/master/voice?error=empty", status_code=302)
+
+    parsed = extract_email_fields(text, "", "", [])
+    follow_up_date = parsed.get("date", "")
+
+    if not follow_up_date:
+        follow_up_date = (datetime.now() + timedelta(days=1)).strftime(
+            "%Y-%m-%d"
+        )
+
+    priority = "urgent" if "срочно" in text.lower() else "normal"
+
+    conn = connect()
+    c = conn.cursor()
+
+    try:
+        c.execute("""
+        INSERT INTO ai_assistant_notes (
+            company_id, username, note, priority, follow_up_date, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            username,
+            text,
+            priority,
+            follow_up_date,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+        conn.commit()
+        note_id = c.lastrowid
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    _main_attr("log_ai_assistant_event")(
+        company_id,
+        note_id,
+        username,
+        "created",
+        f"Голосовое напоминание: {text[:120]}",
+    )
+
+    return RedirectResponse(
+        f"/ai/assistant?reminded=1&note_id={note_id}",
+        status_code=302,
+    )
