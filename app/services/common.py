@@ -5,7 +5,7 @@ circular dependency on the application module.
 """
 
 import calendar
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi.responses import RedirectResponse
 
@@ -702,3 +702,356 @@ def create_task_from_draft(
     )
 
     return task_id, client_id
+
+
+SYSTEM_EVENT_RETENTION_DAYS = 90
+
+SYSTEM_EVENT_RETENTION_KEEP = 200
+
+SYSTEM_EVENT_ALERT_HOURS = 24
+
+HTTP_SLOW_REQUEST_THRESHOLD_MS = 1500
+
+HTTP_OBSERVABILITY_IGNORED_PATH_PREFIXES = ("/static",)
+
+
+def format_file_size(size):
+    size = int(size or 0)
+    units = ["байт", "КБ", "МБ", "ГБ"]
+    value = float(size)
+
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == "байт":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value = value / 1024
+
+    return f"{size} байт"
+
+
+def format_backup_age(age_hours):
+    if age_hours is None:
+        return "нет"
+
+    if age_hours < 1:
+        return "меньше часа"
+
+    if age_hours < 24:
+        return f"{int(age_hours)} ч"
+
+    return f"{int(age_hours // 24)} д"
+
+
+def log_system_event(
+    event_type,
+    severity,
+    username="",
+    source="",
+    message="",
+    details="",
+):
+    conn = None
+    normalized_severity = normalize_system_event_severity(severity)
+
+    try:
+        conn = connect()
+        conn.execute("""
+        INSERT INTO system_events (
+            event_type,
+            severity,
+            username,
+            source,
+            message,
+            details,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(event_type or "system")[:80],
+            normalized_severity,
+            str(username or "")[:120],
+            str(source or "")[:120],
+            str(message or "")[:300],
+            str(details or "")[:1000],
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+        conn.commit()
+    except get_database_error_types() as error:
+        print("System event log error:", error.__class__.__name__)
+    finally:
+        if conn:
+            conn.close()
+
+
+def log_http_request_event(request, response, request_id="", duration_ms=0):
+    status_code = getattr(response, "status_code", 0)
+
+    try:
+        path = request.url.path
+    except Exception:
+        path = ""
+
+    if not should_log_http_request(path, status_code, duration_ms):
+        return
+
+    username = ""
+
+    try:
+        username = get_user(request) or ""
+    except Exception:
+        username = ""
+
+    try:
+        method = request.method
+    except Exception:
+        method = ""
+
+    try:
+        status_code = int(status_code or 0)
+    except (TypeError, ValueError):
+        status_code = 0
+
+    severity = "critical" if status_code >= 500 else "warning"
+
+    if status_code >= 500:
+        message = f"HTTP ошибка {status_code}"
+    elif status_code >= 400:
+        message = f"HTTP предупреждение {status_code}"
+    else:
+        message = "Медленный HTTP запрос"
+
+    details = (
+        f"request_id={request_id}; method={method}; path={path}; "
+        f"status={status_code}; duration_ms={max(0, int(duration_ms or 0))}"
+    )
+    log_system_event(
+        "http_request",
+        severity,
+        username,
+        "http",
+        message,
+        details,
+    )
+
+
+def get_recent_system_event_summary(hours=SYSTEM_EVENT_ALERT_HOURS):
+    cutoff = (
+        datetime.now() - timedelta(hours=hours)
+    ).strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    summary = conn.execute("""
+    SELECT
+        COUNT(*) AS total_count,
+        SUM(CASE WHEN severity='critical' THEN 1 ELSE 0 END)
+            AS critical_count,
+        SUM(
+            CASE
+                WHEN event_type='http_request'
+                THEN 1
+                ELSE 0
+            END
+        ) AS http_request_count,
+        SUM(
+            CASE
+                WHEN event_type='http_request'
+                     AND severity='critical'
+                THEN 1
+                ELSE 0
+            END
+        ) AS http_critical_count,
+        SUM(
+            CASE
+                WHEN event_type='http_request'
+                     AND severity='warning'
+                THEN 1
+                ELSE 0
+            END
+        ) AS http_warning_count,
+        SUM(
+            CASE
+                WHEN event_type='http_request'
+                     AND message='Медленный HTTP запрос'
+                THEN 1
+                ELSE 0
+            END
+        ) AS slow_request_count,
+        SUM(
+            CASE
+                WHEN event_type='runtime_error'
+                     OR source='runtime'
+                THEN 1
+                ELSE 0
+            END
+        ) AS runtime_error_count
+    FROM system_events
+    WHERE created_at >= ?
+    """, (cutoff,)).fetchone()
+    latest_critical = conn.execute("""
+    SELECT *
+    FROM system_events
+    WHERE created_at >= ?
+      AND severity='critical'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (cutoff,)).fetchone()
+    latest_http_request = conn.execute("""
+    SELECT *
+    FROM system_events
+    WHERE created_at >= ?
+      AND event_type='http_request'
+    ORDER BY id DESC
+    LIMIT 1
+    """, (cutoff,)).fetchone()
+    conn.close()
+
+    latest_event = dict(latest_critical) if latest_critical else {}
+    latest_http = dict(latest_http_request) if latest_http_request else {}
+
+    if latest_event:
+        latest_event["severity_label"] = system_event_severity_label(
+            latest_event.get("severity"),
+        )
+
+    if latest_http:
+        latest_http["severity_label"] = system_event_severity_label(
+            latest_http.get("severity"),
+        )
+
+    return {
+        "hours": hours,
+        "total_count": summary["total_count"] or 0,
+        "critical_count": summary["critical_count"] or 0,
+        "http_request_count": summary["http_request_count"] or 0,
+        "http_critical_count": summary["http_critical_count"] or 0,
+        "http_warning_count": summary["http_warning_count"] or 0,
+        "slow_request_count": summary["slow_request_count"] or 0,
+        "runtime_error_count": summary["runtime_error_count"] or 0,
+        "latest_critical": latest_event,
+        "latest_http_request": latest_http,
+    }
+
+
+def cleanup_system_events(username):
+    candidates = get_system_event_cleanup_candidates()
+    candidate_ids = [row["id"] for row in candidates]
+
+    if not candidate_ids:
+        log_system_event(
+            "system_events",
+            "info",
+            username,
+            "system",
+            "Очистка журнала: без изменений",
+            "Нет старых системных событий для удаления.",
+        )
+        return {
+            "deleted_count": 0,
+        }
+
+    placeholders = ",".join("?" for _ in candidate_ids)
+    conn = connect()
+    conn.execute(
+        f"DELETE FROM system_events WHERE id IN ({placeholders})",
+        candidate_ids,
+    )
+    conn.commit()
+    conn.close()
+    log_system_event(
+        "system_events",
+        "ok",
+        username,
+        "system",
+        "Очистка журнала: выполнено",
+        f"Удалено старых событий: {len(candidate_ids)}.",
+    )
+
+    return {
+        "deleted_count": len(candidate_ids),
+    }
+
+
+def request_prefers_json(request):
+    path = getattr(request.url, "path", "") if request else ""
+    accept = ""
+
+    try:
+        accept = request.headers.get("accept", "")
+    except Exception:
+        accept = ""
+
+    return path.startswith("/api/") or "application/json" in accept
+
+
+def build_error_links():
+    return {
+        "home": "/",
+        "system": "/system",
+        "admin": "/admin",
+    }
+
+
+def should_log_http_request(path, status_code, duration_ms):
+    normalized_path = str(path or "")
+
+    if normalized_path.startswith(HTTP_OBSERVABILITY_IGNORED_PATH_PREFIXES):
+        return False
+
+    try:
+        status_code = int(status_code or 0)
+    except (TypeError, ValueError):
+        status_code = 0
+
+    try:
+        duration_ms = int(duration_ms or 0)
+    except (TypeError, ValueError):
+        duration_ms = 0
+
+    return status_code >= 400 or duration_ms >= HTTP_SLOW_REQUEST_THRESHOLD_MS
+
+
+def normalize_system_event_severity(severity):
+    return severity if severity in (
+        "ok",
+        "info",
+        "warning",
+        "critical",
+    ) else "info"
+
+
+def system_event_severity_label(severity):
+    labels = {
+        "ok": "Успешно",
+        "info": "Инфо",
+        "warning": "Внимание",
+        "critical": "Критично",
+    }
+    return labels.get(severity, "Инфо")
+
+
+def get_system_event_cleanup_candidates(now=None):
+    now = now or datetime.now()
+    cutoff = (
+        now - timedelta(days=SYSTEM_EVENT_RETENTION_DAYS)
+    ).strftime("%Y-%m-%d %H:%M")
+    conn = connect()
+    keep_rows = conn.execute("""
+    SELECT id
+    FROM system_events
+    ORDER BY id DESC
+    LIMIT ?
+    """, (SYSTEM_EVENT_RETENTION_KEEP,)).fetchall()
+    keep_ids = {row["id"] for row in keep_rows}
+    rows = conn.execute("""
+    SELECT id, created_at
+    FROM system_events
+    WHERE created_at < ?
+    ORDER BY id ASC
+    """, (cutoff,)).fetchall()
+    conn.close()
+
+    return [
+        row
+        for row in rows
+        if row["id"] not in keep_ids
+    ]
