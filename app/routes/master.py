@@ -216,28 +216,7 @@ async def master_voice_page(request: Request):
     )
 
 
-@router.post("/master/voice/preview")
-async def master_voice_preview(request: Request):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    settings = get_company_settings(company_id)
-
-    form = await request.form()
-    text = str(form.get("note") or "").strip()[:5000]
-
-    if not text:
-        return RedirectResponse("/master/voice?error=empty", status_code=302)
-
+async def _voice_task_preview(request, username, role, company_id, settings, text):
     parsed = extract_email_fields(
         text,
         "",
@@ -356,28 +335,7 @@ async def master_voice_confirm(request: Request):
     return RedirectResponse(f"/task/{task_id}", status_code=302)
 
 
-@router.post("/master/voice/search")
-async def master_voice_search(request: Request):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-    settings = get_company_settings(company_id)
-
-    form = await request.form()
-    text = str(form.get("note") or "").strip()[:300]
-
-    if not text:
-        return RedirectResponse("/master/voice?error=empty", status_code=302)
-
+async def _voice_search(request, username, role, company_id, settings, text):
     parsed = extract_email_fields(text, "", "", [])
 
     name_guess = ""
@@ -461,27 +419,7 @@ async def master_voice_search(request: Request):
     )
 
 
-@router.post("/master/voice/remind")
-async def master_voice_remind(request: Request):
-
-    username = get_user(request)
-
-    if not username:
-        return RedirectResponse("/login", status_code=302)
-
-    role = get_role(username)
-
-    if role not in ("boss", "manager"):
-        return RedirectResponse("/", status_code=302)
-
-    company_id = get_user_company_id(username)
-
-    form = await request.form()
-    text = str(form.get("note") or "").strip()[:1000]
-
-    if not text:
-        return RedirectResponse("/master/voice?error=empty", status_code=302)
-
+async def _voice_remind(request, username, role, company_id, text):
     parsed = extract_email_fields(text, "", "", [])
     follow_up_date = parsed.get("date", "")
 
@@ -529,3 +467,132 @@ async def master_voice_remind(request: Request):
         f"/ai/assistant?reminded=1&note_id={note_id}",
         status_code=302,
     )
+
+
+def _classify_voice_intent(text):
+    lowered = str(text or "").lower()
+
+    if any(word in lowered for word in (
+        "напомни", "напомнить", "не забудь", "напоминание", "позвони мне",
+    )):
+        return "remind"
+
+    if any(word in lowered for word in (
+        "найди", "найти", "поищи", "покажи заявку", "покажи запись",
+        "открой заявку", "где заявка", "статус заявки",
+    )):
+        return "search"
+
+    if any(word in lowered for word in (
+        "запиши", "записать", "запись", "заявк", "создай", "выезд",
+        "приём", "прием", "новый клиент", "клиента на",
+    )):
+        return "task"
+
+    return "note"
+
+
+async def _voice_auth(request):
+    username = get_user(request)
+
+    if not username:
+        return None, None, None, RedirectResponse("/login", status_code=302)
+
+    role = get_role(username)
+
+    if role not in ("boss", "manager"):
+        return None, None, None, RedirectResponse("/", status_code=302)
+
+    company_id = get_user_company_id(username)
+    settings = get_company_settings(company_id)
+    return username, role, (company_id, settings), None
+
+
+@router.post("/master/voice/preview")
+async def master_voice_preview(request: Request):
+    username, role, ctx, error = await _voice_auth(request)
+    if error:
+        return error
+    company_id, settings = ctx
+    form = await request.form()
+    text = str(form.get("note") or "").strip()[:5000]
+    if not text:
+        return RedirectResponse("/master/voice?error=empty", status_code=302)
+    return await _voice_task_preview(request, username, role, company_id, settings, text)
+
+
+@router.post("/master/voice/search")
+async def master_voice_search(request: Request):
+    username, role, ctx, error = await _voice_auth(request)
+    if error:
+        return error
+    company_id, settings = ctx
+    form = await request.form()
+    text = str(form.get("note") or "").strip()[:300]
+    if not text:
+        return RedirectResponse("/master/voice?error=empty", status_code=302)
+    return await _voice_search(request, username, role, company_id, settings, text)
+
+
+@router.post("/master/voice/remind")
+async def master_voice_remind(request: Request):
+    username, role, ctx, error = await _voice_auth(request)
+    if error:
+        return error
+    company_id, settings = ctx
+    form = await request.form()
+    text = str(form.get("note") or "").strip()[:1000]
+    if not text:
+        return RedirectResponse("/master/voice?error=empty", status_code=302)
+    return await _voice_remind(request, username, role, company_id, text)
+
+
+@router.post("/master/voice/command")
+async def master_voice_command(request: Request):
+    username, role, ctx, error = await _voice_auth(request)
+    if error:
+        return error
+    company_id, settings = ctx
+
+    form = await request.form()
+    text = str(form.get("note") or "").strip()[:5000]
+
+    if not text:
+        return RedirectResponse("/master/voice?error=empty", status_code=302)
+
+    intent = _classify_voice_intent(text)
+
+    if intent == "task":
+        return await _voice_task_preview(request, username, role, company_id, settings, text)
+    if intent == "search":
+        return await _voice_search(request, username, role, company_id, settings, text[:300])
+    if intent == "remind":
+        return await _voice_remind(request, username, role, company_id, text[:1000])
+
+    # note: save to AI assistant and open it
+    conn = connect()
+    c = conn.cursor()
+    try:
+        c.execute("""
+        INSERT INTO ai_assistant_notes (
+            company_id, username, note, priority, follow_up_date, created_at
+        )
+        VALUES (?, ?, ?, 'normal', '', ?)
+        """, (
+            company_id,
+            username,
+            text,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ))
+        conn.commit()
+        note_id = c.lastrowid
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    _main_attr("log_ai_assistant_event")(
+        company_id, note_id, username, "created", text[:120]
+    )
+    return RedirectResponse(f"/ai/assistant?note_created=1", status_code=302)

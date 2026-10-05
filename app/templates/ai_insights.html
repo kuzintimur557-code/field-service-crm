@@ -98,7 +98,7 @@
 
         <div class="card">
             <div class="label">Неоплаченная сумма</div>
-            <div class="value warning">₽{{ "%.1f"|format(unpaid_total or 0) }}</div>
+            <div class="value warning">{{ "%.1f"|format(unpaid_total or 0) }} ₽</div>
         </div>
 
         <div class="card">
@@ -177,7 +177,7 @@
                     <tr>
                         <td>{{ client.client or "Не указан" }}</td>
                         <td>{{ client.tasks_count }}</td>
-                        <td>₽{{ "%.1f"|format(client.revenue or 0) }}</td>
+                        <td>{{ "%.1f"|format(client.revenue or 0) }} ₽</td>
                     </tr>
                     {% else %}
                     <tr>

@@ -152,7 +152,7 @@ def main():
         ))
         assert page.status_code == 200
         assert "Говорить" in page.body.decode()
-        assert "/ai/assistant/notes" in page.body.decode()
+        assert "/master/voice/command" in page.body.decode()
 
         # workers stay on their own panel
         response = asyncio.run(crm.master_today_page(

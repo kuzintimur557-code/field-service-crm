@@ -331,6 +331,7 @@ from app.routes.master import (
     master_voice_confirm,
     master_voice_search,
     master_voice_remind,
+    master_voice_command,
     onboarding_page,
 )
 from app.routes.calls import (

@@ -161,7 +161,7 @@ async def ai_insights_page(request: Request):
         insights.append({
             "level": "warning",
             "title": "Есть риск неоплаты",
-            "message": f"Неоплаченная сумма: ₽{round(float(unpaid_total or 0), 1)}. Рекомендуется запустить напоминания клиентам."
+            "message": f"Неоплаченная сумма: {round(float(unpaid_total or 0), 1)} ₽. Рекомендуется запустить напоминания клиентам."
         })
 
     if weak_workers:
@@ -177,7 +177,7 @@ async def ai_insights_page(request: Request):
         insights.append({
             "level": "info",
             "title": "Клиент с низкой выручкой",
-            "message": f"{settings['client_label'] or 'Клиент'} {client['client'] or 'Не указан'} принёс ₽{round(float(client['revenue'] or 0), 1)}."
+            "message": f"{settings['client_label'] or 'Клиент'} {client['client'] or 'Не указан'} принёс {round(float(client['revenue'] or 0), 1)} ₽."
         })
 
     if not insights:
@@ -217,7 +217,7 @@ async def ai_insights_page(request: Request):
     weekly_summary.append(f"За неделю система видит {overdue_tasks} просроченных {settings['task_label'] or 'задач'}.")
 
     if unpaid_total:
-        weekly_summary.append(f"Неоплаченная сумма составляет ₽{round(float(unpaid_total or 0), 1)}.")
+        weekly_summary.append(f"Неоплаченная сумма составляет {round(float(unpaid_total or 0), 1)} ₽.")
 
     if weak_workers:
         weekly_summary.append(f"Требует внимания {settings['worker_label'] or 'сотрудник'}: {weak_workers[0]['username']}.")
@@ -698,7 +698,7 @@ async def create_ai_insights_digest(request: Request):
     message_lines = [
         "ИИ-сводка по бизнесу",
         f"Просроченные {settings['task_label'] or 'задачи'}: {overdue_tasks}",
-        f"Неоплаченная сумма: ₽{round(float(unpaid_total or 0), 1)}"
+        f"Неоплаченная сумма: {round(float(unpaid_total or 0), 1)} ₽"
     ]
 
     if overdue_tasks:

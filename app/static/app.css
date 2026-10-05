@@ -260,3 +260,29 @@ textarea{
 /* --- unified back button --- */
 .mobile-back{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:10px 16px;margin:12px 0 0;color:#2563eb;text-decoration:none;font-weight:900;font-size:16px;border-radius:14px;background:transparent}
 .mobile-back:hover{background:#eff6ff}
+
+/* --- unified inputs and buttons --- */
+input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=hidden]),
+select,textarea{
+    font-family:inherit;font-size:16px;color:#111827;
+    border:1px solid #d1d5db;border-radius:14px;background:#fff;
+    min-height:48px;padding:12px 14px;
+}
+input::placeholder,textarea::placeholder{color:#9ca3af}
+button,.btn{
+    font-family:inherit;font-weight:900;cursor:pointer;
+    min-height:48px;border-radius:14px;
+}
+
+/* --- mobile overflow fixes --- */
+@media(max-width:800px){
+    input[type=month],input[type=date],input[type=time]{width:100%}
+    form{display:block}
+    form>*{margin-bottom:10px}
+    form>.filters,form>input[type=hidden]{margin-bottom:0}
+    .btn,button,a[class*="btn"]{max-width:100%;white-space:normal;overflow-wrap:break-word}
+    .form{display:grid!important;grid-template-columns:1fr!important}
+    .filter-actions{grid-column:span 1!important;grid-template-columns:1fr!important}
+    .filters form{display:block}
+    .filters form>*{width:100%;margin-bottom:10px}
+}

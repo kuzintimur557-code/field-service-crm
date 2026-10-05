@@ -42,26 +42,29 @@ button.save{display:flex;align-items:center;justify-content:center;width:100%;mi
 <button type="button" class="mic" id="micButton">🎙 Говорить</button>
 <div class="status" id="voiceStatus">Голосовой ввод работает в Chrome и Safari на русском языке.</div>
 
-<form method="post" action="/ai/assistant/notes">
 <textarea name="note" id="voiceText" placeholder="Текст появится здесь..."></textarea>
-<input type="hidden" name="priority" value="normal">
-<button type="submit" class="save">Сохранить заметку</button>
+
+<form method="post" action="/master/voice/command">
+<textarea name="note" id="voiceCommandText" style="display:none"></textarea>
+<button type="submit" class="save" style="background:#7c3aed;font-size:19px;min-height:60px" onclick="document.getElementById('voiceCommandText').value=document.getElementById('voiceText').value">Отправить помощнику</button>
 </form>
 
-<form method="post" action="/master/voice/preview">
+<div class="meta" style="margin-top:10px">Помощник сам поймёт: «запиши…» → заявка, «найди…» → поиск, «напомни…» → напоминание, остальное → заметка.</div>
+
+<div style="display:flex;gap:10px;margin-top:14px">
+<form method="post" action="/master/voice/preview" style="flex:1">
 <textarea name="note" id="voiceDraftText" style="display:none"></textarea>
-<button type="submit" class="save" style="background:#7c3aed" onclick="document.getElementById('voiceDraftText').value=document.getElementById('voiceText').value">🎙 Разобрать в запись</button>
+<button type="submit" style="width:100%;min-height:44px;border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:12px;font-weight:900;font-size:14px" onclick="document.getElementById('voiceDraftText').value=document.getElementById('voiceText').value">Запись</button>
 </form>
-
-<form method="post" action="/master/voice/search">
+<form method="post" action="/master/voice/search" style="flex:1">
 <textarea name="note" id="voiceSearchText" style="display:none"></textarea>
-<button type="submit" class="save" style="background:#0f766e" onclick="document.getElementById('voiceSearchText').value=document.getElementById('voiceText').value">🔍 Найти заявку</button>
+<button type="submit" style="width:100%;min-height:44px;border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:12px;font-weight:900;font-size:14px" onclick="document.getElementById('voiceSearchText').value=document.getElementById('voiceText').value">Поиск</button>
 </form>
-
-<form method="post" action="/master/voice/remind">
+<form method="post" action="/master/voice/remind" style="flex:1">
 <textarea name="note" id="voiceRemindText" style="display:none"></textarea>
-<button type="submit" class="save" style="background:#b45309" onclick="document.getElementById('voiceRemindText').value=document.getElementById('voiceText').value">⏰ Напомнить</button>
+<button type="submit" style="width:100%;min-height:44px;border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:12px;font-weight:900;font-size:14px" onclick="document.getElementById('voiceRemindText').value=document.getElementById('voiceText').value">Напомнить</button>
 </form>
+</div>
 </div>
 
 </div>

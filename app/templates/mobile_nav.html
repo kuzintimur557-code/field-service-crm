@@ -17,7 +17,7 @@
     }
 
     ready(function () {
-        if (!document.querySelector(".table-wrap") && window.innerWidth <= 900) {
+        if (window.innerWidth <= 900) {
             var tables = document.querySelectorAll("table");
             for (var i = 0; i < tables.length; i++) {
                 var table = tables[i];

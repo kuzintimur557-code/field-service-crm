@@ -120,7 +120,7 @@ th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb}
     </div>
     <div class="stat">
         <div class="stat-title">Не оплачено</div>
-        <div class="stat-value">₽{{ "%.1f"|format(metrics["unpaid_total"] or 0) }}</div>
+        <div class="stat-value">{{ "%.1f"|format(metrics["unpaid_total"] or 0) }} ₽</div>
     </div>
     <div class="stat">
         <div class="stat-title">{{ settings["worker_label"] or "Сотрудники" }}</div>
