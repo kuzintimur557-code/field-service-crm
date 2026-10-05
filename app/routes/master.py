@@ -187,6 +187,11 @@ async def master_today_page(request: Request):
     )
 
 
+@router.get("/voice", response_class=HTMLResponse)
+async def voice_page(request: Request):
+    return await master_voice_page(request)
+
+
 @router.get("/master/voice", response_class=HTMLResponse)
 async def master_voice_page(request: Request):
 

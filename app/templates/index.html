@@ -38,6 +38,8 @@ button{border:0;background:#2563eb;color:white;font-weight:900;cursor:pointer}
 .badge{display:inline-block;padding:7px 12px;border-radius:999px;font-weight:900;background:#dbeafe;color:#1d4ed8}
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 15px;border-radius:13px;background:#2563eb;color:white;text-decoration:none;font-weight:900;text-align:center}
 .empty{text-align:center;color:#6b7280;font-weight:900;padding:30px}
+.voice-cta{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:64px;margin-top:14px;padding:14px 18px;border-radius:18px;background:#7c3aed;color:#fff;text-decoration:none;font-size:20px;font-weight:900}
+.voice-cta .mic{font-size:26px}
 .alert{padding:18px;border:1px solid transparent;border-radius:18px;font-weight:900;margin-bottom:18px}
 .alert a{display:inline-block;margin-left:12px;text-decoration:underline}
 .alert.danger{background:#fee2e2;color:#991b1b;border-color:#fecaca}
@@ -72,6 +74,10 @@ h1{font-size:30px}
 <div class="header">
     <h1>Бизнес CRM</h1>
     <div class="subtitle">Вы вошли как: {{ username }} / {{ role_label(role) }}</div>
+
+    {% if role in ["boss", "manager"] %}
+    <a class="voice-cta" href="{{ links['voice'] }}"><span class="mic">🎙</span>Голосовой помощник</a>
+    {% endif %}
 
     <div class="nav">
         {% set f = features if features is defined else {} %}

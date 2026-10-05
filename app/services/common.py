@@ -203,6 +203,7 @@ def build_dashboard_links():
         "home": "/",
         "my_tasks": "/my-tasks",
         "create_task": "/create-task",
+        "voice": "/voice",
         "calendar": "/calendar",
         "sla": "/sla",
         "clients": "/clients",
