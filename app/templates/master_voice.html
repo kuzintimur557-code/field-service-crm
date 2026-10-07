@@ -108,7 +108,15 @@ button.save{display:flex;align-items:center;justify-content:center;width:100%;mi
         recording = false;
         button.classList.remove("recording");
         button.textContent = "🎙 Говорить";
-        status.textContent = "Ошибка распознавания: " + (event.error || "неизвестно");
+        var messages = {
+            "not-allowed": "Нет доступа к микрофону. Разрешите микрофон для этого сайта: значок замка слева от адреса → Настройки сайта → Микрофон → Разрешить, затем обновите страницу.",
+            "service-not-allowed": "Голосовой ввод недоступен в этом браузере. Откройте страницу в Safari (iPhone/Mac) или Chrome с разрешённым микрофоном.",
+            "network": "Нет связи с сервисом распознавания. Проверьте интернет и попробуйте снова.",
+            "no-speech": "Не расслышал. Попробуйте ещё раз, говорите чётче и ближе к микрофону.",
+            "audio-capture": "Микрофон не найден. Проверьте, что микрофон подключён и разрешён в настройках системы.",
+            "aborted": "Распознавание прервано. Нажмите ещё раз."
+        };
+        status.textContent = messages[event.error] || ("Ошибка распознавания: " + (event.error || "неизвестно"));
     };
 
     recognition.onend = function () {
