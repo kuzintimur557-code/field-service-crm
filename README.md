@@ -206,7 +206,6 @@ python3 tests/smoke_security.py
 ```
 
 ## Production endpoints
-
 Публичные:
 
 - `GET /health` - приложение и база отвечают
@@ -312,6 +311,7 @@ health/readiness endpoints, deployed commit и security baseline. Настрой
 ## Документы
 
 - [Production Launch Checklist](docs/production_launch_checklist.md)
+- [VPS Deploy (Docker)](docs/vps_deploy.md)
 - [Email Inbox](docs/email_inbox.md)
 - [AI Calls](docs/ai_calls.md)
 - [A3 Master Mode](docs/a3_master.md)

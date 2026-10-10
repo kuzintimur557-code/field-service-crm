@@ -177,12 +177,46 @@ jobs:
       - name: Run Alembic migrations on PostgreSQL
         run: alembic stamp 0001 && alembic upgrade head
 
+  docker:
+    name: Docker image build and health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t field-service-crm:ci .
+
+      - name: Run container and check health
+        run: |
+          docker run -d --name crm \
+            -e ENV=test \
+            -e SECRET_KEY=ci-docker-secret-key-32chars \
+            -e DATABASE_BACKEND=sqlite \
+            -e DATABASE_URL= \
+            -p 8000:8000 \
+            field-service-crm:ci
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
+              echo "health OK"
+              docker logs crm | tail -5
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "container failed health check"
+          docker logs crm | tail -30
+          exit 1
+
   release-gate:
     name: Production release gate
     needs:
       - dependency-audit
       - smoke
       - postgres-schema-smoke
+      - docker
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -193,10 +227,13 @@ jobs:
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           SQLITE_SMOKE_RESULT: ${{ needs.smoke.result }}
           POSTGRESQL_SMOKE_RESULT: ${{ needs.postgres-schema-smoke.result }}
+          DOCKER_RESULT: ${{ needs.docker.result }}
         run: |
           echo "Dependency audit: $DEPENDENCY_AUDIT_RESULT" >> "$GITHUB_STEP_SUMMARY"
           echo "SQLite/security smoke: $SQLITE_SMOKE_RESULT" >> "$GITHUB_STEP_SUMMARY"
           echo "PostgreSQL smoke: $POSTGRESQL_SMOKE_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          echo "Docker image: $DOCKER_RESULT" >> "$GITHUB_STEP_SUMMARY"
           test "$DEPENDENCY_AUDIT_RESULT" = "success"
           test "$SQLITE_SMOKE_RESULT" = "success"
           test "$POSTGRESQL_SMOKE_RESULT" = "success"
+          test "$DOCKER_RESULT" = "success"
