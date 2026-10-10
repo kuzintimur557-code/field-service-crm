@@ -29,7 +29,11 @@ def get_database_url():
             raise RuntimeError(
                 "DATABASE_URL is required for postgresql migrations"
             )
-        return database_url
+        if database_url.startswith("postgres://"):
+            database_url = "postgresql://" + database_url[len("postgres://"):]
+        return database_url.replace(
+            "postgresql://", "postgresql+psycopg://", 1
+        )
 
     data_dir = Path(os.getenv("DATA_DIR", "."))
     db_path = data_dir / "crm.db"
