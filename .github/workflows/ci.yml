@@ -107,6 +107,9 @@ jobs:
       - name: Run migrations smoke
         run: python tests/smoke_migrations.py
 
+      - name: Run email poller smoke
+        run: python tests/smoke_email_poller.py
+
       - name: Run error monitoring smoke
         run: python tests/smoke_error_monitoring.py
 
